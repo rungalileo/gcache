@@ -586,13 +586,13 @@ files = [
 
 [[package]]
 name = "jsonpickle"
-version = "4.0.1"
+version = "4.0.2"
 description = "jsonpickle encodes/decodes any Python object to/from JSON"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "jsonpickle-4.0.1-py3-none-any.whl", hash = "sha256:2973c0b0d988c6792ed6c446fa582c48352e79c2880fa2c013f1abde15905555"},
-    {file = "jsonpickle-4.0.1.tar.gz", hash = "sha256:b5336144d902958b92cb08bc1e76bfa47199b8afd454303693894defd2fa50c5"},
+    {file = "jsonpickle-4.0.2-py3-none-any.whl", hash = "sha256:cd3c90d32a68dcaa7f0e4b918bda7d4bb61f3c03b182d82dae2caf9ded0ab6b3"},
+    {file = "jsonpickle-4.0.2.tar.gz", hash = "sha256:3e650b9853adcdab9d9d62a88412b6d36e9a59ba423b01cacf0cd4ee80733aca"},
 ]
 
 [package.extras]
@@ -1558,4 +1558,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "802374c025ccdf6b52a49cdd6704ecd40c94c3977bef977a8b07b3aaf8ab14cf"
+content-hash = "5ba2a38c2684c59c87075fc130555b76035244f40ef05b9abf085900a2dd56b5"

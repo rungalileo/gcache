@@ -11,7 +11,7 @@ packages = [{ include = "gcache"}]
 python = "^3.10"
 pydantic = "^2.10.6"
 prometheus-client = "^0.21.1"
-cachetools = "^5.5.1"
+cachetools = "^5.5.2"
 types-cachetools = "^5.5.0.20240820"
 redis = "^5.2.1"
 uvloop = "^0.21.0"

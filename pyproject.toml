@@ -38,6 +38,11 @@ types-cachetools = "^5.5.0.20240820"
 requires = ["poetry-core>=2.0"]
 build-backend = "poetry.core.masonry.api"
 
+
+[tool.pytest.ini_options]
+pythonpath = ["./src/"]
+asyncio_default_fixture_loop_scope = "function"
+
 # Linters and formatters.
 [tool.ruff]
 line-length = 120

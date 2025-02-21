@@ -2,9 +2,12 @@ import asyncio
 import threading
 from collections.abc import Awaitable, Callable
 from concurrent.futures import Future
+from logging import getLogger
 from typing import Any
 
 import uvloop
+
+logger = getLogger(__name__)
 
 
 class EventLoopThread(threading.Thread):
@@ -20,7 +23,7 @@ class EventLoopThread(threading.Thread):
     def run(self) -> None:
         # Set the event loop for this thread.
         asyncio.set_event_loop(self.loop)
-        print(f"Event loop '{self.name}' started.")
+        logger.info(f"Event loop '{self.name}' started.")
         self.loop.run_forever()
 
     def submit(self, async_fn: Callable[[], Awaitable[Any]], wait_for_result: bool = True) -> Any:

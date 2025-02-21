@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
-from logging import Logger, getLogger
+from logging import Logger, LoggerAdapter, getLogger
 from random import random
 from typing import Any
 
@@ -24,7 +24,7 @@ from .event_loop_thread import EventLoopThread
 # This is fine because GCache is gauranteed to be a singleton.
 class GCacheGlobalState(BaseModel):
     urn_prefix: str = "urn"
-    logger: Logger = getLogger(__name__)
+    logger: Logger | LoggerAdapter = getLogger(__name__)
     gcache_instantiated: bool = False
 
     model_config = {"arbitrary_types_allowed": True}
@@ -518,7 +518,7 @@ class GCacheConfig(BaseModel):
     urn_prefix: str | None = None
     metrics_prefix: str = "api_"
     redis_config: RedisConfig = RedisConfig()
-    logger: Logger | None = None
+    logger: Logger | LoggerAdapter | None = None
 
     model_config = {"arbitrary_types_allowed": True}
 

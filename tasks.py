@@ -59,4 +59,4 @@ def setup_pre_commit(ctx: Context) -> None:
 
 @task
 def test(ctx: Context) -> None:
-    ctx.run("poetry run pytest -vvv --cov=gcache --cov-report=xml", **COMMON_PARAMS)
+    ctx.run("poetry run pytest -vvv --cov=cachegalileo --cov-report=xml", **COMMON_PARAMS)

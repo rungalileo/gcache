@@ -20,9 +20,9 @@ class FakeCacheConfigProvider:
 
 @pytest.fixture(scope="session")
 def redis_server():
-    # Create a redislite instance listening on TCP port 6379.
-    # You can choose a different port if needed.
-    redis_instance = redislite.Redis(serverconfig={"port": "6379"})
+    # Create a redislite instance listening on TCP port 6397.
+    # Default is 6379, so we avoid that to prevent conflicts.
+    redis_instance = redislite.Redis(serverconfig={"port": "6397"})
     yield redis_instance
     # Shut down the redislite server when tests finish.
     redis_instance.shutdown()

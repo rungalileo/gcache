@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gcache"
-version = "0.0.0"
+version = "0.0.1"
 description = "Fine grained caching"
 authors = ["Lev Neiman <lev.neiman@gmail.com>"]
 license = "MIT"

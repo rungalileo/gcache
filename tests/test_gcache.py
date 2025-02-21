@@ -318,7 +318,7 @@ def test_enforce_singleton(gcache, cache_config_provider):
         GCache(GCacheConfig(cache_config_provider=cache_config_provider))
 
 
-def test_key_lambda_failer(gcache):
+def test_key_lambda_fail(gcache):
     with gcache.enable():
 
         @gcache.cached(key_type="Test", id_arg=("test", lambda x: x["a"]))

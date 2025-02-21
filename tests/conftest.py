@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 import pytest
 import redislite
 from redis import Redis
@@ -9,7 +11,7 @@ class FakeCacheConfigProvider:
     def __init__(self):
         self.configs = {}
 
-    async def __call__(self, *args, **kwargs):
+    async def __call__(self, *args, **kwargs) -> None:
         key = args[0]
         # Return fully ramped cache by default
         return self.configs.get(
@@ -19,7 +21,7 @@ class FakeCacheConfigProvider:
 
 
 @pytest.fixture(scope="session")
-def redis_server():
+def redis_server() -> Generator[redislite.Redis, None, None]:
     # Create a redislite instance listening on TCP port 6397.
     # Default is 6379, so we avoid that to prevent conflicts.
     redis_instance = redislite.Redis(serverconfig={"port": "6397"})
@@ -29,12 +31,11 @@ def redis_server():
 
 
 @pytest.fixture
-def cache_config_provider():
+def cache_config_provider() -> FakeCacheConfigProvider:
     return FakeCacheConfigProvider()
 
 
-@pytest.fixture
-def gcache(redis_server, cache_config_provider):
+def gcache(redis_server, cache_config_provider) -> Generator[GCache, None, None]:
     Redis().flushall()
     gcache = GCache(
         GCacheConfig(

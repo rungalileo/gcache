@@ -1,11 +1,12 @@
-[tool.poetry]
-name = "gcache"
+[project]
+name = "cachegalileo"
 version = "0.0.1"
-description = "Fine grained caching"
-authors = ["Lev Neiman <lev.neiman@gmail.com>"]
-license = "MIT"
+description = "Fine grained caching."
+authors = [{ name = "Galileo Technologies Inc.", email = "team@rungalileo.io" }]
 readme = "README.md"
-packages = [{ include = "gcache"}]
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -30,36 +31,50 @@ invoke = "^2.2.0"
 ruff = "^0.9.7"
 pytest-asyncio = "^0.25.2"
 mypy = "^1.15.0"
-moto = "^5.0.28"
 pre-commit = "^4.1.0"
-
+types-cachetools = "^5.5.0.20240820"
 
 [build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=2.0"]
+build-backend = "poetry.core.masonry.api"
 
-[project]
-name = "gcache"
-version = "0.1.0"
-description = "Fine grained caching"
-authors = [
-    { name="Lev Neiman", email="lev.neiman@gmail.com" }
-]
-license = { text="MIT" }
-readme = "README.md"
-requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["./src/"]
+asyncio_default_fixture_loop_scope = "function"
+
+# Linters and formatters.
+[tool.ruff]
+line-length = 120
+fix = true
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "ASYNC"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["galileo_core"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.docformatter]
+style = "numpy"
+recursive = true
+wrap-summaries = 120
+wrap-descriptions = 120
+
 
 [tool.mypy]
-mypy_path = ["gcache"]
-exclude = "tests"
+mypy_path = ["src"]
 ignore_missing_imports = true
 disallow_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 # Release.
 [tool.semantic_release]
-version_variables = ["gcache/__init__.py:__version__"]
-version_toml = ["pyproject.toml:tool.poetry.version"]
+version_toml = ["pyproject.toml:project.version"]
 version_source = "tag"
 commit_message = "chore(release): v{version}"
 

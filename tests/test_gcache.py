@@ -1,23 +1,23 @@
+import threading
 from random import random
 
 import pytest
-import threading
 
-from gcache.gcache import (
-    CacheLayer,
-    GCacheKeyConfig,
-    UseCaseIsAlreadyRegistered,
-    KeyArgDoesNotExist,
-    UseCaseNameIsReserved,
-    MissingKeyConfig,
+from cachegalileo.gcache import (
     CacheController,
+    CacheLayer,
     Fallback,
-    GCacheKey,
-    LocalCache,
+    GCache,
     GCacheAlreadyInstantiated,
     GCacheConfig,
-    GCache,
+    GCacheKey,
+    GCacheKeyConfig,
     GCacheKeyConstructionError,
+    KeyArgDoesNotExist,
+    LocalCache,
+    MissingKeyConfig,
+    UseCaseIsAlreadyRegistered,
+    UseCaseNameIsReserved,
 )
 
 
@@ -93,9 +93,7 @@ def test_caching_func_with_args(gcache):
 def test_caching_func_with_arg_adapter(gcache):
     v = 0
 
-    @gcache.cached(
-        key_type="Test", id_arg="test", arg_adapters={"a": lambda x: x["foo"]}
-    )
+    @gcache.cached(key_type="Test", id_arg="test", arg_adapters={"a": lambda x: x["foo"]})
     def cached_func(test, a: dict):
         nonlocal v
         return v
@@ -173,9 +171,7 @@ def test_key_arg_does_not_exist(gcache):
     with pytest.raises(KeyArgDoesNotExist):
         with gcache.enable():
 
-            @gcache.cached(
-                key_type="Test", id_arg="doesnt_exist", use_case="cached_func"
-            )
+            @gcache.cached(key_type="Test", id_arg="doesnt_exist", use_case="cached_func")
             def cached_func(test=123):
                 return 0
 
@@ -221,9 +217,7 @@ def test_error_in_cache(gcache, cache_config_provider):
         async def get(self, key: GCacheKey, fallback: Fallback):
             raise Exception("I'm giving up!")
 
-    gcache.cache = CacheController(
-        FailingCache(cache_config_provider), cache_config_provider
-    )
+    gcache.cache = CacheController(FailingCache(cache_config_provider), cache_config_provider)
 
     with gcache.enable():
 
@@ -253,9 +247,7 @@ def test_default_key_config(gcache, cache_config_provider):
 @pytest.mark.skip
 @pytest.mark.asyncio
 async def test_high_load_async(gcache, cache_config_provider):
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(
-        60, "cached_func"
-    )
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
 
     # cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
     @gcache.cached(key_type="test", id_arg="test", use_case="cached_func")
@@ -269,9 +261,7 @@ async def test_high_load_async(gcache, cache_config_provider):
 
 @pytest.mark.skip
 def test_high_load(gcache, cache_config_provider):
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(
-        60, "cached_func"
-    )
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
 
     # cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
     @gcache.cached(key_type="test", id_arg="test", use_case="cached_func")

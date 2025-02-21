@@ -1,8 +1,8 @@
 import pytest
-
-from gcache.gcache import GCache, GCacheKeyConfig, GCacheConfig, RedisConfig
+import redislite
 from redis import Redis
-import redislite  # type: ignore[import-untyped]
+
+from cachegalileo.gcache import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
 
 
 class FakeCacheConfigProvider:

@@ -4,13 +4,13 @@ import inspect
 import pickle
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Generator
+from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
-from logging import getLogger, Logger
+from logging import Logger, getLogger
 from random import random
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
@@ -59,9 +59,7 @@ class GCacheKeyConfig(BaseModel):
 
 
 class GCacheContext:
-    enabled: contextvars.ContextVar[bool] = contextvars.ContextVar(
-        "gcache_enabled", default=False
-    )
+    enabled: contextvars.ContextVar[bool] = contextvars.ContextVar("gcache_enabled", default=False)
 
 
 class GCacheKey(BaseModel):
@@ -70,7 +68,7 @@ class GCacheKey(BaseModel):
     use_case: str
     args: list[tuple[str, str]]
     invalidation_tracking: bool
-    default_config: Optional[GCacheKeyConfig] = None
+    default_config: GCacheKeyConfig | None = None
 
     def __hash__(self) -> int:
         return str(self).__hash__()
@@ -102,7 +100,7 @@ class GCacheKey(BaseModel):
 
 
 # Get cache config given a use case.
-CacheConfigProvider = Callable[[GCacheKey], Awaitable[Optional[GCacheKeyConfig]]]
+CacheConfigProvider = Callable[[GCacheKey], Awaitable[GCacheKeyConfig | None]]
 
 
 class GCacheError(Exception):
@@ -139,9 +137,7 @@ class UseCaseIsAlreadyRegistered(GCacheError):
 
 class MissingKeyConfig(GCacheError):
     def __init__(self, use_case: str):
-        super().__init__(
-            f"Missing entire or partial (ttl/ramp) key config for use case: {use_case}"
-        )
+        super().__init__(f"Missing entire or partial (ttl/ramp) key config for use case: {use_case}")
 
 
 class UseCaseNameIsReserved(GCacheError):
@@ -253,9 +249,7 @@ class RedisConfig(BaseModel):
 
     @property
     def url(self) -> str:
-        return (
-            f"{self.protocol}://{self.username}:{self.password}@{self.host}:{self.port}"
-        )
+        return f"{self.protocol}://{self.username}:{self.password}@{self.host}:{self.port}"
 
 
 class RedisSerializedValue(BaseModel):
@@ -268,18 +262,23 @@ class RedisCache(CacheInterface):
 
     def __init__(self, cache_config_provider: CacheConfigProvider, config: RedisConfig):
         super().__init__(cache_config_provider)
+        self.client: RedisCluster | Redis
 
         # These options are super important for Redis failovers
-        redis_options = {
-            "socket_connect_timeout": config.socket_connect_timeout,
-            "socket_timeout": config.socket_timeout,
-            "max_connections": 100,
-        }
-
         self.client = (
-            RedisCluster.from_url(config.url, **redis_options)
+            RedisCluster.from_url(
+                config.url,
+                socket_connect_timeout=config.socket_connect_timeout,
+                socket_timeout=config.socket_timeout,
+                max_connections=100,
+            )
             if config.cluster
-            else Redis.from_url(config.url, **redis_options)  # type: ignore[arg-type]
+            else Redis.from_url(
+                config.url,
+                socket_connect_timeout=config.socket_connect_timeout,
+                socket_timeout=config.socket_timeout,
+                max_connections=100,
+            )
         )
 
     async def _exec_fallback(self, key: GCacheKey, fallback: Fallback) -> Any:
@@ -293,15 +292,7 @@ class RedisCache(CacheInterface):
         return val
 
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
-        key = (
-            "{"
-            + _GLOBAL_GCACHE_STATE.urn_prefix
-            + ":"
-            + key_type
-            + ":"
-            + id
-            + "}#watermark"
-        )
+        key = "{" + _GLOBAL_GCACHE_STATE.urn_prefix + ":" + key_type + ":" + id + "}#watermark"
         exp_ms = int(time.time() * 1000 + future_buffer_ms)
         await self.client.setex(key, self.WATERMARKS_TTL_SEC, exp_ms)
 
@@ -324,9 +315,7 @@ class RedisCache(CacheInterface):
                 if watermark >= serialized_value.created_at_ms:
                     return await self._exec_fallback(key, fallback)
 
-            _GLOBAL_GCACHE_STATE.logger.debug(
-                f"Got value from Redis in {(time.time_ns() - start_ns) / 1e9} sec"
-            )
+            _GLOBAL_GCACHE_STATE.logger.debug(f"Got value from Redis in {(time.time_ns() - start_ns) / 1e9} sec")
             return serialized_value.payload
         else:
             return await self._exec_fallback(key, fallback)
@@ -341,13 +330,11 @@ class RedisCache(CacheInterface):
             raise MissingKeyConfig(key.use_case)
 
         current_time_ms = int(time.time() * 1000)
-        val_pickle = pickle.dumps(
-            RedisSerializedValue(created_at_ms=current_time_ms, payload=value)
-        )
+        val_pickle = pickle.dumps(RedisSerializedValue(created_at_ms=current_time_ms, payload=value))
 
-        CacheController.CACHE_SIZE_HISTOGRAM.labels(
-            key.use_case, key.key_type, self.layer().name
-        ).observe(len(val_pickle))
+        CacheController.CACHE_SIZE_HISTOGRAM.labels(key.use_case, key.key_type, self.layer().name).observe(
+            len(val_pickle)
+        )
 
         ttl = config.ttl_sec.get(self.layer(), None)
         if ttl is None:
@@ -363,9 +350,7 @@ class RedisCache(CacheInterface):
 
 
 class CacheWrapper(CacheInterface):
-    def __init__(
-        self, cache_config_provider: CacheConfigProvider, cache: CacheInterface
-    ):
+    def __init__(self, cache_config_provider: CacheConfigProvider, cache: CacheInterface):
         super().__init__(cache_config_provider)
         self.wrapped = cache
 
@@ -378,9 +363,7 @@ class CacheWrapper(CacheInterface):
     async def delete(self, key: GCacheKey) -> bool:
         return await self.wrapped.delete(key)
 
-    async def invalidate(
-        self, key_type: str, id: str, future_buffer_ms: int = 0
-    ) -> None:
+    async def invalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
         return await self.wrapped.invalidate(key_type, id, future_buffer_ms)
 
 
@@ -454,9 +437,7 @@ class CacheController(CacheWrapper):
         if await self._should_cache(key):
             start_time = time.monotonic()
             try:
-                self.CACHE_REQUEST_COUNTER.labels(
-                    key.use_case, key.key_type, self.layer().name
-                ).inc()
+                self.CACHE_REQUEST_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
 
                 fallback_failed = False
 
@@ -464,25 +445,21 @@ class CacheController(CacheWrapper):
                     nonlocal fallback_failed
                     start_fallback = time.monotonic()
                     try:
-                        self.CACHE_MISS_COUNTER.labels(
-                            key.use_case, key.key_type, self.layer().name
-                        ).inc()
+                        self.CACHE_MISS_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
                         try:
                             return await fallback()
                         except:
                             fallback_failed = True
                             raise
                     finally:
-                        self.CACHE_FALLBACK_TIMER.labels(
-                            key.use_case, key.key_type, self.layer().name
-                        ).observe(time.monotonic() - start_fallback)
+                        self.CACHE_FALLBACK_TIMER.labels(key.use_case, key.key_type, self.layer().name).observe(
+                            time.monotonic() - start_fallback
+                        )
 
                 try:
                     return await self.wrapped.get(key, instrumented_fallback)
                 except Exception as e:
-                    _GLOBAL_GCACHE_STATE.logger.error(
-                        f"Error getting value from cache: {e}", exc_info=True
-                    )
+                    _GLOBAL_GCACHE_STATE.logger.error(f"Error getting value from cache: {e}", exc_info=True)
                     self.CACHE_ERROR_COUNTER.labels(
                         key.use_case,
                         key.key_type,
@@ -495,9 +472,9 @@ class CacheController(CacheWrapper):
                     else:
                         raise
             finally:
-                self.CACHE_GET_TIMER.labels(
-                    key.use_case, key.key_type, self.layer().name
-                ).observe(time.monotonic() - start_time)
+                self.CACHE_GET_TIMER.labels(key.use_case, key.key_type, self.layer().name).observe(
+                    time.monotonic() - start_time
+                )
         else:
             return await fallback()
 
@@ -515,9 +492,7 @@ class CacheController(CacheWrapper):
         r = int(random() * 100)
         if r <= ramp:
             return True
-        CacheController.CACHE_DISABLED_COUNTER.labels(
-            key.use_case, key.key_type, self.layer()
-        )
+        CacheController.CACHE_DISABLED_COUNTER.labels(key.use_case, key.key_type, self.layer())
         return False
 
 
@@ -540,10 +515,10 @@ class CacheChain(CacheWrapper):
 
 class GCacheConfig(BaseModel):
     cache_config_provider: CacheConfigProvider
-    urn_prefix: Optional[str] = None
+    urn_prefix: str | None = None
     metrics_prefix: str = "api_"
     redis_config: RedisConfig = RedisConfig()
-    logger: Optional[Logger] = None
+    logger: Logger | None = None
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -610,12 +585,12 @@ class GCache:
     def cached(
         self,
         key_type: str,
-        id_arg: Union[str, tuple[str, Callable[[Any], str]]],
-        use_case: Optional[str] = None,
-        arg_adapters: Optional[dict[str, Callable[[Any], str]]] = None,
+        id_arg: str | tuple[str, Callable[[Any], str]],
+        use_case: str | None = None,
+        arg_adapters: dict[str, Callable[[Any], str]] | None = None,
         ignore_args: list[str] = [],
         track_for_invalidation: bool = False,
-        default_config: Optional[GCacheKeyConfig] = None,
+        default_config: GCacheKeyConfig | None = None,
     ) -> Any:
         """
         Decorator which caches a function which can be either sync or async.
@@ -656,9 +631,7 @@ class GCache:
 
             async def async_wrapped(*args: Any, **kwargs: Any) -> Any:
                 if not GCacheContext.enabled:
-                    CacheController.CACHE_DISABLED_COUNTER.labels(
-                        use_case, key_type, "GLOBAL"
-                    )
+                    CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL")
                     return await func(*args, **kwargs)
                 try:
                     bound_args = sig.bind(*args, **kwargs)
@@ -684,9 +657,7 @@ class GCache:
                     sorted_args = [
                         (name, arg_transformer(name, value))
                         for name, value in bound_args.arguments.items()
-                        if name != id_arg_name
-                        and name != "self"
-                        and name not in ignore_args
+                        if name != id_arg_name and name != "self" and name not in ignore_args
                     ]
 
                     sorted_args.sort(key=lambda x: x[0])
@@ -702,9 +673,7 @@ class GCache:
                 except Exception as e:
                     if isinstance(e, GCacheError):
                         raise e
-                    raise GCacheKeyConstructionError(
-                        "Could not construct gcache key"
-                    ) from e
+                    raise GCacheKeyConstructionError("Could not construct gcache key") from e
 
                 if inspect.iscoroutinefunction(func):
                     f = partial(func, *args, **kwargs)
@@ -721,25 +690,17 @@ class GCache:
 
                 def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
                     if not GCacheContext.enabled:
-                        CacheController.CACHE_DISABLED_COUNTER.labels(
-                            use_case, key_type, "GLOBAL"
-                        )
+                        CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL")
                         return func(*args, **kwargs)
 
-                    return self._run_coroutine_in_thread(
-                        partial(async_wrapped, *args, **kwargs)
-                    )
+                    return self._run_coroutine_in_thread(partial(async_wrapped, *args, **kwargs))
 
                 return sync_wrapped
 
         return decorator
 
-    async def ainvalidate(
-        self, key_type: str, id: str, fallback_buffer_ms: int = 0
-    ) -> None:
+    async def ainvalidate(self, key_type: str, id: str, fallback_buffer_ms: int = 0) -> None:
         await self.redis_cache.invalidate(key_type, id, fallback_buffer_ms)
 
     def invalidate(self, key_type: str, id: str, fallback_buffer_ms: int = 0) -> None:
-        return self._run_coroutine_in_thread(
-            partial(self.ainvalidate, key_type, id, fallback_buffer_ms)
-        )
+        return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, fallback_buffer_ms))

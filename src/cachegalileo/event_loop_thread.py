@@ -1,10 +1,10 @@
 import asyncio
 import threading
-from typing import Any, Callable
-import uvloop
-
+from collections.abc import Awaitable, Callable
 from concurrent.futures import Future
-from typing import Awaitable
+from typing import Any
+
+import uvloop
 
 
 class EventLoopThread(threading.Thread):
@@ -23,9 +23,7 @@ class EventLoopThread(threading.Thread):
         print(f"Event loop '{self.name}' started.")
         self.loop.run_forever()
 
-    def submit(
-        self, async_fn: Callable[[], Awaitable[Any]], wait_for_result: bool = True
-    ) -> Any:
+    def submit(self, async_fn: Callable[[], Awaitable[Any]], wait_for_result: bool = True) -> Any:
         """
         Submit an async function to the event loop running in this thread.
 

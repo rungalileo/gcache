@@ -3,10 +3,10 @@ import contextvars
 import time
 from random import random
 
-from gcache.event_loop_thread import EventLoopThread
+from cachegalileo.event_loop_thread import EventLoopThread
 
 
-def test_concurrent():
+def test_concurrent() -> None:
     """
     Test that we can process a lot of couroutines concurrently by scheduling 10k of them.
     Each coroutine is expected to take less than ~1.1 seconds so we should not exceed a boundary like 2 seconds.

@@ -1,4 +1,4 @@
-from invoke import task, Context
+from invoke import Context, task
 
 COMMON_PARAMS = dict(echo=True, pty=True)
 
@@ -39,8 +39,9 @@ def type_check(ctx: Context) -> None:
     ctx : Context
         Invoke context.
     """
-    ctx.run("poetry run mypy --package gcache --namespace-packages", **COMMON_PARAMS)
-    ctx.run("poetry run mypy --package tests --namespace-packages", **COMMON_PARAMS)
+    ctx.run("poetry run mypy --package cachegalileo --namespace-packages", **COMMON_PARAMS)
+    # TODO(@lan17): Enable after completing type hints for tests.
+    # ctx.run("poetry run mypy --package tests --namespace-packages", **COMMON_PARAMS)
 
 
 @task
@@ -58,4 +59,4 @@ def setup_pre_commit(ctx: Context) -> None:
 
 @task
 def test(ctx: Context) -> None:
-    ctx.run("poetry run pytest -vvv --cov=gcache --cov-report=xml", **COMMON_PARAMS)
+    ctx.run("poetry run pytest -vvv --cov=cachegalileo --cov-report=xml", **COMMON_PARAMS)

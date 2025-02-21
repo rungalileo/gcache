@@ -1,0 +1,48 @@
+name: release
+
+# Only trigger on `main` when the CI workflow succeeds.
+on:
+  workflow_run:
+    workflows: ["test"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
+
+      - name: Python Semantic Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v9.17.0
+        with:
+          git_committer_name: galileo-automation
+          git_committer_email: ci@rungalileo.io
+          github_token: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
+          ssh_public_signing_key: ${{ secrets.GALILEO_AUTOMATION_SSH_PUBLIC_KEY }}
+          ssh_private_signing_key: ${{ secrets.GALILEO_AUTOMATION_SSH_PRIVATE_KEY }}
+
+      - name: Publish to GCP
+        if: steps.release.outputs.released == 'true'
+        env:
+          POETRY_HTTP_BASIC_RUNGALILEO_DEV_USERNAME: _json_key_base64
+          POETRY_HTTP_BASIC_RUNGALILEO_DEV_PASSWORD: ${{ secrets.GCP_DEV_PRIVATE_PYPI_PASSWORD }}
+        run: |
+          pipx install poetry==${{vars.POETRY_VERSION}}
+          poetry config repositories.rungalileo-dev https://us-python.pkg.dev/rungalileo-dev/rungalileo/
+          poetry publish --build --repository rungalileo-dev -vvv
+
+      - name: Publish package distributions to GitHub Releases
+        uses: python-semantic-release/upload-to-gh-release@main
+        if: steps.release.outputs.released == 'true'
+        with:
+          github_token: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}

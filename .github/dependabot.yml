@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Update Python packages weekly.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Update GitHub Actions monthly.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

@@ -1,0 +1,64 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: "v0.9.6"
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  # We run `mypy` as a local hook because otherwise it doesn't validate against the
+  # pacakges' types and arguments. Or we'd need to install all of the dependencies again
+  # within the `mypy` venv as `additional_dependecies`, which is a bit silly.
+  # Inspired from: https://jaredkhan.com/blog/mypy-pre-commit
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        language: python
+        entry: inv type-check
+        types: [python]
+        pass_filenames: false
+        # Ensure it is only called once per commit.
+        require_serial: true
+  - repo: https://github.com/python-poetry/poetry
+    rev: 1.8.0
+    hooks:
+      - id: poetry-check
+      - id: poetry-lock
+        args: ["--no-update"]
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: python-check-blanket-noqa
+      - id: python-check-blanket-type-ignore
+      - id: python-check-mock-methods
+      - id: python-no-log-warn
+  # Disabling until https://github.com/PyCQA/docformatter/pull/287 is released.
+  # - repo: https://github.com/PyCQA/docformatter
+  #   rev: v1.7.5
+  #   hooks:
+  #     - id: docformatter
+  #       additional_dependencies: [tomli]
+  #       args:
+  #         [
+  #           "--pre-summary-newline",
+  #           "--in-place",
+  #           "--config",
+  #           "./pyproject.toml",
+  #         ]
+
+exclude: "CHANGELOG.md"

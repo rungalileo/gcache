@@ -1,0 +1,39 @@
+name: test
+
+on: push
+
+jobs:
+  test:
+    runs-on: galileo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install poetry
+        run: pipx install poetry==${{vars.POETRY_VERSION}}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "poetry"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install Dependencies
+        run: |
+          pipx install invoke
+          inv install
+
+      # We run the `mypy` check here since it requires all of the packages to be installed.
+      # Doing that in the pre-commit step would be duplicative and spend more time in CI.
+      - name: Validate Types
+        run: inv type-check
+
+      - name: Run Tets
+        run: inv test
+
+      - name: Upload Test Coverage Reports
+        uses: codecov/codecov-action@v5.3.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

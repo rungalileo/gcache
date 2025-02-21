@@ -203,6 +203,7 @@ class LocalCache(CacheInterface):
                 raise MissingKeyConfig(key.use_case)
 
             async with self.lock:
+                # See if cache was already created by another worker.
                 cache = self.caches.get(key.use_case, None)
                 if cache is None:
                     self.caches[key.use_case] = cache = TTLCache(

@@ -16,7 +16,7 @@ def test_concurrent() -> None:
     event_loop.start()
     try:
 
-        async def heavy_work():
+        async def heavy_work() -> None:
             total = 0.0
             while total < 1:
                 to_sleep = random() * 0.1
@@ -43,13 +43,13 @@ def test_concurrent() -> None:
         event_loop.stop()
 
 
-def test_propogate_context():
+def test_propogate_context() -> None:
     event_loop = EventLoopThread()
     context_var = contextvars.ContextVar("test_var", default=0)
     try:
         event_loop.start()
 
-        async def readout_context():
+        async def readout_context() -> int:
             return context_var.get()
 
         context_var.set(1337)

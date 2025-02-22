@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v0.0.3 (2025-02-22)
+
+### Chores
+
+- Add comment in local cache
+  ([`0bbc2ed`](https://github.com/rungalileo/cachegalileo/commit/0bbc2ede275fd735f35e47e4ff7e6a17b76575d2))
+
+### Testing
+
+- Change port ([#7](https://github.com/rungalileo/cachegalileo/pull/7),
+  [`164ae25`](https://github.com/rungalileo/cachegalileo/commit/164ae25343c346a621dd159cf4d45b4df671f1ba))
+
+* test: Change port
+
+* stash
+
+* test: Fix tests to run on a different port
+
+* chore: Type tests
+
+* fix: Initialize config properly
+
+* chore: Use `project` correctly
+
+* ci: Fix release workflow
+
+* test: Run all tests
+
+
 ## v0.0.2 (2025-02-21)
 
 ### Chores
@@ -28,6 +57,9 @@
 * chore: Add pytest config
 
 * test: Measure coverage for cachegalileo
+
+- **release**: V0.0.2
+  ([`bc037ef`](https://github.com/rungalileo/cachegalileo/commit/bc037ef5fee472b23d8b8d1556472d2c196e2acf))
 
 
 ## v0.0.1 (2025-02-21)

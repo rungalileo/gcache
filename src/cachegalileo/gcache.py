@@ -14,10 +14,10 @@ from typing import Any
 
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from redis.asyncio import Redis, RedisCluster
 
-from .event_loop_thread import EventLoopThread
+from cachegalileo.event_loop_thread import EventLoopThread
 
 
 # Global state is needed to allow reconfiguration when GCache is instantiated.
@@ -27,7 +27,7 @@ class GCacheGlobalState(BaseModel):
     logger: Logger | LoggerAdapter = getLogger(__name__)
     gcache_instantiated: bool = False
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 _GLOBAL_GCACHE_STATE = GCacheGlobalState()
@@ -521,7 +521,7 @@ class GCacheConfig(BaseModel):
     redis_config: RedisConfig = RedisConfig()
     logger: Logger | LoggerAdapter | None = None
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class GCache:

@@ -40,8 +40,7 @@ def type_check(ctx: Context) -> None:
         Invoke context.
     """
     ctx.run("poetry run mypy --package cachegalileo --namespace-packages", **COMMON_PARAMS)
-    # TODO(@lan17): Enable after completing type hints for tests.
-    # ctx.run("poetry run mypy --package tests --namespace-packages", **COMMON_PARAMS)
+    ctx.run("poetry run mypy --package tests --namespace-packages", **COMMON_PARAMS)
 
 
 @task

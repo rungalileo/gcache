@@ -1,10 +1,12 @@
-[tool.poetry]
+[project]
 name = "cachegalileo"
 version = "0.0.2"
 description = "Fine grained caching."
-authors = ["Galileo Technologies Inc. <team@rungalileo.io>"]
+authors = [{ name = "Galileo Technologies Inc.", email = "team@rungalileo.io" }]
 readme = "README.md"
 license = "MIT"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
 
 [tool.poetry.dependencies]
 python = "^3.10"

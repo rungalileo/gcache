@@ -19,14 +19,14 @@ from cachegalileo.gcache import (
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )
+from tests.conftest import FakeCacheConfigProvider
 
 
-@pytest.mark.asyncio
-def test_gcache_sync(gcache):
-    v = 0
+def test_gcache_sync(a_gcache: GCache) -> None:
+    v: int = 0
 
-    @gcache.cached(key_type="Test", id_arg="test")
-    def cached_func(test=123):
+    @a_gcache.cached(key_type="Test", id_arg="test")
+    def cached_func(test: int = 123) -> int:
         nonlocal v
         return v
 
@@ -36,7 +36,7 @@ def test_gcache_sync(gcache):
     assert cached_func() == 5
 
     # With cache enabled, the function should return cached values
-    with gcache.enable():
+    with a_gcache.enable():
         print("In test", threading.current_thread().name)
         assert cached_func() == 5
 
@@ -49,11 +49,11 @@ def test_gcache_sync(gcache):
 
 
 @pytest.mark.asyncio
-async def test_gcache_async(gcache):
-    v = 0
+async def test_gcache_async(a_gcache: GCache) -> None:
+    v: int = 0
 
-    @gcache.cached(key_type="Test", id_arg="test")
-    async def cached_func(test=123):
+    @a_gcache.cached(key_type="Test", id_arg="test")
+    async def cached_func(test: int = 123) -> int:
         nonlocal v
         return v
 
@@ -63,7 +63,7 @@ async def test_gcache_async(gcache):
     assert await cached_func() == 5
 
     # With cache enabled, the function should return cached values
-    with gcache.enable():
+    with a_gcache.enable():
         print("In test", threading.current_thread().name)
         assert await cached_func() == 5
 
@@ -72,15 +72,15 @@ async def test_gcache_async(gcache):
         assert await cached_func() == 5
 
 
-def test_caching_func_with_args(gcache):
-    v = 0
+def test_caching_func_with_args(a_gcache: GCache) -> None:
+    v: int = 0
 
-    @gcache.cached(key_type="Test", id_arg="test", ignore_args=["b"])
-    def cached_func(test=123, a=1, b=2):
+    @a_gcache.cached(key_type="Test", id_arg="test", ignore_args=["b"])
+    def cached_func(test: int = 123, a: int = 1, b: int = 2) -> int:
         nonlocal v
         return v
 
-    with gcache.enable():
+    with a_gcache.enable():
         assert cached_func(a=1, b=1) == 0
 
         v = 10
@@ -90,15 +90,15 @@ def test_caching_func_with_args(gcache):
         assert cached_func(a=1, b=2) == 0
 
 
-def test_caching_func_with_arg_adapter(gcache):
-    v = 0
+def test_caching_func_with_arg_adapter(a_gcache: GCache) -> None:
+    v: int = 0
 
-    @gcache.cached(key_type="Test", id_arg="test", arg_adapters={"a": lambda x: x["foo"]})
-    def cached_func(test, a: dict):
+    @a_gcache.cached(key_type="Test", id_arg="test", arg_adapters={"a": lambda x: x["foo"]})
+    def cached_func(test: int, a: dict) -> int:
         nonlocal v
         return v
 
-    with gcache.enable():
+    with a_gcache.enable():
         assert cached_func(1, {"foo": 1, "bar": 1}) == 0
 
         v = 10
@@ -110,15 +110,15 @@ def test_caching_func_with_arg_adapter(gcache):
         assert cached_func(1, {"foo": 2, "bar": 5}) == 10
 
 
-def test_id_arg_adapter(gcache):
-    v = 0
+def test_id_arg_adapter(a_gcache: GCache) -> None:
+    v: int = 0
 
-    @gcache.cached(key_type="Test", id_arg=("test", lambda x: x["foo"]))
-    def cached_func(test: dict):
+    @a_gcache.cached(key_type="Test", id_arg=("test", lambda x: x["foo"]))
+    def cached_func(test: dict) -> int:
         nonlocal v
         return v
 
-    with gcache.enable():
+    with a_gcache.enable():
         assert cached_func({"foo": 1, "bar": 1}) == 0
 
         v = 10
@@ -129,15 +129,15 @@ def test_id_arg_adapter(gcache):
         assert cached_func({"foo": 2, "bar": 123}) == 10
 
 
-def test_cache_ramp(gcache, cache_config_provider):
-    v = 0
+def test_cache_ramp(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
+    v: int = 0
 
-    @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
-    def cached_func(test=123):
+    @a_gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+    def cached_func(test: int = 123) -> int:
         nonlocal v
         return v
 
-    with gcache.enable():
+    with a_gcache.enable():
         assert cached_func() == 0
 
         v = 5
@@ -145,7 +145,7 @@ def test_cache_ramp(gcache, cache_config_provider):
         assert cached_func() == 0
 
         # We ramp down cache
-        cache_config_provider.configs["cached_func"] = GCacheKeyConfig(
+        mock_cache_config_provider.configs["cached_func"] = GCacheKeyConfig(
             use_case="cached_func",
             ttl_sec={CacheLayer.LOCAL: 1, CacheLayer.REMOTE: 1},
             ramp={CacheLayer.LOCAL: 0, CacheLayer.REMOTE: 0},
@@ -155,164 +155,162 @@ def test_cache_ramp(gcache, cache_config_provider):
         assert cached_func() == 5
 
 
-def test_duplicate_use_cases(gcache):
-    @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
-    def cached_func(test=123):
+def test_duplicate_use_cases(a_gcache: GCache) -> None:
+    @a_gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+    def cached_func(test: int = 123) -> int:
         return 0
 
     with pytest.raises(UseCaseIsAlreadyRegistered):
 
-        @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
-        def another_cached_func(test=123):
+        @a_gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+        def another_cached_func(test: int = 123) -> int:
             return 0
 
 
-def test_key_arg_does_not_exist(gcache):
+def test_key_arg_does_not_exist(a_gcache: GCache) -> None:
     with pytest.raises(KeyArgDoesNotExist):
-        with gcache.enable():
+        with a_gcache.enable():
 
-            @gcache.cached(key_type="Test", id_arg="doesnt_exist", use_case="cached_func")
-            def cached_func(test=123):
+            @a_gcache.cached(key_type="Test", id_arg="doesnt_exist", use_case="cached_func")
+            def cached_func(test: int = 123) -> int:
                 return 0
 
             cached_func()
 
 
-def test_reserved_use_case_name(gcache):
+def test_reserved_use_case_name(a_gcache: GCache) -> None:
     with pytest.raises(UseCaseNameIsReserved):
-        with gcache.enable():
+        with a_gcache.enable():
 
-            @gcache.cached(key_type="Test", id_arg="test", use_case="watermark")
-            def cached_func(test=123):
+            @a_gcache.cached(key_type="Test", id_arg="test", use_case="watermark")
+            def cached_func(test: int = 123) -> int:
                 return 0
 
             cached_func()
 
 
-def test_missing_key_config(gcache, cache_config_provider):
+def test_missing_key_config(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
     with pytest.raises(MissingKeyConfig):
-        with gcache.enable():
-            cache_config_provider.configs["cached_func"] = None
+        with a_gcache.enable():
+            mock_cache_config_provider.configs["cached_func"] = None
 
-            @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
-            def cached_func(test=123):
+            @a_gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+            def cached_func(test: int = 123) -> int:
                 return 0
 
             cached_func()
 
 
-def test_error_in_fallback(gcache):
+def test_error_in_fallback(a_gcache: GCache) -> None:
     with pytest.raises(KeyError):
-        with gcache.enable():
+        with a_gcache.enable():
 
-            @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
-            def cached_func(test=123):
+            @a_gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+            def cached_func(test: int = 123) -> int:
                 raise KeyError("foo")
 
             cached_func()
 
 
-def test_error_in_cache(gcache, cache_config_provider):
+def test_error_in_cache(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
     class FailingCache(LocalCache):
-        async def get(self, key: GCacheKey, fallback: Fallback):
+        async def get(self, key: GCacheKey, fallback: Fallback) -> None:
             raise Exception("I'm giving up!")
 
-    gcache.cache = CacheController(FailingCache(cache_config_provider), cache_config_provider)
+    a_gcache.cache = CacheController(FailingCache(mock_cache_config_provider), mock_cache_config_provider)  # type: ignore[assignment]
 
-    with gcache.enable():
+    with a_gcache.enable():
 
-        @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
-        def cached_func(test=123):
+        @a_gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+        def cached_func(test: int = 123) -> str:
             return "IM ALIVE"
 
         assert "IM ALIVE" == cached_func()
 
 
-def test_default_key_config(gcache, cache_config_provider):
-    with gcache.enable():
-        cache_config_provider.configs["cached_func"] = None
+def test_default_key_config(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
+    with a_gcache.enable():
+        mock_cache_config_provider.configs["cached_func"] = None
 
-        @gcache.cached(
+        @a_gcache.cached(
             key_type="Test",
             id_arg="test",
             use_case="cached_func",
             default_config=GCacheKeyConfig.enabled(60, "cached_func"),
         )
-        def cached_func(test=123):
+        def cached_func(test: int = 123) -> int:
             return 0
 
         cached_func()
 
 
-@pytest.mark.skip
+# @pytest.mark.skip
 @pytest.mark.asyncio
-async def test_high_load_async(gcache, cache_config_provider):
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+async def test_high_load_async(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
+    mock_cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
 
-    # cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
-    @gcache.cached(key_type="test", id_arg="test", use_case="cached_func")
-    async def cached_func(test=123):
+    @a_gcache.cached(key_type="test", id_arg="test", use_case="cached_func")
+    async def cached_func(test: int = 123) -> int:
         return 0
 
-    with gcache.enable():
+    with a_gcache.enable():
         for i in range(100_000):
             await cached_func(int(random() * 100))
 
 
-@pytest.mark.skip
-def test_high_load(gcache, cache_config_provider):
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+# @pytest.mark.skip
+def test_high_load(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
+    mock_cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
 
-    # cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
-    @gcache.cached(key_type="test", id_arg="test", use_case="cached_func")
-    def cached_func(test=123):
-        return 0
+    @a_gcache.cached(key_type="test", id_arg="test", use_case="cached_func")
+    def cached_func(test: int = 123) -> int:
+        return test
 
-    with gcache.enable():
+    with a_gcache.enable():
         for i in range(100_000):
             cached_func(int(random() * 100))
 
 
-def test_invalidation(gcache, cache_config_provider):
-    v = 0
+def test_invalidation(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
+    v: int = 0
 
     config = GCacheKeyConfig.enabled(3600, "cached_func")
     config.ramp[CacheLayer.LOCAL] = 0
 
-    cache_config_provider.configs["cached_func"] = config
+    mock_cache_config_provider.configs["cached_func"] = config
 
-    @gcache.cached(
+    @a_gcache.cached(
         key_type="Test",
         id_arg="test",
         use_case="cached_func",
         track_for_invalidation=True,
     )
-    def cached_func(test=123):
+    def cached_func(test: int = 123) -> int:
         nonlocal v
         return v
 
-    with gcache.enable():
+    with a_gcache.enable():
         assert 0 == cached_func()
 
         v = 10
 
         assert 0 == cached_func()
 
-        gcache.invalidate("Test", "123")
+        a_gcache.invalidate("Test", "123")
 
         assert 10 == cached_func()
 
 
-def test_enforce_singleton(gcache, cache_config_provider):
+def test_enforce_singleton(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
     with pytest.raises(GCacheAlreadyInstantiated):
-        GCache(GCacheConfig(cache_config_provider=cache_config_provider))
+        GCache(GCacheConfig(cache_config_provider=mock_cache_config_provider))
 
 
-def test_key_lambda_fail(gcache):
-    with gcache.enable():
+def test_key_lambda_fail(a_gcache: GCache) -> None:
+    with a_gcache.enable():
 
-        @gcache.cached(key_type="Test", id_arg=("test", lambda x: x["a"]))
-        def cached_func(test=123):
+        @a_gcache.cached(key_type="Test", id_arg=("test", lambda x: x["a"]))
+        def cached_func(test: int = 123) -> int:
             return 0
 
         with pytest.raises(GCacheKeyConstructionError):

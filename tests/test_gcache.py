@@ -2,7 +2,6 @@ import threading
 from random import random
 
 import pytest
-from tests.conftest import FakeCacheConfigProvider
 
 from cachegalileo.gcache import (
     CacheController,
@@ -20,6 +19,7 @@ from cachegalileo.gcache import (
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )
+from tests.conftest import FakeCacheConfigProvider
 
 
 def test_gcache_sync(a_gcache: GCache) -> None:
@@ -244,7 +244,7 @@ def test_default_key_config(a_gcache: GCache, mock_cache_config_provider: FakeCa
         cached_func()
 
 
-@pytest.mark.skip
+# @pytest.mark.skip
 @pytest.mark.asyncio
 async def test_high_load_async(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
     mock_cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
@@ -258,13 +258,13 @@ async def test_high_load_async(a_gcache: GCache, mock_cache_config_provider: Fak
             await cached_func(int(random() * 100))
 
 
-@pytest.mark.skip
+# @pytest.mark.skip
 def test_high_load(a_gcache: GCache, mock_cache_config_provider: FakeCacheConfigProvider) -> None:
     mock_cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
 
     @a_gcache.cached(key_type="test", id_arg="test", use_case="cached_func")
     def cached_func(test: int = 123) -> int:
-        return 0
+        return test
 
     with a_gcache.enable():
         for i in range(100_000):

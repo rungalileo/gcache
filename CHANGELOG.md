@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.1.0 (2025-02-24)
+
+### Features
+
+- Add flushall ([#15](https://github.com/rungalileo/cachegalileo/pull/15),
+  [`226e8b4`](https://github.com/rungalileo/cachegalileo/commit/226e8b4a81e674b0112c422c128e43839476914d))
+
+* fix: Do not write back cache in Redis when its invalidated
+
+* feat: Add flushall
+
+* Add type annotation
+
+
 ## v0.0.10 (2025-02-24)
 
 ### Bug Fixes
@@ -8,6 +22,11 @@
 - Do not write back cache in Redis when its invalidated
   ([#14](https://github.com/rungalileo/cachegalileo/pull/14),
   [`17fed9b`](https://github.com/rungalileo/cachegalileo/commit/17fed9b9cecbea0f5d3d823fe36da0387e6a347e))
+
+### Chores
+
+- **release**: V0.0.10
+  ([`ae3d5cf`](https://github.com/rungalileo/cachegalileo/commit/ae3d5cf4c3fdd7408f6f844623e2820d331c6c98))
 
 
 ## v0.0.9 (2025-02-24)

@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## v0.0.5 (2025-02-24)
+
+### Chores
+
+- Update README ([#9](https://github.com/rungalileo/cachegalileo/pull/9),
+  [`15adb5c`](https://github.com/rungalileo/cachegalileo/commit/15adb5c8ed5bba4b82061cf05f0235b5be811469))
+
+* chore: Cleaning up code
+
+* Some more comments
+
+* More documentation
+
+* todo
+
+* Remove import from readme
+
+* fixups
+
+
 ## v0.0.4 (2025-02-24)
 
 ### Chores
@@ -17,6 +37,9 @@
 * todo
 
 * Remove import from readme
+
+- **release**: V0.0.4
+  ([`40447e6`](https://github.com/rungalileo/cachegalileo/commit/40447e6ee0c9f05f61bb7ff874774e4caac77395))
 
 
 ## v0.0.3 (2025-02-22)

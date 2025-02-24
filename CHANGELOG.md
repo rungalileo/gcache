@@ -1,12 +1,30 @@
 # CHANGELOG
 
 
+## v0.0.8 (2025-02-24)
+
+### Bug Fixes
+
+- Fix early termination when gcache is disabled.
+  ([#12](https://github.com/rungalileo/cachegalileo/pull/12),
+  [`a714e66`](https://github.com/rungalileo/cachegalileo/commit/a714e66910b68111923490d012c393bd372fdc49))
+
+* fix: Increment cache disabled counter
+
+* fix: Fix early termination when cache is disabled
+
+
 ## v0.0.7 (2025-02-24)
 
 ### Bug Fixes
 
 - Increment cache disabled counter ([#11](https://github.com/rungalileo/cachegalileo/pull/11),
   [`d44ce55`](https://github.com/rungalileo/cachegalileo/commit/d44ce556ade70f5c50116347740cfea663f521fc))
+
+### Chores
+
+- **release**: V0.0.7
+  ([`c78790f`](https://github.com/rungalileo/cachegalileo/commit/c78790f9129f8ee4bd07a6333a2b228c069c7adf))
 
 
 ## v0.0.6 (2025-02-24)

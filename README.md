@@ -1,6 +1,9 @@
 # GCache
 
-GCache is a small library that provides fine grained observability and controls for your read-through caching use cases.
+GCache is a lightweight library that provides fine-grained observability and runtime controls for read-through caching.
+
+  * Dashboard: https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache
+  * Runtime controls: TODO
 
 ## Enforcing cache key structure
 
@@ -32,11 +35,11 @@ The biggest use case for this is to turn off caching in write endpoints, while t
 
 `GCache` class is meant to be instantiated once and be used as a singleton throughout the rest of code base.
 
-To cache a function we use `GCache::cached` decorator.
+To cache a function we use `GCache::cached` decorator.  Same decorator works for both sync and async functions.
 
 Example:
 
-```
+```python
 gcache = GCache(...)
 
 ....
@@ -44,8 +47,10 @@ gcache = GCache(...)
     @gcache.cached
           key_type="user_email",
           id_arg="email",
+          # Ignore db_read since its irrelevant to making cache key.
           ignore_args=["db_read"],
-          use_case="GetUserByEmail")
+          use_case="GetUserByEmail",
+       )
     def get_by_email(db_read: Session, email: str) -> User | None:
         ...
 
@@ -58,4 +63,40 @@ get_by_email(....) # Does not cache
 with gcache.enabled():
       ...
       get_by_email(....). # caches
+```
+
+### Arg transformers
+
+Some function arguments may not be suitable to include in cache key directly for various reasons.  In such cases
+you can provide lambdas when using `cached`.
+
+Example:
+
+We cache a function which takes in objects, and we also turn off local caching entirely.
+
+```python
+@gcache.cached(
+    key_type="user_id",
+    id_arg=("user", lambda user: user.system_user_id),
+    arg_adapters={
+        "project_type": lambda project_type: project_type.name,
+        "pagination": lambda pagination: f"{pagination.starting_token}-{pagination.limit}"
+    },
+    ignore_args=["db_read"],
+    # Turn off local cache and only use remote.
+    default_config=GCacheKeyConfig(
+        ttl_sec={
+            CacheLayer.LOCAL: 0,
+            CacheLayer.REMOTE: 60
+        },
+        ramp={
+            CacheLayer.LOCAL: 0,
+            CacheLayer.Remote: 100
+        }
+    )
+)
+def get_latest_runs(
+       self, db_read: Session, user: User, project_type: ProjectType, pagination: PaginationRequestMixin
+   ) -> GetUserLatestRuns:
+    ...
 ```

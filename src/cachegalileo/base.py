@@ -547,32 +547,32 @@ class GCache:
             metrics_prefix=config.metrics_prefix,
         )
 
-        self.redis_cache = redis_cache
+        self._redis_cache = redis_cache
 
-        self.cache = CacheChain(config.cache_config_provider, local_cache, redis_cache)
+        self._cache = CacheChain(config.cache_config_provider, local_cache, redis_cache)
 
-        self.use_case_registry: set = set()
+        self._use_case_registry: set = set()
 
         # Don't create and start here, but lazy load later.
         # This is necessary in forked environments, since we don't want to start a thread before forkinge
-        self._event_loop_thread: EventLoopThread = None  # type: ignore[assignment]
+        self._event_loop_thread_instance: EventLoopThread = None  # type: ignore[assignment]
 
         _GLOBAL_GCACHE_STATE.gcache_instantiated = True
 
     def __del__(self) -> None:
-        self.event_loop_thread.stop()
+        self._event_loop_thread.stop()
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
 
     def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]]) -> Any:
-        return self.event_loop_thread.submit(coro)
+        return self._event_loop_thread.submit(coro)
 
     @property
-    def event_loop_thread(self) -> EventLoopThread:
-        if self._event_loop_thread is None:
+    def _event_loop_thread(self) -> EventLoopThread:
+        if self._event_loop_thread_instance is None:
             _GLOBAL_GCACHE_STATE.logger.info("Initializing event thread loop")
-            self._event_loop_thread = EventLoopThread()
-            self._event_loop_thread.start()
-        return self._event_loop_thread
+            self._event_loop_thread_instance = EventLoopThread()
+            self._event_loop_thread_instance.start()
+        return self._event_loop_thread_instance
 
     @contextmanager
     def enable(self) -> Generator[None]:
@@ -617,13 +617,13 @@ class GCache:
             if use_case is None:
                 use_case = f"{func.__module__}.{func.__name__}"
 
-            if use_case in self.use_case_registry:
+            if use_case in self._use_case_registry:
                 raise UseCaseIsAlreadyRegistered(use_case)
 
             if use_case == "watermark":
                 raise UseCaseNameIsReserved()
 
-            self.use_case_registry.add(use_case)
+            self._use_case_registry.add(use_case)
 
             def arg_transformer(name: str, value: Any) -> str:
                 if arg_adapters and name in arg_adapters:
@@ -683,7 +683,7 @@ class GCache:
                     async def f():  # type: ignore[no-untyped-def, misc]
                         return func(*args, **kwargs)
 
-                return await self.cache.get(key, f)
+                return await self._cache.get(key, f)
 
             if inspect.iscoroutinefunction(func):
                 return async_wrapped
@@ -701,7 +701,7 @@ class GCache:
         return decorator
 
     async def ainvalidate(self, key_type: str, id: str, fallback_buffer_ms: int = 0) -> None:
-        await self.redis_cache.invalidate(key_type, id, fallback_buffer_ms)
+        await self._redis_cache.invalidate(key_type, id, fallback_buffer_ms)
 
     def invalidate(self, key_type: str, id: str, fallback_buffer_ms: int = 0) -> None:
         return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, fallback_buffer_ms))

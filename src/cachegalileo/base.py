@@ -645,7 +645,7 @@ class GCache:
 
             async def async_wrapped(*args: Any, **kwargs: Any) -> Any:
                 if not GCacheContext.enabled:
-                    CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL")
+                    CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL").inc()
                     return await func(*args, **kwargs)
                 try:
                     # Try to create GCacheKey by inspecting function arguments and transforming or ignoring
@@ -707,7 +707,7 @@ class GCache:
 
                 def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
                     if not GCacheContext.enabled:
-                        CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL")
+                        CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL").inc()
                         return func(*args, **kwargs)
 
                     return self._run_coroutine_in_thread(partial(async_wrapped, *args, **kwargs))

@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.0.10 (2025-02-24)
+
+### Bug Fixes
+
+- Do not write back cache in Redis when its invalidated
+  ([#14](https://github.com/rungalileo/cachegalileo/pull/14),
+  [`17fed9b`](https://github.com/rungalileo/cachegalileo/commit/17fed9b9cecbea0f5d3d823fe36da0387e6a347e))
+
+
 ## v0.0.9 (2025-02-24)
 
 ### Bug Fixes
@@ -14,6 +23,11 @@
 * fix: Fix early termination when cache is disabled
 
 * fix: subtract fallback time from get time
+
+### Chores
+
+- **release**: V0.0.9
+  ([`6fb2e5c`](https://github.com/rungalileo/cachegalileo/commit/6fb2e5c5a5579e2a610a6880d87d74a481a38a1f))
 
 
 ## v0.0.8 (2025-02-24)

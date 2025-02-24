@@ -338,3 +338,34 @@ async def test_do_not_write_if_invalidated(
         keys = redis_server.keys()
         assert 1 == len(keys)
         assert keys[0] == b"{urn:galileo:test:Test:123}#watermark"
+
+
+@pytest.mark.asyncio
+async def test_flush_all(gcache, redis_server):
+    with gcache.enable():
+        v = 0
+
+        # Given: A  cached function in both layers.
+        @gcache.cached(key_type="Test", id_arg="test")
+        async def cached_func(test: int = 123) -> int:
+            nonlocal v
+            return v
+
+        # When: We first invoke it then we should hit source of truth and populate the cache.
+        assert 0 == await cached_func()
+
+        # When: We update the value to return in SoT.
+        v = 10
+
+        # Then: We should still be getting cached value back.
+        assert 0 == await cached_func()
+
+        # When: We flush all caches.
+        await gcache.aflushall()
+
+        # Then: There should be no keys in redis.
+        redis_keys = redis_server.keys()
+        assert 0 == len(redis_keys)
+
+        # Then: Cached function should also return SoT.
+        assert 10 == await cached_func()

@@ -180,6 +180,10 @@ class CacheInterface(ABC):
     def layer(self) -> CacheLayer:
         pass
 
+    async def flushall(self) -> None:
+        """Remove all entries"""
+        pass
+
 
 class LocalCache(CacheInterface):
     _MAXSIZE = 10_000
@@ -232,6 +236,10 @@ class LocalCache(CacheInterface):
 
     def layer(self) -> CacheLayer:
         return CacheLayer.LOCAL
+
+    async def flushall(self) -> None:
+        async with self.lock:
+            self.caches.clear()
 
 
 class RedisConfig(BaseModel):
@@ -354,6 +362,9 @@ class RedisCache(CacheInterface):
     def layer(self) -> CacheLayer:
         return CacheLayer.REMOTE
 
+    async def flushall(self) -> None:
+        return await self.client.flushall()
+
 
 class CacheWrapper(CacheInterface):
     """
@@ -377,6 +388,9 @@ class CacheWrapper(CacheInterface):
 
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
         return await self.wrapped.invalidate(key_type, id, future_buffer_ms)
+
+    async def flushall(self) -> None:
+        return await self.wrapped.flushall()
 
 
 class CacheController(CacheWrapper):
@@ -511,6 +525,10 @@ class CacheController(CacheWrapper):
 
 
 class CacheChain(CacheWrapper):
+    """
+    Create cache chain by passing one layer of cache as fallback to another one.
+    """
+
     def __init__(
         self,
         cache_config_provider: CacheConfigProvider,
@@ -560,6 +578,7 @@ class GCache:
             metrics_prefix=config.metrics_prefix,
         )
 
+        self._local_cache = local_cache
         self._redis_cache = redis_cache
 
         self._cache = CacheChain(config.cache_config_provider, local_cache, redis_cache)
@@ -729,3 +748,16 @@ class GCache:
 
     def invalidate(self, key_type: str, id: str, fallback_buffer_ms: int = 0) -> None:
         return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, fallback_buffer_ms))
+
+    async def aflushall(self) -> None:
+        """
+        Remove all local and remote cache entries.
+
+        Useful for testing.
+        :return:
+        """
+        await self._local_cache.flushall()
+        await self._redis_cache.flushall()
+
+    def flushall(self) -> None:
+        self._run_coroutine_in_thread(self.aflushall)

@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.0.6 (2025-02-24)
+
+### Chores
+
+- Add GCacheKey to export ([#10](https://github.com/rungalileo/cachegalileo/pull/10),
+  [`645e575`](https://github.com/rungalileo/cachegalileo/commit/645e575d25d97a3ac8a3ba0e1d0064e2f998e66a))
+
+* chore: Cleaning up code
+
+* Some more comments
+
+* More documentation
+
+* todo
+
+* Remove import from readme
+
+* fixups
+
+* chore: Add GCacheKey to export
+
+
 ## v0.0.5 (2025-02-24)
 
 ### Chores
@@ -19,6 +41,9 @@
 * Remove import from readme
 
 * fixups
+
+- **release**: V0.0.5
+  ([`0be74e2`](https://github.com/rungalileo/cachegalileo/commit/0be74e204c5981df6ba37b6f699bb52454af623d))
 
 
 ## v0.0.4 (2025-02-24)

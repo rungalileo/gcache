@@ -351,6 +351,12 @@ class RedisCache(CacheInterface):
 
 
 class CacheWrapper(CacheInterface):
+    """
+    Abstract class for wrapper implementations.
+
+    Wrappers can be used to add more functionality to a caching layer, like insturmentation, controls, etc.
+    """
+
     def __init__(self, cache_config_provider: CacheConfigProvider, cache: CacheInterface):
         super().__init__(cache_config_provider)
         self.wrapped = cache
@@ -585,6 +591,7 @@ class GCache:
 
     def cached(
         self,
+        *,
         key_type: str,
         id_arg: str | tuple[str, Callable[[Any], str]],
         use_case: str | None = None,
@@ -598,20 +605,25 @@ class GCache:
 
         Whether or not caching will be perofrmed depends on the GCache context and use case configuration.
 
-        :param key_type: Type of entity referred to by the id_arg.
-        :param id_arg: id of the entity, can be a string or a tuple of string and adapter.
+        Arguments to the eventual key are stringified function arguments by default.
+        If you want to transform the args you can provide lambdas, which maybe becessary where function argument
+        is a big object but you only need one field from it to make cache key.
+
+        :param key_type: Type of entity referred to by the id_arg.  Example: user_email, user_id, etc.
+        :param id_arg: name of the argument containing id of the entity or a tuple of name and lambda to extract the value.
         :param use_case: Unique name of the use case.  Defaults to model path + function name.
         :param arg_adapters: Dictionary of argname to an adapter, which is a Callable to extract the value for the arg,
              that can then be serialized for the entire cache key.
         :param ignore_args: List of args to ignore in cache key.
-        :param track_for_invalidation: Boolean flag to indicate if the cache should track for invalidation
+        :param track_for_invalidation: Boolean flag to indicate if the cache should track for invalidation.
+        :param default_config: Default cache config that is used when cache config provider returns None.
         :return:
         """
 
         def decorator(func: Any) -> Any:
             nonlocal use_case
 
-            # Cache the function signature
+            # Cache the function signature by defining it here.
             sig = inspect.signature(func)
 
             if use_case is None:
@@ -626,6 +638,8 @@ class GCache:
             self._use_case_registry.add(use_case)
 
             def arg_transformer(name: str, value: Any) -> str:
+                # Transform function arg name and its value by either invoking a given arg adapter
+                # or just stringifying it.
                 if arg_adapters and name in arg_adapters:
                     return str(arg_adapters[name](value))
                 return str(value)
@@ -635,6 +649,9 @@ class GCache:
                     CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL")
                     return await func(*args, **kwargs)
                 try:
+                    # Try to create GCacheKey by inspecting function arguments and transforming or ignoring
+                    # as necessary.
+
                     bound_args = sig.bind(*args, **kwargs)
                     bound_args.apply_defaults()  # Apply default values if any
 

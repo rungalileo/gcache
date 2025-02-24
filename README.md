@@ -1,6 +1,6 @@
 # GCache
 
-GCache is a lightweight library that provides fine-grained observability and control for your read-through caching scenarios. By enforcing a structured cache key system and offering dynamic runtime controls, GCache simplifies cache invalidation, instrumentation, and management.
+GCache is a lightweight library that provides fine-grained observability and runtime controls for read-through caching.
 
   * Dashboard: https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache
   * Runtime controls: TODO
@@ -35,7 +35,7 @@ The biggest use case for this is to turn off caching in write endpoints, while t
 
 `GCache` class is meant to be instantiated once and be used as a singleton throughout the rest of code base.
 
-To cache a function we use `GCache::cached` decorator.
+To cache a function we use `GCache::cached` decorator.  Same decorator works for both sync and async functions.
 
 Example:
 

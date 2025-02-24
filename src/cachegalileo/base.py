@@ -39,7 +39,6 @@ class CacheLayer(Enum):
 
 
 class GCacheKeyConfig(BaseModel):
-    use_case: str
     ttl_sec: dict[CacheLayer, int]
     ramp: dict[CacheLayer, int]
 

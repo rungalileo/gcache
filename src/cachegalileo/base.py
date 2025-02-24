@@ -281,14 +281,20 @@ class RedisCache(CacheInterface):
             )
         )
 
-    async def _exec_fallback(self, key: GCacheKey, fallback: Fallback) -> Any:
+    async def _exec_fallback(
+        self,
+        key: GCacheKey,
+        watermark_ms: int | None,
+        fallback: Fallback,
+    ) -> Any:
         """
         Execute fallback and store it in cache then return it's return value.
         :param fallback:
         :return:
         """
         val = await fallback()
-        await self.put(key, val)
+        if watermark_ms is None or watermark_ms < time.time() * 1e3:
+            await self.put(key, val)
         return val
 
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
@@ -298,11 +304,11 @@ class RedisCache(CacheInterface):
 
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
-        watermark = None
+        watermark_ms = None
         if key.invalidation_tracking:
             vals = await self.client.mget(key.urn, key.prefix + "#watermark")
             val_pickle = vals[0]
-            watermark = vals[1]
+            watermark_ms = vals[1]
         else:
             val_pickle = await self.client.get(key.urn)
         if val_pickle is not None:
@@ -310,15 +316,15 @@ class RedisCache(CacheInterface):
             serialized_value: RedisSerializedValue = pickle.loads(val_pickle)
 
             # Check if cache val is expired.
-            if watermark is not None:
-                watermark = int(watermark)
-                if watermark >= serialized_value.created_at_ms:
-                    return await self._exec_fallback(key, fallback)
+            if watermark_ms is not None:
+                watermark_ms = int(watermark_ms)
+                if watermark_ms >= serialized_value.created_at_ms:
+                    return await self._exec_fallback(key, watermark_ms, fallback)
 
             _GLOBAL_GCACHE_STATE.logger.debug(f"Got value from Redis in {(time.time_ns() - start_ns) / 1e9} sec")
             return serialized_value.payload
         else:
-            return await self._exec_fallback(key, fallback)
+            return await self._exec_fallback(key, watermark_ms, fallback)
 
     async def put(self, key: GCacheKey, value: Any) -> None:
         config = await self.config_provider(key)

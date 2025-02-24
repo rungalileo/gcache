@@ -2,6 +2,7 @@ import threading
 from random import random
 
 import pytest
+import redislite
 
 from cachegalileo.base import (
     CacheController,
@@ -315,3 +316,25 @@ def test_key_lambda_fail(gcache: GCache) -> None:
 
         with pytest.raises(GCacheKeyConstructionError):
             cached_func()
+
+
+@pytest.mark.asyncio
+async def test_do_not_write_if_invalidated(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider, redis_server: redislite.Redis
+) -> None:
+    with gcache.enable():
+        # Given: We have a function that is cached and tracked for invalidation.
+
+        @gcache.cached(key_type="Test", id_arg="test", track_for_invalidation=True)
+        async def cached_func(test: int) -> int:
+            return 0
+
+        # When: We invalidate it and then invoke it.
+        await gcache.ainvalidate("Test", "123", 1000)
+
+        await cached_func(123)
+
+        # Then: We should not write cache to Redis, only the watermark entry should exist.
+        keys = redis_server.keys()
+        assert 1 == len(keys)
+        assert keys[0] == b"{urn:galileo:test:Test:123}#watermark"

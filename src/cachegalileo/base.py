@@ -442,6 +442,7 @@ class CacheController(CacheWrapper):
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         if await self._should_cache(key):
             start_time = time.monotonic()
+            fallback_time = 0.0
             try:
                 self.CACHE_REQUEST_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
 
@@ -449,17 +450,18 @@ class CacheController(CacheWrapper):
 
                 async def instrumented_fallback() -> Any:
                     nonlocal fallback_failed
+                    nonlocal fallback_time
                     start_fallback = time.monotonic()
+                    self.CACHE_MISS_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
                     try:
-                        self.CACHE_MISS_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
-                        try:
-                            return await fallback()
-                        except:
-                            fallback_failed = True
-                            raise
+                        return await fallback()
+                    except:
+                        fallback_failed = True
+                        raise
                     finally:
+                        fallback_time = time.monotonic() - start_fallback
                         self.CACHE_FALLBACK_TIMER.labels(key.use_case, key.key_type, self.layer().name).observe(
-                            time.monotonic() - start_fallback
+                            fallback_time
                         )
 
                 try:
@@ -479,7 +481,7 @@ class CacheController(CacheWrapper):
                         raise
             finally:
                 self.CACHE_GET_TIMER.labels(key.use_case, key.key_type, self.layer().name).observe(
-                    time.monotonic() - start_time
+                    time.monotonic() - start_time - fallback_time
                 )
         else:
             return await fallback()

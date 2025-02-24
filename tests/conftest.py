@@ -4,9 +4,11 @@ from typing import Any
 import pytest
 import redislite
 
-from cachegalileo.gcache import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
+from cachegalileo import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
 
-REDIS_PORT = 6397
+from . import find_free_port
+
+REDIS_PORT = find_free_port()
 
 
 class FakeCacheConfigProvider:
@@ -32,18 +34,18 @@ def redis_server() -> Generator[redislite.Redis, None, None]:
 
 
 @pytest.fixture
-def mock_cache_config_provider() -> FakeCacheConfigProvider:
+def cache_config_provider() -> FakeCacheConfigProvider:
     return FakeCacheConfigProvider()
 
 
 @pytest.fixture
-def a_gcache(
-    redis_server: redislite.Redis, mock_cache_config_provider: FakeCacheConfigProvider
+def gcache(
+    redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> Generator[GCache, None, None]:
     redis_server.flushall()
     gcache = GCache(
         GCacheConfig(
-            cache_config_provider=mock_cache_config_provider,
+            cache_config_provider=cache_config_provider,
             urn_prefix="urn:galileo:test",
             redis_config=RedisConfig(port=REDIS_PORT),
         )

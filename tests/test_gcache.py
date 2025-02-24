@@ -341,7 +341,7 @@ async def test_do_not_write_if_invalidated(
 
 
 @pytest.mark.asyncio
-async def test_flush_all(gcache, redis_server):
+async def test_flush_all(gcache: GCache, redis_server: redislite.Redis) -> None:
     with gcache.enable():
         v = 0
 

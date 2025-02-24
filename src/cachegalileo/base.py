@@ -759,5 +759,5 @@ class GCache:
         await self._local_cache.flushall()
         await self._redis_cache.flushall()
 
-    def flushall(self):
+    def flushall(self) -> None:
         self._run_coroutine_in_thread(self.aflushall)

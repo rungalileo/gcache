@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.0.7 (2025-02-24)
+
+### Bug Fixes
+
+- Increment cache disabled counter ([#11](https://github.com/rungalileo/cachegalileo/pull/11),
+  [`d44ce55`](https://github.com/rungalileo/cachegalileo/commit/d44ce556ade70f5c50116347740cfea663f521fc))
+
+
 ## v0.0.6 (2025-02-24)
 
 ### Chores
@@ -21,6 +29,9 @@
 * fixups
 
 * chore: Add GCacheKey to export
+
+- **release**: V0.0.6
+  ([`ff430af`](https://github.com/rungalileo/cachegalileo/commit/ff430af8ecbd0895c6ac2e90b0fd5d98c5e1cc20))
 
 
 ## v0.0.5 (2025-02-24)

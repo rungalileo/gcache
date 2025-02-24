@@ -644,7 +644,7 @@ class GCache:
                 return str(value)
 
             async def async_wrapped(*args: Any, **kwargs: Any) -> Any:
-                if not GCacheContext.enabled:
+                if not GCacheContext.enabled.get():
                     CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL").inc()
                     return await func(*args, **kwargs)
                 try:
@@ -706,7 +706,7 @@ class GCache:
             else:
 
                 def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
-                    if not GCacheContext.enabled:
+                    if not GCacheContext.enabled.get():
                         CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL").inc()
                         return func(*args, **kwargs)
 

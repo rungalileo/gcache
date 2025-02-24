@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.0.9 (2025-02-24)
+
+### Bug Fixes
+
+- Subtract fallback time from cache get time.
+  ([#13](https://github.com/rungalileo/cachegalileo/pull/13),
+  [`21b1139`](https://github.com/rungalileo/cachegalileo/commit/21b1139b1b15a52250a583b525e0e89eb7f6cc56))
+
+* fix: Increment cache disabled counter
+
+* fix: Fix early termination when cache is disabled
+
+* fix: subtract fallback time from get time
+
+
 ## v0.0.8 (2025-02-24)
 
 ### Bug Fixes
@@ -12,6 +27,11 @@
 * fix: Increment cache disabled counter
 
 * fix: Fix early termination when cache is disabled
+
+### Chores
+
+- **release**: V0.0.8
+  ([`46e518a`](https://github.com/rungalileo/cachegalileo/commit/46e518aec336f7a8718f36329aab03881964d3ee))
 
 
 ## v0.0.7 (2025-02-24)

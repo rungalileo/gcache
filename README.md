@@ -5,6 +5,7 @@ from src.cachegalileo import GCacheKeyConfig
 GCache is a lightweight library that provides fine-grained observability and control for your read-through caching scenarios. By enforcing a structured cache key system and offering dynamic runtime controls, GCache simplifies cache invalidation, instrumentation, and management.
 
   * Dashboard: https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache
+  * Runtime controls: TODO
 
 ## Enforcing cache key structure
 

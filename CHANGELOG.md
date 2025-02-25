@@ -1,12 +1,25 @@
 # CHANGELOG
 
 
+## v0.1.4 (2025-02-25)
+
+### Bug Fixes
+
+- Always return false when ramp is 0 and true if its 100
+  ([`440e54e`](https://github.com/rungalileo/cachegalileo/commit/440e54eb295efb366094c2290dfa840db2ac1e36))
+
+
 ## v0.1.3 (2025-02-25)
 
 ### Bug Fixes
 
 - Increment counter
   ([`029dc54`](https://github.com/rungalileo/cachegalileo/commit/029dc5469d976fcac66d6b11f334ddd9681f3cfb))
+
+### Chores
+
+- **release**: V0.1.3
+  ([`0a722d7`](https://github.com/rungalileo/cachegalileo/commit/0a722d78113080c5d0ecdb38874758017a7067a2))
 
 
 ## v0.1.2 (2025-02-25)

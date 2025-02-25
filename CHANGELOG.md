@@ -1,7 +1,28 @@
 # CHANGELOG
 
 
+## v0.1.1 (2025-02-25)
+
+### Bug Fixes
+
+- Json serialization for GCacheKeyConfig ([#16](https://github.com/rungalileo/cachegalileo/pull/16),
+  [`56ba27d`](https://github.com/rungalileo/cachegalileo/commit/56ba27dbfc91c6083f8efc33efac29ca3d36f1e0))
+
+* fix: Do not write back cache in Redis when its invalidated
+
+* feat: Add flushall
+
+* Add type annotation
+
+* fix: JSON serialization for GCacheKeyConfig
+
+
 ## v0.1.0 (2025-02-24)
+
+### Chores
+
+- **release**: V0.1.0
+  ([`0bc6951`](https://github.com/rungalileo/cachegalileo/commit/0bc695161b56dac1145f70e3ba326beee29a65a9))
 
 ### Features
 

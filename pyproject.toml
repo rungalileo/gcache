@@ -1,6 +1,6 @@
 [project]
 name = "cachegalileo"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fine grained caching."
 authors = [{ name = "Galileo Technologies Inc.", email = "team@rungalileo.io" }]
 readme = "README.md"

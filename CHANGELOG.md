@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.1.2 (2025-02-25)
+
+### Bug Fixes
+
+- Fix layer label for cache disabled counter
+  ([`ad1d9e7`](https://github.com/rungalileo/cachegalileo/commit/ad1d9e779184e3f16acbb45005b8fbf5c514f21a))
+
+
 ## v0.1.1 (2025-02-25)
 
 ### Bug Fixes
@@ -15,6 +23,11 @@
 * Add type annotation
 
 * fix: JSON serialization for GCacheKeyConfig
+
+### Chores
+
+- **release**: V0.1.1
+  ([`e273d33`](https://github.com/rungalileo/cachegalileo/commit/e273d33482c9d3dab0a1995865e3a6f411613a5f))
 
 
 ## v0.1.0 (2025-02-24)

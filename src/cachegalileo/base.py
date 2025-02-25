@@ -545,7 +545,7 @@ class CacheController(CacheWrapper):
         r = int(random() * 100)
         if r <= ramp:
             return True
-        CacheController.CACHE_DISABLED_COUNTER.labels(key.use_case, key.key_type, self.layer())
+        CacheController.CACHE_DISABLED_COUNTER.labels(key.use_case, key.key_type, self.layer().name)
         return False
 
 

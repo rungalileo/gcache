@@ -1,3 +1,4 @@
+import json
 import threading
 from random import random
 
@@ -369,3 +370,18 @@ async def test_flush_all(gcache: GCache, redis_server: redislite.Redis) -> None:
 
         # Then: Cached function should also return SoT.
         assert 10 == await cached_func()
+
+
+def test_gcache_serialize() -> None:
+    # Test that we can dump a key to json and then load it either from a string of json itself, or from a dict.
+    key = GCacheKeyConfig.enabled(10, "test")
+
+    json_str = key.dumps()
+
+    key2 = GCacheKeyConfig.loads(json_str)
+
+    key3 = GCacheKeyConfig.loads(json.loads(json_str))
+
+    assert key == key2
+
+    assert key == key3

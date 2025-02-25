@@ -1,6 +1,7 @@
 import asyncio
 import contextvars
 import inspect
+import json
 import pickle
 import time
 from abc import ABC, abstractmethod
@@ -14,7 +15,7 @@ from typing import Any
 
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, validator
 from redis.asyncio import Redis, RedisCluster
 
 from cachegalileo.event_loop_thread import EventLoopThread
@@ -41,6 +42,30 @@ class CacheLayer(Enum):
 class GCacheKeyConfig(BaseModel):
     ttl_sec: dict[CacheLayer, int]
     ramp: dict[CacheLayer, int]
+
+    @validator("ttl_sec", "ramp", pre=True)
+    def convert_keys(cls, value: Any) -> Any:
+        # When deserializing, if keys are strings (the enum names), convert them back to CacheLayer.
+        if isinstance(value, dict):
+            return {CacheLayer[key.upper()] if isinstance(key, str) else key: val for key, val in value.items()}
+        return value
+
+    def dict(self, *args: Any, **kwargs: Any) -> dict:
+        # Get the default dict representation.
+        original = super().dict(*args, **kwargs)
+        # Convert dictionary keys for ttl_sec and ramp from CacheLayer to their .name.
+        original["ttl_sec"] = {k.value if isinstance(k, CacheLayer) else k: v for k, v in self.ttl_sec.items()}
+        original["ramp"] = {k.value if isinstance(k, CacheLayer) else k: v for k, v in self.ramp.items()}
+        return original
+
+    def dumps(self) -> str:
+        return json.dumps(self.dict())
+
+    @staticmethod
+    def loads(data: Any) -> "GCacheKeyConfig":
+        if isinstance(data, str):
+            return GCacheKeyConfig.parse_obj(json.loads(data))
+        return GCacheKeyConfig.parse_obj(data)
 
     @staticmethod
     def enabled(ttl_sec: int, use_case: str) -> "GCacheKeyConfig":

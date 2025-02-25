@@ -542,9 +542,12 @@ class CacheController(CacheWrapper):
             raise MissingKeyConfig(key.use_case)
 
         ramp = config.ramp.get(self.layer(), 0)
-        r = int(random() * 100)
-        if r <= ramp:
+        if ramp == 100:
             return True
+        if ramp > 0:
+            r = random()
+            if r < ramp / 100.0:
+                return True
         CacheController.CACHE_DISABLED_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
         return False
 

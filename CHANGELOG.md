@@ -1,12 +1,25 @@
 # CHANGELOG
 
 
+## v0.1.3 (2025-02-25)
+
+### Bug Fixes
+
+- Increment counter
+  ([`029dc54`](https://github.com/rungalileo/cachegalileo/commit/029dc5469d976fcac66d6b11f334ddd9681f3cfb))
+
+
 ## v0.1.2 (2025-02-25)
 
 ### Bug Fixes
 
 - Fix layer label for cache disabled counter
   ([`ad1d9e7`](https://github.com/rungalileo/cachegalileo/commit/ad1d9e779184e3f16acbb45005b8fbf5c514f21a))
+
+### Chores
+
+- **release**: V0.1.2
+  ([`21289c0`](https://github.com/rungalileo/cachegalileo/commit/21289c00ad8b2506e806ab433e8ddda1ba205227))
 
 
 ## v0.1.1 (2025-02-25)

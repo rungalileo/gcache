@@ -1,12 +1,25 @@
 # CHANGELOG
 
 
+## v0.1.5 (2025-02-26)
+
+### Bug Fixes
+
+- Tolerate Redis being down ([#17](https://github.com/rungalileo/cachegalileo/pull/17),
+  [`21877b1`](https://github.com/rungalileo/cachegalileo/commit/21877b191add8dbed3a73af31bb5a067fb72ac69))
+
+
 ## v0.1.4 (2025-02-25)
 
 ### Bug Fixes
 
 - Always return false when ramp is 0 and true if its 100
   ([`440e54e`](https://github.com/rungalileo/cachegalileo/commit/440e54eb295efb366094c2290dfa840db2ac1e36))
+
+### Chores
+
+- **release**: V0.1.4
+  ([`c216c6c`](https://github.com/rungalileo/cachegalileo/commit/c216c6cb93f1658087a028b54e36589285ab2523))
 
 
 ## v0.1.3 (2025-02-25)

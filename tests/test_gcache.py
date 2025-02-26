@@ -18,6 +18,7 @@ from cachegalileo.base import (
     KeyArgDoesNotExist,
     LocalCache,
     MissingKeyConfig,
+    RedisConfig,
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )
@@ -385,3 +386,32 @@ def test_gcache_serialize() -> None:
     assert key == key2
 
     assert key == key3
+
+
+def test_redis_disabled(
+    cache_config_provider: FakeCacheConfigProvider, redis_port: int, redis_server: redislite.Redis
+) -> None:
+    redis_server.flushall()
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:galileo:test",
+            redis_config=RedisConfig(port=redis_port - 1),
+        )
+    )
+    try:
+
+        @gcache.cached(
+            key_type="Test", id_arg="foo", use_case="test", default_config=GCacheKeyConfig.enabled(60, "test")
+        )
+        def cached_func(foo: int) -> int:
+            return 123
+
+        with gcache.enable():
+            assert 123 == cached_func(foo=7)
+
+        assert 0 == len(redis_server.keys())
+
+    finally:
+        gcache.__del__()

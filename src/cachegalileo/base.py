@@ -16,7 +16,9 @@ from typing import Any
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ConfigDict, validator
+from redis import Redis as RedisSync
 from redis.asyncio import Redis, RedisCluster
+from redis.exceptions import ConnectionError
 
 from cachegalileo.event_loop_thread import EventLoopThread
 
@@ -297,22 +299,31 @@ class RedisCache(CacheInterface):
         super().__init__(cache_config_provider)
         self.client: RedisCluster | Redis
 
+        options = dict(
+            socket_connect_timeout=config.socket_connect_timeout,
+            socket_timeout=config.socket_timeout,
+            max_connections=100,
+        )
+
         # These options are super important for Redis failovers
         self.client = (
             RedisCluster.from_url(
                 config.url,
-                socket_connect_timeout=config.socket_connect_timeout,
-                socket_timeout=config.socket_timeout,
-                max_connections=100,
+                **options,
             )
             if config.cluster
             else Redis.from_url(
                 config.url,
-                socket_connect_timeout=config.socket_connect_timeout,
-                socket_timeout=config.socket_timeout,
-                max_connections=100,
+                **options,  # type: ignore[arg-type]
             )
         )
+
+        try:
+            RedisSync.from_url(config.url, **options).ping()
+            self.enabled = True
+        except ConnectionError:
+            _GLOBAL_GCACHE_STATE.logger.error("Could not connect to Redis, so will disable this layer.")
+            self.enabled = False
 
     async def _exec_fallback(
         self,
@@ -336,6 +347,12 @@ class RedisCache(CacheInterface):
         await self.client.setex(key, self.WATERMARKS_TTL_SEC, exp_ms)
 
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+        if not self.enabled:
+            CacheController.CACHE_DISABLED_COUNTER.labels(
+                key.use_case, key.key_type, self.layer().name, DisabledReasons.server_down.name
+            ).inc()
+            return await fallback()
+
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
         watermark_ms = None
         if key.invalidation_tracking:
@@ -418,6 +435,12 @@ class CacheWrapper(CacheInterface):
         return await self.wrapped.flushall()
 
 
+class DisabledReasons(Enum):
+    ramped_down = "ramped_down"
+    context = "context"
+    server_down = "server_down"
+
+
 class CacheController(CacheWrapper):
     """
     Control cache execution and instrument cache hit ratio.
@@ -444,7 +467,7 @@ class CacheController(CacheWrapper):
         if CacheController.CACHE_REQUEST_COUNTER is None:
             CacheController.CACHE_DISABLED_COUNTER = Counter(
                 name=metrics_prefix + "gcache_disabled_counter",
-                labelnames=["use_case", "key_type", "layer"],
+                labelnames=["use_case", "key_type", "layer", "reason"],
                 documentation="Cache disabled counter",
             )
 
@@ -548,7 +571,9 @@ class CacheController(CacheWrapper):
             r = random()
             if r < ramp / 100.0:
                 return True
-        CacheController.CACHE_DISABLED_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
+        CacheController.CACHE_DISABLED_COUNTER.labels(
+            key.use_case, key.key_type, self.layer().name, DisabledReasons.ramped_down.name
+        ).inc()
         return False
 
 
@@ -700,7 +725,9 @@ class GCache:
 
             async def async_wrapped(*args: Any, **kwargs: Any) -> Any:
                 if not GCacheContext.enabled.get():
-                    CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL").inc()
+                    CacheController.CACHE_DISABLED_COUNTER.labels(
+                        use_case, key_type, "GLOBAL", DisabledReasons.context.name
+                    ).inc()
                     return await func(*args, **kwargs)
                 try:
                     # Try to create GCacheKey by inspecting function arguments and transforming or ignoring
@@ -762,7 +789,9 @@ class GCache:
 
                 def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
                     if not GCacheContext.enabled.get():
-                        CacheController.CACHE_DISABLED_COUNTER.labels(use_case, key_type, "GLOBAL").inc()
+                        CacheController.CACHE_DISABLED_COUNTER.labels(
+                            use_case, key_type, "GLOBAL", DisabledReasons.context.name
+                        ).inc()
                         return func(*args, **kwargs)
 
                     return self._run_coroutine_in_thread(partial(async_wrapped, *args, **kwargs))

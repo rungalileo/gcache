@@ -52,7 +52,7 @@ def test_gcache_sync(gcache: GCache) -> None:
 
 
 @pytest.mark.asyncio
-async def test_gcache_async(gcache: GCache) -> None:
+async def test_gcache_async(gcache: GCache, redis_server: redislite.Redis) -> None:
     v: int = 0
 
     @gcache.cached(key_type="Test", id_arg="test")
@@ -73,6 +73,9 @@ async def test_gcache_async(gcache: GCache) -> None:
         v = 10
 
         assert await cached_func() == 5
+
+    keys = redis_server.keys()
+    assert len(keys) == 1
 
 
 def test_caching_func_with_args(gcache: GCache) -> None:

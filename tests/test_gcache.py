@@ -24,6 +24,8 @@ from cachegalileo.base import (
 )
 from tests.conftest import FakeCacheConfigProvider
 
+from .conftest import REDIS_PORT
+
 
 def test_gcache_sync(gcache: GCache) -> None:
     v: int = 0
@@ -388,16 +390,15 @@ def test_gcache_serialize() -> None:
     assert key == key3
 
 
-def test_redis_disabled(
-    cache_config_provider: FakeCacheConfigProvider, redis_port: int, redis_server: redislite.Redis
+@pytest.mark.parametrize("redis_config", [RedisConfig(port=REDIS_PORT - 1), None])
+def test_redis_down(
+    cache_config_provider: FakeCacheConfigProvider, redis_server: redislite.Redis, redis_config: RedisConfig | None
 ) -> None:
     redis_server.flushall()
 
     gcache = GCache(
         GCacheConfig(
-            cache_config_provider=cache_config_provider,
-            urn_prefix="urn:galileo:test",
-            redis_config=RedisConfig(port=redis_port - 1),
+            cache_config_provider=cache_config_provider, urn_prefix="urn:galileo:test", redis_config=redis_config
         )
     )
     try:

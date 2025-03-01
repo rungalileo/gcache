@@ -37,6 +37,7 @@ _GLOBAL_GCACHE_STATE = GCacheGlobalState()
 
 
 class CacheLayer(Enum):
+    NOOP = "noop"
     LOCAL = "local"
     REMOTE = "remote"
 
@@ -210,6 +211,24 @@ class CacheInterface(ABC):
     async def flushall(self) -> None:
         """Remove all entries"""
         pass
+
+
+class NoopCache(CacheInterface):
+    """
+    NOOP Cache that does nothing but invoke fallback on get.
+    """
+
+    async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+        return await fallback()
+
+    async def put(self, key: GCacheKey, value: Any) -> None:
+        pass
+
+    async def delete(self, key: GCacheKey) -> bool:
+        return False
+
+    def layer(self) -> CacheLayer:
+        return CacheLayer.NOOP
 
 
 class LocalCache(CacheInterface):
@@ -602,7 +621,7 @@ class GCacheConfig(BaseModel):
     cache_config_provider: CacheConfigProvider
     urn_prefix: str | None = None
     metrics_prefix: str = "api_"
-    redis_config: RedisConfig = RedisConfig()
+    redis_config: RedisConfig | None = None
     logger: Logger | LoggerAdapter | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -625,10 +644,14 @@ class GCache:
             metrics_prefix=config.metrics_prefix,
         )
 
-        redis_cache = CacheController(
-            RedisCache(config.cache_config_provider, config.redis_config),
-            config.cache_config_provider,
-            metrics_prefix=config.metrics_prefix,
+        redis_cache = (
+            CacheController(
+                RedisCache(config.cache_config_provider, config.redis_config),
+                config.cache_config_provider,
+                metrics_prefix=config.metrics_prefix,
+            )
+            if config.redis_config
+            else NoopCache(config.cache_config_provider)
         )
 
         self._local_cache = local_cache

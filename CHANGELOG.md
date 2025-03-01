@@ -1,12 +1,25 @@
 # CHANGELOG
 
 
+## v0.2.0 (2025-03-01)
+
+### Features
+
+- Optional RedisConfig ([#18](https://github.com/rungalileo/cachegalileo/pull/18),
+  [`a24300e`](https://github.com/rungalileo/cachegalileo/commit/a24300ec4d877b6c1de7f27b9dcc56e0ff075762))
+
+
 ## v0.1.5 (2025-02-26)
 
 ### Bug Fixes
 
 - Tolerate Redis being down ([#17](https://github.com/rungalileo/cachegalileo/pull/17),
   [`21877b1`](https://github.com/rungalileo/cachegalileo/commit/21877b191add8dbed3a73af31bb5a067fb72ac69))
+
+### Chores
+
+- **release**: V0.1.5
+  ([`758cbc0`](https://github.com/rungalileo/cachegalileo/commit/758cbc0a7af3f7ccee3b87300c75c14503a95b5d))
 
 
 ## v0.1.4 (2025-02-25)

@@ -24,11 +24,6 @@ class FakeCacheConfigProvider:
         )
 
 
-@pytest.fixture
-def redis_port() -> int:
-    return REDIS_PORT
-
-
 @pytest.fixture(scope="session")
 def redis_server() -> Generator[redislite.Redis, None, None]:
     # Create a redislite instance listening on TCP port 6397. Default is 6379, so we avoid that to prevent conflicts.

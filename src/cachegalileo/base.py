@@ -810,7 +810,7 @@ class GCache:
                         ).inc()
                         return func(*args, **kwargs)
 
-                    return self._run_coroutine_in_thread(lambda: async_wrapped(*args, **kwargs))
+                    return self._run_coroutine_in_thread(partial(async_wrapped, *args, **kwargs))
 
                 return sync_wrapped
 

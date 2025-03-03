@@ -797,10 +797,7 @@ class GCache:
                     async def f():  # type: ignore[no-untyped-def, misc]
                         return func(*args, **kwargs)
 
-                # Get the cached result using the fallback function
-                cached_result = await self._cache.get(key, f)
-                # Return the result directly
-                return cached_result
+                return await self._cache.get(key, f)
 
             if inspect.iscoroutinefunction(func):
                 return async_wrapped

@@ -3,6 +3,7 @@ import contextvars
 import inspect
 import json
 import pickle
+import threading
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Generator
@@ -16,9 +17,7 @@ from typing import Any
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ConfigDict, validator
-from redis import Redis as RedisSync
 from redis.asyncio import Redis, RedisCluster
-from redis.exceptions import ConnectionError
 
 from cachegalileo.event_loop_thread import EventLoopThread
 
@@ -316,33 +315,32 @@ class RedisCache(CacheInterface):
 
     def __init__(self, cache_config_provider: CacheConfigProvider, config: RedisConfig):
         super().__init__(cache_config_provider)
-        self.client: RedisCluster | Redis
+        # Store config but don't create client immediately
+        self._config = config
+        self._client = threading.local()
 
-        options = dict(
-            socket_connect_timeout=config.socket_connect_timeout,
-            socket_timeout=config.socket_timeout,
-            max_connections=100,
-        )
-
-        # These options are super important for Redis failovers
-        self.client = (
-            RedisCluster.from_url(
-                config.url,
-                **options,
+    @property
+    def client(self) -> Redis | RedisCluster:
+        """
+        Get a Redis client that's bound to the current thread/event loop.
+        Each thread gets its own dedicated client.
+        """
+        # Check if this thread already has a client
+        if not hasattr(self._client, "client"):
+            # Create a new client for this thread
+            options = dict(
+                socket_connect_timeout=self._config.socket_connect_timeout,
+                socket_timeout=self._config.socket_timeout,
+                max_connections=100,
             )
-            if config.cluster
-            else Redis.from_url(
-                config.url,
-                **options,  # type: ignore[arg-type]
-            )
-        )
 
-        try:
-            RedisSync.from_url(config.url, **options).ping()
-            self.enabled = True
-        except ConnectionError:
-            _GLOBAL_GCACHE_STATE.logger.error("Could not connect to Redis, so will disable this layer.")
-            self.enabled = False
+            # Create the appropriate Redis client based on config
+            if self._config.cluster:
+                self._client.client = RedisCluster.from_url(self._config.url, **options)
+            else:
+                self._client.client = Redis.from_url(self._config.url, **options)  # type: ignore[arg-type]
+
+        return self._client.client
 
     async def _exec_fallback(
         self,
@@ -366,18 +364,14 @@ class RedisCache(CacheInterface):
         await self.client.setex(key, self.WATERMARKS_TTL_SEC, exp_ms)
 
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
-        if not self.enabled:
-            CacheController.CACHE_DISABLED_COUNTER.labels(
-                key.use_case, key.key_type, self.layer().name, DisabledReasons.server_down.name
-            ).inc()
-            return await fallback()
-
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
         watermark_ms = None
         if key.invalidation_tracking:
             vals = await self.client.mget(key.urn, key.prefix + "#watermark")
             val_pickle = vals[0]
             watermark_ms = vals[1]
+            if watermark_ms is not None:
+                watermark_ms = float(watermark_ms)
         else:
             val_pickle = await self.client.get(key.urn)
         if val_pickle is not None:
@@ -397,7 +391,6 @@ class RedisCache(CacheInterface):
 
     async def put(self, key: GCacheKey, value: Any) -> None:
         config = await self.config_provider(key)
-
         if config is None:
             config = key.default_config
 

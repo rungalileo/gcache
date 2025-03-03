@@ -3,7 +3,6 @@ import contextvars
 import inspect
 import json
 import pickle
-import queue
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -18,9 +17,7 @@ from typing import Any
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ConfigDict, validator
-from redis import Redis as RedisSync
 from redis.asyncio import Redis, RedisCluster
-from redis.exceptions import ConnectionError
 
 from cachegalileo.event_loop_thread import EventLoopThread
 
@@ -323,13 +320,13 @@ class RedisCache(CacheInterface):
         self._client = threading.local()
 
     @property
-    def client(self):
+    def client(self) -> Redis | RedisCluster:
         """
         Get a Redis client that's bound to the current thread/event loop.
         Each thread gets its own dedicated client.
         """
         # Check if this thread already has a client
-        if not hasattr(self._client, 'client'):
+        if not hasattr(self._client, "client"):
             # Create a new client for this thread
             options = dict(
                 socket_connect_timeout=self._config.socket_connect_timeout,
@@ -341,15 +338,15 @@ class RedisCache(CacheInterface):
             if self._config.cluster:
                 self._client.client = RedisCluster.from_url(self._config.url, **options)
             else:
-                self._client.client = Redis.from_url(self._config.url, **options)
+                self._client.client = Redis.from_url(self._config.url, **options)  # type: ignore[arg-type]
 
         return self._client.client
 
     async def _exec_fallback(
-            self,
-            key: GCacheKey,
-            watermark_ms: int | None,
-            fallback: Fallback,
+        self,
+        key: GCacheKey,
+        watermark_ms: int | None,
+        fallback: Fallback,
     ) -> Any:
         """
         Execute fallback and store it in cache then return it's return value.
@@ -470,10 +467,10 @@ class CacheController(CacheWrapper):
     CACHE_SIZE_HISTOGRAM: Histogram = None  # type: ignore[assignment]
 
     def __init__(
-            self,
-            cache: CacheInterface,
-            cache_config_provider: CacheConfigProvider,
-            metrics_prefix: str = "",
+        self,
+        cache: CacheInterface,
+        cache_config_provider: CacheConfigProvider,
+        metrics_prefix: str = "",
     ):
         super().__init__(cache_config_provider, cache)
 
@@ -546,10 +543,7 @@ class CacheController(CacheWrapper):
                         )
 
                 try:
-                    # Get the cached result using the fallback function
-                    cached_result = await self.wrapped.get(key, instrumented_fallback)
-                    # Return the result directly
-                    return cached_result
+                    return await self.wrapped.get(key, instrumented_fallback)
                 except Exception as e:
                     _GLOBAL_GCACHE_STATE.logger.error(f"Error getting value from cache: {e}", exc_info=True)
                     self.CACHE_ERROR_COUNTER.labels(
@@ -599,10 +593,10 @@ class CacheChain(CacheWrapper):
     """
 
     def __init__(
-            self,
-            cache_config_provider: CacheConfigProvider,
-            cache: CacheInterface,
-            fallback_cache: CacheInterface,
+        self,
+        cache_config_provider: CacheConfigProvider,
+        cache: CacheInterface,
+        fallback_cache: CacheInterface,
     ):
         super().__init__(cache_config_provider, cache)
         self.fallback_cache = fallback_cache
@@ -689,15 +683,15 @@ class GCache:
         GCacheContext.enabled.set(False)
 
     def cached(
-            self,
-            *,
-            key_type: str,
-            id_arg: str | tuple[str, Callable[[Any], str]],
-            use_case: str | None = None,
-            arg_adapters: dict[str, Callable[[Any], str]] | None = None,
-            ignore_args: list[str] = [],
-            track_for_invalidation: bool = False,
-            default_config: GCacheKeyConfig | None = None,
+        self,
+        *,
+        key_type: str,
+        id_arg: str | tuple[str, Callable[[Any], str]],
+        use_case: str | None = None,
+        arg_adapters: dict[str, Callable[[Any], str]] | None = None,
+        ignore_args: list[str] = [],
+        track_for_invalidation: bool = False,
+        default_config: GCacheKeyConfig | None = None,
     ) -> Any:
         """
         Decorator which caches a function which can be either sync or async.

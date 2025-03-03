@@ -370,6 +370,8 @@ class RedisCache(CacheInterface):
             vals = await self.client.mget(key.urn, key.prefix + "#watermark")
             val_pickle = vals[0]
             watermark_ms = vals[1]
+            if watermark_ms is not None:
+                watermark_ms = float(watermark_ms)
         else:
             val_pickle = await self.client.get(key.urn)
         if val_pickle is not None:

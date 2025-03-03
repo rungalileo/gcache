@@ -3,6 +3,8 @@ import contextvars
 import inspect
 import json
 import pickle
+import queue
+import threading
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Generator
@@ -316,39 +318,38 @@ class RedisCache(CacheInterface):
 
     def __init__(self, cache_config_provider: CacheConfigProvider, config: RedisConfig):
         super().__init__(cache_config_provider)
-        self.client: RedisCluster | Redis
+        # Store config but don't create client immediately
+        self._config = config
+        self._client = threading.local()
 
-        options = dict(
-            socket_connect_timeout=config.socket_connect_timeout,
-            socket_timeout=config.socket_timeout,
-            max_connections=100,
-        )
-
-        # These options are super important for Redis failovers
-        self.client = (
-            RedisCluster.from_url(
-                config.url,
-                **options,
+    @property
+    def client(self):
+        """
+        Get a Redis client that's bound to the current thread/event loop.
+        Each thread gets its own dedicated client.
+        """
+        # Check if this thread already has a client
+        if not hasattr(self._client, 'client'):
+            # Create a new client for this thread
+            options = dict(
+                socket_connect_timeout=self._config.socket_connect_timeout,
+                socket_timeout=self._config.socket_timeout,
+                max_connections=100,
             )
-            if config.cluster
-            else Redis.from_url(
-                config.url,
-                **options,  # type: ignore[arg-type]
-            )
-        )
 
-        try:
-            RedisSync.from_url(config.url, **options).ping()
-            self.enabled = True
-        except ConnectionError:
-            _GLOBAL_GCACHE_STATE.logger.error("Could not connect to Redis, so will disable this layer.")
-            self.enabled = False
+            # Create the appropriate Redis client based on config
+            if self._config.cluster:
+                self._client.client = RedisCluster.from_url(self._config.url, **options)
+            else:
+                self._client.client = Redis.from_url(self._config.url, **options)
+
+        return self._client.client
 
     async def _exec_fallback(
-        self,
-        key: GCacheKey,
-        watermark_ms: int | None,
-        fallback: Fallback,
+            self,
+            key: GCacheKey,
+            watermark_ms: int | None,
+            fallback: Fallback,
     ) -> Any:
         """
         Execute fallback and store it in cache then return it's return value.
@@ -366,12 +367,6 @@ class RedisCache(CacheInterface):
         await self.client.setex(key, self.WATERMARKS_TTL_SEC, exp_ms)
 
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
-        if not self.enabled:
-            CacheController.CACHE_DISABLED_COUNTER.labels(
-                key.use_case, key.key_type, self.layer().name, DisabledReasons.server_down.name
-            ).inc()
-            return await fallback()
-
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
         watermark_ms = None
         if key.invalidation_tracking:
@@ -397,7 +392,6 @@ class RedisCache(CacheInterface):
 
     async def put(self, key: GCacheKey, value: Any) -> None:
         config = await self.config_provider(key)
-
         if config is None:
             config = key.default_config
 
@@ -476,10 +470,10 @@ class CacheController(CacheWrapper):
     CACHE_SIZE_HISTOGRAM: Histogram = None  # type: ignore[assignment]
 
     def __init__(
-        self,
-        cache: CacheInterface,
-        cache_config_provider: CacheConfigProvider,
-        metrics_prefix: str = "",
+            self,
+            cache: CacheInterface,
+            cache_config_provider: CacheConfigProvider,
+            metrics_prefix: str = "",
     ):
         super().__init__(cache_config_provider, cache)
 
@@ -552,7 +546,10 @@ class CacheController(CacheWrapper):
                         )
 
                 try:
-                    return await self.wrapped.get(key, instrumented_fallback)
+                    # Get the cached result using the fallback function
+                    cached_result = await self.wrapped.get(key, instrumented_fallback)
+                    # Return the result directly
+                    return cached_result
                 except Exception as e:
                     _GLOBAL_GCACHE_STATE.logger.error(f"Error getting value from cache: {e}", exc_info=True)
                     self.CACHE_ERROR_COUNTER.labels(
@@ -602,10 +599,10 @@ class CacheChain(CacheWrapper):
     """
 
     def __init__(
-        self,
-        cache_config_provider: CacheConfigProvider,
-        cache: CacheInterface,
-        fallback_cache: CacheInterface,
+            self,
+            cache_config_provider: CacheConfigProvider,
+            cache: CacheInterface,
+            fallback_cache: CacheInterface,
     ):
         super().__init__(cache_config_provider, cache)
         self.fallback_cache = fallback_cache
@@ -692,15 +689,15 @@ class GCache:
         GCacheContext.enabled.set(False)
 
     def cached(
-        self,
-        *,
-        key_type: str,
-        id_arg: str | tuple[str, Callable[[Any], str]],
-        use_case: str | None = None,
-        arg_adapters: dict[str, Callable[[Any], str]] | None = None,
-        ignore_args: list[str] = [],
-        track_for_invalidation: bool = False,
-        default_config: GCacheKeyConfig | None = None,
+            self,
+            *,
+            key_type: str,
+            id_arg: str | tuple[str, Callable[[Any], str]],
+            use_case: str | None = None,
+            arg_adapters: dict[str, Callable[[Any], str]] | None = None,
+            ignore_args: list[str] = [],
+            track_for_invalidation: bool = False,
+            default_config: GCacheKeyConfig | None = None,
     ) -> Any:
         """
         Decorator which caches a function which can be either sync or async.
@@ -804,7 +801,10 @@ class GCache:
                     async def f():  # type: ignore[no-untyped-def, misc]
                         return func(*args, **kwargs)
 
-                return await self._cache.get(key, f)
+                # Get the cached result using the fallback function
+                cached_result = await self._cache.get(key, f)
+                # Return the result directly
+                return cached_result
 
             if inspect.iscoroutinefunction(func):
                 return async_wrapped
@@ -817,7 +817,8 @@ class GCache:
                         ).inc()
                         return func(*args, **kwargs)
 
-                    return self._run_coroutine_in_thread(partial(async_wrapped, *args, **kwargs))
+                    # Use a lambda to ensure proper coroutine creation
+                    return self._run_coroutine_in_thread(lambda: async_wrapped(*args, **kwargs))
 
                 return sync_wrapped
 

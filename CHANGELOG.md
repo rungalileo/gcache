@@ -1,7 +1,23 @@
 # CHANGELOG
 
 
+## v0.4.0 (2025-03-04)
+
+### Features
+
+- Allow users to explicitly disable cache
+  ([#23](https://github.com/rungalileo/cachegalileo/pull/23),
+  [`be6dbc4`](https://github.com/rungalileo/cachegalileo/commit/be6dbc4253308ccfa3c9c97efadc43d039cfcffe))
+
+Adds ability to disable cache via context manager
+
+
 ## v0.3.0 (2025-03-04)
+
+### Chores
+
+- **release**: V0.3.0
+  ([`edee9cf`](https://github.com/rungalileo/cachegalileo/commit/edee9cfccab6c0537346822943fc3fb10652728a))
 
 ### Features
 

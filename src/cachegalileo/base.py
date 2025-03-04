@@ -805,7 +805,7 @@ class GCache:
                     CacheController.CACHE_ERROR_COUNTER.labels(
                         use_case,
                         key_type,
-                        "GLOBAL",
+                        "key creation",
                         type(e).__name__,
                         False,
                     ).inc()

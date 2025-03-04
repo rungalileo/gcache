@@ -359,12 +359,15 @@ class RedisCache(CacheInterface):
         return val
 
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
+        CacheController.CACHE_INVALIDATION_COUNT.labels(key_type, self.layer().name).inc()
+
         key = "{" + _GLOBAL_GCACHE_STATE.urn_prefix + ":" + key_type + ":" + id + "}#watermark"
         exp_ms = int(time.time() * 1000 + future_buffer_ms)
         await self.client.setex(key, self.WATERMARKS_TTL_SEC, exp_ms)
 
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
+
         watermark_ms = None
         if key.invalidation_tracking:
             vals = await self.client.mget(key.urn, key.prefix + "#watermark")
@@ -458,6 +461,7 @@ class CacheController(CacheWrapper):
     Control cache execution and instrument cache hit ratio.
     """
 
+    # TODO: These caches should be defined elsewhere.
     CACHE_DISABLED_COUNTER: Counter = None  # type: ignore[assignment]
     CACHE_MISS_COUNTER: Counter = None  # type: ignore[assignment]
     CACHE_REQUEST_COUNTER: Counter = None  # type: ignore[assignment]
@@ -467,6 +471,8 @@ class CacheController(CacheWrapper):
     CACHE_FALLBACK_TIMER: Histogram = None  # type: ignore[assignment]
 
     CACHE_SIZE_HISTOGRAM: Histogram = None  # type: ignore[assignment]
+
+    CACHE_INVALIDATION_COUNT: Counter = None  # type: ignore[assignment]
 
     def __init__(
         self,
@@ -498,6 +504,11 @@ class CacheController(CacheWrapper):
                 name=metrics_prefix + "gcache_error_counter",
                 labelnames=["use_case", "key_type", "layer", "error", "in_fallback"],
                 documentation="Cache error counter",
+            )
+            CacheController.CACHE_INVALIDATION_COUNT = Counter(
+                name=metrics_prefix + "gcache_invalidation_counter",
+                labelnames=["key_type", "layer"],
+                documentation="Cache invalidation counter",
             )
             CacheController.CACHE_GET_TIMER = Histogram(
                 name=metrics_prefix + "gcache_get_timer",
@@ -786,6 +797,13 @@ class GCache:
                         default_config=default_config,
                     )
                 except Exception as e:
+                    CacheController.CACHE_ERROR_COUNTER.labels(
+                        use_case,
+                        key_type,
+                        "GLOBAL",
+                        type(e).__name__,
+                        False,
+                    ).inc()
                     if isinstance(e, GCacheError):
                         raise e
                     raise GCacheKeyConstructionError("Could not construct gcache key") from e

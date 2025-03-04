@@ -16,8 +16,9 @@ class EventLoopThread(threading.Thread):
     on it and wait for results from synchronous code.
     """
 
-    def __init__(self, name: str = "EventLoopThread") -> None:
+    def __init__(self, name: str = "EventLoopThread", daemon: bool = True) -> None:
         super().__init__(name=name)
+        self.daemon = daemon
         self.loop = uvloop.new_event_loop()
 
     def run(self) -> None:

@@ -1,7 +1,24 @@
 # CHANGELOG
 
 
+## v0.4.1 (2025-03-04)
+
+### Bug Fixes
+
+- Eventloopthread is now run in daemon mode
+  ([#24](https://github.com/rungalileo/cachegalileo/pull/24),
+  [`04b3b5a`](https://github.com/rungalileo/cachegalileo/commit/04b3b5a3ec45719d89a158a8e3195c872e96b2af))
+
+EventLoopThread now runs in daemon mode which means that when process is shutting down it won't
+  prevent it.
+
+
 ## v0.4.0 (2025-03-04)
+
+### Chores
+
+- **release**: V0.4.0
+  ([`3a470a6`](https://github.com/rungalileo/cachegalileo/commit/3a470a6fc779a8b7c64a242ad2fe916a91a3d66f))
 
 ### Features
 

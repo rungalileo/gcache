@@ -1,7 +1,76 @@
 # CHANGELOG
 
 
+## v0.2.1 (2025-03-03)
+
+### Bug Fixes
+
+- Fix Redis async client not playing nice with FastAPI
+  ([#21](https://github.com/rungalileo/cachegalileo/pull/21),
+  [`4acd2d4`](https://github.com/rungalileo/cachegalileo/commit/4acd2d457a924c3c7e2aab777d45648b08aa95b2))
+
+* chore: Fix Redis async client not playing nice with FastAPI
+
+* fixups
+
+* Coerce watermark to float
+
+* fix
+
+* revert
+
+* getridof
+
+* revertline
+
+### Chores
+
+- **deps**: Bump codecov/codecov-action from 5.3.1 to 5.4.0
+  ([#20](https://github.com/rungalileo/cachegalileo/pull/20),
+  [`6ab3ae3`](https://github.com/rungalileo/cachegalileo/commit/6ab3ae3f98f7fbe7ab59af7c9c78a9330fd9c4bf))
+
+Bumps [codecov/codecov-action](https://github.com/codecov/codecov-action) from 5.3.1 to 5.4.0. -
+  [Release notes](https://github.com/codecov/codecov-action/releases) -
+  [Changelog](https://github.com/codecov/codecov-action/blob/main/CHANGELOG.md) -
+  [Commits](https://github.com/codecov/codecov-action/compare/v5.3.1...v5.4.0)
+
+--- updated-dependencies: - dependency-name: codecov/codecov-action dependency-type:
+  direct:production
+
+update-type: version-update:semver-minor ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps**: Bump python-semantic-release/python-semantic-release
+  ([#19](https://github.com/rungalileo/cachegalileo/pull/19),
+  [`4bc26ef`](https://github.com/rungalileo/cachegalileo/commit/4bc26efea38b0bf3cb0b2d0548f566f7196b2d9b))
+
+Bumps
+  [python-semantic-release/python-semantic-release](https://github.com/python-semantic-release/python-semantic-release)
+  from 9.20.0 to 9.21.0. - [Release
+  notes](https://github.com/python-semantic-release/python-semantic-release/releases) -
+  [Changelog](https://github.com/python-semantic-release/python-semantic-release/blob/master/CHANGELOG.rst)
+  -
+  [Commits](https://github.com/python-semantic-release/python-semantic-release/compare/v9.20.0...v9.21.0)
+
+--- updated-dependencies: - dependency-name: python-semantic-release/python-semantic-release
+  dependency-type: direct:production
+
+update-type: version-update:semver-minor ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+
 ## v0.2.0 (2025-03-01)
+
+### Chores
+
+- **release**: V0.2.0
+  ([`f1a4893`](https://github.com/rungalileo/cachegalileo/commit/f1a4893c12434514528fd45e28c7f392aabf1183))
 
 ### Features
 

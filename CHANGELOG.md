@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.3.0 (2025-03-04)
+
+### Features
+
+- Tolerate key creation failures ([#22](https://github.com/rungalileo/cachegalileo/pull/22),
+  [`24f7c99`](https://github.com/rungalileo/cachegalileo/commit/24f7c99b1d200863192dcc856b4c0a8c11ed8c00))
+
+* feat: Instrument invalidation count and key error count:
+
+* Update behavior to use fallback when we can't create key
+
+* Update label
+
+
 ## v0.2.1 (2025-03-03)
 
 ### Bug Fixes
@@ -63,6 +77,9 @@ update-type: version-update:semver-minor ...
 Signed-off-by: dependabot[bot] <support@github.com>
 
 Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **release**: V0.2.1
+  ([`78aecc9`](https://github.com/rungalileo/cachegalileo/commit/78aecc90aa5c3085b2c8f7a3694d7ea27191a1db))
 
 
 ## v0.2.0 (2025-03-01)

@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 import redislite
+from prometheus_client import REGISTRY
 
 from cachegalileo import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
 
@@ -54,3 +55,22 @@ def gcache(
     # Manually call destructor so we make sure to remove
     # singleton checks as well as stop event loop thread
     gcache.__del__()
+
+
+@pytest.fixture()
+def reset_prometheus_registry() -> Generator:
+    """
+    Clears the prometheus registry before each test.
+
+    This is necessary because the registry is a global singleton, and we don't want to have metrics from previous tests
+    affecting the results of the current test.
+    """
+    collectors = tuple(REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        try:
+            collector._metrics.clear()  # type: ignore[attr-defined]
+            collector._metric_init()  # type: ignore[attr-defined]
+        except AttributeError:
+            # For built-in collectors
+            pass
+    yield

@@ -1,9 +1,11 @@
 import json
 import threading
+from collections.abc import Generator
 from random import random
 
 import pytest
 import redislite
+from prometheus_client import generate_latest
 
 from cachegalileo.base import (
     CacheController,
@@ -14,8 +16,6 @@ from cachegalileo.base import (
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,
-    GCacheKeyConstructionError,
-    KeyArgDoesNotExist,
     LocalCache,
     MissingKeyConfig,
     RedisConfig,
@@ -25,6 +25,14 @@ from cachegalileo.base import (
 from tests.conftest import FakeCacheConfigProvider
 
 from .conftest import REDIS_PORT
+
+
+def get_func_metric(name: str) -> float:
+    metrics = generate_latest().decode("utf-8")
+    for line in metrics.split("\n"):
+        if line.startswith(name):
+            return float(line.split(" ")[-1])
+    return 0
 
 
 def test_gcache_sync(gcache: GCache) -> None:
@@ -175,15 +183,19 @@ def test_duplicate_use_cases(gcache: GCache) -> None:
             return 0
 
 
-def test_key_arg_does_not_exist(gcache: GCache) -> None:
-    with pytest.raises(KeyArgDoesNotExist):
-        with gcache.enable():
+def test_key_arg_does_not_exist(gcache: GCache, reset_prometheus_registry: Generator) -> None:
+    with gcache.enable():
+        # Given: Function that is cached, but id arg is incorrect
+        @gcache.cached(key_type="Test", id_arg="doesnt_exist", use_case="cached_func")
+        def cached_func(test: int = 123) -> int:
+            return 0
 
-            @gcache.cached(key_type="Test", id_arg="doesnt_exist", use_case="cached_func")
-            def cached_func(test: int = 123) -> int:
-                return 0
+        # When: Function is called
+        # Then: Fallback is used
+        0 == cached_func()
 
-            cached_func()
+        # Then: Error counter is incremented
+        assert 1 == get_func_metric("api_gcache_error_counter_total")
 
 
 def test_reserved_use_case_name(gcache: GCache) -> None:
@@ -321,8 +333,8 @@ def test_key_lambda_fail(gcache: GCache) -> None:
         def cached_func(test: int = 123) -> int:
             return 0
 
-        with pytest.raises(GCacheKeyConstructionError):
-            cached_func()
+        assert 0 == cached_func()
+        assert 1 == get_func_metric("api_gcache_error_counter_total")
 
 
 @pytest.mark.asyncio

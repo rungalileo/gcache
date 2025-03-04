@@ -671,6 +671,8 @@ class GCache:
 
         _GLOBAL_GCACHE_STATE.gcache_instantiated = True
 
+        self.config = config
+
     def __del__(self) -> None:
         self._event_loop_thread.stop()
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
@@ -751,11 +753,12 @@ class GCache:
                 return str(value)
 
             async def async_wrapped(*args: Any, **kwargs: Any) -> Any:
+                should_cache = True
                 if not GCacheContext.enabled.get():
                     CacheController.CACHE_DISABLED_COUNTER.labels(
                         use_case, key_type, "GLOBAL", DisabledReasons.context.name
                     ).inc()
-                    return await func(*args, **kwargs)
+                    should_cache = False
                 try:
                     # Try to create GCacheKey by inspecting function arguments and transforming or ignoring
                     # as necessary.
@@ -797,6 +800,8 @@ class GCache:
                         default_config=default_config,
                     )
                 except Exception as e:
+                    # Default to fallback but instrument the error as well as log.
+                    _GLOBAL_GCACHE_STATE.logger.error("Could not construct key", exc_info=True)
                     CacheController.CACHE_ERROR_COUNTER.labels(
                         use_case,
                         key_type,
@@ -804,13 +809,15 @@ class GCache:
                         type(e).__name__,
                         False,
                     ).inc()
-                    if isinstance(e, GCacheError):
-                        raise e
-                    raise GCacheKeyConstructionError("Could not construct gcache key") from e
+                    should_cache = False
 
                 if inspect.iscoroutinefunction(func):
+                    if not should_cache:
+                        return await func(*args, **kwargs)
                     f = partial(func, *args, **kwargs)
                 else:
+                    if not should_cache:
+                        return func(*args, **kwargs)
 
                     async def f():  # type: ignore[no-untyped-def, misc]
                         return func(*args, **kwargs)

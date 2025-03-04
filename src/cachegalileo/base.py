@@ -689,13 +689,14 @@ class GCache:
         return self._event_loop_thread_instance
 
     @contextmanager
-    def enable(self) -> Generator[None]:
+    def enable(self, enabled: bool = True) -> Generator[None]:
         """
-        Enable GCache for the duration of the context
+        Enable or disable GCache for the duration of the context
         """
-        GCacheContext.enabled.set(True)
+        prev_val = GCacheContext.enabled.get()
+        GCacheContext.enabled.set(enabled)
         yield
-        GCacheContext.enabled.set(False)
+        GCacheContext.enabled.set(prev_val)
 
     def cached(
         self,

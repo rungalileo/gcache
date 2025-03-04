@@ -35,7 +35,7 @@ def get_func_metric(name: str) -> float:
     return 0
 
 
-def test_gcache_sync(gcache: GCache) -> None:
+def test_gcache_sync(gcache: GCache, redis_server: redislite.Redis, reset_prometheus_registry: Generator) -> None:
     v: int = 0
 
     @gcache.cached(key_type="Test", id_arg="test")
@@ -57,12 +57,28 @@ def test_gcache_sync(gcache: GCache) -> None:
 
         assert cached_func() == 5
 
+        # When we disable cache then we should get fresh value.
+        with gcache.enable(False):
+            assert cached_func() == 10
+
+        # When we are back in the enabled contextg we should still get cached value
+        assert cached_func() == 5
+
         # When we call with different arg then we should get fresh value.
         assert cached_func(test=124) == 10
 
+    # We should have count 3 for disableed metric since we made 3 calls when gcache was disabled.
+    assert get_func_metric("api_gcache_disabled_counter") == 3
+
+    # We should have 2 keys.  One for 123 and one for 124 args.
+    keys = redis_server.keys()
+    assert len(keys) == 2
+
 
 @pytest.mark.asyncio
-async def test_gcache_async(gcache: GCache, redis_server: redislite.Redis) -> None:
+async def test_gcache_async(
+    gcache: GCache, redis_server: redislite.Redis, reset_prometheus_registry: Generator
+) -> None:
     v: int = 0
 
     @gcache.cached(key_type="Test", id_arg="test")
@@ -84,8 +100,22 @@ async def test_gcache_async(gcache: GCache, redis_server: redislite.Redis) -> No
 
         assert await cached_func() == 5
 
+        # When we disable cache then we should get fresh value.
+        with gcache.enable(False):
+            assert await cached_func() == 10
+
+        # When we are back in the enabled contextg we should still get cached value
+        assert await cached_func() == 5
+
+        # When we call with different arg then we should get fresh value.
+        assert await cached_func(test=124) == 10
+
+    # We should have count 3 for disableed metric since we made 3 calls when gcache was disabled.
+    assert get_func_metric("api_gcache_disabled_counter") == 3
+
+    # We should have 2 keys.  One for 123 and one for 124 args.
     keys = redis_server.keys()
-    assert len(keys) == 1
+    assert len(keys) == 2
 
 
 def test_caching_func_with_args(gcache: GCache) -> None:

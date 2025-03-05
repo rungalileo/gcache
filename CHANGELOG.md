@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.4.2 (2025-03-05)
+
+### Bug Fixes
+
+- Do not initialize event loop thread on __del__
+  ([#25](https://github.com/rungalileo/cachegalileo/pull/25),
+  [`9f4bef0`](https://github.com/rungalileo/cachegalileo/commit/9f4bef0d707fd124e190cee7a59e76eecbabf180))
+
+This should prevent main process for uvicorn/gunicorn hanging when exiting.
+
+
 ## v0.4.1 (2025-03-04)
 
 ### Bug Fixes
@@ -11,6 +22,11 @@
 
 EventLoopThread now runs in daemon mode which means that when process is shutting down it won't
   prevent it.
+
+### Chores
+
+- **release**: V0.4.1
+  ([`9339b30`](https://github.com/rungalileo/cachegalileo/commit/9339b30286b3dd09442088b817ce92b872aa9df3))
 
 
 ## v0.4.0 (2025-03-04)

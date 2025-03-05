@@ -674,7 +674,8 @@ class GCache:
         self.config = config
 
     def __del__(self) -> None:
-        self._event_loop_thread.stop()
+        if self._event_loop_thread_instance is not None:
+            self._event_loop_thread.stop()
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
 
     def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]]) -> Any:

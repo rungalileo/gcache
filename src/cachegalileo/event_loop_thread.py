@@ -47,6 +47,8 @@ class EventLoopThread(threading.Thread):
         else:
             return future
 
-    def stop(self) -> None:
+    def stop(self, timeout_sec: int = 2) -> None:
         """Stop the event loop."""
+        logger.info(f"Stopping event loop '{self.name}'.")
         self.loop.call_soon_threadsafe(self.loop.stop)
+        self.join(timeout=timeout_sec)

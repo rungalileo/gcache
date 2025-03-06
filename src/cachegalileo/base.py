@@ -716,11 +716,11 @@ class GCache:
         Whether or not caching will be perofrmed depends on the GCache context and use case configuration.
 
         Arguments to the eventual key are stringified function arguments by default.
-        If you want to transform the args you can provide lambdas, which maybe becessary where function argument
+        If you want to transform the args you can provide lambdas via id_arg and arg_adapters, which maybe be nessary where function argument
         is a big object but you only need one field from it to make cache key.
 
         :param key_type: Type of entity referred to by the id_arg.  Example: user_email, user_id, etc.
-        :param id_arg: name of the argument containing id of the entity or a tuple of name and lambda to extract the value.
+        :param id_arg: Name of the argument containing id of the entity or a tuple of name and lambda to extract the value.
         :param use_case: Unique name of the use case.  Defaults to model path + function name.
         :param arg_adapters: Dictionary of argname to an adapter, which is a Callable to extract the value for the arg,
              that can then be serialized for the entire cache key.
@@ -732,6 +732,7 @@ class GCache:
 
         def decorator(func: Any) -> Any:
             nonlocal use_case
+            nonlocal arg_adapters
 
             # Cache the function signature by defining it here.
             sig = inspect.signature(func)
@@ -746,6 +747,16 @@ class GCache:
                 raise UseCaseNameIsReserved()
 
             self._use_case_registry.add(use_case)
+
+            if arg_adapters is None:
+                arg_adapters = {}
+
+            adapter_for_key = not isinstance(id_arg, str)
+            id_arg_name = id_arg[0] if adapter_for_key else id_arg
+
+            # If name of id arg is in arg_adapters then we should include it in the cache key args.
+            # Otherwise we should ignore it.
+            should_skip_id_arg_in_args = id_arg_name not in arg_adapters
 
             def arg_transformer(name: str, value: Any) -> str:
                 # Transform function arg name and its value by either invoking a given arg adapter
@@ -768,10 +779,6 @@ class GCache:
                     bound_args = sig.bind(*args, **kwargs)
                     bound_args.apply_defaults()  # Apply default values if any
 
-                    adapter_for_key = not isinstance(id_arg, str)
-
-                    id_arg_name = id_arg[0] if adapter_for_key else id_arg
-
                     if id_arg_name in kwargs:
                         key_id = kwargs[id_arg_name]  # type: ignore[index]
                     else:
@@ -788,7 +795,11 @@ class GCache:
                     sorted_args = [
                         (name, arg_transformer(name, value))
                         for name, value in bound_args.arguments.items()
-                        if name != id_arg_name and name != "self" and name not in ignore_args
+                        if (
+                            not (should_skip_id_arg_in_args and name == id_arg_name)
+                            and name != "self"
+                            and name not in ignore_args
+                        )
                     ]
 
                     sorted_args.sort(key=lambda x: x[0])

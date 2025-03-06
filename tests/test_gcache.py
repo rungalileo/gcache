@@ -461,3 +461,18 @@ def test_redis_down(
 
     finally:
         gcache.__del__()
+
+
+def test_id_arg_also_in_args(gcache: GCache, redis_server: redislite.Redis) -> None:
+    # Given: A function where we want id arg to also be part of args because we want to extract different value.
+    @gcache.cached(key_type="Test", id_arg="a", arg_adapters={"a": lambda _: "foo"})
+    def cached_func(a: int) -> int:
+        return 0
+
+    # When: We call the cached func.
+    with gcache.enable():
+        cached_func(123)
+
+    # Then: We should generate a new key where id_arg is 123 but the key also has a as an arg with value foo
+    keys = keys = redis_server.keys("*")
+    assert b"urn:galileo:test:Test:123?a=foo#tests.test_gcache.cached_func" in keys

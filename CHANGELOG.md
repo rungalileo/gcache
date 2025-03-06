@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v0.5.0 (2025-03-06)
+
+### Features
+
+- Allow to extract different value from an id arg and include it as args in cache key
+  ([#26](https://github.com/rungalileo/cachegalileo/pull/26),
+  [`9bf48eb`](https://github.com/rungalileo/cachegalileo/commit/9bf48ebbedc4731e95b1dac646e4f9ec2c42493f))
+
+This change allows to include id_arg name in arg_adapters and have it be included as args.
+
+This is useful in a case where you want to use one value from an id value for cache key id, but a
+  different value that is included as part of the args.
+
+Contrived example: we have a class `CarMake` and we have a function to compute number of cars.
+
+We want our cache key id to be based off of `make` because we have other functions that cache by car
+  make, maybe something like `get_car_make_counts(make: str)` which gets counts for all releases for
+  specific make of the car.
+
+```python @dataclass class CarMake: make: str year: int
+
+.... @gcache.cached( key_type="car_make", id_arg=("car", lambda car: car.make), arg_adapters={
+  "car": lambda car: f"{car.make}, {car.year}" }, track_for_invalidation=True ) def
+  get_car_count_for_year(car: Car): """Get car count for make/year""" .... ```
+
+So in this case we are caching by both make and year, while keeping key type and its id to just make
+  of the car.
+
+When its time to invalidate by car make we can invalidate all caches with that key type. We will
+  invalidate caches for both `get_car_count_for_year` and `get_car_make_counts`
+
+
 ## v0.4.2 (2025-03-05)
 
 ### Bug Fixes
@@ -10,6 +42,11 @@
   [`9f4bef0`](https://github.com/rungalileo/cachegalileo/commit/9f4bef0d707fd124e190cee7a59e76eecbabf180))
 
 This should prevent main process for uvicorn/gunicorn hanging when exiting.
+
+### Chores
+
+- **release**: V0.4.2
+  ([`ad20dd1`](https://github.com/rungalileo/cachegalileo/commit/ad20dd1b9149ed45905581ae608d528188c261b1))
 
 
 ## v0.4.1 (2025-03-04)

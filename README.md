@@ -83,17 +83,6 @@ We cache a function which takes in objects, and we also turn off local caching e
         "pagination": lambda pagination: f"{pagination.starting_token}-{pagination.limit}"
     },
     ignore_args=["db_read"],
-    # Turn off local cache and only use remote.
-    default_config=GCacheKeyConfig(
-        ttl_sec={
-            CacheLayer.LOCAL: 0,
-            CacheLayer.REMOTE: 60
-        },
-        ramp={
-            CacheLayer.LOCAL: 0,
-            CacheLayer.Remote: 100
-        }
-    )
 )
 def get_latest_runs(
        self, db_read: Session, user: User, project_type: ProjectType, pagination: PaginationRequestMixin

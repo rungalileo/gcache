@@ -454,6 +454,7 @@ class DisabledReasons(Enum):
     ramped_down = "ramped_down"
     context = "context"
     server_down = "server_down"
+    missing_config = "missing_config"
 
 
 class CacheController(CacheWrapper):
@@ -585,7 +586,22 @@ class CacheController(CacheWrapper):
             config = key.default_config
 
         if config is None:
-            raise MissingKeyConfig(key.use_case)
+            CacheController.CACHE_DISABLED_COUNTER.labels(
+                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+            ).inc()
+            return False
+
+        if config.ttl_sec.get(self.layer(), None) is None:
+            CacheController.CACHE_DISABLED_COUNTER.labels(
+                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+            ).inc()
+            return False
+
+        if config.ramp.get(self.layer(), None) is None:
+            CacheController.CACHE_DISABLED_COUNTER.labels(
+                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+            ).inc()
+            return False
 
         ramp = config.ramp.get(self.layer(), 0)
         if ramp == 100:

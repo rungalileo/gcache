@@ -17,7 +17,6 @@ from cachegalileo.base import (
     GCacheKey,
     GCacheKeyConfig,
     LocalCache,
-    MissingKeyConfig,
     RedisConfig,
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
@@ -239,16 +238,73 @@ def test_reserved_use_case_name(gcache: GCache) -> None:
             cached_func()
 
 
-def test_missing_key_config(gcache: GCache, cache_config_provider: FakeCacheConfigProvider) -> None:
-    with pytest.raises(MissingKeyConfig):
-        with gcache.enable():
-            cache_config_provider.configs["cached_func"] = None
+def test_missing_key_config(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_prometheus_registry: Generator,
+) -> None:
+    with gcache.enable():
+        cache_config_provider.configs["cached_func"] = None
 
-            @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
-            def cached_func(test: int = 123) -> int:
-                return 0
+        @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+        def cached_func(test: int = 123) -> int:
+            return 0
 
-            cached_func()
+        cached_func()
+
+        assert 1 == get_func_metric(
+            'api_gcache_disabled_counter_total{key_type="Test",layer="REMOTE",reason="missing_config",use_case="cached_func"}'
+        )
+        assert 0 == len(redis_server.keys())
+
+
+@pytest.mark.parametrize("layer", [CacheLayer.LOCAL, CacheLayer.REMOTE])
+def test_missing_key_config_ttl(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_prometheus_registry: Generator,
+    layer: CacheLayer,
+) -> None:
+    with gcache.enable():
+        cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+        del cache_config_provider.configs["cached_func"].ttl_sec[layer]
+
+        @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+        def cached_func(test: int = 123) -> int:
+            return 0
+
+        cached_func()
+
+        assert 1 == get_func_metric(
+            'api_gcache_disabled_counter_total{key_type="Test",layer="%s",reason="missing_config",use_case="cached_func"}'  # noqa: UP031
+            % (layer.name)  # noqa: UP031
+        )
+
+
+@pytest.mark.parametrize("layer", [CacheLayer.LOCAL, CacheLayer.REMOTE])
+def test_missing_key_config_ramp(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_prometheus_registry: Generator,
+    layer: CacheLayer,
+) -> None:
+    with gcache.enable():
+        cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+        del cache_config_provider.configs["cached_func"].ramp[layer]
+
+        @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+        def cached_func(test: int = 123) -> int:
+            return 0
+
+        cached_func()
+
+        assert 1 == get_func_metric(
+            'api_gcache_disabled_counter_total{key_type="Test",layer="%s",reason="missing_config",use_case="cached_func"}'  # noqa: UP031
+            % (layer.name)  # noqa: UP031
+        )
 
 
 def test_error_in_fallback(gcache: GCache) -> None:

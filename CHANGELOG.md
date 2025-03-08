@@ -1,7 +1,24 @@
 # CHANGELOG
 
 
+## v0.6.0 (2025-03-08)
+
+### Features
+
+- Tolerate missing key configs, and missing parts of key config
+  ([#27](https://github.com/rungalileo/cachegalileo/pull/27),
+  [`8e3afb0`](https://github.com/rungalileo/cachegalileo/commit/8e3afb04b8b6a4402a5949326aef697f39904ab7))
+
+If key config is not found for use case, then we will just skip caching altogether. Same applies for
+  missing ttl/ramp values.
+
+
 ## v0.5.0 (2025-03-06)
+
+### Chores
+
+- **release**: V0.5.0
+  ([`7216a72`](https://github.com/rungalileo/cachegalileo/commit/7216a7280194a4d55233d1173172d380f2adeb03))
 
 ### Features
 

@@ -532,3 +532,29 @@ def test_id_arg_also_in_args(gcache: GCache, redis_server: redislite.Redis) -> N
     # Then: We should generate a new key where id_arg is 123 but the key also has a as an arg with value foo
     keys = keys = redis_server.keys("*")
     assert b"urn:galileo:test:Test:123?a=foo#tests.test_gcache.cached_func" in keys
+
+
+def test_config_serialization_deserialization() -> None:
+    # Test that we can dump a key to json and then load it either from a string of json itself, or from a dict.
+    configs = {
+        "old_schema_use_case": GCacheKeyConfig(
+            ttl_sec={"local": 10, "remote": 1},
+            ramp={"local": 0, "remote": 0},
+        ),
+        "defaults": {
+            "test": GCacheKeyConfig(
+                ttl_sec={"local": 5, "remote": 6},
+                ramp={"local": 100, "remote": 100},
+            ),
+        },
+        "customer_foo": {
+            "test": GCacheKeyConfig(
+                ttl_sec={"local": 7, "remote": 8},
+                ramp={"local": 0, "remote": 0},
+            ),
+        },
+    }
+
+    json_str = GCacheKeyConfig.dump_configs(configs)  # type: ignore[arg-type]
+    configs_deserialized = GCacheKeyConfig.load_configs(json_str)
+    assert configs == configs_deserialized

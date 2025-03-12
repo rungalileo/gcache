@@ -1,4 +1,5 @@
 import asyncio
+import builtins
 import contextvars
 import inspect
 import json
@@ -41,6 +42,9 @@ class CacheLayer(Enum):
     REMOTE = "remote"
 
 
+GCacheKeyConfigs = dict[str, "GCacheKeyConfig" | dict[str, "GCacheKeyConfig"]]
+
+
 class GCacheKeyConfig(BaseModel):
     ttl_sec: dict[CacheLayer, int]
     ramp: dict[CacheLayer, int]
@@ -68,6 +72,44 @@ class GCacheKeyConfig(BaseModel):
         if isinstance(data, str):
             return GCacheKeyConfig.parse_obj(json.loads(data))
         return GCacheKeyConfig.parse_obj(data)
+
+    @staticmethod
+    def load_configs(data: str | builtins.dict) -> GCacheKeyConfigs:
+        """
+        Load a collection of configs, which is a dict of use case to GCacheKeyConfig.
+        We also support keys mapping to another dict of str -> GCacheKeyConfig as a way
+        to override configs for a specific environment.
+        :return:
+        """
+        data_dict = json.loads(data) if isinstance(data, str) else data
+
+        configs: GCacheKeyConfigs = {}
+        for k, v in data_dict.items():
+            config: GCacheKeyConfig | dict[str, GCacheKeyConfig]
+            try:
+                config = GCacheKeyConfig.loads(v)
+            except Exception:
+                config = {k: GCacheKeyConfig.loads(v) for k, v in v.items()}
+
+            configs[k] = config
+        return configs
+
+    @staticmethod
+    def dump_configs(data: GCacheKeyConfigs) -> str:
+        """
+        Dump a collection of configs, which is a dict of use case to GCacheKeyConfig.
+        We also support keys mapping to another dict of str -> GCacheKeyConfig as a way
+        to override configs for a specific environment.
+        :return:
+        """
+        data_dict: dict[str, Any] = {}
+        for k, v in data.items():
+            if isinstance(v, GCacheKeyConfig):
+                data_dict[k] = v.dumps()
+            else:
+                data_dict[k] = {k: v.dumps() for k, v in v.items()}
+
+        return json.dumps(data_dict, indent=2)
 
     @staticmethod
     def enabled(ttl_sec: int, use_case: str) -> "GCacheKeyConfig":

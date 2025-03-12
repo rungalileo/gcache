@@ -497,6 +497,7 @@ class DisabledReasons(Enum):
     context = "context"
     server_down = "server_down"
     missing_config = "missing_config"
+    config_error = "config_error"
 
 
 class CacheController(CacheWrapper):
@@ -621,41 +622,48 @@ class CacheController(CacheWrapper):
             return await fallback()
 
     async def _should_cache(self, key: GCacheKey) -> bool:
-        if not GCacheContext.enabled.get():
-            return False
-        config = await self.config_provider(key)
-        if config is None:
-            config = key.default_config
+        try:
+            if not GCacheContext.enabled.get():
+                return False
+            config = await self.config_provider(key)
+            if config is None:
+                config = key.default_config
 
-        if config is None:
-            CacheController.CACHE_DISABLED_COUNTER.labels(
-                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
-            ).inc()
-            return False
+            if config is None:
+                CacheController.CACHE_DISABLED_COUNTER.labels(
+                    key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+                ).inc()
+                return False
 
-        if config.ttl_sec.get(self.layer(), None) is None:
-            CacheController.CACHE_DISABLED_COUNTER.labels(
-                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
-            ).inc()
-            return False
+            if config.ttl_sec.get(self.layer(), None) is None:
+                CacheController.CACHE_DISABLED_COUNTER.labels(
+                    key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+                ).inc()
+                return False
 
-        if config.ramp.get(self.layer(), None) is None:
-            CacheController.CACHE_DISABLED_COUNTER.labels(
-                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
-            ).inc()
-            return False
+            if config.ramp.get(self.layer(), None) is None:
+                CacheController.CACHE_DISABLED_COUNTER.labels(
+                    key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+                ).inc()
+                return False
 
-        ramp = config.ramp.get(self.layer(), 0)
-        if ramp == 100:
-            return True
-        if ramp > 0:
-            r = random()
-            if r < ramp / 100.0:
+            ramp = config.ramp.get(self.layer(), 0)
+            if ramp == 100:
                 return True
-        CacheController.CACHE_DISABLED_COUNTER.labels(
-            key.use_case, key.key_type, self.layer().name, DisabledReasons.ramped_down.name
-        ).inc()
-        return False
+            if ramp > 0:
+                r = random()
+                if r < ramp / 100.0:
+                    return True
+            CacheController.CACHE_DISABLED_COUNTER.labels(
+                key.use_case, key.key_type, self.layer().name, DisabledReasons.ramped_down.name
+            ).inc()
+            return False
+        except Exception as e:
+            CacheController.CACHE_DISABLED_COUNTER.labels(
+                key.use_case, key.key_type, self.layer().name, DisabledReasons.config_error.name
+            ).inc()
+            _GLOBAL_GCACHE_STATE.logger.error(f"Error getting cache config: {e}", exc_info=True)
+            return False
 
 
 class CacheChain(CacheWrapper):

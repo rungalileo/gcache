@@ -13,7 +13,7 @@ from enum import Enum
 from functools import partial
 from logging import Logger, LoggerAdapter, getLogger
 from random import random
-from typing import Any
+from typing import Any, Union
 
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
@@ -42,7 +42,7 @@ class CacheLayer(Enum):
     REMOTE = "remote"
 
 
-GCacheKeyConfigs = dict[str, "GCacheKeyConfig" | dict[str, "GCacheKeyConfig"]]
+GCacheKeyConfigs = dict[str, Union["GCacheKeyConfig", dict[str, "GCacheKeyConfig"]]]
 
 
 class GCacheKeyConfig(BaseModel):

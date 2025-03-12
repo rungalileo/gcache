@@ -1,4 +1,5 @@
 import asyncio
+import builtins
 import contextvars
 import inspect
 import json
@@ -12,7 +13,7 @@ from enum import Enum
 from functools import partial
 from logging import Logger, LoggerAdapter, getLogger
 from random import random
-from typing import Any
+from typing import Any, Union
 
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
@@ -39,6 +40,9 @@ class CacheLayer(Enum):
     NOOP = "noop"
     LOCAL = "local"
     REMOTE = "remote"
+
+
+GCacheKeyConfigs = dict[str, Union["GCacheKeyConfig", dict[str, "GCacheKeyConfig"]]]
 
 
 class GCacheKeyConfig(BaseModel):
@@ -68,6 +72,44 @@ class GCacheKeyConfig(BaseModel):
         if isinstance(data, str):
             return GCacheKeyConfig.parse_obj(json.loads(data))
         return GCacheKeyConfig.parse_obj(data)
+
+    @staticmethod
+    def load_configs(data: str | builtins.dict) -> GCacheKeyConfigs:
+        """
+        Load a collection of configs, which is a dict of use case to GCacheKeyConfig.
+        We also support keys mapping to another dict of str -> GCacheKeyConfig as a way
+        to override configs for a specific environment.
+        :return:
+        """
+        data_dict = json.loads(data) if isinstance(data, str) else data
+
+        configs: GCacheKeyConfigs = {}
+        for k, v in data_dict.items():
+            config: GCacheKeyConfig | dict[str, GCacheKeyConfig]
+            try:
+                config = GCacheKeyConfig.loads(v)
+            except Exception:
+                config = {k: GCacheKeyConfig.loads(v) for k, v in v.items()}
+
+            configs[k] = config
+        return configs
+
+    @staticmethod
+    def dump_configs(data: GCacheKeyConfigs) -> str:
+        """
+        Dump a collection of configs, which is a dict of use case to GCacheKeyConfig.
+        We also support keys mapping to another dict of str -> GCacheKeyConfig as a way
+        to override configs for a specific environment.
+        :return:
+        """
+        data_dict: dict[str, Any] = {}
+        for k, v in data.items():
+            if isinstance(v, GCacheKeyConfig):
+                data_dict[k] = v.dumps()
+            else:
+                data_dict[k] = {k: v.dumps() for k, v in v.items()}
+
+        return json.dumps(data_dict, indent=2)
 
     @staticmethod
     def enabled(ttl_sec: int, use_case: str) -> "GCacheKeyConfig":
@@ -455,6 +497,7 @@ class DisabledReasons(Enum):
     context = "context"
     server_down = "server_down"
     missing_config = "missing_config"
+    config_error = "config_error"
 
 
 class CacheController(CacheWrapper):
@@ -579,41 +622,48 @@ class CacheController(CacheWrapper):
             return await fallback()
 
     async def _should_cache(self, key: GCacheKey) -> bool:
-        if not GCacheContext.enabled.get():
-            return False
-        config = await self.config_provider(key)
-        if config is None:
-            config = key.default_config
+        try:
+            if not GCacheContext.enabled.get():
+                return False
+            config = await self.config_provider(key)
+            if config is None:
+                config = key.default_config
 
-        if config is None:
-            CacheController.CACHE_DISABLED_COUNTER.labels(
-                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
-            ).inc()
-            return False
+            if config is None:
+                CacheController.CACHE_DISABLED_COUNTER.labels(
+                    key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+                ).inc()
+                return False
 
-        if config.ttl_sec.get(self.layer(), None) is None:
-            CacheController.CACHE_DISABLED_COUNTER.labels(
-                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
-            ).inc()
-            return False
+            if config.ttl_sec.get(self.layer(), None) is None:
+                CacheController.CACHE_DISABLED_COUNTER.labels(
+                    key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+                ).inc()
+                return False
 
-        if config.ramp.get(self.layer(), None) is None:
-            CacheController.CACHE_DISABLED_COUNTER.labels(
-                key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
-            ).inc()
-            return False
+            if config.ramp.get(self.layer(), None) is None:
+                CacheController.CACHE_DISABLED_COUNTER.labels(
+                    key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name
+                ).inc()
+                return False
 
-        ramp = config.ramp.get(self.layer(), 0)
-        if ramp == 100:
-            return True
-        if ramp > 0:
-            r = random()
-            if r < ramp / 100.0:
+            ramp = config.ramp.get(self.layer(), 0)
+            if ramp == 100:
                 return True
-        CacheController.CACHE_DISABLED_COUNTER.labels(
-            key.use_case, key.key_type, self.layer().name, DisabledReasons.ramped_down.name
-        ).inc()
-        return False
+            if ramp > 0:
+                r = random()
+                if r < ramp / 100.0:
+                    return True
+            CacheController.CACHE_DISABLED_COUNTER.labels(
+                key.use_case, key.key_type, self.layer().name, DisabledReasons.ramped_down.name
+            ).inc()
+            return False
+        except Exception as e:
+            CacheController.CACHE_DISABLED_COUNTER.labels(
+                key.use_case, key.key_type, self.layer().name, DisabledReasons.config_error.name
+            ).inc()
+            _GLOBAL_GCACHE_STATE.logger.error(f"Error getting cache config: {e}", exc_info=True)
+            return False
 
 
 class CacheChain(CacheWrapper):

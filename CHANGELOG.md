@@ -1,7 +1,24 @@
 # CHANGELOG
 
 
+## v0.7.0 (2025-03-12)
+
+### Features
+
+- Serialize/deserialize collection of configs
+  ([#28](https://github.com/rungalileo/cachegalileo/pull/28),
+  [`96c5c0e`](https://github.com/rungalileo/cachegalileo/commit/96c5c0e06040fafc191e64972126b5d5e462fcf7))
+
+Fails open when there's exception in config provider, and also adds utilities to
+  serialize/deserialize dicts of key configs.
+
+
 ## v0.6.0 (2025-03-08)
+
+### Chores
+
+- **release**: V0.6.0
+  ([`433d440`](https://github.com/rungalileo/cachegalileo/commit/433d440644295d2f8eef8a5fd7247f03c1fc9128))
 
 ### Features
 

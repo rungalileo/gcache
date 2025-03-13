@@ -105,9 +105,9 @@ class GCacheKeyConfig(BaseModel):
         data_dict: dict[str, Any] = {}
         for k, v in data.items():
             if isinstance(v, GCacheKeyConfig):
-                data_dict[k] = v.dumps()
+                data_dict[k] = v.dict()
             else:
-                data_dict[k] = {k: v.dumps() for k, v in v.items()}
+                data_dict[k] = {k: v.dict() for k, v in v.items()}
 
         return json.dumps(data_dict, indent=2)
 

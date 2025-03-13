@@ -1,7 +1,27 @@
 # CHANGELOG
 
 
+## v0.7.1 (2025-03-13)
+
+### Bug Fixes
+
+- Pretty print configs when serializing ([#29](https://github.com/rungalileo/cachegalileo/pull/29),
+  [`7c0c7bb`](https://github.com/rungalileo/cachegalileo/commit/7c0c7bbca1e513980e3ae14c7424e99651439aab))
+
+Previous iteration was serializing keys as quote escaped json, which doesn't pretty print properly
+  when serialized.
+
+With this change, the output JSON will be all entirely JSON, including key representation.
+
+I also test that previous format will still be parsed correctly.
+
+
 ## v0.7.0 (2025-03-12)
+
+### Chores
+
+- **release**: V0.7.0
+  ([`4dec6af`](https://github.com/rungalileo/cachegalileo/commit/4dec6afc512ada409a6c541a8f6765b06559ca1a))
 
 ### Features
 

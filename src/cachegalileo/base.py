@@ -1,6 +1,7 @@
 import asyncio
 import builtins
 import contextvars
+import functools
 import inspect
 import json
 import pickle
@@ -904,7 +905,7 @@ class GCache:
                 return await self._cache.get(key, f)
 
             if inspect.iscoroutinefunction(func):
-                return async_wrapped
+                return functools.wraps(func)(async_wrapped)
             else:
 
                 def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
@@ -916,7 +917,7 @@ class GCache:
 
                     return self._run_coroutine_in_thread(partial(async_wrapped, *args, **kwargs))
 
-                return sync_wrapped
+                return functools.wraps(func)(sync_wrapped)
 
         return decorator
 

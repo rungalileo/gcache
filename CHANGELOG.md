@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.7.2 (2025-03-20)
+
+### Bug Fixes
+
+- Preserve function name after its decorated
+  ([#30](https://github.com/rungalileo/cachegalileo/pull/30),
+  [`4103470`](https://github.com/rungalileo/cachegalileo/commit/4103470cf74c8b03bbbb4942f4c3b4874e1156af))
+
+Preserve function name after its being decorated.
+
+This is important for instrumentation.
+
+
 ## v0.7.1 (2025-03-13)
 
 ### Bug Fixes
@@ -14,6 +27,11 @@ Previous iteration was serializing keys as quote escaped json, which doesn't pre
 With this change, the output JSON will be all entirely JSON, including key representation.
 
 I also test that previous format will still be parsed correctly.
+
+### Chores
+
+- **release**: V0.7.1
+  ([`36c12e1`](https://github.com/rungalileo/cachegalileo/commit/36c12e158becfa09aa10aebef3b0b78e7d636846))
 
 
 ## v0.7.0 (2025-03-12)

@@ -574,3 +574,21 @@ def test_config_serialization_deserialization() -> None:
     assert configs == configs_deserialized
 
     assert GCacheKeyConfig.load_configs(old_config_json) == configs
+
+
+def test_preserve_func_metadata(gcache: GCache) -> None:
+    class FooBar:
+        @gcache.cached(key_type="Test", id_arg="test")
+        def some_method(self, test: int = 123) -> int:
+            return 123
+
+    assert FooBar.some_method.__name__ == "some_method"
+
+
+def test_preserve_func_metadata_async(gcache: GCache) -> None:
+    class FooBar:
+        @gcache.cached(key_type="Test", id_arg="test")
+        async def some_method(self, test: int = 123) -> int:
+            return 123
+
+    assert FooBar.some_method.__name__ == "some_method"

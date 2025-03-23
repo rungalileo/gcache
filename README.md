@@ -1,91 +1,216 @@
 # GCache
 
-GCache is a lightweight library that provides fine-grained observability and runtime controls for read-through caching.
+GCache is a lightweight library that provides fine-grained observability and runtime controls for read-through caching. It's designed to be flexible, performant, and easy to integrate into your application.
 
-  * Dashboard: https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache
-  * Runtime controls: TODO
+* [Dashboard](https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache)
+* [Runtime configs](https://github.com/rungalileo/cache-configurations/blob/main/cacheconfigs/gcache_configs.py)
 
-## Enforcing cache key structure
+## Core Concepts
 
-### Key types
+### Key Structure and Organization
 
-Each cache key is required to reference key type on top of actual id. for example, key type could be `user_email` while id is `lev@galileo.ai`. Other arguments are treated differently.
+GCache organizes cache entries using a structured key system that consists of three main components:
 
-This opens up a door for easier cache invalidation since any caches that share the same key type and id can be invalidate using one operation.
+1. **Key Type**: Identifies the type of entity being cached (e.g., `user_email`, `user_id`, `organization_id`)
+2. **ID**: The specific identifier for that entity (e.g., `user@example.com`, `12345`)
+3. **Arguments**: Additional parameters that differentiate cache entries for the same entity
 
-Another benefit is instrumentation since we can track all caches sharing same key type in a dashboard.
+This structured approach provides several benefits:
 
-### Use cases
+- **Targeted Invalidation**: Invalidate all cache entries for a specific entity type and ID
+- **Comprehensive Monitoring**: Track cache performance metrics by entity type
+- **Hierarchical Organization**: Group related cache entries logically
 
-Each unique caching use case is required to have a unique name. By default the name is the module path + function name, but its encouraged to provide custom use case names.
+### Use Cases
 
-Benefit here is instrumentation and runtime control based on use case.
+Every unique use case in GCache is associated with a "use case" - a unique identifier for a specific caching scenario. By default, this is the module path + function name, but custom use case names are recommended for clarity.
 
-It makes it possible to tune or ramp specific use cases individually.
+Use cases enable:
 
-### Code level cache control
+- **Granular Instrumentation**: Monitor cache hit/miss rates for specific use cases
+- **Targeted Runtime Control**: Enable, disable, or adjust caching behavior for individual use cases
+- **Documentation**: Self-document the purpose of each cache operation
 
-Caching is disabled by default for all use cases, and to actually start caching we need to enable cache via a context variable.
+### Cache Layers
 
-This makes it possible to turn caching on/off entirely for specific blocks of code.
+GCache supports multiple caching layers:
 
-The biggest use case for this is to turn off caching in write endpoints, while turning it on in read endpoints. In a write endpoint we want to avoid `write -> read stale` scenario.
+- **Local Cache**: In-memory cache for ultra-fast access
+- **Remote Cache**: Redis-based distributed cache for shared access across instances
 
-## Usage
+## Getting Started
 
-`GCache` class is meant to be instantiated once and be used as a singleton throughout the rest of code base.
+### Basic Usage
 
-To cache a function we use `GCache::cached` decorator.  Same decorator works for both sync and async functions.
-
-Example:
+`GCache` is designed to be instantiated once as a singleton:
 
 ```python
-gcache = GCache(...)
+from cachegalileo.base import GCache, GCacheConfig, GCacheKeyConfig
 
-....
-
-    @gcache.cached
-          key_type="user_email",
-          id_arg="email",
-          # Ignore db_read since its irrelevant to making cache key.
-          ignore_args=["db_read"],
-          use_case="GetUserByEmail",
-       )
-    def get_by_email(db_read: Session, email: str) -> User | None:
-        ...
-
-....
-
-get_by_email(....) # Does not cache
-
-...
-
-with gcache.enabled():
-      ...
-      get_by_email(....). # caches
+# Create GCache instance
+gcache = GCache(
+    GCacheConfig(
+        # Configure cache settings
+        cache_config_provider=your_config_provider,
+        # Optional Redis configuration
+        redis_config=redis_config
+    )
+)
 ```
 
-### Arg transformers
+Example in API: https://github.com/rungalileo/api/blob/main/api/caching.py#L43
 
-Some function arguments may not be suitable to include in cache key directly for various reasons.  In such cases
-you can provide lambdas when using `cached`.
+## Caching Functions
 
-Example:
+The `@cached` decorator is the primary way to cache function results. It works with both synchronous and asynchronous functions:
 
-We cache a function which takes in objects, and we also turn off local caching entirely.
+### Simple Example
+
+```python
+# Simple caching example
+@gcache.cached(
+    key_type="user_id",
+    id_arg="user_id",
+    use_case="GetUserProfile"
+)
+def get_user_profile(user_id: str) -> dict:
+    # Expensive operation to fetch user profile
+    return expensive_db_query(user_id)
+
+# This won't use cache (caching is disabled by default)
+profile = get_user_profile("12345")
+
+# Enable caching for a specific block of code
+with gcache.enable():
+    # This will use cache
+    profile = get_user_profile("12345")
+    # Subsequent calls with the same user_id will return cached results
+    profile_again = get_user_profile("12345")  # Cache hit!
+```
+
+### Advanced Example: Argument Transformers
+
+For complex objects, you can use argument transformers to extract only the relevant parts for cache keys:
 
 ```python
 @gcache.cached(
     key_type="user_id",
+    # Extract ID from a complex object
     id_arg=("user", lambda user: user.system_user_id),
+    use_case="GetUserLatestRuns",
+    # Transform complex arguments into simple strings for the cache key
     arg_adapters={
         "project_type": lambda project_type: project_type.name,
         "pagination": lambda pagination: f"{pagination.starting_token}-{pagination.limit}"
     },
+    # Exclude arguments that don't affect the result
     ignore_args=["db_read"],
 )
 def get_latest_runs(
-       self, db_read: Session, user: User, project_type: ProjectType, pagination: PaginationRequestMixin
-   ) -> GetUserLatestRuns:
-    ...
+    db_read: Session,
+    user: User,
+    project_type: ProjectType,
+    pagination: PaginationRequestMixin
+) -> GetUserLatestRuns:
+    # Implementation...
+    return db_results
 ```
+
+Example in API: https://github.com/rungalileo/api/blob/main/api/daos/user.py#L130
+
+### Controlling Cache Behavior
+
+#### Enabling/Disabling Cache
+
+Caching is **disabled by default** for safety. To enable caching, use the `enable()` context manager:
+
+```python
+# Cache is disabled here
+result1 = cached_function()  # No caching occurs
+
+# Enable caching for this block
+with gcache.enable():
+    result2 = cached_function()  # First call, cache miss
+    result3 = cached_function()  # Subsequent call, cache hit
+
+# Cache is disabled again
+result4 = cached_function()  # No caching occurs
+```
+
+This design allows precise control over when caching is active, particularly useful in write operations where you want to avoid stale reads.
+
+> **API enable pattern:**
+> In Api we enable caching on endpoint level.  We enable for all GET endpoints and select other endpoints.
+> * https://github.com/rungalileo/api/blob/main/api/middleware/gcache_middleware.py
+> * https://github.com/rungalileo/api/blob/main/api/route_dependencies/gcache.py
+
+#### Ramping up Caching
+
+A use case must be ramped up to enable caching in addition to being executed in "enabled" context.  Use runtime config to ramp up your particular use case.
+
+## Cache Invalidation
+### Targeted Invalidation
+
+Invalidate all cache entries for a specific entity:
+
+```python
+@gcache.cached(
+    key_type="user_id",
+    id_arg="user_id",
+    track_for_invalidation=True  # Enable tracking for invalidation
+)
+def get_user_profile(user_id: str) -> dict:
+    # ...
+
+# Invalidate all cache entries for user with ID "12345"
+gcache.invalidate(key_type="user_id", id="12345")
+
+# Async version
+await gcache.ainvalidate(key_type="user_id", id="12345")
+```
+
+This invalidates all cache entries that share the same key type and ID, regardless of additional arguments or use case.
+
+### Future Invalidation Buffer
+
+To prevent race conditions where a read happens just before a write, you can set a future buffer:
+
+```python
+# Invalidate with a 5-second buffer into the future
+gcache.invalidate(
+    key_type="user_id",
+    id="12345",
+    fallback_buffer_ms=5000
+)
+```
+
+This ensures that any cache entry created right before the invalidation will also be considered invalid.
+
+### Complete Cache Flush
+
+For testing or emergency scenarios:
+
+```python
+# Clear all cache entries (local and remote)
+gcache.flushall()
+
+# Async version
+await gcache.aflushall()
+```
+
+## Performance Considerations
+
+- **Local Cache**: Ultra-fast in-memory cache, but not shared between instances.  Cannot be invalidated by other instances.
+- **Remote Cache**: Shared between instances, but slightly higher latency.  Can be invalidated by other instances.
+- **Argument Transformers**: Use them to keep cache keys small and focused
+
+## Monitoring and Observability
+
+GCache automatically collects metrics for:
+
+- Cache hit/miss rates by use case and key type
+- Cache operation latency
+- Cache size
+- Invalidation frequency
+
+These metrics are available through Prometheus and can be viewed in the [GCache Dashboard](https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache).

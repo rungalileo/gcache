@@ -5,6 +5,9 @@ GCache is a lightweight library that provides fine-grained observability and run
 * [Dashboard](https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache)
 * [Runtime configs](https://github.com/rungalileo/cache-configurations/blob/main/cacheconfigs/gcache_configs.py)
 
+> **TODO**
+> Shadowing cache reads against SoT is not implemented yet
+
 ## Core Concepts
 
 ### Key Structure and Organization
@@ -198,11 +201,35 @@ gcache.flushall()
 await gcache.aflushall()
 ```
 
+## Guidelines for caching
+
+### When to use caching
+We can break up caching use cases by eventual consistency constraints.
+#### 1: Can tolerate stale cache
+In certain use cases, it's acceptable to have a few seconds - minutes of delay for updates to take effect. In these situations its safe to use local and remote cache and to rely soley on TTL.
+
+Monitoring cache hit rates is crucial for performance optimization; adjusting the TTL settings can help improve this metric.
+
+In this scenario, there's no need to implement shadowing to monitor cache accuracy.
+
+#### 2: Cannot tolerate stale cache
+In these use cases cache must be updated immediately, otherwise we will cause regression.
+
+We can only use remote caching in these cases since local cache cannot be invalidated.
+
+In this scenario we need a robust cache invalidation mechanic.  Right before or after write you must make sure all cache is invalidated.
+
+In order to demonstrate efficacy of cache invalidation you will also need to shadow cache reads for consistency against SoT.
+
+Good news is that we can set TTL on remote cache to be quite long as long as invalidation is proven to be correct.
+
+
 ## Performance Considerations
 
 - **Local Cache**: Ultra-fast in-memory cache, but not shared between instances.  Cannot be invalidated by other instances.
 - **Remote Cache**: Shared between instances, but slightly higher latency.  Can be invalidated by other instances.
 - **Argument Transformers**: Use them to keep cache keys small and focused
+
 
 ## Monitoring and Observability
 

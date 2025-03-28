@@ -14,6 +14,7 @@ def test_concurrent() -> None:
     """
     event_loop = EventLoopThread()
     try:
+        event_loop.start()
 
         async def heavy_work() -> None:
             total = 0.0

@@ -21,7 +21,7 @@ from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ConfigDict, validator
 from redis.asyncio import Redis, RedisCluster
 
-from cachegalileo.event_loop_thread import EventLoopThread
+from cachegalileo.event_loop_thread import EventLoopThreadPool
 
 
 # Global state is needed to allow reconfiguration when GCache is instantiated.
@@ -732,29 +732,21 @@ class GCache:
 
         self._use_case_registry: set = set()
 
-        # Don't create and start here, but lazy load later.
-        # This is necessary in forked environments, since we don't want to start a thread before forkinge
-        self._event_loop_thread_instance: EventLoopThread = None  # type: ignore[assignment]
+        # Use a thread pool to run non async cached functions in.
+        # This is because all of the GCache implementation is async, but we still want to support caching
+        # Sync functions.
+        self._event_loop_thread_pool: EventLoopThreadPool = EventLoopThreadPool("gcache thread pool")
 
         _GLOBAL_GCACHE_STATE.gcache_instantiated = True
 
         self.config = config
 
     def __del__(self) -> None:
-        if self._event_loop_thread_instance is not None:
-            self._event_loop_thread.stop()
+        self._event_loop_thread_pool.stop()
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
 
     def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]]) -> Any:
-        return self._event_loop_thread.submit(coro)
-
-    @property
-    def _event_loop_thread(self) -> EventLoopThread:
-        if self._event_loop_thread_instance is None:
-            _GLOBAL_GCACHE_STATE.logger.info("Initializing event thread loop")
-            self._event_loop_thread_instance = EventLoopThread()
-            self._event_loop_thread_instance.start()
-        return self._event_loop_thread_instance
+        return self._event_loop_thread_pool.submit(coro)
 
     @contextmanager
     def enable(self, enabled: bool = True) -> Generator[None]:

@@ -732,8 +732,9 @@ class GCache:
 
         self._use_case_registry: set = set()
 
-        # Don't create and start here, but lazy load later.
-        # This is necessary in forked environments, since we don't want to start a thread before forkinge
+        # Use a thread pool to run non async cached functions in.
+        # This is because all of the GCache implementation is async, but we still want to support caching
+        # Sync functions.
         self._event_loop_thread_pool: EventLoopThreadPool = EventLoopThreadPool("gcache thread pool")
 
         _GLOBAL_GCACHE_STATE.gcache_instantiated = True

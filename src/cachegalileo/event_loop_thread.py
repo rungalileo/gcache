@@ -1,5 +1,4 @@
 import asyncio
-import os
 import random
 import threading
 from abc import abstractmethod
@@ -74,7 +73,7 @@ class EventLoopThreadPool(EventLoopThreadInterface):
     Lazy initialization is important when running in forked processes.
     """
 
-    def __init__(self, name: str = "EventLoopThreadPool", num_threads: int = os.cpu_count() or 16) -> None:
+    def __init__(self, name: str = "EventLoopThreadPool", num_threads: int = 16) -> None:
         self.name = name
         self.num_threads = num_threads
         self.threads: list[EventLoopThread] | None = None

@@ -1,7 +1,24 @@
 # CHANGELOG
 
 
+## v0.9.0 (2025-03-29)
+
+### Features
+
+- Remove individual cache keys ([#33](https://github.com/rungalileo/cachegalileo/pull/33),
+  [`c8b3b51`](https://github.com/rungalileo/cachegalileo/commit/c8b3b5106b46341981d2441a98bdd5041c455eb4))
+
+Allows to remove individual cache keys.
+
+it's up to the user to make sure they provide correct cache keys.
+
+
 ## v0.8.0 (2025-03-29)
+
+### Chores
+
+- **release**: V0.8.0
+  ([`2a84ed4`](https://github.com/rungalileo/cachegalileo/commit/2a84ed4fae7e6eccda800b60f9514b27fff2329e))
 
 ### Features
 

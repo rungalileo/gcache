@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.8.0 (2025-03-29)
+
+### Features
+
+- Use a thread pool in order to create multiple EventLoopThread(s)
+  ([#32](https://github.com/rungalileo/cachegalileo/pull/32),
+  [`59860a5`](https://github.com/rungalileo/cachegalileo/commit/59860a52c74f5241bbe17a53b3ea0da7842b8a4a))
+
+When we cache non async functions we use a single EventLoopThread to execute it since all of the
+  machinery of GCache is async otherwise.
+
+However, this presents issues because if we have multiple requests they will only execute in single
+  thread, and since we are executing sync functions they will block each other.
+
+With this change, we will be using a simple wrapper on top of EventLoopThread which manages
+  multiples of them and then picks one at random to execute a coroutine.
+
+
 ## v0.7.2 (2025-03-20)
 
 ### Bug Fixes
@@ -12,6 +30,11 @@
 Preserve function name after its being decorated.
 
 This is important for instrumentation.
+
+### Chores
+
+- **release**: V0.7.2
+  ([`4960b10`](https://github.com/rungalileo/cachegalileo/commit/4960b10cb88314ad762407fcd4e09b5379525804))
 
 
 ## v0.7.1 (2025-03-13)

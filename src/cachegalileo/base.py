@@ -135,8 +135,8 @@ class GCacheKey(BaseModel):
     key_type: str
     id: str
     use_case: str
-    args: list[tuple[str, str]]
-    invalidation_tracking: bool
+    args: list[tuple[str, str]] = []
+    invalidation_tracking: bool = False
     default_config: GCacheKeyConfig | None = None
 
     def __hash__(self) -> int:
@@ -687,6 +687,11 @@ class CacheChain(CacheWrapper):
 
         return await self.wrapped.get(key, cache_fallback)
 
+    async def delete(self, key: GCacheKey) -> bool:
+        ret = await self.wrapped.delete(key)
+        ret = await self.fallback_cache.delete(key) or ret
+        return ret
+
 
 class GCacheConfig(BaseModel):
     cache_config_provider: CacheConfigProvider
@@ -931,3 +936,9 @@ class GCache:
 
     def flushall(self) -> None:
         self._run_coroutine_in_thread(self.aflushall)
+
+    async def adelete(self, key: GCacheKey) -> bool:
+        return await self._cache.delete(key)
+
+    def delete(self, key: GCacheKey) -> bool:
+        return self._run_coroutine_in_thread(partial(self.adelete, key))

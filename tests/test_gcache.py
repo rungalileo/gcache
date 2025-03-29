@@ -592,3 +592,26 @@ def test_preserve_func_metadata_async(gcache: GCache) -> None:
             return 123
 
     assert FooBar.some_method.__name__ == "some_method"
+
+
+def test_delete_key(gcache: GCache) -> None:
+    """
+    Test that we can manually delete a cache key
+    :param gcache:
+    :return:
+    """
+    v = 0
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+    def cached_func(test: int = 123) -> int:
+        nonlocal v
+        return v
+
+    with gcache.enable():
+        assert 0 == cached_func()
+        v = 10
+        assert 0 == cached_func()
+
+        gcache.delete(GCacheKey(key_type="Test", id="123", use_case="cached_func"))
+
+        assert 10 == cached_func()

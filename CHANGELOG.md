@@ -1,7 +1,23 @@
 # CHANGELOG
 
 
+## v0.10.0 (2025-04-14)
+
+### Features
+
+- Allow to pass in redis py options in config
+  ([#34](https://github.com/rungalileo/cachegalileo/pull/34),
+  [`4d1fca8`](https://github.com/rungalileo/cachegalileo/commit/4d1fca826ae2657aa74c175e3e328c961afd060e))
+
+Allow to pass a dict of options that get passed directly to redispy client
+
+
 ## v0.9.0 (2025-03-29)
+
+### Chores
+
+- **release**: V0.9.0
+  ([`f6aa281`](https://github.com/rungalileo/cachegalileo/commit/f6aa281ab6a4a0189938f2ee276198eb2b97ac02))
 
 ### Features
 

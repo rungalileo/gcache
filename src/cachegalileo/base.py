@@ -339,7 +339,7 @@ class RedisConfig(BaseModel):
     protocol: str = "redis"
     cluster: bool = False
 
-    redis_py_options: dict[str, int | bool] = {
+    redis_py_options: dict[str, int | bool | str] = {
         "socket_connect_timeout": 1,
         "socket_timeout": 1,
         "retry_on_timeout": True,
@@ -373,7 +373,7 @@ class RedisCache(CacheInterface):
         # Check if this thread already has a client
         if not hasattr(self._client, "client"):
             # Create a new client for this thread
-            options = dict(max_connections=100)
+            options: dict[str, int | bool | str] = dict(max_connections=100)
             options.update(self._config.redis_py_options)
 
             # Create the appropriate Redis client based on config

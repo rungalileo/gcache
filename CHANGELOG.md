@@ -1,7 +1,21 @@
 # CHANGELOG
 
 
+## v0.10.1 (2025-04-15)
+
+### Bug Fixes
+
+- Fix type definition for redis py options
+  ([#35](https://github.com/rungalileo/cachegalileo/pull/35),
+  [`afb0446`](https://github.com/rungalileo/cachegalileo/commit/afb04467d0bdf452b6fe7d19afe989b3e89ef84b))
+
+
 ## v0.10.0 (2025-04-14)
+
+### Chores
+
+- **release**: V0.10.0
+  ([`573ff94`](https://github.com/rungalileo/cachegalileo/commit/573ff947681a1493542fbece75be27d27c09a582))
 
 ### Features
 

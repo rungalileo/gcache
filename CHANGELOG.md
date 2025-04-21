@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.10.2 (2025-04-21)
+
+### Chores
+
+- Add instrumentation for serialization/deserialization
+  ([#36](https://github.com/rungalileo/cachegalileo/pull/36),
+  [`000291b`](https://github.com/rungalileo/cachegalileo/commit/000291b8f13f3bd5c27b1e24e3bf99c3adf0e9fe))
+
+Instruments serializing and de-serializing values when caching in Redis layer.
+
+
 ## v0.10.1 (2025-04-15)
 
 ### Bug Fixes
@@ -8,6 +19,11 @@
 - Fix type definition for redis py options
   ([#35](https://github.com/rungalileo/cachegalileo/pull/35),
   [`afb0446`](https://github.com/rungalileo/cachegalileo/commit/afb04467d0bdf452b6fe7d19afe989b3e89ef84b))
+
+### Chores
+
+- **release**: V0.10.1
+  ([`2ec9828`](https://github.com/rungalileo/cachegalileo/commit/2ec98283af2b1e4d7e109b6dc3064971d0038536))
 
 
 ## v0.10.0 (2025-04-14)

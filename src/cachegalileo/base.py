@@ -342,7 +342,6 @@ class RedisConfig(BaseModel):
     redis_py_options: dict[str, int | bool | str] = {
         "socket_connect_timeout": 1,
         "socket_timeout": 1,
-        "retry_on_timeout": True,
     }
 
     @property
@@ -420,16 +419,21 @@ class RedisCache(CacheInterface):
         else:
             val_pickle = await self.client.get(key.urn)
         if val_pickle is not None:
-            start_ns = time.time_ns()
+            start_sec = time.monotonic()
+
             serialized_value: RedisSerializedValue = pickle.loads(val_pickle)
+
+            (
+                CacheController.CACHE_SERIALIZATION_TIMER.labels(
+                    key.use_case, key.key_type, self.layer().name, "load"
+                ).observe(time.monotonic() - start_sec)
+            )
 
             # Check if cache val is expired.
             if watermark_ms is not None:
                 watermark_ms = int(watermark_ms)
                 if watermark_ms >= serialized_value.created_at_ms:
                     return await self._exec_fallback(key, watermark_ms, fallback)
-
-            _GLOBAL_GCACHE_STATE.logger.debug(f"Got value from Redis in {(time.time_ns() - start_ns) / 1e9} sec")
             return serialized_value.payload
         else:
             return await self._exec_fallback(key, watermark_ms, fallback)
@@ -443,7 +447,12 @@ class RedisCache(CacheInterface):
             raise MissingKeyConfig(key.use_case)
 
         current_time_ms = int(time.time() * 1000)
+
         val_pickle = pickle.dumps(RedisSerializedValue(created_at_ms=current_time_ms, payload=value))
+
+        CacheController.CACHE_SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "dump").observe(
+            time.time() - (current_time_ms / 1e3)
+        )
 
         CacheController.CACHE_SIZE_HISTOGRAM.labels(key.use_case, key.key_type, self.layer().name).observe(
             len(val_pickle)
@@ -514,6 +523,8 @@ class CacheController(CacheWrapper):
     CACHE_GET_TIMER: Histogram = None  # type: ignore[assignment]
     CACHE_FALLBACK_TIMER: Histogram = None  # type: ignore[assignment]
 
+    CACHE_SERIALIZATION_TIMER: Histogram = None  # type: ignore[assignment]
+
     CACHE_SIZE_HISTOGRAM: Histogram = None  # type: ignore[assignment]
 
     CACHE_INVALIDATION_COUNT: Counter = None  # type: ignore[assignment]
@@ -564,6 +575,13 @@ class CacheController(CacheWrapper):
                 name=metrics_prefix + "gcache_fallback_timer",
                 labelnames=["use_case", "key_type", "layer"],
                 documentation="Fallback timer",
+                buckets=[0.001] + list(Histogram.DEFAULT_BUCKETS),
+            )
+
+            CacheController.CACHE_SERIALIZATION_TIMER = Histogram(
+                name=metrics_prefix + "gcache_serialization_timer",
+                labelnames=["use_case", "key_type", "layer", "operation"],
+                documentation="Cache serialization timer",
                 buckets=[0.001] + list(Histogram.DEFAULT_BUCKETS),
             )
 

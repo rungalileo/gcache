@@ -615,3 +615,35 @@ def test_delete_key(gcache: GCache) -> None:
         gcache.delete(GCacheKey(key_type="Test", id="123", use_case="cached_func"))
 
         assert 10 == cached_func()
+
+
+@pytest.mark.asyncio
+async def test_serialization_instrumentation(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider, reset_prometheus_registry: Generator
+) -> None:
+    # Given: A cached function with local layer turned off.
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+    cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+    async def cached_func(test: int = 123) -> str:
+        return "foobar"
+
+    # When: We call it twice in a row.
+    with gcache.enable():
+        await cached_func(123)
+        await cached_func(123)
+
+    # Then: we should have recorded some store/load metrics.
+    assert (
+        get_func_metric(
+            'api_gcache_serialization_timer_bucket{key_type="Test",layer="REMOTE",le="+Inf",operation="dump",use_case="cached_func"}'
+        )
+        == 1.0
+    )
+    assert (
+        get_func_metric(
+            'api_gcache_serialization_timer_bucket{key_type="Test",layer="REMOTE",le="+Inf",operation="load",use_case="cached_func"}'
+        )
+        == 1.0
+    )

@@ -1,7 +1,9 @@
 import json
+import pickle
 import threading
 from collections.abc import Generator
 from random import random
+from typing import Any
 
 import pytest
 import redislite
@@ -18,6 +20,7 @@ from cachegalileo.base import (
     GCacheKeyConfig,
     LocalCache,
     RedisConfig,
+    Serializer,
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )
@@ -647,3 +650,34 @@ async def test_serialization_instrumentation(
         )
         == 1.0
     )
+
+
+@pytest.mark.asyncio
+async def test_custom_serializer(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Given: A cached function with local layer turned off.
+    # and a custom serializer which will always load and dump values that are actually different
+    # from what is returned from cached func.
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+    cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
+
+    class CustomSerializer(Serializer):
+        async def dump(self, obj: Any) -> bytes:
+            return b"baz"
+
+        async def load(self, data: bytes) -> Any:
+            return "behhh"
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func", serializer=CustomSerializer())
+    async def cached_func(test: int = 123) -> str:
+        return "foobar"
+
+    with gcache.enable():
+        # When: We call cached func first time, we should get the right value back.
+        assert "foobar" == await cached_func(123)
+        # We should store "baz" as payload in redis.
+        keys = redis_server.keys()
+        assert pickle.loads(redis_server.get(keys[0])).payload == b"baz"
+        # When: We call twice we should get "behhh" back because we hardcoded it in serializer.
+        assert "behhh" == await cached_func(123)

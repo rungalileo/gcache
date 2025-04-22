@@ -131,6 +131,20 @@ class GCacheContext:
     enabled: contextvars.ContextVar[bool] = contextvars.ContextVar("gcache_enabled", default=False)
 
 
+class Serializer:
+    """
+    Serializer that can be overloaded to allow for custom loading/dumping of values into cache.
+    """
+
+    @abstractmethod
+    async def dump(self, obj: Any) -> bytes:
+        pass
+
+    @abstractmethod
+    async def load(self, data: bytes) -> Any:
+        pass
+
+
 class GCacheKey(BaseModel):
     key_type: str
     id: str
@@ -138,6 +152,9 @@ class GCacheKey(BaseModel):
     args: list[tuple[str, str]] = []
     invalidation_tracking: bool = False
     default_config: GCacheKeyConfig | None = None
+    serializer: Serializer | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __hash__(self) -> int:
         return str(self).__hash__()
@@ -349,7 +366,11 @@ class RedisConfig(BaseModel):
         return f"{self.protocol}://{self.username}:{self.password}@{self.host}:{self.port}"
 
 
-class RedisSerializedValue(BaseModel):
+class RedisValue(BaseModel):
+    """
+    Wrap actual payload with created timestamp.
+    """
+
     created_at_ms: int
     payload: Any
 
@@ -421,7 +442,11 @@ class RedisCache(CacheInterface):
         if val_pickle is not None:
             start_sec = time.monotonic()
 
-            serialized_value: RedisSerializedValue = pickle.loads(val_pickle)
+            deserialized_value: RedisValue = pickle.loads(val_pickle)
+
+            # Load payload using custom serializer if present.
+            if key.serializer is not None:
+                deserialized_value.payload = await key.serializer.load(deserialized_value.payload)
 
             (
                 CacheController.CACHE_SERIALIZATION_TIMER.labels(
@@ -432,9 +457,9 @@ class RedisCache(CacheInterface):
             # Check if cache val is expired.
             if watermark_ms is not None:
                 watermark_ms = int(watermark_ms)
-                if watermark_ms >= serialized_value.created_at_ms:
+                if watermark_ms >= deserialized_value.created_at_ms:
                     return await self._exec_fallback(key, watermark_ms, fallback)
-            return serialized_value.payload
+            return deserialized_value.payload
         else:
             return await self._exec_fallback(key, watermark_ms, fallback)
 
@@ -448,7 +473,13 @@ class RedisCache(CacheInterface):
 
         current_time_ms = int(time.time() * 1000)
 
-        val_pickle = pickle.dumps(RedisSerializedValue(created_at_ms=current_time_ms, payload=value))
+        serialized_value = value if key.serializer is None else await key.serializer.dump(value)
+
+        # val_pickle = pickle.dumps(RedisValue(created_at_ms=current_time_ms, payload=serialized_value))
+        try:
+            val_pickle = pickle.dumps(RedisValue(created_at_ms=current_time_ms, payload=serialized_value))
+        except Exception as e:
+            print(e)
 
         CacheController.CACHE_SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "dump").observe(
             time.time() - (current_time_ms / 1e3)
@@ -790,6 +821,7 @@ class GCache:
         ignore_args: list[str] = [],
         track_for_invalidation: bool = False,
         default_config: GCacheKeyConfig | None = None,
+        serializer: Serializer | None = None,
     ) -> Any:
         """
         Decorator which caches a function which can be either sync or async.
@@ -892,6 +924,7 @@ class GCache:
                         args=sorted_args,
                         invalidation_tracking=track_for_invalidation,
                         default_config=default_config,
+                        serializer=serializer,
                     )
                 except Exception as e:
                     # Default to fallback but instrument the error as well as log.

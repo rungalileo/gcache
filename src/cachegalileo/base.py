@@ -475,9 +475,8 @@ class RedisCache(CacheInterface):
 
         serialized_value = value if key.serializer is None else await key.serializer.dump(value)
 
-        # val_pickle = pickle.dumps(RedisValue(created_at_ms=current_time_ms, payload=serialized_value))
         try:
-            val_pickle = pickle.dumps(RedisValue(created_at_ms=current_time_ms, payload=serialized_value))
+            val_pickle = pickle.dumps(RedisValue(created_at_ms=current_time_ms, payload=serialized_value), protocol=-1)
         except Exception as e:
             print(e)
 

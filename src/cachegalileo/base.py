@@ -137,11 +137,11 @@ class Serializer:
     """
 
     @abstractmethod
-    async def dump(self, obj: Any) -> bytes:
+    async def dump(self, obj: Any) -> bytes | str:
         pass
 
     @abstractmethod
-    async def load(self, data: bytes) -> Any:
+    async def load(self, data: bytes | str) -> Any:
         pass
 
 

@@ -663,10 +663,10 @@ async def test_custom_serializer(
     cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
 
     class CustomSerializer(Serializer):
-        async def dump(self, obj: Any) -> bytes:
+        async def dump(self, obj: Any) -> bytes | str:
             return b"baz"
 
-        async def load(self, data: bytes) -> Any:
+        async def load(self, data: bytes | str) -> Any:
             return "behhh"
 
     @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func", serializer=CustomSerializer())

@@ -9,6 +9,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Generator
+from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
@@ -378,6 +379,8 @@ class RedisValue(BaseModel):
 class RedisCache(CacheInterface):
     WATERMARKS_TTL_SEC = 3600 * 4  # 4 hours
 
+    _executor = ThreadPoolExecutor()
+
     def __init__(self, cache_config_provider: CacheConfigProvider, config: RedisConfig):
         super().__init__(cache_config_provider)
         # Store config but don't create client immediately
@@ -427,6 +430,11 @@ class RedisCache(CacheInterface):
         exp_ms = int(time.time() * 1000 + future_buffer_ms)
         await self.client.setex(key, self.WATERMARKS_TTL_SEC, exp_ms)
 
+    @staticmethod
+    async def _async_pickle_loads(data: bytes) -> Any:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(RedisCache._executor, pickle.loads, data)
+
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
 
@@ -442,7 +450,11 @@ class RedisCache(CacheInterface):
         if val_pickle is not None:
             start_sec = time.monotonic()
 
-            deserialized_value: RedisValue = pickle.loads(val_pickle)
+            deserialized_value: RedisValue = (
+                pickle.loads(val_pickle)
+                if len(val_pickle) < 50_000
+                else await RedisCache._async_pickle_loads(val_pickle)
+            )
 
             # Load payload using custom serializer if present.
             if key.serializer is not None:
@@ -475,7 +487,9 @@ class RedisCache(CacheInterface):
 
         serialized_value = value if key.serializer is None else await key.serializer.dump(value)
 
-        val_pickle = pickle.dumps(RedisValue(created_at_ms=current_time_ms, payload=serialized_value), protocol=-1)
+        val_pickle = pickle.dumps(
+            RedisValue(created_at_ms=current_time_ms, payload=serialized_value), protocol=pickle.HIGHEST_PROTOCOL
+        )
 
         CacheController.CACHE_SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "dump").observe(
             time.time() - (current_time_ms / 1e3)

@@ -681,3 +681,24 @@ async def test_custom_serializer(
         assert pickle.loads(redis_server.get(keys[0])).payload == b"baz"
         # When: We call twice we should get "behhh" back because we hardcoded it in serializer.
         assert "behhh" == await cached_func(123)
+
+
+@pytest.mark.asyncio
+async def test_large_payload(
+    gcache: GCache, reset_prometheus_registry: Generator, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Test async unpickling for larger objects.
+    # Given: A cached function which returns a large payload (50k+ bytes)
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+    cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
+    async def cached_func(test: int = 123) -> str:
+        return "f" * 100_000
+
+    with gcache.enable():
+        # When we invoke the function twice we should not get errors
+        await cached_func(123)
+        assert "f" * 100_000 == await cached_func(123)
+
+        assert get_func_metric("api_gcache_error_counter_total") == 0.0

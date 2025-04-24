@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.11.0 (2025-04-24)
+
+### Features
+
+- Custom serializers ([#37](https://github.com/rungalileo/cachegalileo/pull/37),
+  [`84d05d7`](https://github.com/rungalileo/cachegalileo/commit/84d05d7adaaf93f93af7cfe03280fe3d8bd4daa1))
+
+Adds supports for custom serializer to be used for a use case.
+
+Also for large cache values we will run pickle.loads in separate thread
+
+Motivation for this is potentially large latency for deserializing cache objects like caching user:
+  https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache?orgId=1&from=2025-04-23T02%3A15%3A09.560Z&to=2025-04-23T03%3A21%3A18.612Z&timezone=browser&var-customer=atypical&var-use_case=UserDAO%3A%3Aget_by_email_internal&var-layer=REMOTE&var-key_type=%24__all&refresh=5s
+
+
 ## v0.10.2 (2025-04-21)
 
 ### Chores
@@ -10,6 +25,9 @@
   [`000291b`](https://github.com/rungalileo/cachegalileo/commit/000291b8f13f3bd5c27b1e24e3bf99c3adf0e9fe))
 
 Instruments serializing and de-serializing values when caching in Redis layer.
+
+- **release**: V0.10.2
+  ([`cf04234`](https://github.com/rungalileo/cachegalileo/commit/cf042346f2acd267e5fbc88494a0dce1e034a328))
 
 
 ## v0.10.1 (2025-04-15)

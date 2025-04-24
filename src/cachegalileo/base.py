@@ -850,6 +850,9 @@ class GCache:
         :param ignore_args: List of args to ignore in cache key.
         :param track_for_invalidation: Boolean flag to indicate if the cache should track for invalidation.
         :param default_config: Default cache config that is used when cache config provider returns None.
+        :param serializer: Optional serializer to use to serialize and deserialize cache values.  Care must be taken that
+                           the returned value matches the signature of cached function, as otherwise you may get runtime
+                           type/attribute errors.
         :return:
         """
 

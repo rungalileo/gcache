@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.11.4 (2025-05-01)
+
+### Chores
+
+- **deps-dev**: Bump ruff from 0.9.7 to 0.11.8
+  ([#42](https://github.com/rungalileo/cachegalileo/pull/42),
+  [`24504b5`](https://github.com/rungalileo/cachegalileo/commit/24504b5fc1f0847c2e3792fbfa5baee11546f6c6))
+
+
 ## v0.11.3 (2025-05-01)
 
 ### Chores
@@ -8,6 +17,9 @@
 - **deps-dev**: Bump pytest-asyncio from 0.25.3 to 0.26.0
   ([#43](https://github.com/rungalileo/cachegalileo/pull/43),
   [`eef7889`](https://github.com/rungalileo/cachegalileo/commit/eef7889263cc78dd1b9c543c943b309887e5adef))
+
+- **release**: V0.11.3
+  ([`f1d3507`](https://github.com/rungalileo/cachegalileo/commit/f1d3507cbbc0aa9639a2db91c0cedefc88763968))
 
 
 ## v0.11.2 (2025-05-01)

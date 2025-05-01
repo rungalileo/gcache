@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.11.2 (2025-05-01)
+
+### Chores
+
+- **deps**: Bump pydantic from 2.10.6 to 2.11.4
+  ([#41](https://github.com/rungalileo/cachegalileo/pull/41),
+  [`046e4b7`](https://github.com/rungalileo/cachegalileo/commit/046e4b7fd16dde7684427fcd6420250d234dc1b0))
+
+- **deps-dev**: Bump pytest from 8.3.4 to 8.3.5
+  ([#39](https://github.com/rungalileo/cachegalileo/pull/39),
+  [`087f970`](https://github.com/rungalileo/cachegalileo/commit/087f97029160ba98781b2918c5e2dace252fcaba))
+
+
 ## v0.11.1 (2025-05-01)
 
 ### Chores
@@ -8,6 +21,9 @@
 - **deps**: Bump codecov/codecov-action from 5.4.0 to 5.4.2
   ([#38](https://github.com/rungalileo/cachegalileo/pull/38),
   [`e609550`](https://github.com/rungalileo/cachegalileo/commit/e609550128394c751ad5b63d93e87f5340d77e4d))
+
+- **release**: V0.11.1
+  ([`1a0e09a`](https://github.com/rungalileo/cachegalileo/commit/1a0e09a342568b1ff83038d3a3472ef942d1a2e5))
 
 
 ## v0.11.0 (2025-04-24)

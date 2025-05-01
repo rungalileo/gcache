@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.11.6 (2025-05-01)
+
+### Chores
+
+- **deps-dev**: Bump coverage from 7.6.12 to 7.8.0
+  ([#40](https://github.com/rungalileo/cachegalileo/pull/40),
+  [`b2fbd05`](https://github.com/rungalileo/cachegalileo/commit/b2fbd05a853e3a173c03c3623f36c215065cd89b))
+
+
 ## v0.11.5 (2025-05-01)
 
 ### Chores
@@ -8,6 +17,9 @@
 - **deps-dev**: Bump pytest-cov from 6.0.0 to 6.1.1
   ([#44](https://github.com/rungalileo/cachegalileo/pull/44),
   [`8823ece`](https://github.com/rungalileo/cachegalileo/commit/8823ecef0d262021ba9a7ba536fec5e1373353b2))
+
+- **release**: V0.11.5
+  ([`d4b5fbe`](https://github.com/rungalileo/cachegalileo/commit/d4b5fbe95213a07321738e130ce28e4d0130f82a))
 
 
 ## v0.11.4 (2025-05-01)

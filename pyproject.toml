@@ -10,7 +10,7 @@ dynamic = ["dependencies"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pydantic = "^2.10.6"
+pydantic = "^2.11.4"
 prometheus-client = "^0.21.1"
 cachetools = "^5.5.2"
 types-cachetools = "^5.5.0.20240820"

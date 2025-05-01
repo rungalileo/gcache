@@ -1,7 +1,21 @@
 # CHANGELOG
 
 
+## v0.11.1 (2025-05-01)
+
+### Chores
+
+- **deps**: Bump codecov/codecov-action from 5.4.0 to 5.4.2
+  ([#38](https://github.com/rungalileo/cachegalileo/pull/38),
+  [`e609550`](https://github.com/rungalileo/cachegalileo/commit/e609550128394c751ad5b63d93e87f5340d77e4d))
+
+
 ## v0.11.0 (2025-04-24)
+
+### Chores
+
+- **release**: V0.11.0
+  ([`ac106d0`](https://github.com/rungalileo/cachegalileo/commit/ac106d0b1e2ff9f823a8d8b6c24522d7829bcbbd))
 
 ### Features
 

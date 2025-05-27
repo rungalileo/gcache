@@ -39,7 +39,7 @@ def type_check(ctx: Context) -> None:
     ctx : Context
         Invoke context.
     """
-    ctx.run("poetry run mypy --package cachegalileo --namespace-packages", **COMMON_PARAMS)
+    ctx.run("poetry run mypy --package gcache --namespace-packages", **COMMON_PARAMS)
     ctx.run("poetry run mypy --package tests --namespace-packages", **COMMON_PARAMS)
 
 

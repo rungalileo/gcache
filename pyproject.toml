@@ -1,5 +1,5 @@
 [project]
-name = "cachegalileo"
+name = "gcache"
 version = "0.11.6"
 description = "Fine grained caching."
 authors = [{ name = "Galileo Technologies Inc.", email = "team@rungalileo.io" }]

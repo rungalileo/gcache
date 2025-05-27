@@ -3,7 +3,7 @@ import contextvars
 import time
 from random import random
 
-from cachegalileo.event_loop_thread import EventLoopThread, EventLoopThreadPool
+from gcache.event_loop_thread import EventLoopThread, EventLoopThreadPool
 
 
 def test_concurrent() -> None:

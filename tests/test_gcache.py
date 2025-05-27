@@ -9,7 +9,7 @@ import pytest
 import redislite
 from prometheus_client import generate_latest
 
-from cachegalileo.base import (
+from gcache.base import (
     CacheController,
     CacheLayer,
     Fallback,

@@ -22,7 +22,7 @@ from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ConfigDict, validator
 from redis.asyncio import Redis, RedisCluster
 
-from cachegalileo.event_loop_thread import EventLoopThreadPool
+from gcache.event_loop_thread import EventLoopThreadPool
 
 
 # Global state is needed to allow reconfiguration when GCache is instantiated.

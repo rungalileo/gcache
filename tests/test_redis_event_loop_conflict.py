@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 import redislite
 
-from cachegalileo import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
+from gcache import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
 
 from .conftest import REDIS_PORT, FakeCacheConfigProvider
 

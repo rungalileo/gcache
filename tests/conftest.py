@@ -5,7 +5,7 @@ import pytest
 import redislite
 from prometheus_client import REGISTRY
 
-from gcache import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
+from cachegalileo import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
 
 from . import find_free_port
 

@@ -48,7 +48,7 @@ GCache supports multiple caching layers:
 `GCache` is designed to be instantiated once as a singleton:
 
 ```python
-from cachegalileo.base import GCache, GCacheConfig, GCacheKeyConfig
+from gcache.base import GCache, GCacheConfig, GCacheKeyConfig
 
 # Create GCache instance
 gcache = GCache(

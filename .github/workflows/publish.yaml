@@ -13,6 +13,12 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
           token: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
 
+      - name: Build Package
+        # if: steps.release.outputs.released == 'true'
+        run: |
+          pipx install poetry==${{ vars.POETRY_V2_VERSION }}
+          poetry build
+
       - name: Publish Package to PyPI
         # if: steps.release.outputs.released == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1

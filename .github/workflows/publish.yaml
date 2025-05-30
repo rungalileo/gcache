@@ -1,6 +1,4 @@
-name: release
-
-# Only trigger on `main` when the CI workflow succeeds.
+name: publish
 on: workflow_dispatch
 
 jobs:

@@ -1,7 +1,20 @@
 # CHANGELOG
 
 
+## v0.12.1 (2025-05-30)
+
+### Chores
+
+- Publish to pypi ([#49](https://github.com/rungalileo/gcache/pull/49),
+  [`dd3a58e`](https://github.com/rungalileo/gcache/commit/dd3a58e9795c300a68f39d885e4d73d626752b7b))
+
+
 ## v0.12.0 (2025-05-27)
+
+### Chores
+
+- **release**: V0.12.0
+  ([`047fc54`](https://github.com/rungalileo/gcache/commit/047fc540d2794dc18a35a8b6d959d7d631b2f8b7))
 
 ### Features
 

@@ -4,6 +4,10 @@ on: workflow_dispatch
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      # The write permission is required to push the release commit and tag using trusted publishing
+      # for the pypa/gh-action-pypi-publish action.
+      id-token: write
 
     steps:
       - name: checkout

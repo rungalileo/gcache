@@ -58,8 +58,6 @@ gcache = GCache(
 )
 ```
 
-Example in API: https://github.com/rungalileo/api/blob/main/api/caching.py#L43
-
 ## Caching Functions
 
 The `@cached` decorator is the primary way to cache function results. It works with both synchronous and asynchronous functions:
@@ -116,8 +114,6 @@ def get_latest_runs(
     return db_results
 ```
 
-Example in API: https://github.com/rungalileo/api/blob/main/api/daos/user.py#L130
-
 ### Controlling Cache Behavior
 
 #### Enabling/Disabling Cache
@@ -138,11 +134,6 @@ result4 = cached_function()  # No caching occurs
 ```
 
 This design allows precise control over when caching is active, particularly useful in write operations where you want to avoid stale reads.
-
-> **API enable pattern:**
-> In Api we enable caching on endpoint level.  We enable for all GET endpoints and select other endpoints.
-> * https://github.com/rungalileo/api/blob/main/api/middleware/gcache_middleware.py
-> * https://github.com/rungalileo/api/blob/main/api/route_dependencies/gcache.py
 
 #### Ramping up Caching
 
@@ -236,5 +227,3 @@ GCache automatically collects metrics for:
 - Cache operation latency
 - Cache size
 - Invalidation frequency
-
-These metrics are available through Prometheus and can be viewed in the [GCache Dashboard](https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache).

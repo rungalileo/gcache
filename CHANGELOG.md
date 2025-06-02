@@ -1,12 +1,28 @@
 # CHANGELOG
 
 
+## v0.12.2 (2025-06-02)
+
+### Chores
+
+- **deps-dev**: Bump ruff from 0.11.8 to 0.11.12
+  ([#54](https://github.com/rungalileo/gcache/pull/54),
+  [`4b0ddfb`](https://github.com/rungalileo/gcache/commit/4b0ddfb3aab082969768598ccda0d1a82d9521a8))
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+
 ## v0.12.1 (2025-05-30)
 
 ### Chores
 
 - Publish to pypi ([#49](https://github.com/rungalileo/gcache/pull/49),
   [`dd3a58e`](https://github.com/rungalileo/gcache/commit/dd3a58e9795c300a68f39d885e4d73d626752b7b))
+
+- **release**: V0.12.1
+  ([`b96b9fe`](https://github.com/rungalileo/gcache/commit/b96b9fe2ee8c42b46fcfa9224ecdf01d4d42bb45))
 
 
 ## v0.12.0 (2025-05-27)

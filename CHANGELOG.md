@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.12.3 (2025-06-02)
+
+### Chores
+
+- **deps**: Bump types-cachetools from 5.5.0.20240820 to 6.0.0.20250525
+  ([#53](https://github.com/rungalileo/gcache/pull/53),
+  [`0cf369f`](https://github.com/rungalileo/gcache/commit/0cf369fb44933dbecd206d6ef94d8bb5709d35b6))
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+
 ## v0.12.2 (2025-06-02)
 
 ### Chores
@@ -12,6 +25,9 @@
 Signed-off-by: dependabot[bot] <support@github.com>
 
 Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **release**: V0.12.2
+  ([`c6f7214`](https://github.com/rungalileo/gcache/commit/c6f7214442982e75bbaa3f6c2e8a16c3bdd20ea2))
 
 
 ## v0.12.1 (2025-05-30)

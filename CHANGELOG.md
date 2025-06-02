@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.12.4 (2025-06-02)
+
+### Chores
+
+- **deps**: Bump codecov/codecov-action from 5.4.2 to 5.4.3
+  ([#50](https://github.com/rungalileo/gcache/pull/50),
+  [`a1badd9`](https://github.com/rungalileo/gcache/commit/a1badd90a6c9a0af969e7d318538c3154d775193))
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps**: Bump python-semantic-release/python-semantic-release from 9.21.0 to 10.0.2
+  ([#51](https://github.com/rungalileo/gcache/pull/51),
+  [`9553a56`](https://github.com/rungalileo/gcache/commit/9553a56d034001fc34cc02b89b985c978b54f350))
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+
 ## v0.12.3 (2025-06-02)
 
 ### Chores
@@ -12,6 +33,9 @@
 Signed-off-by: dependabot[bot] <support@github.com>
 
 Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **release**: V0.12.3
+  ([`6a4bf17`](https://github.com/rungalileo/gcache/commit/6a4bf173b4529b4ab879ab2a274ee8036b989fc1))
 
 
 ## v0.12.2 (2025-06-02)

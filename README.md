@@ -2,9 +2,6 @@
 
 GCache is a lightweight library that provides fine-grained observability and runtime controls for read-through caching. It's designed to be flexible, performant, and easy to integrate into your application.
 
-* [Dashboard](https://rungalileo.grafana.net/d/bd8fc1a7-46bd-42ee-ae53-773c10128608/gcache)
-* [Runtime configs](https://github.com/rungalileo/cache-configurations/blob/main/cacheconfigs/gcache_configs.py)
-
 > **TODO**
 > Shadowing cache reads against SoT is not implemented yet
 

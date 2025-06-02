@@ -837,14 +837,14 @@ markers = {dev = "python_version < \"3.11\"", test = "python_full_version <= \"3
 
 [[package]]
 name = "types-cachetools"
-version = "5.5.0.20240820"
+version = "6.0.0.20250525"
 description = "Typing stubs for cachetools"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "types-cachetools-5.5.0.20240820.tar.gz", hash = "sha256:b888ab5c1a48116f7799cd5004b18474cd82b5463acb5ffb2db2fc9c7b053bc0"},
-    {file = "types_cachetools-5.5.0.20240820-py3-none-any.whl", hash = "sha256:efb2ed8bf27a4b9d3ed70d33849f536362603a90b8090a328acf0cd42fda82e2"},
+    {file = "types_cachetools-6.0.0.20250525-py3-none-any.whl", hash = "sha256:1de8f0fe4bdcb187a48d2026c1e3672830f67943ad2bf3486abe031b632f1252"},
+    {file = "types_cachetools-6.0.0.20250525.tar.gz", hash = "sha256:baf06f234cac3aeb44c07893447ba03ecdb6c0742ba2607e28a35d38e6821b02"},
 ]
 
 [[package]]
@@ -950,4 +950,4 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "d0e0f39200471d5418211b5e714e652d8c428689cf73f5a8ea7f85190e381b6b"
+content-hash = "16b481a73036c3c8d75195e6280f5a75927530d252df118871f80ef251b4f388"

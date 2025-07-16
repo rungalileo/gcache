@@ -50,7 +50,7 @@ class EventLoopThread(EventLoopThreadInterface, threading.Thread):
         This implementation preserves context variables of the thread that calls submit.
         """
 
-        future: Future = asyncio.run_coroutine_threadsafe(async_fn(), self.loop)
+        future: Future = asyncio.run_coroutine_threadsafe(async_fn(), self.loop)  # type: ignore[arg-type]
 
         if wait_for_result:
             # Block until the result is ready (or an exception is raised).

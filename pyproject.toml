@@ -14,7 +14,7 @@ pydantic = "^2.11.4"
 prometheus-client = "^0.22.1"
 cachetools = "^5.5.2"
 types-cachetools = "^6.0.0.20250525"
-redis = "^6.2.0"
+redis = ">=5.2.0"
 uvloop = "^0.21.0"
 
 

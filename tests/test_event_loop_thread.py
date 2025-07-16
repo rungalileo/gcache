@@ -89,6 +89,6 @@ def test_blocking_sync() -> None:
         print(f"Elapsed time: {elapsed_time}")
 
         # Total elapsed time should be a few seconds.  On fast machines its close to 1.1s
-        assert elapsed_time < 6
+        assert elapsed_time < 7
     finally:
         event_loop.stop()

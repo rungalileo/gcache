@@ -36,7 +36,7 @@ python = "^3.10"
 pydantic = "^2.11.4"
 prometheus-client = "^0.22.1"
 cachetools = "^6.1.0"
-types-cachetools = "^6.1.0.20250717"
+types-cachetools = "^6.2.0.20250827"
 redis = ">=5.0.0"
 uvloop = "^0.21.0"
 
@@ -55,7 +55,7 @@ ruff = "^0.12.11"
 pytest-asyncio = "^1.1.0"
 mypy = "^1.17.1"
 pre-commit = "^4.1.0"
-types-cachetools = "^6.1.0.20250717"
+types-cachetools = "^6.2.0.20250827"
 
 [build-system]
 requires = ["poetry-core>=2.0"]

@@ -44,7 +44,7 @@ uvloop = "^0.21.0"
 [tool.poetry.group.test.dependencies]
 pytest = "^8.4.1"
 pytest-xdist = "^3.6.1"
-coverage = "^7.8.0"
+coverage = "^7.10.6"
 pytest-cov = "^6.2.1"
 pytest-asyncio = "^1.1.0"
 redislite = "^6.2.912183"

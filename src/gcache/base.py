@@ -360,6 +360,7 @@ class RedisConfig(BaseModel):
     redis_py_options: dict[str, int | bool | str] = {
         "socket_connect_timeout": 1,
         "socket_timeout": 1,
+        "max_connections": 100,
     }
 
     @property
@@ -396,8 +397,7 @@ class RedisCache(CacheInterface):
         # Check if this thread already has a client
         if not hasattr(self._client, "client"):
             # Create a new client for this thread
-            options: dict[str, int | bool | str] = dict(max_connections=100)
-            options.update(self._config.redis_py_options)
+            options: dict[str, int | bool | str] = self._config.redis_py_options
 
             # Create the appropriate Redis client based on config
             if self._config.cluster:

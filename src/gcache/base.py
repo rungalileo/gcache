@@ -22,7 +22,7 @@ from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ConfigDict, validator
 from redis.asyncio import Redis, RedisCluster
 
-from gcache.event_loop_thread import EventLoopThreadPool
+from gcache.event_loop_thread import EventLoopThread, EventLoopThreadPool
 
 
 # Global state is needed to allow reconfiguration when GCache is instantiated.
@@ -192,6 +192,13 @@ CacheConfigProvider = Callable[[GCacheKey], Awaitable[GCacheKeyConfig | None]]
 
 class GCacheError(Exception):
     pass
+
+
+class ReentrantSyncFunctionDetected(GCacheError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Sync cached function calling another sync cached function detected.  This is not supported for sync functions.  Convert your use cases to be async."
+        )
 
 
 class GCacheKeyConstructionError(GCacheError):
@@ -809,6 +816,9 @@ class GCache:
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
 
     def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]]) -> Any:
+        if isinstance(threading.current_thread(), EventLoopThread):
+            raise ReentrantSyncFunctionDetected()
+
         return self._event_loop_thread_pool.submit(coro)
 
     @contextmanager

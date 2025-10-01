@@ -88,7 +88,6 @@ class EventLoopThreadPool(EventLoopThreadInterface):
                     for thread in self.threads:
                         thread.start()
                     logger.info(f"Initialized EventLoopThreadPool {self.name}")
-
         return random.choice(self.threads).submit(async_fn, wait_for_result)
 
     def stop(self, timeout_sec: int = 2) -> None:

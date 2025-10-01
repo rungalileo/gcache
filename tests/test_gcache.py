@@ -20,6 +20,7 @@ from gcache.base import (
     GCacheKeyConfig,
     LocalCache,
     RedisConfig,
+    ReentrantSyncFunctionDetected,
     Serializer,
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
@@ -702,3 +703,17 @@ async def test_large_payload(
         assert "f" * 100_000 == await cached_func(123)
 
         assert get_func_metric("api_gcache_error_counter_total") == 0.0
+
+
+def test_recursive_caching(gcache: GCache) -> None:
+    @gcache.cached(key_type="Test", id_arg="test")
+    def cached_func_a(test: int) -> str:
+        return "foo"
+
+    @gcache.cached(key_type="Test", id_arg="test")
+    def cached_func(test: int = 123) -> str:
+        return cached_func_a(test)
+
+    with gcache.enable():
+        with pytest.raises(ReentrantSyncFunctionDetected):
+            cached_func()

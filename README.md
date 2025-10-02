@@ -1,29 +1,25 @@
 # GCache
 
-GCache is a lightweight library that provides fine-grained observability and runtime controls for read-through caching. It's designed to be flexible, performant, and easy to integrate into your application.
+GCache is a lightweight library that provides fine-grained observability, runtime controls and invalidation mechanics for read-through caching.
 
-> **TODO**
-> Shadowing cache reads against SoT is not implemented yet
+It's designed for rapidly adding new cache use cases with safety and structure in place.
 
 ## Core Concepts
 
 ### Key Structure and Organization
 
-GCache organizes cache entries using a structured key system that consists of three main components:
+GCache organizes cache entries using a structured key system that consists of four main components:
 
 1. **Key Type**: Identifies the type of entity being cached (e.g., `user_email`, `user_id`, `organization_id`)
 2. **ID**: The specific identifier for that entity (e.g., `user@example.com`, `12345`)
 3. **Arguments**: Additional parameters that differentiate cache entries for the same entity
+4. **Use Cases**: Every unique use case in GCache is associated with a "use case" - a unique identifier for a specific caching scenario. By default, this is the module path + function name, but custom use case names are recommended for clarity.
 
-This structured approach provides several benefits:
+Structured arguments provide several benefits:
 
 - **Targeted Invalidation**: Invalidate all cache entries for a specific entity type and ID
-- **Comprehensive Monitoring**: Track cache performance metrics by entity type
+- **Comprehensive Monitoring**: Track cache performance metrics by key type
 - **Hierarchical Organization**: Group related cache entries logically
-
-### Use Cases
-
-Every unique use case in GCache is associated with a "use case" - a unique identifier for a specific caching scenario. By default, this is the module path + function name, but custom use case names are recommended for clarity.
 
 Use cases enable:
 
@@ -38,6 +34,47 @@ GCache supports multiple caching layers:
 - **Local Cache**: In-memory cache for ultra-fast access
 - **Remote Cache**: Redis-based distributed cache for shared access across instances
 
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Multi-Layer Read-Through Cache Flow                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    CLIENT REQUEST
+         │
+         ▼
+    ┌─────────┐
+    │ @cached │ ──── "get_user(id=123)"
+    └────┬────┘
+         │
+         ▼
+┌─────────────────┐     HIT ✓
+│  LOCAL CACHE    │ ◄──────────► {"id": 123, "name": "Alice"}
+│  (In-Memory)    │               ↑ RETURN IMMEDIATELY
+│  TTL: 5 min     │
+└────────┬────────┘
+         │ MISS ✗
+         ▼
+┌─────────────────┐     HIT ✓
+│  REDIS CACHE    │ ◄──────────► {"id": 123, "name": "Alice"}
+│  (Distributed)  │               ↑ POPULATE LOCAL + RETURN
+│  TTL: 1 hour    │
+└────────┬────────┘
+         │ MISS ✗
+         ▼
+┌─────────────────┐
+│ SOURCE OF TRUTH │ ──── Database Query / API Call
+│  (Database/API) │      SELECT * FROM users WHERE id = 123
+└────────┬────────┘
+         │
+         ▼
+    FETCH DATA: {"id": 123, "name": "Alice"}
+         │
+         ├──► POPULATE REDIS CACHE
+         ├──► POPULATE LOCAL CACHE
+         └──► RETURN TO CLIENT
+```
+
+
 ## Getting Started
 
 ### Basic Usage
@@ -45,24 +82,30 @@ GCache supports multiple caching layers:
 `GCache` is designed to be instantiated once as a singleton:
 
 ```python
-from gcache import GCache, GCacheConfig, GCacheKeyConfig
+from gcache import GCache, GCacheConfig, GCacheKeyConfig, GCacheKey, CacheLayer
+
+async def config_provider(key: GCacheKey) -> GCacheKeyConfig:
+    return GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: 5, CacheLayer.REMOTE: 10},
+        ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
+    )
 
 # Create GCache instance
 gcache = GCache(
     GCacheConfig(
-        # Configure cache settings
-        cache_config_provider=your_config_provider,
+        # Callable to get individual key configs
+        cache_config_provider=config_provider,
         # Optional Redis configuration
-        redis_config=redis_config
+        redis_config=<redis_config>
     )
 )
 ```
 
-## Caching Functions
+### Caching Functions
 
-The `@cached` decorator is the primary way to cache function results. It works with both synchronous and asynchronous functions:
+The `@cached` decorator is the primary way to cache function results. It works with both synchronous and asynchronous functions.
 
-### Simple Example
+#### Simple Example
 
 ```python
 # Simple caching example
@@ -86,7 +129,7 @@ with gcache.enable():
     profile_again = get_user_profile("12345")  # Cache hit!
 ```
 
-### Advanced Example: Argument Transformers
+#### Advanced Example: Argument Transformers
 
 For complex objects, you can use argument transformers to extract only the relevant parts for cache keys:
 

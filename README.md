@@ -184,7 +184,7 @@ This design allows precise control over when caching is active, particularly use
 
 A use case must be ramped up to enable caching in addition to being executed in "enabled" context.  Use runtime config to ramp up your particular use case.
 
-Cache config provider given to GCache constructor is invoked for each unique use case to determine ramp % as wella s TTL config.
+Cache config provider given to GCache constructor is invoked for each unique use case to determine ramp % as well as TTL config.
 
 ## Cache Invalidation
 ### Targeted Invalidation

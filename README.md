@@ -28,6 +28,7 @@ Use cases enable:
 - **Documentation**: Self-document the purpose of each cache operation
 
 All of these components are represented as an [URN](https://en.wikipedia.org/wiki/Uniform_Resource_Name) which becomes final cache key:
+
 `urn:galileo:<Key Type>:<ID>?<Arguments>#<Use case>`
 
 ### Cache Layers

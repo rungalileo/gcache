@@ -17,7 +17,7 @@ GCache organizes cache entries using a structured key system that consists of fo
 
 Structured arguments provide several benefits:
 
-- **Targeted Invalidation**: Invalidate all cache entries for a specific entity type and ID
+- **Targeted Invalidation**: Invalidate all cache entries for a specific key type and ID
 - **Comprehensive Monitoring**: Track cache performance metrics by key type
 - **Hierarchical Organization**: Group related cache entries logically
 

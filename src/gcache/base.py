@@ -224,6 +224,11 @@ class GCacheDisabled(GCacheError):
         super().__init__("GCache is disabled in this context.")
 
 
+class RedisConfigConflict(GCacheError):
+    def __init__(self) -> None:
+        super().__init__("Cannot provide both redis_config and redis_client_factory. Only one is allowed.")
+
+
 class UseCaseIsAlreadyRegistered(GCacheError):
     def __init__(self, use_case: str):
         super().__init__(f"Use case already registered: {use_case}")
@@ -795,6 +800,7 @@ class GCacheConfig(BaseModel):
     urn_prefix: str | None = None
     metrics_prefix: str = "api_"
     redis_config: RedisConfig | None = None
+    redis_client_factory: Callable[[], Redis | RedisCluster] | None = None
     logger: Logger | LoggerAdapter | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -817,17 +823,31 @@ class GCache:
             metrics_prefix=config.metrics_prefix,
         )
 
-        redis_cache = (
-            CacheController(
-                RedisCache(
-                    config.cache_config_provider,
-                    create_default_redis_client_factory(config.redis_config),
-                ),
-                config.cache_config_provider,
-                metrics_prefix=config.metrics_prefix,
+        # Validate and determine Redis client factory
+        if config.redis_config is not None and config.redis_client_factory is not None:
+            raise RedisConfigConflict()
+
+        if config.redis_config is None and config.redis_client_factory is None:
+            # Both None: use default config and factory
+            default_redis_config = RedisConfig()
+            redis_client_factory: Callable[[], Redis | RedisCluster] = create_default_redis_client_factory(
+                default_redis_config
             )
-            if config.redis_config
-            else NoopCache(config.cache_config_provider)
+        elif config.redis_config is not None:
+            # Only redis_config provided
+            redis_client_factory = create_default_redis_client_factory(config.redis_config)
+        else:
+            # Only redis_client_factory provided
+            assert config.redis_client_factory is not None
+            redis_client_factory = config.redis_client_factory
+
+        redis_cache = CacheController(
+            RedisCache(
+                config.cache_config_provider,
+                redis_client_factory,
+            ),
+            config.cache_config_provider,
+            metrics_prefix=config.metrics_prefix,
         )
 
         self._local_cache = local_cache

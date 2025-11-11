@@ -18,9 +18,13 @@ from random import random
 from typing import Any, Union
 
 from cachetools import TTLCache
+import botocore.session
+from botocore.model import ServiceId
+from botocore.signers import RequestSigner
 from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ConfigDict, validator
 from redis.asyncio import Redis, RedisCluster
+from urllib.parse import ParseResult, quote, urlencode, urlunparse
 
 from gcache.event_loop_thread import EventLoopThread, EventLoopThreadPool
 
@@ -363,6 +367,8 @@ class RedisConfig(BaseModel):
     # protocol is either redis or rediss
     protocol: str = "redis"
     cluster: bool = False
+    elasticache_iam: bool = False
+    elasticache_region: str | None = None
 
     redis_py_options: dict[str, int | bool | str] = {
         "socket_connect_timeout": 1,
@@ -520,6 +526,118 @@ class RedisCache(CacheInterface):
 
     async def flushall(self) -> None:
         return await self.client.flushall()
+
+
+class ElastiCacheIAMProvider:
+    _TOKEN_EXPIRATION_SECONDS = 15 * 60
+
+    def __init__(self, user: str, cache_name: str, region: str, is_serverless: bool = False):
+        if not user:
+            raise ValueError("ElastiCache IAM user must be provided.")
+        if not cache_name:
+            raise ValueError("ElastiCache cache name must be provided.")
+        if not region:
+            raise ValueError("ElastiCache region must be provided.")
+
+        self.user = user
+        self.cache_name = cache_name
+        self.region = region
+        self.is_serverless = is_serverless
+        self._session = botocore.session.get_session()
+
+    def _generate_credentials(self) -> tuple[str, str]:
+        credentials = self._session.get_credentials()
+        if credentials is None:
+            raise ValueError("Unable to locate AWS credentials for ElastiCache IAM provider.")
+
+        request_signer = RequestSigner(
+            ServiceId("elasticache"),
+            self.region,
+            "elasticache",
+            "v4",
+            credentials,
+            self._session.get_component("event_emitter"),
+        )
+
+        query_params = {"Action": "connect", "User": self.user}
+        if self.is_serverless:
+            query_params["ResourceType"] = "ServerlessCache"
+
+        url = urlunparse(
+            ParseResult(
+                scheme="https",
+                netloc=self.cache_name,
+                path="/",
+                params="",
+                query=urlencode(query_params),
+                fragment="",
+            )
+        )
+
+        signed_url = request_signer.generate_presigned_url(
+            {"method": "GET", "url": url, "body": {}, "headers": {}, "context": {}},
+            operation_name="connect",
+            expires_in=self._TOKEN_EXPIRATION_SECONDS,
+            region_name=self.region,
+        )
+
+        return self.user, signed_url.removeprefix("https://")
+
+    def get_credentials(self) -> tuple[str, str]:
+        return self._generate_credentials()
+
+
+class ElasticCacheRedisCache(RedisCache):
+    _CLIENT_CACHE_MAXSIZE = 128
+    _CLIENT_CACHE_TTL_SECONDS = 14 * 60
+
+    def __init__(self, cache_config_provider: CacheConfigProvider, config: RedisConfig):
+        if not config.username:
+            raise ValueError("RedisConfig.username must be set when using ElastiCache IAM authentication.")
+
+        super().__init__(cache_config_provider, config)
+
+        options = dict(config.redis_py_options)
+        cache_name = options.pop("elasticache_cache_name", config.host)
+        is_serverless = bool(options.pop("elasticache_serverless", False))
+
+        self._client_cache: TTLCache[int, Redis | RedisCluster] = TTLCache(
+            maxsize=self._CLIENT_CACHE_MAXSIZE,
+            ttl=self._CLIENT_CACHE_TTL_SECONDS,
+        )
+        self._client_cache_lock = threading.Lock()
+        self._token_provider = ElastiCacheIAMProvider(
+            user=config.username,
+            cache_name=str(cache_name),
+            region=(config.elasticache_region or "us-east-1"),
+            is_serverless=is_serverless,
+        )
+        self._redis_client_options = options
+
+    def _build_url(self, username: str, password: str) -> str:
+        encoded_password = quote(password, safe="")
+        auth_part = f"{username}:{encoded_password}@" if username else f":{encoded_password}@"
+        return f"{self._config.protocol}://{auth_part}{self._config.host}:{self._config.port}"
+
+    def _create_client(self) -> Redis | RedisCluster:
+        username, password = self._token_provider.get_credentials()
+        url = self._build_url(username, password)
+        options = dict(self._redis_client_options)
+
+        if self._config.cluster:
+            return RedisCluster.from_url(url, **options)
+        return Redis.from_url(url, **options)  # type: ignore[arg-type]
+
+    @property
+    def client(self) -> Redis | RedisCluster:
+        thread_id = threading.get_ident()
+        with self._client_cache_lock:
+            try:
+                return self._client_cache[thread_id]
+            except KeyError:
+                client = self._create_client()
+                self._client_cache[thread_id] = client
+                return client
 
 
 class CacheWrapper(CacheInterface):
@@ -785,15 +903,21 @@ class GCache:
             metrics_prefix=config.metrics_prefix,
         )
 
-        redis_cache = (
-            CacheController(
-                RedisCache(config.cache_config_provider, config.redis_config),
+        if config.redis_config:
+            if config.redis_config.elasticache_iam:
+                redis_backend: CacheInterface = ElasticCacheRedisCache(
+                    config.cache_config_provider, config.redis_config
+                )
+            else:
+                redis_backend = RedisCache(config.cache_config_provider, config.redis_config)
+
+            redis_cache = CacheController(
+                redis_backend,
                 config.cache_config_provider,
                 metrics_prefix=config.metrics_prefix,
             )
-            if config.redis_config
-            else NoopCache(config.cache_config_provider)
-        )
+        else:
+            redis_cache = NoopCache(config.cache_config_provider)
 
         self._local_cache = local_cache
         self._redis_cache = redis_cache

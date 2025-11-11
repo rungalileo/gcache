@@ -27,40 +27,51 @@ def test_redis_config_conflict(cache_config_provider: FakeCacheConfigProvider) -
         )
 
 
-def test_default_redis_client(
+def test_no_redis_uses_noop_cache(
     cache_config_provider: FakeCacheConfigProvider,
     redis_server: redislite.Redis,
 ) -> None:
-    """Test that when neither redis_config nor redis_client_factory is provided, default config is used."""
+    """Test that when neither redis_config nor redis_client_factory is provided, NoopCache is used."""
     redis_server.flushall()
 
     # Create GCache without redis_config or redis_client_factory
     gcache = GCache(
         GCacheConfig(
             cache_config_provider=cache_config_provider,
-            urn_prefix="urn:test:default",
+            urn_prefix="urn:test:noop",
         )
     )
 
     try:
-        # Define a cached function to verify Redis is working
+        call_count = {"count": 0}
+
+        # Define a cached function
         @gcache.cached(
             key_type="Test",
             id_arg="test_id",
-            use_case="test_default_client",
-            default_config=GCacheKeyConfig.enabled(60, "test_default_client"),
+            use_case="test_noop",
+            default_config=GCacheKeyConfig.enabled(60, "test_noop"),
         )
         def cached_func(test_id: int) -> str:
+            call_count["count"] += 1
             return f"value_{test_id}"
 
         # Enable caching and test
         with gcache.enable():
             result = cached_func(test_id=123)
             assert result == "value_123"
+            assert call_count["count"] == 1
 
-            # Verify that the result is cached by checking subsequent calls
+            # Call again - with local cache only, this should still be cached
+            # but remote layer is NOOP so no Redis keys should exist
             result2 = cached_func(test_id=123)
             assert result2 == "value_123"
+            # Local cache should prevent another call
+            assert call_count["count"] == 1
+
+            # Verify Redis has NO keys (NoopCache doesn't write to Redis)
+            keys = redis_server.keys()
+            assert len(keys) == 0
 
     finally:
         gcache.__del__()

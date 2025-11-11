@@ -823,32 +823,37 @@ class GCache:
             metrics_prefix=config.metrics_prefix,
         )
 
-        # Validate and determine Redis client factory
+        # Validate and determine Redis cache layer
         if config.redis_config is not None and config.redis_client_factory is not None:
             raise RedisConfigConflict()
 
-        if config.redis_config is None and config.redis_client_factory is None:
-            # Both None: use default config and factory
-            default_redis_config = RedisConfig()
-            redis_client_factory: Callable[[], Redis | RedisCluster] = create_default_redis_client_factory(
-                default_redis_config
-            )
-        elif config.redis_config is not None:
-            # Only redis_config provided
-            redis_client_factory = create_default_redis_client_factory(config.redis_config)
-        else:
-            # Only redis_client_factory provided
-            assert config.redis_client_factory is not None
-            redis_client_factory = config.redis_client_factory
-
-        redis_cache = CacheController(
-            RedisCache(
+        if config.redis_config is not None:
+            # redis_config provided: create RedisCache with factory from config
+            redis_cache = CacheController(
+                RedisCache(
+                    config.cache_config_provider,
+                    create_default_redis_client_factory(config.redis_config),
+                ),
                 config.cache_config_provider,
-                redis_client_factory,
-            ),
-            config.cache_config_provider,
-            metrics_prefix=config.metrics_prefix,
-        )
+                metrics_prefix=config.metrics_prefix,
+            )
+        elif config.redis_client_factory is not None:
+            # redis_client_factory provided: create RedisCache with custom factory
+            redis_cache = CacheController(
+                RedisCache(
+                    config.cache_config_provider,
+                    config.redis_client_factory,
+                ),
+                config.cache_config_provider,
+                metrics_prefix=config.metrics_prefix,
+            )
+        else:
+            # Both None: use NoopCache (no Redis layer)
+            redis_cache = CacheController(
+                NoopCache(config.cache_config_provider),
+                config.cache_config_provider,
+                metrics_prefix=config.metrics_prefix,
+            )
 
         self._local_cache = local_cache
         self._redis_cache = redis_cache

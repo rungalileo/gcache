@@ -96,13 +96,92 @@ async def config_provider(key: GCacheKey) -> GCacheKeyConfig:
 # Create GCache instance
 gcache = GCache(
     GCacheConfig(
-        # Callable to get individual key configs
         cache_config_provider=config_provider,
-        # Optional Redis configuration
-        redis_config=<redis_config>
+        redis_config=RedisConfig(port=6379),  # Optional
     )
 )
 ```
+
+### Redis Configuration
+
+GCache supports flexible Redis configuration. You can disable Redis entirely (local cache only), use standard Redis configuration, or provide a custom client factory for advanced use cases.
+
+#### Option 1: No Redis (Local Cache Only)
+
+If neither `redis_config` nor `redis_client_factory` is provided, GCache uses only local in-memory cache:
+
+```python
+gcache = GCache(
+    GCacheConfig(
+        cache_config_provider=config_provider,
+        # No redis_config or redis_client_factory = local cache only
+    )
+)
+```
+
+#### Option 2: Using RedisConfig
+
+Provide Redis connection parameters via `RedisConfig`:
+
+```python
+from gcache import RedisConfig
+
+gcache = GCache(
+    GCacheConfig(
+        cache_config_provider=config_provider,
+        redis_config=RedisConfig(
+            host="redis.example.com",
+            port=6379,
+            username="myuser",
+            password="mypassword",
+            protocol="redis",  # or "rediss" for TLS
+            cluster=False,  # Set to True for Redis Cluster
+            redis_py_options={
+                "socket_connect_timeout": 1,
+                "socket_timeout": 1,
+                "max_connections": 100,
+            },
+        ),
+    )
+)
+```
+
+#### Option 3: Custom Redis Client Factory
+
+For advanced scenarios (e.g., dynamic credentials, token refresh, custom connection logic), provide a custom `redis_client_factory`:
+
+```python
+import threading
+from redis.asyncio import Redis, RedisCluster
+
+def create_custom_redis_factory():
+    """Factory with thread-local storage for Redis clients."""
+    _thread_local = threading.local()
+
+    def factory() -> Redis | RedisCluster:
+        if not hasattr(_thread_local, "client"):
+            # Custom logic: fetch credentials, handle token refresh, etc.
+            token = get_auth_token_from_vault()
+            _thread_local.client = Redis.from_url(
+                f"redis://:{token}@redis.example.com:6379",
+                socket_connect_timeout=1,
+                socket_timeout=1,
+            )
+        return _thread_local.client
+
+    return factory
+
+gcache = GCache(
+    GCacheConfig(
+        cache_config_provider=config_provider,
+        redis_client_factory=create_custom_redis_factory(),
+    )
+)
+```
+
+**Important**: Your custom factory must implement thread-local storage to ensure each thread gets its own Redis client instance.
+
+**Note**: You cannot provide both `redis_config` and `redis_client_factory`. If both are provided, a `RedisConfigConflict` exception will be raised.
 
 ### Caching Functions
 

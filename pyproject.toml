@@ -1,6 +1,6 @@
 [project]
 name = "gcache"
-version = "1.1.0"
+version = "1.1.1"
 description = "Fine grained caching."
 authors = [{ name = "Galileo Technologies Inc.", email = "team@rungalileo.io" }]
 readme = "README.md"
@@ -34,7 +34,7 @@ repository = "https://github.com/rungalileo/gcache"
 [tool.poetry.dependencies]
 python = "^3.10"
 pydantic = "^2.11.4"
-prometheus-client = "^0.22.1"
+prometheus-client = "^0.23.1"
 cachetools = ">=5.5.2"
 types-cachetools = "^6.2.0.20250827"
 redis = ">=5.0.0"

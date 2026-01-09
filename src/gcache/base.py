@@ -393,28 +393,21 @@ def create_default_redis_client_factory(
     config: RedisConfig,
 ) -> Callable[[], Redis | RedisCluster]:
     """
-    Create a default Redis client factory function.
+    Create a default Redis client factory function from a RedisConfig.
 
-    The factory maintains thread-local storage of Redis clients to ensure each thread
-    gets its own dedicated client instance. Multiple calls to the returned factory
-    from the same thread will return the same client instance.
+    This factory creates a new Redis client each time it's called. Thread-local
+    caching is handled by RedisCache, so the factory doesn't need to manage it.
 
     :param config: RedisConfig containing URL, cluster flag, and redis-py options
-    :return: Factory function that returns a thread-local Redis client
+    :return: Factory function that creates a Redis client
     """
-    _thread_local = threading.local()
 
     def factory() -> Redis | RedisCluster:
-        # Check if this thread already has a client
-        if not hasattr(_thread_local, "client"):
-            # Create a new client for this thread
-            options: dict[str, int | bool | str] = config.redis_py_options
-            if config.cluster:
-                _thread_local.client = RedisCluster.from_url(config.url, **options)
-            else:
-                _thread_local.client = Redis.from_url(config.url, **options)  # type: ignore[arg-type]
-
-        return _thread_local.client
+        options: dict[str, int | bool | str] = config.redis_py_options
+        if config.cluster:
+            return RedisCluster.from_url(config.url, **options)
+        else:
+            return Redis.from_url(config.url, **options)  # type: ignore[arg-type]
 
     return factory
 
@@ -434,22 +427,26 @@ class RedisCache(CacheInterface):
 
         :param cache_config_provider: Provider for cache configuration
         :param client_factory: Factory function to create Redis clients.
-            IMPORTANT: The factory MUST handle thread-local storage to ensure each thread
-            gets its own client instance. Use create_default_redis_client_factory() for
-            standard behavior, or provide a custom factory that implements thread-local
-            semantics (e.g., for token refresh logic).
+            The factory should return a new Redis client when called. Thread-local
+            caching is handled internally by RedisCache - the factory will only be
+            called once per thread, and the resulting client will be reused for
+            subsequent operations on that thread.
         """
         super().__init__(cache_config_provider)
         self._client_factory = client_factory
+        self._thread_local = threading.local()
 
     @property
     def client(self) -> Redis | RedisCluster:
         """
         Get a Redis client for the current thread.
 
-        Calls the factory function to get a thread-local client instance.
+        The client is created once per thread using the factory and cached
+        in thread-local storage for reuse.
         """
-        return self._client_factory()
+        if not hasattr(self._thread_local, "client"):
+            self._thread_local.client = self._client_factory()
+        return self._thread_local.client
 
     async def _exec_fallback(
         self,

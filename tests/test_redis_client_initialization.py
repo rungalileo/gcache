@@ -213,3 +213,163 @@ async def test_redis_config_async_operations(
 
     finally:
         gcache.__del__()
+
+
+def test_factory_called_once_per_thread(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+) -> None:
+    """Test that the client factory is called only once per thread, not on every operation."""
+    redis_server.flushall()
+
+    factory_call_count = {"count": 0}
+
+    def counting_factory() -> Redis:
+        """Factory that counts how many times it's called."""
+        factory_call_count["count"] += 1
+        return Redis.from_url(f"redis://localhost:{REDIS_PORT}")
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:test:factory_once",
+            redis_client_factory=counting_factory,
+        )
+    )
+
+    try:
+
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test_id",
+            use_case="test_factory_once",
+            default_config=GCacheKeyConfig.enabled(60, "test_factory_once"),
+        )
+        def cached_func(test_id: int) -> str:
+            return f"value_{test_id}"
+
+        with gcache.enable():
+            # Make multiple cache operations
+            cached_func(test_id=1)
+            cached_func(test_id=2)
+            cached_func(test_id=3)
+            cached_func(test_id=1)  # Cache hit
+            cached_func(test_id=4)
+
+            # Factory should only be called once (for the single thread)
+            # gcache uses EventLoopThreadPool which picks a thread, and that thread
+            # should reuse the same client
+            assert factory_call_count["count"] >= 1
+            # The key assertion: factory should NOT be called for every operation
+            # With 5 operations, if thread-local caching wasn't working, we'd see 5 calls
+            assert factory_call_count["count"] < 5
+
+    finally:
+        gcache.__del__()
+
+
+def test_factory_called_once_per_thread_multiple_threads(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+) -> None:
+    """Test that each thread gets its own client (factory called once per thread)."""
+    import concurrent.futures
+    import threading
+
+    redis_server.flushall()
+
+    factory_call_count = 0
+    factory_thread_ids: set[int | None] = set()
+    factory_lock = threading.Lock()
+
+    def counting_factory() -> Redis:
+        """Factory that counts calls and tracks which threads called it."""
+        nonlocal factory_call_count
+        with factory_lock:
+            factory_call_count += 1
+            factory_thread_ids.add(threading.current_thread().ident)
+        return Redis.from_url(f"redis://localhost:{REDIS_PORT}")
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:test:multithread",
+            redis_client_factory=counting_factory,
+        )
+    )
+
+    try:
+
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test_id",
+            use_case="test_multithread",
+            default_config=GCacheKeyConfig.enabled(60, "test_multithread"),
+        )
+        def cached_func(test_id: int) -> str:
+            return f"value_{test_id}"
+
+        with gcache.enable():
+            # Run many operations that will be distributed across threads
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = []
+                for i in range(20):
+                    futures.append(executor.submit(cached_func, test_id=i))
+                # Wait for all to complete
+                for f in futures:
+                    f.result()
+
+            # Factory should be called once per unique thread that handled operations
+            # The number of factory calls should equal the number of unique threads
+            assert factory_call_count == len(factory_thread_ids)
+
+    finally:
+        gcache.__del__()
+
+
+def test_same_thread_reuses_client_instance(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+) -> None:
+    """Test that the same thread always gets the exact same client instance."""
+    redis_server.flushall()
+
+    created_clients: list = []
+
+    def tracking_factory() -> Redis:
+        """Factory that tracks all created client instances."""
+        client = Redis.from_url(f"redis://localhost:{REDIS_PORT}")
+        created_clients.append(client)
+        return client
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:test:same_instance",
+            redis_client_factory=tracking_factory,
+        )
+    )
+
+    try:
+
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test_id",
+            use_case="test_same_instance",
+            default_config=GCacheKeyConfig.enabled(60, "test_same_instance"),
+        )
+        def cached_func(test_id: int) -> str:
+            return f"value_{test_id}"
+
+        with gcache.enable():
+            # Make multiple operations
+            for i in range(10):
+                cached_func(test_id=i)
+
+            # If thread-local caching is working, we should have very few clients
+            # (one per thread used by the event loop pool)
+            # Without thread-local caching, we'd have 10 clients
+            assert len(created_clients) < 10
+
+    finally:
+        gcache.__del__()

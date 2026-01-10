@@ -89,14 +89,13 @@ class GCacheKeyConfig(BaseModel):
         return json.dumps(data_dict, indent=2)
 
     @staticmethod
-    def enabled(ttl_sec: int, use_case: str) -> "GCacheKeyConfig":
+    def enabled(ttl_sec: int) -> "GCacheKeyConfig":
         """
-        Return config that enabled cache with given ttl for all layers.
-        :param ttl_sec:
-        :param use_case:
-        :return:
+        Return config that enables cache with given ttl for all layers.
+        :param ttl_sec: TTL in seconds for all cache layers.
+        :return: GCacheKeyConfig with all layers enabled at 100% ramp.
         """
-        config = GCacheKeyConfig(use_case=use_case, ttl_sec={}, ramp={})
+        config = GCacheKeyConfig(ttl_sec={}, ramp={})
         for layer in CacheLayer:
             config.ttl_sec[layer] = ttl_sec
             config.ramp[layer] = 100

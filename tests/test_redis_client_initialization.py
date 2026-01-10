@@ -50,7 +50,7 @@ def test_no_redis_uses_noop_cache(
             key_type="Test",
             id_arg="test_id",
             use_case="test_noop",
-            default_config=GCacheKeyConfig.enabled(60, "test_noop"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             call_count["count"] += 1
@@ -100,7 +100,7 @@ def test_redis_config_only(
             key_type="Test",
             id_arg="test_id",
             use_case="test_config_only",
-            default_config=GCacheKeyConfig.enabled(60, "test_config_only"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"config_value_{test_id}"
@@ -148,7 +148,7 @@ def test_redis_client_factory_only(
             key_type="Test",
             id_arg="test_id",
             use_case="test_factory_only",
-            default_config=GCacheKeyConfig.enabled(60, "test_factory_only"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"factory_value_{test_id}"
@@ -193,7 +193,7 @@ async def test_redis_config_async_operations(
             key_type="Test",
             id_arg="test_id",
             use_case="test_async",
-            default_config=GCacheKeyConfig.enabled(60, "test_async"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         async def cached_func_async(test_id: int) -> str:
             return f"async_value_{test_id}"
@@ -243,7 +243,7 @@ def test_factory_called_once_per_thread(
             key_type="Test",
             id_arg="test_id",
             use_case="test_factory_once",
-            default_config=GCacheKeyConfig.enabled(60, "test_factory_once"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"value_{test_id}"
@@ -304,7 +304,7 @@ def test_factory_called_once_per_thread_multiple_threads(
             key_type="Test",
             id_arg="test_id",
             use_case="test_multithread",
-            default_config=GCacheKeyConfig.enabled(60, "test_multithread"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"value_{test_id}"
@@ -356,7 +356,7 @@ def test_same_thread_reuses_client_instance(
             key_type="Test",
             id_arg="test_id",
             use_case="test_same_instance",
-            default_config=GCacheKeyConfig.enabled(60, "test_same_instance"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"value_{test_id}"

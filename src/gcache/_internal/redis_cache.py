@@ -10,8 +10,9 @@ from pydantic import BaseModel
 from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
+from gcache._internal.constants import ASYNC_PICKLE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
+from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache._internal.wrappers import CacheController
 from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, RedisConfig
 from gcache.exceptions import MissingKeyConfig
 
@@ -49,8 +50,6 @@ def create_default_redis_client_factory(
 
 
 class RedisCache(CacheInterface):
-    WATERMARKS_TTL_SEC = 3600 * 4  # 4 hours
-
     _executor = ThreadPoolExecutor()
 
     def __init__(
@@ -101,11 +100,11 @@ class RedisCache(CacheInterface):
         return val
 
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
-        CacheController.CACHE_INVALIDATION_COUNT.labels(key_type, self.layer().name).inc()
+        GCacheMetrics.INVALIDATION_COUNTER.labels(key_type, self.layer().name).inc()
 
         key = "{" + _GLOBAL_GCACHE_STATE.urn_prefix + ":" + key_type + ":" + id + "}#watermark"
         exp_ms = int(time.time() * 1000 + future_buffer_ms)
-        await self.client.setex(key, self.WATERMARKS_TTL_SEC, exp_ms)
+        await self.client.setex(key, WATERMARK_TTL_SECONDS, exp_ms)
 
     @staticmethod
     async def _async_pickle_loads(data: bytes) -> Any:
@@ -129,7 +128,7 @@ class RedisCache(CacheInterface):
 
             deserialized_value: RedisValue = (
                 pickle.loads(val_pickle)
-                if len(val_pickle) < 50_000
+                if len(val_pickle) < ASYNC_PICKLE_THRESHOLD_BYTES
                 else await RedisCache._async_pickle_loads(val_pickle)
             )
 
@@ -138,9 +137,9 @@ class RedisCache(CacheInterface):
                 deserialized_value.payload = await key.serializer.load(deserialized_value.payload)
 
             (
-                CacheController.CACHE_SERIALIZATION_TIMER.labels(
-                    key.use_case, key.key_type, self.layer().name, "load"
-                ).observe(time.monotonic() - start_sec)
+                GCacheMetrics.SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "load").observe(
+                    time.monotonic() - start_sec
+                )
             )
 
             # Check if cache val is expired.
@@ -169,13 +168,11 @@ class RedisCache(CacheInterface):
             RedisValue(created_at_ms=current_time_ms, payload=serialized_value), protocol=pickle.HIGHEST_PROTOCOL
         )
 
-        CacheController.CACHE_SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "dump").observe(
+        GCacheMetrics.SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "dump").observe(
             time.monotonic() - start_time
         )
 
-        CacheController.CACHE_SIZE_HISTOGRAM.labels(key.use_case, key.key_type, self.layer().name).observe(
-            len(val_pickle)
-        )
+        GCacheMetrics.SIZE_HISTOGRAM.labels(key.use_case, key.key_type, self.layer().name).observe(len(val_pickle))
 
         ttl = config.ttl_sec.get(self.layer(), None)
         if ttl is None:

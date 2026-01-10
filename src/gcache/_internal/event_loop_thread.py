@@ -9,6 +9,8 @@ from typing import Any
 
 import uvloop
 
+from gcache._internal.constants import EVENT_LOOP_THREAD_POOL_SIZE
+
 logger = getLogger(__name__)
 
 
@@ -73,7 +75,7 @@ class EventLoopThreadPool(EventLoopThreadInterface):
     Lazy initialization is important when running in forked processes.
     """
 
-    def __init__(self, name: str = "EventLoopThreadPool", num_threads: int = 16) -> None:
+    def __init__(self, name: str = "EventLoopThreadPool", num_threads: int = EVENT_LOOP_THREAD_POOL_SIZE) -> None:
         self.name = name
         self.num_threads = num_threads
         self.threads: list[EventLoopThread] | None = None

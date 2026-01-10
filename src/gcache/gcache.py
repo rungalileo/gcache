@@ -8,6 +8,7 @@ from typing import Any
 
 from gcache._internal.event_loop_thread import EventLoopThread, EventLoopThreadPool
 from gcache._internal.local_cache import LocalCache
+from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.noop_cache import NoopCache
 from gcache._internal.redis_cache import RedisCache, create_default_redis_client_factory
 from gcache._internal.state import _GLOBAL_GCACHE_STATE, GCacheContext
@@ -120,7 +121,7 @@ class GCache:
         id_arg: str | tuple[str, Callable[[Any], str]],
         use_case: str | None = None,
         arg_adapters: dict[str, Callable[[Any], str]] | None = None,
-        ignore_args: list[str] = [],
+        ignore_args: list[str] | None = None,
         track_for_invalidation: bool = False,
         default_config: GCacheKeyConfig | None = None,
         serializer: Serializer | None = None,
@@ -151,6 +152,7 @@ class GCache:
         def decorator(func: Any) -> Any:
             nonlocal use_case
             nonlocal arg_adapters
+            nonlocal ignore_args
 
             # Cache the function signature by defining it here.
             sig = inspect.signature(func)
@@ -169,6 +171,9 @@ class GCache:
             if arg_adapters is None:
                 arg_adapters = {}
 
+            if ignore_args is None:
+                ignore_args = []
+
             adapter_for_key = not isinstance(id_arg, str)
             id_arg_name = id_arg[0] if adapter_for_key else id_arg
 
@@ -186,7 +191,7 @@ class GCache:
             async def async_wrapped(*args: Any, **kwargs: Any) -> Any:
                 should_cache = True
                 if not GCacheContext.enabled.get():
-                    CacheController.CACHE_DISABLED_COUNTER.labels(
+                    GCacheMetrics.DISABLED_COUNTER.labels(
                         use_case, key_type, "GLOBAL", DisabledReasons.context.name
                     ).inc()
                     should_cache = False
@@ -234,7 +239,7 @@ class GCache:
                 except Exception as e:
                     # Default to fallback but instrument the error as well as log.
                     _GLOBAL_GCACHE_STATE.logger.error("Could not construct key", exc_info=True)
-                    CacheController.CACHE_ERROR_COUNTER.labels(
+                    GCacheMetrics.ERROR_COUNTER.labels(
                         use_case,
                         key_type,
                         "key creation",
@@ -262,7 +267,7 @@ class GCache:
 
                 def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
                     if not GCacheContext.enabled.get():
-                        CacheController.CACHE_DISABLED_COUNTER.labels(
+                        GCacheMetrics.DISABLED_COUNTER.labels(
                             use_case, key_type, "GLOBAL", DisabledReasons.context.name
                         ).inc()
                         return func(*args, **kwargs)

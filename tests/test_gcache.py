@@ -274,7 +274,7 @@ def test_missing_key_config_ttl(
     layer: CacheLayer,
 ) -> None:
     with gcache.enable():
-        cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+        cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60)
         del cache_config_provider.configs["cached_func"].ttl_sec[layer]
 
         @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
@@ -298,7 +298,7 @@ def test_missing_key_config_ramp(
     layer: CacheLayer,
 ) -> None:
     with gcache.enable():
-        cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+        cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60)
         del cache_config_provider.configs["cached_func"].ramp[layer]
 
         @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
@@ -348,7 +348,7 @@ def test_default_key_config(gcache: GCache, cache_config_provider: FakeCacheConf
             key_type="Test",
             id_arg="test",
             use_case="cached_func",
-            default_config=GCacheKeyConfig.enabled(60, "cached_func"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test: int = 123) -> int:
             return 0
@@ -359,7 +359,7 @@ def test_default_key_config(gcache: GCache, cache_config_provider: FakeCacheConf
 @pytest.mark.skip
 @pytest.mark.asyncio
 async def test_high_load_async(gcache: GCache, cache_config_provider: FakeCacheConfigProvider) -> None:
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60)
 
     @gcache.cached(key_type="test", id_arg="test", use_case="cached_func")
     async def cached_func(test: int = 123) -> int:
@@ -372,7 +372,7 @@ async def test_high_load_async(gcache: GCache, cache_config_provider: FakeCacheC
 
 @pytest.mark.skip
 def test_high_load(gcache: GCache, cache_config_provider: FakeCacheConfigProvider) -> None:
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60)
 
     @gcache.cached(key_type="test", id_arg="test", use_case="cached_func")
     def cached_func(test: int = 123) -> int:
@@ -386,7 +386,7 @@ def test_high_load(gcache: GCache, cache_config_provider: FakeCacheConfigProvide
 def test_invalidation(gcache: GCache, cache_config_provider: FakeCacheConfigProvider) -> None:
     v: int = 0
 
-    config = GCacheKeyConfig.enabled(3600, "cached_func")
+    config = GCacheKeyConfig.enabled(3600)
     config.ramp[CacheLayer.LOCAL] = 0
 
     cache_config_provider.configs["cached_func"] = config
@@ -484,7 +484,7 @@ async def test_flush_all(gcache: GCache, redis_server: redislite.Redis) -> None:
 
 def test_gcache_serialize() -> None:
     # Test that we can dump a key to json and then load it either from a string of json itself, or from a dict.
-    key = GCacheKeyConfig.enabled(10, "test")
+    key = GCacheKeyConfig.enabled(10)
 
     json_str = key.dumps()
 
@@ -510,9 +510,7 @@ def test_redis_down(
     )
     try:
 
-        @gcache.cached(
-            key_type="Test", id_arg="foo", use_case="test", default_config=GCacheKeyConfig.enabled(60, "test")
-        )
+        @gcache.cached(key_type="Test", id_arg="foo", use_case="test", default_config=GCacheKeyConfig.enabled(60))
         def cached_func(foo: int) -> int:
             return 123
 
@@ -628,7 +626,7 @@ async def test_serialization_instrumentation(
     gcache: GCache, cache_config_provider: FakeCacheConfigProvider, reset_prometheus_registry: Generator
 ) -> None:
     # Given: A cached function with local layer turned off.
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
 
     @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
@@ -662,7 +660,7 @@ async def test_custom_serializer(
     # Given: A cached function with local layer turned off.
     # and a custom serializer which will always load and dump values that are actually different
     # from what is returned from cached func.
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
 
     class CustomSerializer(Serializer):
@@ -692,7 +690,7 @@ async def test_large_payload(
 ) -> None:
     # Test async unpickling for larger objects.
     # Given: A cached function which returns a large payload (50k+ bytes)
-    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60, "cached_func")
+    cache_config_provider.configs["cached_func"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["cached_func"].ramp[CacheLayer.LOCAL] = 0
 
     @gcache.cached(key_type="Test", id_arg="test", use_case="cached_func")
@@ -719,3 +717,140 @@ def test_recursive_caching(gcache: GCache) -> None:
     with gcache.enable():
         with pytest.raises(ReentrantSyncFunctionDetected):
             cached_func()
+
+
+# =============================================================================
+# Metrics tests
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_miss_counter_incremented(
+    gcache: GCache, reset_prometheus_registry: Generator, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    """Test that api_gcache_miss_counter is incremented on cache miss."""
+    cache_config_provider.configs["test_miss"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="test_miss")
+    async def cached_func(test: int) -> str:
+        return "value"
+
+    with gcache.enable():
+        # First call is a cache miss
+        await cached_func(1)
+        # Check miss counter was incremented (both LOCAL and REMOTE layers)
+        miss_count = get_func_metric(
+            'api_gcache_miss_counter_total{key_type="Test",layer="LOCAL",use_case="test_miss"}'
+        )
+        assert miss_count >= 1.0
+
+
+@pytest.mark.asyncio
+async def test_request_counter_incremented(
+    gcache: GCache, reset_prometheus_registry: Generator, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    """Test that api_gcache_request_counter is incremented on each request."""
+    cache_config_provider.configs["test_request"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="test_request")
+    async def cached_func(test: int) -> str:
+        return "value"
+
+    with gcache.enable():
+        # Make 3 requests
+        await cached_func(1)
+        await cached_func(1)  # cache hit
+        await cached_func(2)  # different key, cache miss
+
+        # Check request counter was incremented
+        request_count = get_func_metric(
+            'api_gcache_request_counter_total{key_type="Test",layer="LOCAL",use_case="test_request"}'
+        )
+        assert request_count == 3.0
+
+
+@pytest.mark.asyncio
+async def test_get_timer_records_observations(
+    gcache: GCache, reset_prometheus_registry: Generator, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    """Test that api_gcache_get_timer histogram has observations."""
+    cache_config_provider.configs["test_get_timer"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="test_get_timer")
+    async def cached_func(test: int) -> str:
+        return "value"
+
+    with gcache.enable():
+        await cached_func(1)
+
+        # Check histogram has observations (using +Inf bucket which counts all)
+        timer_count = get_func_metric(
+            'api_gcache_get_timer_bucket{key_type="Test",layer="LOCAL",le="+Inf",use_case="test_get_timer"}'
+        )
+        assert timer_count >= 1.0
+
+
+@pytest.mark.asyncio
+async def test_fallback_timer_records_observations(
+    gcache: GCache, reset_prometheus_registry: Generator, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    """Test that api_gcache_fallback_timer histogram has observations on cache miss."""
+    cache_config_provider.configs["test_fallback_timer"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="test_fallback_timer")
+    async def cached_func(test: int) -> str:
+        return "value"
+
+    with gcache.enable():
+        # First call triggers fallback (source of truth call)
+        await cached_func(1)
+
+        # Check fallback timer histogram has observations (includes layer label)
+        timer_count = get_func_metric(
+            'api_gcache_fallback_timer_bucket{key_type="Test",layer="REMOTE",le="+Inf",use_case="test_fallback_timer"}'
+        )
+        assert timer_count >= 1.0
+
+
+@pytest.mark.asyncio
+async def test_size_histogram_records_on_put(
+    gcache: GCache, reset_prometheus_registry: Generator, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    """Test that api_gcache_size_histogram records size when caching values (REMOTE layer only)."""
+    cache_config_provider.configs["test_size"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="test_size")
+    async def cached_func(test: int) -> str:
+        return "some_value_to_cache"
+
+    with gcache.enable():
+        await cached_func(1)
+
+        # Check size histogram has observations (REMOTE layer only - size tracked on Redis put)
+        size_count = get_func_metric(
+            'api_gcache_size_histogram_bucket{key_type="Test",layer="REMOTE",le="+Inf",use_case="test_size"}'
+        )
+        assert size_count >= 1.0
+
+
+@pytest.mark.asyncio
+async def test_invalidation_counter_incremented(
+    gcache: GCache, reset_prometheus_registry: Generator, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    """Test that api_gcache_invalidation_counter is incremented on invalidation."""
+    cache_config_provider.configs["test_invalidation"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="test_invalidation", track_for_invalidation=True)
+    async def cached_func(test: int) -> str:
+        return "value"
+
+    with gcache.enable():
+        # Cache a value first
+        await cached_func(123)
+
+        # Invalidate
+        await gcache.ainvalidate("Test", "123")
+
+        # Check invalidation counter was incremented (REMOTE layer)
+        invalidation_count = get_func_metric('api_gcache_invalidation_counter_total{key_type="Test",layer="REMOTE"}')
+        assert invalidation_count >= 1.0

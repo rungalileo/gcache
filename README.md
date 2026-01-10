@@ -216,7 +216,6 @@ from gcache import RedisConfig
 
 gcache = GCache(
     GCacheConfig(
-        cache_config_provider=config_provider,
         redis_config=RedisConfig(
             host="redis.example.com",
             port=6379,
@@ -247,7 +246,6 @@ def make_redis_factory():
 
 gcache = GCache(
     GCacheConfig(
-        cache_config_provider=config_provider,
         redis_client_factory=make_redis_factory(),
     )
 )
@@ -323,7 +321,6 @@ You can add a prefix to avoid collisions:
 
 ```python
 GCacheConfig(
-    cache_config_provider=config_provider,
     metrics_prefix="myapp_",  # Metrics become myapp_gcache_request_counter, etc.
 )
 ```

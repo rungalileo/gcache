@@ -374,3 +374,49 @@ def test_same_thread_reuses_client_instance(
 
     finally:
         gcache.__del__()
+
+
+def test_no_config_provider_uses_default_config(
+    redis_server: redislite.Redis,
+) -> None:
+    """Test that when no config_provider is passed, default_config on decorator is used."""
+    redis_server.flushall()
+
+    # Create GCache WITHOUT cache_config_provider - uses the default that returns None
+    gcache = GCache(
+        GCacheConfig(
+            urn_prefix="urn:test:no_provider",
+            redis_config=RedisConfig(port=REDIS_PORT),
+        )
+    )
+
+    try:
+        call_count = {"count": 0}
+
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test_id",
+            use_case="test_no_provider",
+            default_config=GCacheKeyConfig.enabled(60),
+        )
+        def cached_func(test_id: int) -> str:
+            call_count["count"] += 1
+            return f"value_{test_id}"
+
+        with gcache.enable():
+            # First call - cache miss, function executes
+            result = cached_func(test_id=123)
+            assert result == "value_123"
+            assert call_count["count"] == 1
+
+            # Second call - cache hit, function should NOT execute
+            result2 = cached_func(test_id=123)
+            assert result2 == "value_123"
+            assert call_count["count"] == 1  # Still 1, proving cache worked
+
+            # Verify Redis has the cached key
+            keys = redis_server.keys()
+            assert len(keys) == 1
+
+    finally:
+        gcache.__del__()

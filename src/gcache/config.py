@@ -159,6 +159,11 @@ class GCacheKey(BaseModel):
 CacheConfigProvider = Callable[[GCacheKey], Awaitable[GCacheKeyConfig | None]]
 
 
+async def _default_config_provider(key: GCacheKey) -> GCacheKeyConfig | None:
+    """Default config provider that returns None, falling back to decorator's default_config."""
+    return None
+
+
 class RedisConfig(BaseModel):
     username: str = ""
     password: str = ""
@@ -180,7 +185,7 @@ class RedisConfig(BaseModel):
 
 
 class GCacheConfig(BaseModel):
-    cache_config_provider: CacheConfigProvider
+    cache_config_provider: CacheConfigProvider = _default_config_provider
     urn_prefix: str | None = None
     metrics_prefix: str = "api_"
     redis_config: RedisConfig | None = None

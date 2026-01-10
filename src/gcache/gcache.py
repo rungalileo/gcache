@@ -1,3 +1,4 @@
+import asyncio
 import functools
 import inspect
 import threading
@@ -116,9 +117,19 @@ class GCache:
         self._event_loop_thread_pool.stop()
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
 
-    def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]]) -> Any:
+    def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]], func_name: str = "") -> Any:
         if isinstance(threading.current_thread(), EventLoopThread):
             raise ReentrantSyncFunctionDetected()
+
+        # Warn if sync cached function is called from async context (blocks event loop)
+        try:
+            asyncio.get_running_loop()
+            _GLOBAL_GCACHE_STATE.logger.warning(
+                f"Sync cached function '{func_name}' called from async context. "
+                "This blocks the event loop. Consider using an async cached function instead."
+            )
+        except RuntimeError:
+            pass  # No running loop - this is the normal/expected case
 
         return self._event_loop_thread_pool.submit(coro)
 
@@ -290,7 +301,10 @@ class GCache:
                         ).inc()
                         return func(*args, **kwargs)
 
-                    return self._run_coroutine_in_thread(partial(async_wrapped, *args, **kwargs))
+                    return self._run_coroutine_in_thread(
+                        partial(async_wrapped, *args, **kwargs),
+                        func_name=f"{func.__module__}.{func.__name__}",
+                    )
 
                 return functools.wraps(func)(sync_wrapped)
 

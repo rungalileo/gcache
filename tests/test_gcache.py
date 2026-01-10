@@ -1,4 +1,5 @@
 import json
+import logging
 import pickle
 import threading
 from collections.abc import Generator
@@ -854,3 +855,27 @@ async def test_invalidation_counter_incremented(
         # Check invalidation counter was incremented (REMOTE layer)
         invalidation_count = get_func_metric('api_gcache_invalidation_counter_total{key_type="Test",layer="REMOTE"}')
         assert invalidation_count >= 1.0
+
+
+@pytest.mark.asyncio
+async def test_sync_from_async_logs_warning(
+    gcache: GCache,
+    caplog: pytest.LogCaptureFixture,
+    cache_config_provider: FakeCacheConfigProvider,
+) -> None:
+    """Test that calling sync cached function from async context logs a warning."""
+    cache_config_provider.configs["test_sync_async_warning"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="Test", id_arg="test_id", use_case="test_sync_async_warning")
+    def sync_cached_func(test_id: int) -> str:
+        return f"value_{test_id}"
+
+    with gcache.enable():
+        # Call sync function from async context - should log warning
+        with caplog.at_level(logging.WARNING):
+            result = sync_cached_func(test_id=123)
+
+        assert result == "value_123"
+        assert "Sync cached function" in caplog.text
+        assert "async context" in caplog.text
+        assert "test_sync_async_warning" not in caplog.text or "sync_cached_func" in caplog.text

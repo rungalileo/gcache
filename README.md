@@ -139,13 +139,15 @@ The decorator handles both sync and async functions automatically.
 
 ```python
 @gcache.cached(
-    key_type="user_id",      # What kind of entity is this?
-    id_arg="user_id",        # Which argument contains the ID?
-    use_case="GetUserProfile" # Optional: name for metrics (defaults to module.function)
+    key_type="user_id",           # What kind of entity is this?
+    id_arg="user_id",             # Which argument contains the ID?
+    use_case="GetUserProfile",    # Identifies this specific caching use case
 )
 async def get_user_profile(user_id: str) -> dict:
     ...
 ```
+
+**Tip:** Always define `use_case` explicitly. It identifies the specific caching scenario (e.g., `GetUserProfile`, `ListOrgProjects`) and appears in cache keys, metrics, and logs. It defaults to `module.function_name`, but an explicit name ensures consistency if you refactor your code.
 
 ### Working with Complex Arguments
 
@@ -174,7 +176,7 @@ async def search_user_posts(
 ### Sync Functions Work Too
 
 ```python
-@gcache.cached(key_type="org_id", id_arg="org_id")
+@gcache.cached(key_type="org_id", id_arg="org_id", use_case="GetOrgSettings")
 def get_org_settings(org_id: str) -> dict:  # No async needed
     return db.query(...)
 ```
@@ -186,7 +188,7 @@ Under the hood, sync functions run through a thread pool to avoid blocking the e
 ### No Redis (Local Only)
 
 ```python
-gcache = GCache(GCacheConfig(cache_config_provider=config_provider))
+gcache = GCache(GCacheConfig())
 ```
 
 ### With Redis
@@ -251,14 +253,14 @@ When data changes, you need to invalidate the cache. GCache makes this easy with
 async def get_user(user_id: str) -> dict:
     ...
 
-# When user data changes, invalidate all their cached data
+# When data changes, invalidate all cached entries for that key_type + ID
 await gcache.ainvalidate(key_type="user_id", id="12345")
 
 # Sync version
 gcache.invalidate(key_type="user_id", id="12345")
 ```
 
-This invalidates *all* cache entries for that user—every use case, every argument combination.
+This invalidates *all* cache entries for that `key_type` + ID—every use case, every argument combination.
 
 ### Handling Race Conditions
 

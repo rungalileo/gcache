@@ -18,4 +18,7 @@ _GLOBAL_GCACHE_STATE = GCacheGlobalState()
 
 
 class GCacheContext:
+    # Disabled by default to prevent accidental caching in write paths.
+    # Users must explicitly enable caching in read paths using `with gcache.enable():`.
+    # This forces conscious decisions about where caching is safe.
     enabled: contextvars.ContextVar[bool] = contextvars.ContextVar("gcache_enabled", default=False)

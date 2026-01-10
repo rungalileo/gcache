@@ -147,10 +147,10 @@ class GCache:
         """
         Decorator which caches a function which can be either sync or async.
 
-        Whether or not caching will be perofrmed depends on the GCache context and use case configuration.
+        Whether or not caching will be performed depends on the GCache context and use case configuration.
 
         Arguments to the eventual key are stringified function arguments by default.
-        If you want to transform the args you can provide lambdas via id_arg and arg_adapters, which maybe be nessary where function argument
+        If you want to transform the args you can provide lambdas via id_arg and arg_adapters, which may be necessary where function argument
         is a big object but you only need one field from it to make cache key.
 
         :param key_type: Type of entity referred to by the id_arg.  Example: user_email, user_id, etc.

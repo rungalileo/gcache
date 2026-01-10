@@ -1,4 +1,3 @@
-import builtins
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
@@ -51,7 +50,7 @@ class GCacheKeyConfig(BaseModel):
         return GCacheKeyConfig.model_validate(data)
 
     @staticmethod
-    def load_configs(data: str | builtins.dict) -> GCacheKeyConfigs:
+    def load_configs(data: str | dict) -> GCacheKeyConfigs:
         """
         Load a collection of configs, which is a dict of use case to GCacheKeyConfig.
         We also support keys mapping to another dict of str -> GCacheKeyConfig as a way
@@ -84,7 +83,7 @@ class GCacheKeyConfig(BaseModel):
             if isinstance(v, GCacheKeyConfig):
                 data_dict[k] = v.model_dump()
             else:
-                data_dict[k] = {k: v.model_dump() for k, v in v.items()}
+                data_dict[k] = {inner_k: inner_v.model_dump() for inner_k, inner_v in v.items()}
 
         return json.dumps(data_dict, indent=2)
 

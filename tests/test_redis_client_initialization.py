@@ -5,7 +5,7 @@ import redislite
 from redis.asyncio import Redis, RedisCluster
 
 from gcache import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
-from gcache.base import RedisConfigConflict
+from gcache.exceptions import RedisConfigConflict
 from tests.conftest import REDIS_PORT, FakeCacheConfigProvider
 
 

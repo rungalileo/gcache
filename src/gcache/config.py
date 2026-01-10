@@ -1,0 +1,192 @@
+import builtins
+import json
+from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
+from enum import Enum
+from logging import Logger, LoggerAdapter
+from typing import Any, Union
+
+from pydantic import BaseModel, ConfigDict, field_validator
+from redis.asyncio import Redis, RedisCluster
+
+from gcache._internal.state import _GLOBAL_GCACHE_STATE
+
+
+class CacheLayer(Enum):
+    NOOP = "noop"
+    LOCAL = "local"
+    REMOTE = "remote"
+
+
+GCacheKeyConfigs = dict[str, Union["GCacheKeyConfig", dict[str, "GCacheKeyConfig"]]]
+
+
+class GCacheKeyConfig(BaseModel):
+    ttl_sec: dict[CacheLayer, int]
+    ramp: dict[CacheLayer, int]
+
+    @field_validator("ttl_sec", "ramp", mode="before")
+    @classmethod
+    def convert_keys(cls, value: Any) -> Any:
+        # When deserializing, if keys are strings (the enum names), convert them back to CacheLayer.
+        if isinstance(value, dict):
+            return {CacheLayer[key.upper()] if isinstance(key, str) else key: val for key, val in value.items()}
+        return value
+
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict:  # type: ignore[override]
+        # Get the default dict representation.
+        original = super().model_dump(*args, **kwargs)
+        # Convert dictionary keys for ttl_sec and ramp from CacheLayer to their .name.
+        original["ttl_sec"] = {k.value if isinstance(k, CacheLayer) else k: v for k, v in self.ttl_sec.items()}
+        original["ramp"] = {k.value if isinstance(k, CacheLayer) else k: v for k, v in self.ramp.items()}
+        return original
+
+    def dumps(self) -> str:
+        return json.dumps(self.model_dump())
+
+    @staticmethod
+    def loads(data: Any) -> "GCacheKeyConfig":
+        if isinstance(data, str):
+            return GCacheKeyConfig.model_validate(json.loads(data))
+        return GCacheKeyConfig.model_validate(data)
+
+    @staticmethod
+    def load_configs(data: str | builtins.dict) -> GCacheKeyConfigs:
+        """
+        Load a collection of configs, which is a dict of use case to GCacheKeyConfig.
+        We also support keys mapping to another dict of str -> GCacheKeyConfig as a way
+        to override configs for a specific environment.
+        :return:
+        """
+        data_dict = json.loads(data) if isinstance(data, str) else data
+
+        configs: GCacheKeyConfigs = {}
+        for k, v in data_dict.items():
+            config: GCacheKeyConfig | dict[str, GCacheKeyConfig]
+            try:
+                config = GCacheKeyConfig.loads(v)
+            except Exception:
+                config = {k: GCacheKeyConfig.loads(v) for k, v in v.items()}
+
+            configs[k] = config
+        return configs
+
+    @staticmethod
+    def dump_configs(data: GCacheKeyConfigs) -> str:
+        """
+        Dump a collection of configs, which is a dict of use case to GCacheKeyConfig.
+        We also support keys mapping to another dict of str -> GCacheKeyConfig as a way
+        to override configs for a specific environment.
+        :return:
+        """
+        data_dict: dict[str, Any] = {}
+        for k, v in data.items():
+            if isinstance(v, GCacheKeyConfig):
+                data_dict[k] = v.model_dump()
+            else:
+                data_dict[k] = {k: v.model_dump() for k, v in v.items()}
+
+        return json.dumps(data_dict, indent=2)
+
+    @staticmethod
+    def enabled(ttl_sec: int, use_case: str) -> "GCacheKeyConfig":
+        """
+        Return config that enabled cache with given ttl for all layers.
+        :param ttl_sec:
+        :param use_case:
+        :return:
+        """
+        config = GCacheKeyConfig(use_case=use_case, ttl_sec={}, ramp={})
+        for layer in CacheLayer:
+            config.ttl_sec[layer] = ttl_sec
+            config.ramp[layer] = 100
+        return config
+
+
+class Serializer(ABC):
+    """
+    Serializer that can be overloaded to allow for custom loading/dumping of values into cache.
+    """
+
+    @abstractmethod
+    async def dump(self, obj: Any) -> bytes | str:
+        pass
+
+    @abstractmethod
+    async def load(self, data: bytes | str) -> Any:
+        pass
+
+
+class GCacheKey(BaseModel):
+    key_type: str
+    id: str
+    use_case: str
+    args: list[tuple[str, str]] = []
+    invalidation_tracking: bool = False
+    default_config: GCacheKeyConfig | None = None
+    serializer: Serializer | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def __hash__(self) -> int:
+        return str(self).__hash__()
+
+    def __eq__(self, other: object) -> bool:
+        return self.__hash__() == other.__hash__()
+
+    def _args_to_str(self) -> str:
+        if self.args:
+            joined = "&".join([f"{arg[0]}={arg[1]}" for arg in self.args])
+            return "?" + joined
+        return ""
+
+    @property
+    def prefix(self) -> str:
+        prefix = f"{self.key_type}:{self.id}"
+        if _GLOBAL_GCACHE_STATE.urn_prefix:
+            prefix = f"{_GLOBAL_GCACHE_STATE.urn_prefix}:{prefix}"
+        if self.invalidation_tracking:
+            prefix = "{" + prefix + "}"
+        return prefix
+
+    def __str__(self) -> str:
+        return f"{self.prefix}{self._args_to_str()}#{self.use_case}"
+
+    @property
+    def urn(self) -> str:
+        return str(self)
+
+
+# Get cache config given a use case.
+CacheConfigProvider = Callable[[GCacheKey], Awaitable[GCacheKeyConfig | None]]
+
+
+class RedisConfig(BaseModel):
+    username: str = ""
+    password: str = ""
+    host: str = "localhost"
+    port: int = 6379
+    # protocol is either redis or rediss
+    protocol: str = "redis"
+    cluster: bool = False
+
+    redis_py_options: dict[str, int | bool | str] = {
+        "socket_connect_timeout": 1,
+        "socket_timeout": 1,
+        "max_connections": 100,
+    }
+
+    @property
+    def url(self) -> str:
+        return f"{self.protocol}://{self.username}:{self.password}@{self.host}:{self.port}"
+
+
+class GCacheConfig(BaseModel):
+    cache_config_provider: CacheConfigProvider
+    urn_prefix: str | None = None
+    metrics_prefix: str = "api_"
+    redis_config: RedisConfig | None = None
+    redis_client_factory: Callable[[], Redis | RedisCluster] | None = None
+    logger: Logger | LoggerAdapter | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)

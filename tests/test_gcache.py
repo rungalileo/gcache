@@ -9,19 +9,21 @@ import pytest
 import redislite
 from prometheus_client import generate_latest
 
-from gcache.base import (
-    CacheController,
+from gcache import (
     CacheLayer,
-    Fallback,
     GCache,
-    GCacheAlreadyInstantiated,
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,
-    LocalCache,
     RedisConfig,
+)
+from gcache._internal.cache_interface import Fallback
+from gcache._internal.local_cache import LocalCache
+from gcache._internal.wrappers import CacheController
+from gcache.config import Serializer
+from gcache.exceptions import (
+    GCacheAlreadyInstantiated,
     ReentrantSyncFunctionDetected,
-    Serializer,
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )

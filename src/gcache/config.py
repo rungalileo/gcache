@@ -125,6 +125,24 @@ class GCacheKey:
     invalidation_tracking: bool = False
     default_config: GCacheKeyConfig | None = None
     serializer: Serializer | None = None
+    # Cached computed fields (set in __post_init__)
+    prefix: str = field(init=False)
+    urn: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        # Compute prefix
+        prefix = f"{self.key_type}:{self.id}"
+        if _GLOBAL_GCACHE_STATE.urn_prefix:
+            prefix = f"{_GLOBAL_GCACHE_STATE.urn_prefix}:{prefix}"
+        if self.invalidation_tracking:
+            prefix = "{" + prefix + "}"
+        object.__setattr__(self, "prefix", prefix)
+
+        # Compute urn
+        args_str = ""
+        if self.args:
+            args_str = "?" + "&".join([f"{arg[0]}={arg[1]}" for arg in self.args])
+        object.__setattr__(self, "urn", f"{prefix}{args_str}#{self.use_case}")
 
     def __hash__(self) -> int:
         # Tuple hashing is fast (C implementation) and avoids string allocation
@@ -141,30 +159,8 @@ class GCacheKey:
             and self.args == other.args
         )
 
-    def _args_to_str(self) -> str:
-        if self.args:
-            joined = "&".join([f"{arg[0]}={arg[1]}" for arg in self.args])
-            return "?" + joined
-        return ""
-
-    @property
-    def prefix(self) -> str:
-        prefix = f"{self.key_type}:{self.id}"
-        if _GLOBAL_GCACHE_STATE.urn_prefix:
-            prefix = f"{_GLOBAL_GCACHE_STATE.urn_prefix}:{prefix}"
-        if self.invalidation_tracking:
-            prefix = "{" + prefix + "}"
-        return prefix
-
-    def _get_str(self) -> str:
-        return f"{self.prefix}{self._args_to_str()}#{self.use_case}"
-
     def __str__(self) -> str:
-        return self._get_str()
-
-    @property
-    def urn(self) -> str:
-        return self._get_str()
+        return self.urn
 
 
 # Get cache config given a use case.

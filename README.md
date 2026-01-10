@@ -10,10 +10,10 @@ A caching library built for moving fast without breaking things. GCache lets you
 
 Most caching libraries give you a key-value store and leave the rest to you. GCache takes a different approach:
 
-- **Opinionated structure** — Enforced key format (entity type + ID + use case) keeps your caching organized and enables the features below
+- **Opinionated structure** — Enforced key format (`key_type` + ID + use case, e.g., `user_id:123`) keeps your caching organized and enables the features below
 - **Runtime controls** — Enable/disable caching per request, ramp from 0-100% per use case, adjust configuration without redeploying
-- **Targeted invalidation** — Invalidate all cache entries for an entity type + ID (e.g., a user, org, or project) with one call
-- **Full observability** — Prometheus metrics out of the box, broken down by use case and entity type
+- **Targeted invalidation** — Invalidate all cache entries for a `key_type` + ID (e.g., all caches for a specific user, org, or project) with one call
+- **Full observability** — Prometheus metrics out of the box, broken down by use case and `key_type`
 
 ## Installation
 

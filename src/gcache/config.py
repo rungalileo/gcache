@@ -1,6 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger, LoggerAdapter
 from typing import Any, Union
@@ -115,16 +116,15 @@ class Serializer(ABC):
         pass
 
 
-class GCacheKey(BaseModel):
+@dataclass(frozen=True, slots=True)
+class GCacheKey:
     key_type: str
     id: str
     use_case: str
-    args: list[tuple[str, str]] = []
+    args: list[tuple[str, str]] = field(default_factory=list)
     invalidation_tracking: bool = False
     default_config: GCacheKeyConfig | None = None
     serializer: Serializer | None = None
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __hash__(self) -> int:
         # Tuple hashing is fast (C implementation) and avoids string allocation

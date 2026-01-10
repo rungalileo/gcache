@@ -4,9 +4,9 @@ import threading
 import time
 from collections.abc import Callable
 from concurrent.futures.thread import ThreadPoolExecutor
+from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel
 from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
@@ -17,7 +17,8 @@ from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, RedisConfi
 from gcache.exceptions import MissingKeyConfig
 
 
-class RedisValue(BaseModel):
+@dataclass(frozen=True, slots=True)
+class RedisValue:
     """
     Wrap actual payload with created timestamp.
     """
@@ -133,8 +134,9 @@ class RedisCache(CacheInterface):
             )
 
             # Load payload using custom serializer if present.
+            payload = deserialized_value.payload
             if key.serializer is not None:
-                deserialized_value.payload = await key.serializer.load(deserialized_value.payload)
+                payload = await key.serializer.load(payload)
 
             (
                 GCacheMetrics.SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "load").observe(
@@ -147,7 +149,7 @@ class RedisCache(CacheInterface):
                 watermark_ms = int(watermark_ms)
                 if watermark_ms >= deserialized_value.created_at_ms:
                     return await self._exec_fallback(key, watermark_ms, fallback)
-            return deserialized_value.payload
+            return payload
         else:
             return await self._exec_fallback(key, watermark_ms, fallback)
 

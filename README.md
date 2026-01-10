@@ -1,127 +1,143 @@
 # GCache
 
-GCache is a lightweight library that provides fine-grained observability, runtime controls and invalidation mechanics for read-through caching.
+[![PyPI version](https://badge.fury.io/py/gcache.svg)](https://badge.fury.io/py/gcache)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-It's designed for rapidly adding new cache use cases with safety and structure in place.
+A lightweight caching library that gives you fine-grained control over what gets cached, when, and for how long. Built for teams who need observability, runtime controls, and proper invalidation—not just a key-value store.
 
-## Core Concepts
+## Why GCache?
 
-### Key Structure and Organization
+Most caching libraries make simple things easy but hard things impossible. GCache is designed for the messy reality of production systems:
 
-GCache organizes cache entries using a structured key system that consists of four main components:
+- **Gradual rollout** — Ramp up caching from 0% to 100% per use case, not all-or-nothing
+- **Targeted invalidation** — Invalidate all cache entries for a user without knowing every cache key
+- **Full observability** — Prometheus metrics out of the box, broken down by use case
+- **Safe by default** — Caching is opt-in per request, so you won't accidentally serve stale data during writes
 
-1. **Key Type**: Identifies the type of entity being cached (e.g., `user_email`, `user_id`, `organization_id`)
-2. **ID**: The specific identifier for that entity (e.g., `user@example.com`, `12345`)
-3. **Arguments**: Additional parameters that differentiate cache entries for the same entity
-4. **Use Cases**: Every unique use case in GCache is associated with a "use case" - a unique identifier for a specific caching scenario. By default, this is the module path + function name, but custom use case names are recommended for clarity.
+## Installation
 
-Structured arguments provide several benefits:
-
-- **Targeted Invalidation**: Invalidate all cache entries for a specific key type and ID
-- **Comprehensive Monitoring**: Track cache performance metrics by key type
-- **Hierarchical Organization**: Group related cache entries logically
-
-Use cases enable:
-
-- **Granular Instrumentation**: Monitor cache hit/miss rates for specific use cases
-- **Targeted Runtime Control**: Enable, disable, or adjust caching behavior for individual use cases
-- **Documentation**: Self-document the purpose of each cache operation
-
-All of these components are represented as an [URN](https://en.wikipedia.org/wiki/Uniform_Resource_Name) which becomes final cache key:
-`urn:galileo:<Key Type>:<ID>?<Arguments>#<Use case>`
-
-### Cache Layers
-
-GCache supports multiple caching layers:
-
-- **Local Cache**: In-memory cache for ultra-fast access
-- **Remote Cache**: Redis-based distributed cache for shared access across instances
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     Multi-Layer Read-Through Cache Flow                     │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-    CLIENT REQUEST
-         │
-         ▼
-    ┌─────────┐
-    │ @cached │ ──── "get_user(id=123)"
-    └────┬────┘
-         │
-         ▼
-┌─────────────────┐     HIT ✓
-│  LOCAL CACHE    │ ◄──────────► {"id": 123, "name": "Alice"}
-│  (In-Memory)    │               ↑ RETURN IMMEDIATELY
-│  TTL: 5 min     │
-└────────┬────────┘
-         │ MISS ✗
-         ▼
-┌─────────────────┐     HIT ✓
-│  REDIS CACHE    │ ◄──────────► {"id": 123, "name": "Alice"}
-│  (Distributed)  │               ↑ POPULATE LOCAL + RETURN
-│  TTL: 1 hour    │
-└────────┬────────┘
-         │ MISS ✗
-         ▼
-┌─────────────────┐
-│ SOURCE OF TRUTH │ ──── Database Query / API Call
-│  (Database/API) │      SELECT * FROM users WHERE id = 123
-└────────┬────────┘
-         │
-         ▼
-    FETCH DATA: {"id": 123, "name": "Alice"}
-         │
-         ├──► POPULATE REDIS CACHE
-         ├──► POPULATE LOCAL CACHE
-         └──► RETURN TO CLIENT
+```bash
+pip install gcache
 ```
 
+Requires Python 3.10+
 
-## Getting Started
-
-### Basic Usage
-
-`GCache` is designed to be instantiated once as a singleton:
+## Quick Start
 
 ```python
 from gcache import GCache, GCacheConfig, GCacheKeyConfig, GCacheKey, CacheLayer
 
+# 1. Define how long things should be cached
 async def config_provider(key: GCacheKey) -> GCacheKeyConfig:
     return GCacheKeyConfig(
-        ttl_sec={CacheLayer.LOCAL: 5, CacheLayer.REMOTE: 10},
+        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 300},
         ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
     )
 
-# Create GCache instance
-gcache = GCache(
-    GCacheConfig(
-        cache_config_provider=config_provider,
-        redis_config=RedisConfig(port=6379),  # Optional
-    )
-)
+# 2. Create the cache instance (singleton)
+gcache = GCache(GCacheConfig(cache_config_provider=config_provider))
+
+# 3. Decorate your function
+@gcache.cached(key_type="user_id", id_arg="user_id")
+async def get_user(user_id: str) -> dict:
+    return await db.fetch_user(user_id)  # Your expensive operation
+
+# 4. Use it — caching only happens inside enable() blocks
+async def handle_request(user_id: str):
+    with gcache.enable():
+        user = await get_user(user_id)  # Cached!
+    return user
 ```
 
-### Redis Configuration
+That's it. The function works normally outside `enable()` blocks, and caches results inside them.
 
-GCache supports flexible Redis configuration. You can disable Redis entirely (local cache only), use standard Redis configuration, or provide a custom client factory for advanced use cases.
+## How It Works
 
-#### Option 1: No Redis (Local Cache Only)
+GCache uses a multi-layer read-through cache. When you call a cached function:
 
-If neither `redis_config` nor `redis_client_factory` is provided, GCache uses only local in-memory cache:
+```
+Request
+   │
+   ▼
+┌─────────────────┐
+│  LOCAL CACHE    │ ◄─── Hit? Return immediately
+│  (in-memory)    │
+└────────┬────────┘
+         │ Miss
+         ▼
+┌─────────────────┐
+│  REDIS CACHE    │ ◄─── Hit? Store in local, return
+│  (distributed)  │
+└────────┬────────┘
+         │ Miss
+         ▼
+┌─────────────────┐
+│  YOUR FUNCTION  │ ◄─── Execute, store in both caches, return
+└─────────────────┘
+```
+
+Local cache is fast but per-instance. Redis is shared across your fleet. Use both for best performance, or just local if you don't need Redis.
+
+## The `@cached` Decorator
+
+The decorator handles both sync and async functions automatically.
+
+### Basic Usage
 
 ```python
-gcache = GCache(
-    GCacheConfig(
-        cache_config_provider=config_provider,
-        # No redis_config or redis_client_factory = local cache only
-    )
+@gcache.cached(
+    key_type="user_id",      # What kind of entity is this?
+    id_arg="user_id",        # Which argument contains the ID?
+    use_case="GetUserProfile" # Optional: name for metrics (defaults to module.function)
 )
+async def get_user_profile(user_id: str) -> dict:
+    ...
 ```
 
-#### Option 2: Using RedisConfig
+### Working with Complex Arguments
 
-Provide Redis connection parameters via `RedisConfig`:
+Real functions have complex arguments. Use `id_arg` tuples and `arg_adapters` to handle them:
+
+```python
+@gcache.cached(
+    key_type="user_id",
+    id_arg=("user", lambda u: u.id),  # Extract ID from User object
+    arg_adapters={
+        "filters": lambda f: f.to_cache_key(),  # Convert complex objects
+        "page": str,  # Simple conversion
+    },
+    ignore_args=["db_session", "logger"],  # Don't include these in cache key
+)
+async def search_user_posts(
+    user: User,
+    filters: SearchFilters,
+    page: int,
+    db_session: Session,
+    logger: Logger,
+) -> list[Post]:
+    ...
+```
+
+### Sync Functions Work Too
+
+```python
+@gcache.cached(key_type="org_id", id_arg="org_id")
+def get_org_settings(org_id: str) -> dict:  # No async needed
+    return db.query(...)
+```
+
+Under the hood, sync functions run through a thread pool to avoid blocking the event loop.
+
+## Redis Configuration
+
+### No Redis (Local Only)
+
+```python
+gcache = GCache(GCacheConfig(cache_config_provider=config_provider))
+```
+
+### With Redis
 
 ```python
 from gcache import RedisConfig
@@ -132,225 +148,204 @@ gcache = GCache(
         redis_config=RedisConfig(
             host="redis.example.com",
             port=6379,
-            username="myuser",
-            password="mypassword",
-            protocol="redis",  # or "rediss" for TLS
-            cluster=False,  # Set to True for Redis Cluster
-            redis_py_options={
-                "socket_connect_timeout": 1,
-                "socket_timeout": 1,
-                "max_connections": 100,
-            },
+            password="secret",
         ),
     )
 )
 ```
 
-#### Option 3: Custom Redis Client Factory
+### Custom Redis Factory
 
-For advanced scenarios (e.g., dynamic credentials, token refresh, custom connection logic), provide a custom `redis_client_factory`:
+For dynamic credentials, token refresh, or connection pooling:
 
 ```python
 import threading
-from redis.asyncio import Redis, RedisCluster
+from redis.asyncio import Redis
 
-def create_custom_redis_factory():
-    """Factory with thread-local storage for Redis clients."""
-    _thread_local = threading.local()
+def make_redis_factory():
+    local = threading.local()
 
-    def factory() -> Redis | RedisCluster:
-        if not hasattr(_thread_local, "client"):
-            # Custom logic: fetch credentials, handle token refresh, etc.
-            token = get_auth_token_from_vault()
-            _thread_local.client = Redis.from_url(
-                f"redis://:{token}@redis.example.com:6379",
-                socket_connect_timeout=1,
-                socket_timeout=1,
-            )
-        return _thread_local.client
+    def factory() -> Redis:
+        if not hasattr(local, "client"):
+            token = fetch_token_from_vault()
+            local.client = Redis.from_url(f"redis://:{token}@redis:6379")
+        return local.client
 
     return factory
 
 gcache = GCache(
     GCacheConfig(
         cache_config_provider=config_provider,
-        redis_client_factory=create_custom_redis_factory(),
+        redis_client_factory=make_redis_factory(),
     )
 )
 ```
 
-**Important**: Your custom factory must implement thread-local storage to ensure each thread gets its own Redis client instance.
+**Important:** Custom factories must use thread-local storage. Each thread needs its own client.
 
-**Note**: You cannot provide both `redis_config` and `redis_client_factory`. If both are provided, a `RedisConfigConflict` exception will be raised.
+## Invalidation
 
-### Caching Functions
+When data changes, you need to invalidate the cache. GCache makes this easy with targeted invalidation.
 
-The `@cached` decorator is the primary way to cache function results. It works with both synchronous and asynchronous functions.
-
-#### Simple Example
+### Basic Invalidation
 
 ```python
-# Simple caching example
+# Mark the function for invalidation tracking
 @gcache.cached(
     key_type="user_id",
     id_arg="user_id",
-    use_case="GetUserProfile"
+    track_for_invalidation=True,  # Enable this
 )
-def get_user_profile(user_id: str) -> dict:
-    # Expensive operation to fetch user profile
-    return expensive_db_query(user_id)
+async def get_user(user_id: str) -> dict:
+    ...
 
-# This won't use cache (caching is disabled by default)
-profile = get_user_profile("12345")
-
-# Enable caching for a specific block of code
-with gcache.enable():
-    # This will use cache
-    profile = get_user_profile("12345")
-    # Subsequent calls with the same user_id will return cached results
-    profile_again = get_user_profile("12345")  # Cache hit!
-```
-
-#### Advanced Example: Argument Transformers
-
-For complex objects, you can use argument transformers to extract only the relevant parts for cache keys:
-
-```python
-@gcache.cached(
-    key_type="user_id",
-    # Extract ID from a complex object
-    id_arg=("user", lambda user: user.system_user_id),
-    use_case="GetUserLatestRuns",
-    # Transform complex arguments into simple strings for the cache key
-    arg_adapters={
-        "project_type": lambda project_type: project_type.name,
-        "pagination": lambda pagination: f"{pagination.starting_token}-{pagination.limit}"
-    },
-    # Exclude arguments that don't affect the result
-    ignore_args=["db_read"],
-)
-def get_latest_runs(
-    db_read: Session,
-    user: User,
-    project_type: ProjectType,
-    pagination: PaginationRequestMixin
-) -> GetUserLatestRuns:
-    # Implementation...
-    return db_results
-```
-
-### Controlling Cache Behavior
-
-#### Enabling/Disabling Cache
-
-Caching is **disabled by default** for safety. To enable caching, use the `enable()` context manager:
-
-```python
-# Cache is disabled here
-result1 = cached_function()  # No caching occurs
-
-# Enable caching for this block
-with gcache.enable():
-    result2 = cached_function()  # First call, cache miss
-    result3 = cached_function()  # Subsequent call, cache hit
-
-# Cache is disabled again
-result4 = cached_function()  # No caching occurs
-```
-
-This design allows precise control over when caching is active, particularly useful in write operations where you want to avoid stale reads.
-
-#### Ramping up Caching
-
-A use case must be ramped up to enable caching in addition to being executed in "enabled" context.  Use runtime config to ramp up your particular use case.
-
-Cache config provider given to GCache constructor is invoked for each unique use case to determine ramp % as well as TTL config.
-
-## Cache Invalidation
-### Targeted Invalidation
-
-Invalidate all cache entries for a specific entity:
-
-```python
-@gcache.cached(
-    key_type="user_id",
-    id_arg="user_id",
-    track_for_invalidation=True  # Enable tracking for invalidation
-)
-def get_user_profile(user_id: str) -> dict:
-    # ...
-
-# Invalidate all cache entries for user with ID "12345"
-gcache.invalidate(key_type="user_id", id="12345")
-
-# Async version
+# When user data changes, invalidate all their cached data
 await gcache.ainvalidate(key_type="user_id", id="12345")
+
+# Sync version
+gcache.invalidate(key_type="user_id", id="12345")
 ```
 
-This invalidates all cache entries that share the same key type and ID, regardless of additional arguments or use case.
+This invalidates *all* cache entries for that user—every use case, every argument combination.
 
-### Future Invalidation Buffer
+### Handling Race Conditions
 
-To prevent race conditions where a read happens just before a write, you can set a future buffer:
+If a read happens right before a write, the stale data might get cached. Use a future buffer:
 
 ```python
-# Invalidate with a 5-second buffer into the future
-gcache.invalidate(
+await gcache.ainvalidate(
     key_type="user_id",
     id="12345",
-    fallback_buffer_ms=5000
+    future_buffer_ms=5000,  # Also invalidate anything cached in the next 5 seconds
 )
 ```
 
-This ensures that any cache entry created right before the invalidation will also be considered invalid.
+### Full Flush
 
-### Complete Cache Flush
-
-For testing or emergency scenarios:
+For testing or emergencies:
 
 ```python
-# Clear all cache entries (local and remote)
-gcache.flushall()
-
-# Async version
-await gcache.aflushall()
+gcache.flushall()       # Sync
+await gcache.aflushall()  # Async
 ```
 
-## Guidelines for caching
+## Runtime Configuration
 
-### When to use caching
-We can break up caching use cases by eventual consistency constraints.
-#### 1: Can tolerate stale cache
-In certain use cases, it's acceptable to have a few seconds - minutes of delay for updates to take effect. In these situations its safe to use local and remote cache and to rely soley on TTL.
+The config provider runs for each cache operation, so you can adjust behavior dynamically:
 
-Monitoring cache hit rates is crucial for performance optimization; adjusting the TTL settings can help improve this metric.
+```python
+async def config_provider(key: GCacheKey) -> GCacheKeyConfig | None:
+    # Disable caching for a specific use case
+    if key.use_case == "LegacyEndpoint":
+        return None
 
-In this scenario, there's no need to implement shadowing to monitor cache accuracy.
+    # Ramp up gradually
+    if key.use_case == "NewFeature":
+        return GCacheKeyConfig(
+            ttl_sec={CacheLayer.LOCAL: 30, CacheLayer.REMOTE: 120},
+            ramp={CacheLayer.LOCAL: 25, CacheLayer.REMOTE: 50},  # 25% local, 50% remote
+        )
 
-#### 2: Cannot tolerate stale cache
-In these use cases cache must be updated immediately, otherwise we will cause regression.
+    # Default config
+    return GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 300},
+        ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
+    )
+```
 
-We can only use remote caching in these cases since local cache cannot be invalidated.
+The `ramp` parameter controls what percentage of requests actually use the cache. Start at 0% and increase as you gain confidence.
 
-In this scenario we need a robust cache invalidation mechanic.  Right before or after write you must make sure all cache is invalidated.
+## Metrics
 
-In order to demonstrate efficacy of cache invalidation you will also need to shadow cache reads for consistency against SoT.
+GCache exports Prometheus metrics automatically:
 
-Good news is that we can set TTL on remote cache to be quite long as long as invalidation is proven to be correct.
+| Metric | Type | Description |
+|--------|------|-------------|
+| `gcache_request_counter` | Counter | Total cache requests |
+| `gcache_miss_counter` | Counter | Cache misses |
+| `gcache_disabled_counter` | Counter | Requests where caching was skipped (labels: `reason`) |
+| `gcache_error_counter` | Counter | Errors during cache operations |
+| `gcache_invalidation_counter` | Counter | Invalidation calls |
+| `gcache_get_timer` | Histogram | Cache get latency |
+| `gcache_fallback_timer` | Histogram | Time spent in the underlying function |
+| `gcache_serialization_timer` | Histogram | Pickle serialization time |
+| `gcache_size_histogram` | Histogram | Size of cached values |
 
+All metrics include `use_case` and `key_type` labels for filtering.
 
-## Performance Considerations
+You can add a prefix to avoid collisions:
 
-- **Local Cache**: Ultra-fast in-memory cache, but not shared between instances.  Cannot be invalidated by other instances.
-- **Remote Cache**: Shared between instances, but slightly higher latency.  Can be invalidated by other instances.
-- **Argument Transformers**: Use them to keep cache keys small and focused
+```python
+GCacheConfig(
+    cache_config_provider=config_provider,
+    metrics_prefix="myapp_",  # Metrics become myapp_gcache_request_counter, etc.
+)
+```
 
+## Error Handling
 
-## Monitoring and Observability
+GCache is designed to fail open. If Redis is down or an error occurs:
 
-GCache automatically collects metrics for:
+1. The underlying function executes normally
+2. The error is logged and counted in `gcache_error_counter`
+3. Your request succeeds (just without caching)
 
-- Cache hit/miss rates by use case and key type
-- Cache operation latency
-- Cache size
-- Invalidation frequency
+This means a cache failure never breaks your application.
+
+## Caching Strategy Guide
+
+### When stale data is acceptable
+
+Use both local and remote cache, rely on TTL:
+
+```python
+GCacheKeyConfig(
+    ttl_sec={CacheLayer.LOCAL: 300, CacheLayer.REMOTE: 3600},
+    ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
+)
+```
+
+Good for: feature flags, configuration, rarely-changing data.
+
+### When data must be fresh
+
+Use remote cache only (local can't be invalidated across instances), with invalidation:
+
+```python
+# In config
+GCacheKeyConfig(
+    ttl_sec={CacheLayer.LOCAL: 0, CacheLayer.REMOTE: 3600},  # No local cache
+    ramp={CacheLayer.LOCAL: 0, CacheLayer.REMOTE: 100},
+)
+
+# In your write path
+async def update_user(user_id: str, data: dict):
+    await db.update_user(user_id, data)
+    await gcache.ainvalidate(key_type="user_id", id=user_id)
+```
+
+Good for: user profiles, permissions, anything that needs immediate consistency.
+
+## Contributing
+
+Contributions are welcome! The project uses:
+
+- **pytest** for testing (`pytest tests/`)
+- **ruff** for formatting and linting
+- **mypy** for type checking
+- **pre-commit** for automated checks
+
+```bash
+# Setup
+poetry install
+
+# Run tests
+pytest tests/
+
+# Run all checks
+pre-commit run --all-files
+```
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.

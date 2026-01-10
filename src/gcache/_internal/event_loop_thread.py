@@ -7,9 +7,21 @@ from concurrent.futures import Future
 from logging import getLogger
 from typing import Any
 
-import uvloop
-
 from gcache._internal.constants import EVENT_LOOP_THREAD_POOL_SIZE
+
+# uvloop is optional - provides better performance on Linux/macOS but
+# doesn't work on Windows or PyPy. Fall back to standard asyncio if unavailable.
+try:
+    import uvloop
+
+    def _new_event_loop() -> asyncio.AbstractEventLoop:
+        return uvloop.new_event_loop()
+
+except ImportError:
+
+    def _new_event_loop() -> asyncio.AbstractEventLoop:
+        return asyncio.new_event_loop()
+
 
 logger = getLogger(__name__)
 
@@ -33,7 +45,7 @@ class EventLoopThread(EventLoopThreadInterface, threading.Thread):
     def __init__(self, name: str = "EventLoopThread", daemon: bool = True) -> None:
         super().__init__(name=name)
         self.daemon = daemon
-        self.loop = uvloop.new_event_loop()
+        self.loop = _new_event_loop()
 
     def run(self) -> None:
         # Set the event loop for this thread.

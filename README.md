@@ -79,6 +79,21 @@ Request
 
 Local cache is fast but per-instance. Redis is shared across your fleet. Use both for best performance, or just local if you don't need Redis.
 
+### Key Format
+
+GCache constructs structured cache keys in URN format:
+
+```
+urn:prefix:key_type:id?arg1=val1&arg2=val2#use_case
+```
+
+For example: `urn:gcache:user_id:123?page=1#GetUserPosts`
+
+This structure is useful for:
+- **Debugging** — Keys are human-readable when inspecting Redis
+- **Grouping** — All caches for a `key_type:id` pair share a common prefix, making it easy to find related entries
+- **Targeted invalidation** — The structure enables invalidating all entries for a specific `key_type` + ID
+
 ### Runtime Controls
 
 Caching doesn't happen automatically—you control when it's active:
@@ -164,7 +179,7 @@ def get_org_settings(org_id: str) -> dict:  # No async needed
     return db.query(...)
 ```
 
-Under the hood, sync functions run through a thread pool to avoid blocking the event loop.
+Under the hood, sync functions run through a thread pool to avoid blocking the event loop. This adds some overhead, so **prefer async functions when possible** for better performance.
 
 ## Redis Configuration
 

@@ -127,10 +127,19 @@ class GCacheKey(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __hash__(self) -> int:
-        return str(self).__hash__()
+        # Tuple hashing is fast (C implementation) and avoids string allocation
+        return hash((self.key_type, self.id, self.use_case, tuple(self.args)))
 
     def __eq__(self, other: object) -> bool:
-        return self.__hash__() == other.__hash__()
+        if not isinstance(other, GCacheKey):
+            return False
+        # Direct field comparison - short-circuits on first mismatch
+        return (
+            self.key_type == other.key_type
+            and self.id == other.id
+            and self.use_case == other.use_case
+            and self.args == other.args
+        )
 
     def _args_to_str(self) -> str:
         if self.args:
@@ -147,12 +156,15 @@ class GCacheKey(BaseModel):
             prefix = "{" + prefix + "}"
         return prefix
 
-    def __str__(self) -> str:
+    def _get_str(self) -> str:
         return f"{self.prefix}{self._args_to_str()}#{self.use_case}"
+
+    def __str__(self) -> str:
+        return self._get_str()
 
     @property
     def urn(self) -> str:
-        return str(self)
+        return self._get_str()
 
 
 # Get cache config given a use case.

@@ -362,14 +362,15 @@ def test_same_thread_reuses_client_instance(
             return f"value_{test_id}"
 
         with gcache.enable():
-            # Make multiple operations
-            for i in range(10):
+            # Make many operations to ensure thread reuse occurs
+            # With 16 threads and 100 operations, threads will definitely be reused
+            for i in range(100):
                 cached_func(test_id=i)
 
-            # If thread-local caching is working, we should have very few clients
-            # (one per thread used by the event loop pool)
-            # Without thread-local caching, we'd have 10 clients
-            assert len(created_clients) < 10
+            # If thread-local caching is working, we should have at most
+            # as many clients as threads in the pool (16), not 100
+            # This proves threads reuse their cached client instances
+            assert len(created_clients) <= 16
 
     finally:
         gcache.__del__()

@@ -4,16 +4,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-A lightweight caching library that gives you fine-grained control over what gets cached, when, and for how long. Built for teams who need observability, runtime controls, and proper invalidation—not just a key-value store.
+A caching library built for moving fast without breaking things. GCache lets you rapidly add new caching use cases while maintaining structure and runtime control guardrails—so you can ramp up gradually, kill a bad cache instantly, and have full observability into what's cached across your system.
 
 ## Why GCache?
 
-Most caching libraries make simple things easy but hard things impossible. GCache is designed for the messy reality of production systems:
+Most caching libraries give you a key-value store and leave the rest to you. GCache takes a different approach:
 
-- **Gradual rollout** — Ramp up caching from 0% to 100% per use case, not all-or-nothing
-- **Targeted invalidation** — Invalidate all cache entries for a user without knowing every cache key
-- **Full observability** — Prometheus metrics out of the box, broken down by use case
-- **Safe by default** — Caching is opt-in per request, so you won't accidentally serve stale data during writes
+- **Opinionated structure** — Enforced key format (entity type + ID + use case) keeps your caching organized and enables the features below
+- **Runtime controls** — Enable/disable caching per request, ramp from 0-100% per use case, adjust configuration without redeploying
+- **Targeted invalidation** — Invalidate all cache entries for an entity type + ID (e.g., a user, org, or project) with one call
+- **Full observability** — Prometheus metrics out of the box, broken down by use case and entity type
 
 ## Installation
 
@@ -26,35 +26,35 @@ Requires Python 3.10+
 ## Quick Start
 
 ```python
-from gcache import GCache, GCacheConfig, GCacheKeyConfig, GCacheKey, CacheLayer
+from gcache import GCache, GCacheConfig, GCacheKeyConfig, CacheLayer
 
-# 1. Define how long things should be cached
-async def config_provider(key: GCacheKey) -> GCacheKeyConfig:
-    return GCacheKeyConfig(
+# Create the cache instance (singleton)
+gcache = GCache(GCacheConfig())
+
+# Decorate your function
+@gcache.cached(
+    key_type="user_id",
+    id_arg="user_id",
+    default_config=GCacheKeyConfig(
         ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 300},
         ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
-    )
-
-# 2. Create the cache instance (singleton)
-gcache = GCache(GCacheConfig(cache_config_provider=config_provider))
-
-# 3. Decorate your function
-@gcache.cached(key_type="user_id", id_arg="user_id")
+    ),
+)
 async def get_user(user_id: str) -> dict:
     return await db.fetch_user(user_id)  # Your expensive operation
 
-# 4. Use it — caching only happens inside enable() blocks
-async def handle_request(user_id: str):
-    with gcache.enable():
-        user = await get_user(user_id)  # Cached!
-    return user
+# Use it — caching only happens inside enable() blocks
+with gcache.enable():
+    user = await get_user("123")  # Cached!
 ```
 
 That's it. The function works normally outside `enable()` blocks, and caches results inside them.
 
 ## How It Works
 
-GCache uses a multi-layer read-through cache. When you call a cached function:
+### Cache Layers
+
+GCache uses a multi-layer read-through cache:
 
 ```
 Request
@@ -78,6 +78,43 @@ Request
 ```
 
 Local cache is fast but per-instance. Redis is shared across your fleet. Use both for best performance, or just local if you don't need Redis.
+
+### Runtime Controls
+
+Caching doesn't happen automatically—you control when it's active:
+
+- **`enable()` context** — Caching only happens inside `with gcache.enable():` blocks. Outside of them, your function runs normally. This lets you disable caching during write operations to avoid stale reads.
+
+- **`ramp` percentage** — Each cache layer has a ramp from 0-100%. At 50%, half the requests use the cache, half go straight to the source. Start at 0% when adding a new use case, then ramp up as you gain confidence.
+
+- **Dynamic config** — The config provider runs on each request, so you can adjust TTLs or ramp percentages without redeploying.
+
+## Runtime Configuration
+
+For dynamic control, provide a config provider when creating GCache. This lets you adjust caching behavior without redeploying:
+
+```python
+from gcache import GCache, GCacheConfig, GCacheKeyConfig, GCacheKey, CacheLayer
+
+async def config_provider(key: GCacheKey) -> GCacheKeyConfig | None:
+    # Fetch from your config source: LaunchDarkly, database, config file, etc.
+    config = await config_service.get_cache_config(key.use_case)
+
+    if config is None:
+        return None  # Fall back to default_config on the decorator
+
+    return GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: config.local_ttl, CacheLayer.REMOTE: config.remote_ttl},
+        ramp={CacheLayer.LOCAL: config.local_ramp, CacheLayer.REMOTE: config.remote_ramp},
+    )
+
+gcache = GCache(GCacheConfig(cache_config_provider=config_provider))
+```
+
+This enables:
+- **Kill switches** — Set ramp to 0% to instantly disable a problematic cache
+- **Gradual rollout** — Start at 10%, monitor metrics, increase to 100%
+- **Per-use-case tuning** — Different TTLs and ramp percentages for different use cases
 
 ## The `@cached` Decorator
 
@@ -228,32 +265,6 @@ For testing or emergencies:
 gcache.flushall()       # Sync
 await gcache.aflushall()  # Async
 ```
-
-## Runtime Configuration
-
-The config provider runs for each cache operation, so you can adjust behavior dynamically:
-
-```python
-async def config_provider(key: GCacheKey) -> GCacheKeyConfig | None:
-    # Disable caching for a specific use case
-    if key.use_case == "LegacyEndpoint":
-        return None
-
-    # Ramp up gradually
-    if key.use_case == "NewFeature":
-        return GCacheKeyConfig(
-            ttl_sec={CacheLayer.LOCAL: 30, CacheLayer.REMOTE: 120},
-            ramp={CacheLayer.LOCAL: 25, CacheLayer.REMOTE: 50},  # 25% local, 50% remote
-        )
-
-    # Default config
-    return GCacheKeyConfig(
-        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 300},
-        ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
-    )
-```
-
-The `ramp` parameter controls what percentage of requests actually use the cache. Start at 0% and increase as you gain confidence.
 
 ## Metrics
 

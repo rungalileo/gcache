@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey
+from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, GCacheKeyConfig
 
 Fallback = Callable[..., Awaitable[Any]]
 
@@ -10,6 +10,18 @@ Fallback = Callable[..., Awaitable[Any]]
 class CacheInterface(ABC):
     def __init__(self, cache_config_provider: CacheConfigProvider):
         self.config_provider = cache_config_provider
+
+    async def _resolve_config(self, key: GCacheKey) -> GCacheKeyConfig | None:
+        """
+        Resolve the cache config for a key.
+
+        First tries the config provider, then falls back to the key's default_config.
+        Returns None if neither provides a config.
+        """
+        config = await self.config_provider(key)
+        if config is None:
+            config = key.default_config
+        return config
 
     @abstractmethod
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
@@ -31,7 +43,7 @@ class CacheInterface(ABC):
 
         :param key_type:
         :param id:
-        :param future_buffer_ms: Invalidate cache into the future.   Useful to avoid stale read -> write scenarious.0
+        :param future_buffer_ms: Invalidate cache into the future. Useful to avoid stale read -> write scenarios.
         :return:
         """
         pass

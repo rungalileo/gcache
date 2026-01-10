@@ -20,11 +20,7 @@ class LocalCache(CacheInterface):
     async def _get_ttl_cache(self, key: GCacheKey) -> TTLCache:
         cache = self.caches.get(key.use_case, None)
         if cache is None:
-            config = await self.config_provider(key)
-
-            if config is None:
-                config = key.default_config
-
+            config = await self._resolve_config(key)
             if config is None:
                 raise MissingKeyConfig(key.use_case)
 

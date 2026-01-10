@@ -13,7 +13,7 @@ class CacheWrapper(CacheInterface):
     """
     Abstract class for wrapper implementations.
 
-    Wrappers can be used to add more functionality to a caching layer, like insturmentation, controls, etc.
+    Wrappers can be used to add more functionality to a caching layer, like instrumentation, controls, etc.
     """
 
     def __init__(self, cache_config_provider: CacheConfigProvider, cache: CacheInterface):
@@ -109,10 +109,7 @@ class CacheController(CacheWrapper):
         try:
             if not GCacheContext.enabled.get():
                 return False
-            config = await self.config_provider(key)
-            if config is None:
-                config = key.default_config
-
+            config = await self._resolve_config(key)
             if config is None:
                 GCacheMetrics.DISABLED_COUNTER.labels(
                     key.use_case, key.key_type, self.layer().name, DisabledReasons.missing_config.name

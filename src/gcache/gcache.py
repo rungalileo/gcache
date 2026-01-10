@@ -30,7 +30,25 @@ from gcache.exceptions import (
 
 
 class GCache:
-    def __init__(self, config: GCacheConfig):
+    """
+    Main entry point for the GCache caching library.
+
+    GCache provides a two-layer caching system (local in-memory + Redis) with
+    support for both sync and async functions, cache invalidation, and
+    configurable TTLs per use case.
+
+    Only one GCache instance can exist at a time (singleton pattern).
+    """
+
+    def __init__(self, config: GCacheConfig) -> None:
+        """
+        Initialize GCache with the given configuration.
+
+        :param config: Configuration object containing cache settings, Redis config,
+                      and cache config provider.
+        :raises GCacheAlreadyInstantiated: If a GCache instance already exists.
+        :raises RedisConfigConflict: If both redis_config and redis_client_factory are provided.
+        """
         if _GLOBAL_GCACHE_STATE.gcache_instantiated:
             raise GCacheAlreadyInstantiated()
 
@@ -279,9 +297,23 @@ class GCache:
         return decorator
 
     async def ainvalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
+        """
+        Invalidate all cache entries matching the given key type and ID (async version).
+
+        :param key_type: The type of cache key to invalidate.
+        :param id: The ID of the entity to invalidate.
+        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the future.
+        """
         await self._redis_cache.invalidate(key_type, id, future_buffer_ms)
 
     def invalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
+        """
+        Invalidate all cache entries matching the given key type and ID (sync version).
+
+        :param key_type: The type of cache key to invalidate.
+        :param id: The ID of the entity to invalidate.
+        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the future.
+        """
         return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, future_buffer_ms))
 
     async def aflushall(self) -> None:
@@ -295,10 +327,23 @@ class GCache:
         await self._redis_cache.flushall()
 
     def flushall(self) -> None:
+        """Remove all local and remote cache entries (sync version)."""
         self._run_coroutine_in_thread(self.aflushall)
 
     async def adelete(self, key: GCacheKey) -> bool:
+        """
+        Delete a specific cache entry (async version).
+
+        :param key: The cache key to delete.
+        :return: True if the key was deleted, False otherwise.
+        """
         return await self._cache.delete(key)
 
     def delete(self, key: GCacheKey) -> bool:
+        """
+        Delete a specific cache entry (sync version).
+
+        :param key: The cache key to delete.
+        :return: True if the key was deleted, False otherwise.
+        """
         return self._run_coroutine_in_thread(partial(self.adelete, key))

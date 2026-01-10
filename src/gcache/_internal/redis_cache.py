@@ -152,10 +152,7 @@ class RedisCache(CacheInterface):
             return await self._exec_fallback(key, watermark_ms, fallback)
 
     async def put(self, key: GCacheKey, value: Any) -> None:
-        config = await self.config_provider(key)
-        if config is None:
-            config = key.default_config
-
+        config = await self._resolve_config(key)
         if config is None:
             raise MissingKeyConfig(key.use_case)
 

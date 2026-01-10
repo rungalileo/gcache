@@ -66,7 +66,7 @@ class GCacheKeyConfig(BaseModel):
             try:
                 config = GCacheKeyConfig.loads(v)
             except Exception:
-                config = {k: GCacheKeyConfig.loads(v) for k, v in v.items()}
+                config = {inner_k: GCacheKeyConfig.loads(inner_v) for inner_k, inner_v in v.items()}
 
             configs[k] = config
         return configs

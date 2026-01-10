@@ -70,7 +70,7 @@ class EventLoopThread(EventLoopThreadInterface, threading.Thread):
 
 class EventLoopThreadPool(EventLoopThreadInterface):
     """
-    Manage collection of EventLoopThread instances and also initailize them lazily.
+    Manage collection of EventLoopThread instances and also initialize them lazily.
 
     Lazy initialization is important when running in forked processes.
     """

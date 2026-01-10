@@ -1,0 +1,11 @@
+# Cache sizes
+LOCAL_CACHE_MAX_SIZE = 10_000
+
+# Thresholds
+ASYNC_PICKLE_THRESHOLD_BYTES = 50_000
+
+# TTLs (seconds)
+WATERMARK_TTL_SECONDS = 3600 * 4  # 4 hours
+
+# Thread pool
+EVENT_LOOP_THREAD_POOL_SIZE = 16

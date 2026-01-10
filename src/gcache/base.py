@@ -19,14 +19,14 @@ from typing import Any, Union
 
 from cachetools import TTLCache
 from prometheus_client import Counter, Histogram
-from pydantic import BaseModel, ConfigDict, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
 
 from gcache.event_loop_thread import EventLoopThread, EventLoopThreadPool
 
 
 # Global state is needed to allow reconfiguration when GCache is instantiated.
-# This is fine because GCache is gauranteed to be a singleton.
+# This is fine because GCache is guaranteed to be a singleton.
 class GCacheGlobalState(BaseModel):
     urn_prefix: str = "urn"
     logger: Logger | LoggerAdapter = getLogger(__name__)
@@ -51,29 +51,30 @@ class GCacheKeyConfig(BaseModel):
     ttl_sec: dict[CacheLayer, int]
     ramp: dict[CacheLayer, int]
 
-    @validator("ttl_sec", "ramp", pre=True)
+    @field_validator("ttl_sec", "ramp", mode="before")
+    @classmethod
     def convert_keys(cls, value: Any) -> Any:
         # When deserializing, if keys are strings (the enum names), convert them back to CacheLayer.
         if isinstance(value, dict):
             return {CacheLayer[key.upper()] if isinstance(key, str) else key: val for key, val in value.items()}
         return value
 
-    def dict(self, *args: Any, **kwargs: Any) -> dict:
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict:  # type: ignore[override]
         # Get the default dict representation.
-        original = super().dict(*args, **kwargs)
+        original = super().model_dump(*args, **kwargs)
         # Convert dictionary keys for ttl_sec and ramp from CacheLayer to their .name.
         original["ttl_sec"] = {k.value if isinstance(k, CacheLayer) else k: v for k, v in self.ttl_sec.items()}
         original["ramp"] = {k.value if isinstance(k, CacheLayer) else k: v for k, v in self.ramp.items()}
         return original
 
     def dumps(self) -> str:
-        return json.dumps(self.dict())
+        return json.dumps(self.model_dump())
 
     @staticmethod
     def loads(data: Any) -> "GCacheKeyConfig":
         if isinstance(data, str):
-            return GCacheKeyConfig.parse_obj(json.loads(data))
-        return GCacheKeyConfig.parse_obj(data)
+            return GCacheKeyConfig.model_validate(json.loads(data))
+        return GCacheKeyConfig.model_validate(data)
 
     @staticmethod
     def load_configs(data: str | builtins.dict) -> GCacheKeyConfigs:
@@ -107,9 +108,9 @@ class GCacheKeyConfig(BaseModel):
         data_dict: dict[str, Any] = {}
         for k, v in data.items():
             if isinstance(v, GCacheKeyConfig):
-                data_dict[k] = v.dict()
+                data_dict[k] = v.model_dump()
             else:
-                data_dict[k] = {k: v.dict() for k, v in v.items()}
+                data_dict[k] = {k: v.model_dump() for k, v in v.items()}
 
         return json.dumps(data_dict, indent=2)
 
@@ -132,7 +133,7 @@ class GCacheContext:
     enabled: contextvars.ContextVar[bool] = contextvars.ContextVar("gcache_enabled", default=False)
 
 
-class Serializer:
+class Serializer(ABC):
     """
     Serializer that can be overloaded to allow for custom loading/dumping of values into cache.
     """
@@ -526,6 +527,7 @@ class RedisCache(CacheInterface):
 
         current_time_ms = int(time.time() * 1000)
 
+        start_time = time.monotonic()
         serialized_value = value if key.serializer is None else await key.serializer.dump(value)
 
         val_pickle = pickle.dumps(
@@ -533,7 +535,7 @@ class RedisCache(CacheInterface):
         )
 
         CacheController.CACHE_SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "dump").observe(
-            time.time() - (current_time_ms / 1e3)
+            time.monotonic() - start_time
         )
 
         CacheController.CACHE_SIZE_HISTOGRAM.labels(key.use_case, key.key_type, self.layer().name).observe(
@@ -1048,11 +1050,11 @@ class GCache:
 
         return decorator
 
-    async def ainvalidate(self, key_type: str, id: str, fallback_buffer_ms: int = 0) -> None:
-        await self._redis_cache.invalidate(key_type, id, fallback_buffer_ms)
+    async def ainvalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
+        await self._redis_cache.invalidate(key_type, id, future_buffer_ms)
 
-    def invalidate(self, key_type: str, id: str, fallback_buffer_ms: int = 0) -> None:
-        return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, fallback_buffer_ms))
+    def invalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
+        return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, future_buffer_ms))
 
     async def aflushall(self) -> None:
         """

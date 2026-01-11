@@ -77,7 +77,7 @@ async def test_multi_loop_concurrent_access(
         key_type="ConcurrentTest",
         id_arg="id",
         track_for_invalidation=True,
-        default_config=GCacheKeyConfig.enabled(60, "test"),
+        default_config=GCacheKeyConfig.enabled(60),
     )
     def cached_func(id: str) -> int:
         return 42

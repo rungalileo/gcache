@@ -21,7 +21,7 @@ class FakeCacheConfigProvider:
         # Return fully ramped cache by default
         return self.configs.get(
             key.use_case,
-            GCacheKeyConfig.enabled(60, key.use_case),
+            GCacheKeyConfig.enabled(60),
         )
 
 

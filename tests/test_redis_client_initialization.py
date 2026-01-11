@@ -5,7 +5,7 @@ import redislite
 from redis.asyncio import Redis, RedisCluster
 
 from gcache import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
-from gcache.base import RedisConfigConflict
+from gcache.exceptions import RedisConfigConflict
 from tests.conftest import REDIS_PORT, FakeCacheConfigProvider
 
 
@@ -50,7 +50,7 @@ def test_no_redis_uses_noop_cache(
             key_type="Test",
             id_arg="test_id",
             use_case="test_noop",
-            default_config=GCacheKeyConfig.enabled(60, "test_noop"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             call_count["count"] += 1
@@ -100,7 +100,7 @@ def test_redis_config_only(
             key_type="Test",
             id_arg="test_id",
             use_case="test_config_only",
-            default_config=GCacheKeyConfig.enabled(60, "test_config_only"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"config_value_{test_id}"
@@ -148,7 +148,7 @@ def test_redis_client_factory_only(
             key_type="Test",
             id_arg="test_id",
             use_case="test_factory_only",
-            default_config=GCacheKeyConfig.enabled(60, "test_factory_only"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"factory_value_{test_id}"
@@ -193,7 +193,7 @@ async def test_redis_config_async_operations(
             key_type="Test",
             id_arg="test_id",
             use_case="test_async",
-            default_config=GCacheKeyConfig.enabled(60, "test_async"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         async def cached_func_async(test_id: int) -> str:
             return f"async_value_{test_id}"
@@ -243,7 +243,7 @@ def test_factory_called_once_per_thread(
             key_type="Test",
             id_arg="test_id",
             use_case="test_factory_once",
-            default_config=GCacheKeyConfig.enabled(60, "test_factory_once"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"value_{test_id}"
@@ -304,7 +304,7 @@ def test_factory_called_once_per_thread_multiple_threads(
             key_type="Test",
             id_arg="test_id",
             use_case="test_multithread",
-            default_config=GCacheKeyConfig.enabled(60, "test_multithread"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"value_{test_id}"
@@ -356,20 +356,67 @@ def test_same_thread_reuses_client_instance(
             key_type="Test",
             id_arg="test_id",
             use_case="test_same_instance",
-            default_config=GCacheKeyConfig.enabled(60, "test_same_instance"),
+            default_config=GCacheKeyConfig.enabled(60),
         )
         def cached_func(test_id: int) -> str:
             return f"value_{test_id}"
 
         with gcache.enable():
-            # Make multiple operations
-            for i in range(10):
+            # Make many operations to ensure thread reuse occurs
+            # With 16 threads and 100 operations, threads will definitely be reused
+            for i in range(100):
                 cached_func(test_id=i)
 
-            # If thread-local caching is working, we should have very few clients
-            # (one per thread used by the event loop pool)
-            # Without thread-local caching, we'd have 10 clients
-            assert len(created_clients) < 10
+            # If thread-local caching is working, we should have at most
+            # as many clients as threads in the pool (16), not 100
+            # This proves threads reuse their cached client instances
+            assert len(created_clients) <= 16
+
+    finally:
+        gcache.__del__()
+
+
+def test_no_config_provider_uses_default_config(
+    redis_server: redislite.Redis,
+) -> None:
+    """Test that when no config_provider is passed, default_config on decorator is used."""
+    redis_server.flushall()
+
+    # Create GCache WITHOUT cache_config_provider - uses the default that returns None
+    gcache = GCache(
+        GCacheConfig(
+            urn_prefix="urn:test:no_provider",
+            redis_config=RedisConfig(port=REDIS_PORT),
+        )
+    )
+
+    try:
+        call_count = {"count": 0}
+
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test_id",
+            use_case="test_no_provider",
+            default_config=GCacheKeyConfig.enabled(60),
+        )
+        def cached_func(test_id: int) -> str:
+            call_count["count"] += 1
+            return f"value_{test_id}"
+
+        with gcache.enable():
+            # First call - cache miss, function executes
+            result = cached_func(test_id=123)
+            assert result == "value_123"
+            assert call_count["count"] == 1
+
+            # Second call - cache hit, function should NOT execute
+            result2 = cached_func(test_id=123)
+            assert result2 == "value_123"
+            assert call_count["count"] == 1  # Still 1, proving cache worked
+
+            # Verify Redis has the cached key
+            keys = redis_server.keys()
+            assert len(keys) == 1
 
     finally:
         gcache.__del__()

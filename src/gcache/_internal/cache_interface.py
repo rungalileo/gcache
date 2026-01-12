@@ -4,6 +4,8 @@ from typing import Any
 
 from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, GCacheKeyConfig
 
+#: Async callable that fetches the actual value on cache miss.
+#: Invoked by cache implementations when the requested key is not found or is stale.
 Fallback = Callable[..., Awaitable[Any]]
 
 
@@ -37,14 +39,17 @@ class CacheInterface(ABC):
 
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
         """
-        Invalidate all caches matching key_type and id at this point in time.
+        Invalidate all cache entries matching key_type and id.
 
-        Any cache entry that was created before now + future_buffer_ms will be considered invalid.
+        Sets a watermark timestamp so that any cached value created before
+        (now + future_buffer_ms) is considered stale on subsequent reads.
 
-        :param key_type:
-        :param id:
-        :param future_buffer_ms: Invalidate cache into the future. Useful to avoid stale read -> write scenarios.
-        :return:
+        :param key_type: The entity type (e.g., 'user', 'project') matching the
+            key_type used in @cached decorators.
+        :param id: The entity identifier to invalidate.
+        :param future_buffer_ms: Extends invalidation window into the future.
+            Useful to handle race conditions where a read starts before a write
+            completes but finishes after, preventing caching of stale data.
         """
         pass
 

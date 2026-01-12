@@ -20,11 +20,14 @@ from gcache.exceptions import MissingKeyConfig
 @dataclass(frozen=True, slots=True)
 class RedisValue:
     """
-    Wrap actual payload with created timestamp.
+    Wrapper around cached payload that includes creation timestamp.
+
+    The timestamp enables cache invalidation: when a watermark is set for a key,
+    any cached value with created_at_ms <= watermark is considered stale.
     """
 
-    created_at_ms: int
-    payload: Any
+    created_at_ms: int  # Unix timestamp in milliseconds when this value was cached
+    payload: Any  # The actual cached data (may be serialized if Serializer is used)
 
 
 def create_default_redis_client_factory(
@@ -70,6 +73,11 @@ class RedisCache(CacheInterface):
         """
         super().__init__(cache_config_provider)
         self._client_factory = client_factory
+        # Thread-local storage is required because async redis-py clients maintain
+        # internal state (connection pool, pending requests) bound to a specific event loop.
+        # Since gcache runs sync cached functions in EventLoopThread workers (each with its
+        # own event loop), sharing a client across threads causes "attached to a different
+        # event loop" RuntimeError. One client per thread ensures correct event loop binding.
         self._thread_local = threading.local()
 
     @property
@@ -91,9 +99,17 @@ class RedisCache(CacheInterface):
         fallback: Fallback,
     ) -> Any:
         """
-        Execute fallback and store it in cache then return it's return value.
-        :param fallback:
-        :return:
+        Execute the fallback function, optionally cache the result, and return it.
+
+        The result is stored in cache unless there's an active invalidation window
+        (watermark_ms is in the future). This prevents caching potentially stale data
+        that was fetched during an invalidation period.
+
+        :param key: Cache key for storing the result.
+        :param watermark_ms: Invalidation watermark timestamp in milliseconds, or None.
+            If set and greater than current time, the result is not cached.
+        :param fallback: Async function that fetches the actual value.
+        :return: The value returned by the fallback function.
         """
         val = await fallback()
         if watermark_ms is None or watermark_ms < time.time() * 1e3:

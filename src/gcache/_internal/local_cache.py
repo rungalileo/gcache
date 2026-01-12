@@ -11,11 +11,21 @@ from gcache.exceptions import MissingKeyConfig
 
 
 class LocalCache(CacheInterface):
+    """
+    In-memory cache layer using TTLCache from cachetools.
+
+    Maintains a separate TTLCache instance per use_case, each with a configurable
+    TTL and a max size of LOCAL_CACHE_MAX_SIZE entries. This is the first layer
+    in the cache chain, checked before Redis.
+
+    Note: LocalCache does not support invalidation (watermarks). If you need
+    invalidation support, rely on the Redis layer with track_for_invalidation=True.
+    """
+
     def __init__(self, cache_config_provider: CacheConfigProvider):
         super().__init__(cache_config_provider)
-        # Dict of usecase -> ttl cache instance.
-        self.caches: dict[str, TTLCache] = {}
-        self.lock = asyncio.Lock()
+        self.caches: dict[str, TTLCache] = {}  # use_case -> TTLCache instance
+        self.lock = asyncio.Lock()  # Protects cache creation
 
     async def _get_ttl_cache(self, key: GCacheKey) -> TTLCache:
         cache = self.caches.get(key.use_case, None)

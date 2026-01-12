@@ -58,5 +58,12 @@ class CacheInterface(ABC):
         pass
 
     async def flushall(self) -> None:
-        """Remove all entries"""
+        """
+        Remove all entries from this cache layer.
+
+        Used primarily for testing to reset cache state between tests.
+        Default implementation is a no-op; subclasses should override if
+        they support flushing (e.g., LocalCache clears its TTLCache dict,
+        RedisCache calls FLUSHALL on Redis).
+        """
         pass

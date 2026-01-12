@@ -13,9 +13,21 @@ from gcache._internal.state import _GLOBAL_GCACHE_STATE
 
 
 class CacheLayer(Enum):
+    """
+    Cache layers available in gcache.
+
+    The cache chain checks LOCAL first, then REMOTE on miss. Each layer can have
+    independent TTL and ramp settings via GCacheKeyConfig.
+    """
+
     NOOP = "noop"
+    """No-op layer that always calls the fallback. Used when Redis is not configured."""
+
     LOCAL = "local"
+    """In-memory TTLCache layer. Fast but not shared across processes."""
+
     REMOTE = "remote"
+    """Redis-backed layer. Shared across processes, supports invalidation."""
 
 
 GCacheKeyConfigs = dict[str, Union["GCacheKeyConfig", dict[str, "GCacheKeyConfig"]]]

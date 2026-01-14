@@ -36,6 +36,7 @@ gcache = GCache(GCacheConfig())
 @gcache.cached(
     key_type="user_id",
     id_arg="user_id",
+    use_case="GetUser",
     default_config=GCacheKeyConfig(
         ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 300},
         ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
@@ -46,7 +47,7 @@ async def get_user(user_id: str) -> dict:
 
 # Use it — caching only happens inside enable() blocks
 with gcache.enable():
-    user = await get_user("123")  # Cached!
+    user = await get_user("123")  # Cache key: urn:gcache:user_id:123#GetUser
 ```
 
 That's it. The function works normally outside `enable()` blocks, and caches results inside them.
@@ -170,17 +171,49 @@ async def get_user_profile(user_id: str) -> dict:
 
 ### Working with Complex Arguments
 
-Real functions have complex arguments. Use `id_arg` tuples and `arg_adapters` to handle them:
+Options for mapping function arguments to cache keys.
+
+#### `id_arg` (required)
+
+Specifies which argument contains the entity ID for the cache key.
+
+**String form** — use when the argument itself is the ID:
+```python
+id_arg="user_id"  # user_id argument is the ID
+```
+
+**Tuple form** — use when the ID needs to be extracted from an object:
+```python
+id_arg=("user", lambda u: u.id)  # Extract ID from User object
+```
+
+#### `arg_adapters`
+
+Converts complex arguments to strings for the cache key. Only needed for non-primitive types.
+
+```python
+arg_adapters={
+    "filters": lambda f: f.to_cache_key(),  # Complex object
+    "page": str,                             # Simple conversion
+}
+```
+
+#### `ignore_args`
+
+Excludes arguments that don't affect the cached result.
+
+```python
+ignore_args=["db_session", "logger"]
+```
+
+#### Example
 
 ```python
 @gcache.cached(
     key_type="user_id",
-    id_arg=("user", lambda u: u.id),  # Extract ID from User object
-    arg_adapters={
-        "filters": lambda f: f.to_cache_key(),  # Convert complex objects
-        "page": str,  # Simple conversion
-    },
-    ignore_args=["db_session", "logger"],  # Don't include these in cache key
+    id_arg=("user", lambda u: u.id),
+    arg_adapters={"filters": lambda f: f.to_cache_key()},
+    ignore_args=["db_session", "logger"],
 )
 async def search_user_posts(
     user: User,
@@ -190,7 +223,11 @@ async def search_user_posts(
     logger: Logger,
 ) -> list[Post]:
     ...
+
+# Cache key: urn:gcache:user_id:123?filters=active&page=2#SearchUserPosts
 ```
+
+The `id_arg` becomes `:123`, `arg_adapters` produce `?filters=active&page=2`, and `ignore_args` are excluded.
 
 ### Sync Functions Work Too
 

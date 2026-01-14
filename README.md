@@ -3,6 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/gcache.svg)](https://badge.fury.io/py/gcache)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![codecov](https://codecov.io/gh/rungalileo/gcache/graph/badge.svg)](https://codecov.io/gh/rungalileo/gcache)
 
 A caching library built for moving fast without breaking things. GCache lets you rapidly add new caching use cases while maintaining structure and runtime control guardrails—so you can ramp up gradually, kill a bad cache instantly, and have full observability into what's cached across your system.
 
@@ -35,6 +36,7 @@ gcache = GCache(GCacheConfig())
 @gcache.cached(
     key_type="user_id",
     id_arg="user_id",
+    use_case="GetUser",
     default_config=GCacheKeyConfig(
         ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 300},
         ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
@@ -45,7 +47,7 @@ async def get_user(user_id: str) -> dict:
 
 # Use it — caching only happens inside enable() blocks
 with gcache.enable():
-    user = await get_user("123")  # Cached!
+    user = await get_user("123")  # Cache key: urn:gcache:user_id:123#GetUser
 ```
 
 That's it. The function works normally outside `enable()` blocks, and caches results inside them.
@@ -104,6 +106,24 @@ Caching doesn't happen automatically—you control when it's active:
 
 - **Dynamic config** — The config provider runs on each request, so you can adjust TTLs or ramp percentages without redeploying.
 
+### Why Explicit `enable()`?
+
+GCache requires you to explicitly enable caching with `with gcache.enable():`. This is intentional.
+
+Caching in write paths can cause subtle bugs—a stale read might get cached right before a write, leading to inconsistent data. By requiring explicit opt-in, GCache forces you to consciously decide where caching is safe:
+
+```python
+# Read path — caching is safe
+with gcache.enable():
+    user = await get_user(user_id)
+
+# Write path — no caching, function runs normally
+await update_user(user_id, new_data)
+await gcache.ainvalidate("user_id", user_id)
+```
+
+This design prevents accidental caching in dangerous places.
+
 ## Runtime Configuration
 
 For dynamic control, provide a config provider when creating GCache. This lets you adjust caching behavior without redeploying:
@@ -151,17 +171,49 @@ async def get_user_profile(user_id: str) -> dict:
 
 ### Working with Complex Arguments
 
-Real functions have complex arguments. Use `id_arg` tuples and `arg_adapters` to handle them:
+Options for mapping function arguments to cache keys.
+
+#### `id_arg` (required)
+
+Specifies which argument contains the entity ID for the cache key.
+
+**String form** — use when the argument itself is the ID:
+```python
+id_arg="user_id"  # user_id argument is the ID
+```
+
+**Tuple form** — use when the ID needs to be extracted from an object:
+```python
+id_arg=("user", lambda u: u.id)  # Extract ID from User object
+```
+
+#### `arg_adapters`
+
+Converts complex arguments to strings for the cache key. Only needed for non-primitive types.
+
+```python
+arg_adapters={
+    "filters": lambda f: f.to_cache_key(),  # Complex object
+    "page": str,                             # Simple conversion
+}
+```
+
+#### `ignore_args`
+
+Excludes arguments that don't affect the cached result.
+
+```python
+ignore_args=["db_session", "logger"]
+```
+
+#### Example
 
 ```python
 @gcache.cached(
     key_type="user_id",
-    id_arg=("user", lambda u: u.id),  # Extract ID from User object
-    arg_adapters={
-        "filters": lambda f: f.to_cache_key(),  # Convert complex objects
-        "page": str,  # Simple conversion
-    },
-    ignore_args=["db_session", "logger"],  # Don't include these in cache key
+    id_arg=("user", lambda u: u.id),
+    arg_adapters={"filters": lambda f: f.to_cache_key()},
+    ignore_args=["db_session", "logger"],
 )
 async def search_user_posts(
     user: User,
@@ -171,7 +223,11 @@ async def search_user_posts(
     logger: Logger,
 ) -> list[Post]:
     ...
+
+# Cache key: urn:gcache:user_id:123?filters=active&page=2#SearchUserPosts
 ```
+
+The `id_arg` becomes `:123`, `arg_adapters` produce `?filters=active&page=2`, and `ignore_args` are excluded.
 
 ### Sync Functions Work Too
 
@@ -198,7 +254,6 @@ from gcache import RedisConfig
 
 gcache = GCache(
     GCacheConfig(
-        cache_config_provider=config_provider,
         redis_config=RedisConfig(
             host="redis.example.com",
             port=6379,
@@ -229,7 +284,6 @@ def make_redis_factory():
 
 gcache = GCache(
     GCacheConfig(
-        cache_config_provider=config_provider,
         redis_client_factory=make_redis_factory(),
     )
 )
@@ -305,7 +359,6 @@ You can add a prefix to avoid collisions:
 
 ```python
 GCacheConfig(
-    cache_config_provider=config_provider,
     metrics_prefix="myapp_",  # Metrics become myapp_gcache_request_counter, etc.
 )
 ```

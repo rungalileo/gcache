@@ -173,7 +173,7 @@ async def get_user_profile(user_id: str) -> dict:
 
 Options for mapping function arguments to cache keys.
 
-#### `id_arg`
+#### `id_arg` (required)
 
 Specifies which argument contains the entity ID for the cache key.
 

@@ -6,6 +6,7 @@ import redislite
 from prometheus_client import REGISTRY
 
 from gcache import GCache, GCacheConfig, GCacheKeyConfig, RedisConfig
+from gcache._internal.state import _GLOBAL_GCACHE_STATE
 
 from . import find_free_port
 
@@ -74,3 +75,18 @@ def reset_prometheus_registry() -> Generator:
             # For built-in collectors
             pass
     yield
+
+
+@pytest.fixture()
+def reset_global_state() -> Generator:
+    """
+    Saves and restores global gcache state around a test.
+
+    Use this fixture when testing code that modifies _GLOBAL_GCACHE_STATE
+    (e.g., custom logger, urn_prefix) to prevent state leakage between tests.
+    """
+    original_logger = _GLOBAL_GCACHE_STATE.logger
+    original_urn_prefix = _GLOBAL_GCACHE_STATE.urn_prefix
+    yield
+    _GLOBAL_GCACHE_STATE.logger = original_logger
+    _GLOBAL_GCACHE_STATE.urn_prefix = original_urn_prefix

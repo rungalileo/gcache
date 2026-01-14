@@ -36,6 +36,7 @@ gcache = GCache(GCacheConfig())
 @gcache.cached(
     key_type="user_id",
     id_arg="user_id",
+    use_case="GetUser",
     default_config=GCacheKeyConfig(
         ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 300},
         ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},

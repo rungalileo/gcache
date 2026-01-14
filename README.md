@@ -104,6 +104,24 @@ Caching doesn't happen automatically—you control when it's active:
 
 - **Dynamic config** — The config provider runs on each request, so you can adjust TTLs or ramp percentages without redeploying.
 
+### Why Explicit `enable()`?
+
+GCache requires you to explicitly enable caching with `with gcache.enable():`. This is intentional.
+
+Caching in write paths can cause subtle bugs—a stale read might get cached right before a write, leading to inconsistent data. By requiring explicit opt-in, GCache forces you to consciously decide where caching is safe:
+
+```python
+# Read path — caching is safe
+with gcache.enable():
+    user = await get_user(user_id)
+
+# Write path — no caching, function runs normally
+await update_user(user_id, new_data)
+await gcache.ainvalidate("user_id", user_id)
+```
+
+This design prevents accidental caching in dangerous places.
+
 ## Runtime Configuration
 
 For dynamic control, provide a config provider when creating GCache. This lets you adjust caching behavior without redeploying:
@@ -198,7 +216,6 @@ from gcache import RedisConfig
 
 gcache = GCache(
     GCacheConfig(
-        cache_config_provider=config_provider,
         redis_config=RedisConfig(
             host="redis.example.com",
             port=6379,
@@ -229,7 +246,6 @@ def make_redis_factory():
 
 gcache = GCache(
     GCacheConfig(
-        cache_config_provider=config_provider,
         redis_client_factory=make_redis_factory(),
     )
 )
@@ -305,7 +321,6 @@ You can add a prefix to avoid collisions:
 
 ```python
 GCacheConfig(
-    cache_config_provider=config_provider,
     metrics_prefix="myapp_",  # Metrics become myapp_gcache_request_counter, etc.
 )
 ```

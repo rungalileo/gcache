@@ -1,6 +1,6 @@
 # GCache
 
-[![PyPI version](https://badge.fury.io/py/gcache.svg)](https://badge.fury.io/py/gcache)
+[![PyPI version](https://img.shields.io/pypi/v/gcache.svg)](https://pypi.org/project/gcache/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![codecov](https://codecov.io/gh/rungalileo/gcache/graph/badge.svg)](https://codecov.io/gh/rungalileo/gcache)

@@ -49,6 +49,7 @@ tests/
 
 - Type hints required, line length 120, ruff + mypy
 - Python 3.10+ (uses `|` union syntax)
+- Always use `poetry run` for commands (e.g., `poetry run pytest`, `poetry run ruff`)
 
 ## Testing
 

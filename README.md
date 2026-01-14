@@ -46,7 +46,7 @@ async def get_user(user_id: str) -> dict:
 
 # Use it — caching only happens inside enable() blocks
 with gcache.enable():
-    user = await get_user("123")  # Cached!
+    user = await get_user("123")  # Cache key: urn:gcache:user_id:123#GetUser
 ```
 
 That's it. The function works normally outside `enable()` blocks, and caches results inside them.
@@ -222,7 +222,11 @@ async def search_user_posts(
     logger: Logger,
 ) -> list[Post]:
     ...
+
+# Cache key: urn:gcache:user_id:123?filters=active&page=2#SearchUserPosts
 ```
+
+The `id_arg` becomes `:123`, `arg_adapters` produce `?filters=active&page=2`, and `ignore_args` are excluded.
 
 ### Sync Functions Work Too
 

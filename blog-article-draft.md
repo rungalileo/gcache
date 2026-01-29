@@ -1,6 +1,6 @@
 # Production-Grade Caching for Fast-Moving Teams
 
-> How gcache lets you retrofit caching onto existing code without the usual risks
+> Retrofit caching onto existing code without the usual risks
 
 ---
 
@@ -14,7 +14,7 @@ At Galileo, we hit this exact problem. We were shipping fast, performance issues
 
 ## What Makes gcache Different
 
-[gcache](https://github.com/lev/gcache):
+[gcache](https://github.com/rungalileo/gcache):
 
 - **Caching is off by default** — you explicitly enable it where it's safe
 - **Gradual rollout with runtime kill switch** — no redeploy to dial back
@@ -99,6 +99,8 @@ async def config_provider(key: GCacheKey) -> GCacheKeyConfig | None:
 gcache = GCache(GCacheConfig(cache_config_provider=config_provider))
 ```
 
+The config provider implementation is up to you—it could be a database lookup, a feature flag service, a config file, or anything else that returns cache settings at runtime.
+
 Found a bug? Set the ramp to 0% in your config service and it takes effect immediately—no redeploy required.
 
 ### Structured Keys & Targeted Invalidation
@@ -144,6 +146,8 @@ You can answer questions like:
 - Is the local cache actually helping, or is everything going to Redis?
 - Why is caching disabled for 30% of requests?
 
+![TODO: Add Grafana screenshot showing gcache dashboard - cache request rate, hit rate, etc.]
+
 No additional instrumentation required.
 
 ### Multi-Layer Read-Through Cache
@@ -157,13 +161,26 @@ On a cache read:
 
 This reduces load on Redis significantly. Most repeated reads within a short window hit the local cache and never touch the network. You can configure TTLs and ramp percentages independently for each layer—aggressive local caching with conservative Redis caching, or vice versa.
 
-## Before/After: [Real Example]
+## Before/After: Caching API Key Verification at Galileo
 
-> [TODO: Add real before/after story here]
+One of our highest-traffic endpoints is `/protect/invoke`, which handles AI guardrail checks. We noticed latency creeping up and used our function metrics dashboard to find the bottleneck.
 
-- The situation before gcache
-- How gcache was added
-- The results (perf improvement, time to implement, operational experience)
+The culprit: API key verification. Every request authenticates via API key, which involves a database lookup and bcrypt verification. This was adding significant latency to every request.
+
+The fix was adding the `@gcache.cached` decorator to the lookup function—no other code changes required. We configured a 5-second local TTL and 10-second Redis TTL via our runtime config service, then ramped the cache from 0% to 100%.
+
+**Results:**
+- **50%+ improvement** in p50 and p75 latency
+- **~10% improvement** in p95 and p99 latency
+- **40% reduction** in CPU usage across API pods
+
+![TODO: Add Grafana screenshot showing latency comparison - cache enabled (left) vs cache disabled (right)]
+
+To validate these results weren't noise, we ramped the cache back down to 0%—latency immediately returned to previous levels. This confirmed the improvement was real and gave us confidence to leave caching enabled.
+
+We've since applied the same pattern to other hot paths: user lookup by email (10-15% latency improvement), stage configuration loading (7% RPS boost), and authorization checks. Each followed the same process: identify the bottleneck, add the decorator, ramp gradually, measure.
+
+The key insight wasn't just the performance gains—it was how quickly we could ship and validate caching changes without redeploying. When you can ramp a cache from 0% to 100% (or back) via a config change, experimentation becomes low-risk.
 
 ## When to Use gcache (and When Not To)
 
@@ -184,11 +201,21 @@ This reduces load on Redis significantly. Most repeated reads within a short win
 pip install gcache
 ```
 
-[GitHub Repository](https://github.com/lev/gcache)
+```python
+from gcache import GCache, GCacheConfig
+
+gcache = GCache(GCacheConfig())
+
+@gcache.cached(key_type="user_id", id_arg="user_id", use_case="GetUser")
+async def get_user(user_id: str) -> dict:
+    return await db.fetch_user(user_id)
+```
+
+See the [GitHub repository](https://github.com/rungalileo/gcache) for full documentation and configuration examples. Contributions and feedback welcome.
 
 ---
 
-This is the approach we use at Galileo. gcache has been running in our production systems [TODO: add specifics - duration, scale, etc.]. It won't redesign your I/O patterns, but when you need to improve performance without a rewrite, it gives you caching with the guardrails to ship safely.
+This is the approach we use at Galileo. gcache is running in production across multiple services, handling authentication, authorization, and configuration lookups. It won't redesign your I/O patterns, but when you need to improve performance without a rewrite, it gives you caching with the guardrails to ship safely.
 
 ---
 
@@ -237,5 +264,5 @@ This section captures the voice, tone, and style constraints for this article. U
 - Open with the problem (shipped fast, now slow)
 - Teaser section gives the 4 key differentiators upfront for skimmers
 - "Why caching is scary" validates the hesitation before presenting the solution
-- Before/after section (TODO) is the emotional hook — needs real concrete example
+- Before/after section is the emotional hook — uses real API key caching example with concrete metrics
 - Code examples should be copy-pasteable

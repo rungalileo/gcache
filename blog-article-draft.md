@@ -1,6 +1,6 @@
-# Production-Grade Caching for Fast-Moving Teams
+# Caching Without the Chaos
 
-> Retrofit caching onto existing code without the usual risks
+> Shipping performance fixes safely
 
 ---
 
@@ -10,7 +10,7 @@ One option is to refactor your I/O patterns—batch those database calls, dedupl
 
 You need to add caching to your existing code, not rewrite it. But caching comes with its own risks—inconsistent key patterns across the codebase, stale data bugs that are hard to reproduce, no visibility into what's actually being cached, and invalidation logic scattered everywhere. Without guardrails, caching can quickly become its own maintenance nightmare.
 
-At Galileo, we hit this exact problem. We were shipping fast, performance issues piled up, and we needed a way to add caching incrementally without the usual risks. So we built gcache—an opinionated wrapper around standard caching tools (Redis, cachetools) that adds the guardrails we needed.
+At Galileo, we hit this exact problem. We were shipping fast, performance issues piled up, and we needed a way to add caching incrementally without the usual risks. This isn't the first time I've tackled this—I [previously built a similar library at DoorDash](https://careersatdoordash.com/blog/how-doordash-standardized-and-improved-microservices-caching/) for their Kotlin microservices. gcache applies the same proven patterns to Python, as an opinionated wrapper around standard caching tools (Redis, cachetools) that adds the guardrails we needed.
 
 ## What Makes gcache Different
 
@@ -21,8 +21,7 @@ At Galileo, we hit this exact problem. We were shipping fast, performance issues
 - **Built-in Prometheus metrics** — hit rates, miss reasons, latencies per cache layer and use case
 - **Entity-based invalidation** — one call invalidates all caches for a user, org, or any entity
 - **Multi-layer read-through cache** — local in-memory + Redis, reducing load on your distributed cache
-
-The rest of this article explains why these matter and how they work.
+- **Fail-open design** — cache errors are logged and metriced, never thrown
 
 ## Why "Just Add Caching" Is Scary
 
@@ -159,15 +158,17 @@ On a cache read:
 2. Check Redis → hit? Populate local cache, return
 3. Miss? Execute function, populate both layers, return
 
+![TODO: Add architecture diagram showing App → Local Cache → Redis → DB flow with hit/miss paths]
+
 This reduces load on Redis significantly. Most repeated reads within a short window hit the local cache and never touch the network. You can configure TTLs and ramp percentages independently for each layer—aggressive local caching with conservative Redis caching, or vice versa.
 
 ## Before/After: Caching API Key Verification at Galileo
 
-One of our highest-traffic endpoints is `/protect/invoke`, which handles AI guardrail checks. We noticed latency creeping up and used our function metrics dashboard to find the bottleneck.
+One of our highest-traffic endpoints is `/protect/invoke`, part of one of our core product offerings that provides real-time guardrails for AI applications. We noticed latency creeping up and used our function metrics dashboard to find the bottleneck.
 
 The culprit: API key verification. Every request authenticates via API key, which involves a database lookup and bcrypt verification. This was adding significant latency to every request.
 
-The fix was adding the `@gcache.cached` decorator to the lookup function—no other code changes required. We configured a 5-second local TTL and 10-second Redis TTL via our runtime config service, then ramped the cache from 0% to 100%.
+The fix was a 3-line diff: adding the `@gcache.cached` decorator to the lookup function. We configured a 5-second local TTL and 10-second Redis TTL via our runtime config service, then ramped the cache from 0% to 100%.
 
 **Results:**
 - **50%+ improvement** in p50 and p75 latency
@@ -191,9 +192,12 @@ The key insight wasn't just the performance gains—it was how quickly we could 
 - Python async or sync codebases
 
 **Not the right tool:**
-- Greenfield projects where you can design optimal I/O patterns upfront
 - Simple scripts or CLIs where caching complexity isn't worth it
-- Cases where you need to coordinate cache invalidation across multiple services (gcache invalidation works across instances of the same service via Redis, but doesn't broadcast to other services)
+- Cases where services don't share a Redis instance (gcache invalidation works across any services that share the same Redis and use compatible key structures, but there's no cross-Redis broadcast mechanism)
+
+**How you configure depends on staleness tolerance:**
+- **Can tolerate minutes of staleness** — use both local and Redis layers with longer TTLs
+- **Need near-real-time consistency** — disable local caching, use shorter Redis TTLs, call `ainvalidate()` on writes
 
 ## Getting Started
 
@@ -206,16 +210,16 @@ from gcache import GCache, GCacheConfig
 
 gcache = GCache(GCacheConfig())
 
-@gcache.cached(key_type="user_id", id_arg="user_id", use_case="GetUser")
-async def get_user(user_id: str) -> dict:
-    return await db.fetch_user(user_id)
+@gcache.cached(key_type="org_id", id_arg="org_id", use_case="GetOrgSettings")
+async def get_org_settings(org_id: str) -> dict:
+    return await db.fetch_org_settings(org_id)
 ```
 
 See the [GitHub repository](https://github.com/rungalileo/gcache) for full documentation and configuration examples. Contributions and feedback welcome.
 
 ---
 
-This is the approach we use at Galileo. gcache is running in production across multiple services, handling authentication, authorization, and configuration lookups. It won't redesign your I/O patterns, but when you need to improve performance without a rewrite, it gives you caching with the guardrails to ship safely.
+gcache is running in production at Galileo across multiple services, handling authentication, authorization, and configuration lookups. If you're dealing with similar performance challenges, give it a try—and let us know how it goes.
 
 ---
 
@@ -262,7 +266,7 @@ This section captures the voice, tone, and style constraints for this article. U
 ### Structure Notes
 
 - Open with the problem (shipped fast, now slow)
-- Teaser section gives the 4 key differentiators upfront for skimmers
+- Teaser section gives the 5 key differentiators upfront for skimmers
 - "Why caching is scary" validates the hesitation before presenting the solution
 - Before/after section is the emotional hook — uses real API key caching example with concrete metrics
 - Code examples should be copy-pasteable

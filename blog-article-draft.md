@@ -12,6 +12,8 @@ You need to add caching to your existing code, not rewrite it. But caching comes
 
 At Galileo, we hit this exact problem. We were shipping fast, performance issues piled up, and we needed a way to add caching incrementally without the usual risks. This isn't the first time I've tackled this—I [previously built a similar library at DoorDash](https://careersatdoordash.com/blog/how-doordash-standardized-and-improved-microservices-caching/) for their Kotlin microservices. gcache applies the same proven patterns to Python, as an opinionated wrapper around standard caching tools (Redis, cachetools) that adds the guardrails we needed.
 
+Adding gcache to our API key verification cut p50 latency by 50%.
+
 ## What Makes gcache Different
 
 [gcache](https://github.com/rungalileo/gcache):
@@ -19,9 +21,9 @@ At Galileo, we hit this exact problem. We were shipping fast, performance issues
 - **Caching is off by default** — you explicitly enable it where it's safe
 - **Gradual rollout with runtime kill switch** — no redeploy to dial back
 - **Built-in Prometheus metrics** — hit rates, miss reasons, latencies per cache layer and use case
-- **Entity-based invalidation** — one call invalidates all caches for a user, org, or any entity
+- **O(1) entity invalidation** — one call invalidates all caches for a user, org, or any entity—no scanning
 - **Multi-layer read-through cache** — local in-memory + Redis, reducing load on your distributed cache
-- **Fail-open design** — cache errors are logged and metriced, never thrown
+- **Fail-open design** — cache errors are logged and emitted as metrics, never thrown
 
 ## Why "Just Add Caching" Is Scary
 
@@ -37,7 +39,7 @@ The worst part: **cache bugs are invisible**. When something goes wrong, caching
 
 **Configuration requires redeploy.** Found a caching bug? You need to push a config change through your entire CI/CD pipeline just to turn it off—often at the worst possible time.
 
-**Invalidation hell** deserves its own callout.
+**Invalidation hell.**
 
 Your user updates their profile. Now you need to invalidate their cached data. But where is it cached?
 
@@ -102,7 +104,7 @@ The config provider implementation is up to you—it could be a database lookup,
 
 Found a bug? Set the ramp to 0% in your config service and it takes effect immediately—no redeploy required.
 
-### Structured Keys & Targeted Invalidation
+### Structured Keys & O(1) Invalidation
 
 gcache enforces a consistent cache key structure using URN format:
 
@@ -124,6 +126,44 @@ await gcache.ainvalidate(key_type="user_id", id="12345")
 ```
 
 That single call invalidates *all* cached data for user 12345—`GetUser`, `GetUserPosts`, `GetUserSettings`, everything. No more grepping the codebase for cache keys. No more hoping you found them all.
+
+**How it works under the hood:** Most caching libraries handle invalidation by scanning for matching keys and deleting them. This is O(n)—the more cached entries, the slower invalidation gets. gcache uses a different approach: **watermarks**.
+
+When you call `ainvalidate()`, gcache doesn't hunt for keys to delete. Instead, it writes a single watermark key with the current timestamp:
+
+```
+{user_id:123}#watermark → 1706547200000
+```
+
+On every cache read, gcache fetches both the cached value and its watermark in one Redis call. Every cached value stores a `created_at` timestamp. If the watermark is newer than the cached value, the cache is considered stale—the function re-executes and the result is re-cached.
+
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam sequenceMessageAlign center
+
+participant App
+participant Redis
+
+== Cache Write ==
+App -> Redis: SET {user_id:123}#GetUser\n→ {value, created_at: T1}
+
+== Invalidation ==
+App -> Redis: SET {user_id:123}#watermark → T2
+
+== Read (after invalidation) ==
+App -> Redis: MGET value, watermark
+Redis --> App: {value, created_at: T1}, T2
+App -> App: T2 > T1? Stale!\nRe-execute function
+@enduml
+```
+
+This design has key advantages:
+
+- **O(1) invalidation** — One Redis write, regardless of how many entries exist for that entity
+- **No scanning** — Works at scale without performance degradation
+- **Atomic reads** — Value and watermark fetched together, no race conditions
+- **Redis Cluster compatible** — No cross-shard coordination needed
 
 Note: invalidation applies to the Redis layer. Local in-memory caches expire via TTL. For data where staleness after writes is unacceptable, configure local caching with a short TTL or disable it entirely.
 
@@ -151,6 +191,8 @@ No additional instrumentation required.
 
 ### Multi-Layer Read-Through Cache
 
+Why not just use Redis? Network round trips add latency, even to a fast cache. For data that's read repeatedly within a short window—authentication tokens, feature flags, configuration—hitting Redis on every call is wasteful.
+
 gcache uses a two-layer architecture: a local in-memory cache (per-instance) backed by Redis (shared across your fleet).
 
 On a cache read:
@@ -161,6 +203,10 @@ On a cache read:
 ![TODO: Add architecture diagram showing App → Local Cache → Redis → DB flow with hit/miss paths]
 
 This reduces load on Redis significantly. Most repeated reads within a short window hit the local cache and never touch the network. You can configure TTLs and ramp percentages independently for each layer—aggressive local caching with conservative Redis caching, or vice versa.
+
+### Fail-Open Design
+
+Caching should improve your system, not become a new failure mode. gcache is fail-open: if Redis is down or a cache operation fails, the underlying function executes normally. Your app gets slower, not broken. Errors are logged and emitted as Prometheus metrics (`gcache_error_counter`), so you'll know something's wrong—but your users won't see errors.
 
 ## Before/After: Caching API Key Verification at Galileo
 
@@ -193,7 +239,7 @@ The key insight wasn't just the performance gains—it was how quickly we could 
 
 **Not the right tool:**
 - Simple scripts or CLIs where caching complexity isn't worth it
-- Cases where services don't share a Redis instance (gcache invalidation works across any services that share the same Redis and use compatible key structures, but there's no cross-Redis broadcast mechanism)
+- Cases where services don't share a Redis instance (invalidation doesn't broadcast across separate Redis clusters)
 
 **How you configure depends on staleness tolerance:**
 - **Can tolerate minutes of staleness** — use both local and Redis layers with longer TTLs
@@ -266,7 +312,7 @@ This section captures the voice, tone, and style constraints for this article. U
 ### Structure Notes
 
 - Open with the problem (shipped fast, now slow)
-- Teaser section gives the 5 key differentiators upfront for skimmers
+- Teaser section gives the 6 key differentiators upfront for skimmers
 - "Why caching is scary" validates the hesitation before presenting the solution
 - Before/after section is the emotional hook — uses real API key caching example with concrete metrics
 - Code examples should be copy-pasteable

@@ -196,4 +196,3 @@ Brief explanations of why gcache works the way it does:
 - [ ] Any specific metrics to share? (X% faster, Y hours saved, etc.)
 - [ ] Should we include the Redis setup or keep it simple?
 - [ ] Target length? (1500 words? 2500?)
-

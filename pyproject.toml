@@ -35,7 +35,7 @@ prometheus-client = "^0.22.1"
 cachetools = ">=5.5.2"
 types-cachetools = "^6.2.0.20250827"
 redis = ">=5.0.0"
-uvloop = "^0.21.0"
+uvloop = "^0.22.1"
 
 
 [tool.poetry.group.test.dependencies]

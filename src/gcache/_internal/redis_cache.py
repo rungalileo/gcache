@@ -9,11 +9,20 @@ from typing import Any
 
 from redis.asyncio import Redis, RedisCluster
 
+from gcache._internal.cache_hit import BypassCurrentLayer, run_cache_hit_hook
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import ASYNC_PICKLE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, RedisConfig
+from gcache.config import (
+    CacheConfigProvider,
+    CacheHitHook,
+    CacheLayer,
+    EvictAndFallback,
+    GCacheKey,
+    RedisConfig,
+    ReturnCached,
+)
 from gcache.exceptions import MissingKeyConfig
 
 
@@ -128,7 +137,13 @@ class RedisCache(CacheInterface):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(RedisCache._executor, pickle.loads, data)
 
-    async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+    async def get(
+        self,
+        key: GCacheKey,
+        fallback: Fallback,
+        *,
+        on_cache_hit: CacheHitHook | None = None,
+    ) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
 
         watermark_ms = None
@@ -142,6 +157,9 @@ class RedisCache(CacheInterface):
             val_pickle = await self.client.get(key.urn)
         if val_pickle is not None:
             start_sec = time.monotonic()
+            serialization_timer = GCacheMetrics.SERIALIZATION_TIMER.labels(
+                key.use_case, key.key_type, self.layer().name, "load"
+            )
 
             deserialized_value: RedisValue = (
                 pickle.loads(val_pickle)
@@ -149,22 +167,34 @@ class RedisCache(CacheInterface):
                 else await RedisCache._async_pickle_loads(val_pickle)
             )
 
+            # Ignore invalidated remote entries before payload deserialization or hook execution.
+            if watermark_ms is not None:
+                watermark_ms = int(watermark_ms)
+                if watermark_ms >= deserialized_value.created_at_ms:
+                    serialization_timer.observe(time.monotonic() - start_sec)
+                    return await self._exec_fallback(key, watermark_ms, fallback)
+
             # Load payload using custom serializer if present.
             payload = deserialized_value.payload
             if key.serializer is not None:
                 payload = await key.serializer.load(payload)
 
-            (
-                GCacheMetrics.SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "load").observe(
-                    time.monotonic() - start_sec
-                )
-            )
+            serialization_timer.observe(time.monotonic() - start_sec)
 
-            # Check if cache val is expired.
-            if watermark_ms is not None:
-                watermark_ms = int(watermark_ms)
-                if watermark_ms >= deserialized_value.created_at_ms:
-                    return await self._exec_fallback(key, watermark_ms, fallback)
+            decision = await run_cache_hit_hook(
+                key=key,
+                layer=self.layer(),
+                value=payload,
+                on_cache_hit=on_cache_hit,
+            )
+            if isinstance(decision, EvictAndFallback):
+                await self.delete(key)
+                return await self._exec_fallback(key, watermark_ms, fallback)
+            if isinstance(decision, BypassCurrentLayer):
+                return await fallback()
+            if not isinstance(decision, ReturnCached):
+                return await fallback()
+
             return payload
         else:
             return await self._exec_fallback(key, watermark_ms, fallback)

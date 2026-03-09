@@ -1,4 +1,5 @@
 import time
+from collections.abc import Mapping
 from enum import Enum
 from random import random
 from typing import Any
@@ -6,7 +7,7 @@ from typing import Any
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE, GCacheContext
-from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey
+from gcache.config import CacheConfigProvider, CacheHitHook, CacheLayer, GCacheKey
 
 
 class CacheWrapper(CacheInterface):
@@ -58,7 +59,14 @@ class CacheController(CacheWrapper):
         super().__init__(cache_config_provider, cache)
         GCacheMetrics.initialize(metrics_prefix)
 
-    async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+    async def get(
+        self,
+        key: GCacheKey,
+        fallback: Fallback,
+        *,
+        call_args: Mapping[str, Any] | None = None,
+        on_cache_hit: CacheHitHook | None = None,
+    ) -> Any:
         if await self._should_cache(key):
             start_time = time.monotonic()
             fallback_time = 0.0
@@ -84,7 +92,12 @@ class CacheController(CacheWrapper):
                         )
 
                 try:
-                    return await self.wrapped.get(key, instrumented_fallback)
+                    return await self.wrapped.get(
+                        key,
+                        instrumented_fallback,
+                        call_args=call_args,
+                        on_cache_hit=on_cache_hit,
+                    )
                 except Exception as e:
                     _GLOBAL_GCACHE_STATE.logger.error(f"Error getting value from cache: {e}", exc_info=True)
                     GCacheMetrics.ERROR_COUNTER.labels(
@@ -161,11 +174,18 @@ class CacheChain(CacheWrapper):
         super().__init__(cache_config_provider, cache)
         self.fallback_cache = fallback_cache
 
-    async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+    async def get(
+        self,
+        key: GCacheKey,
+        fallback: Fallback,
+        *,
+        call_args: Mapping[str, Any] | None = None,
+        on_cache_hit: CacheHitHook | None = None,
+    ) -> Any:
         async def cache_fallback() -> Any:
-            return await self.fallback_cache.get(key, fallback)
+            return await self.fallback_cache.get(key, fallback, call_args=call_args, on_cache_hit=on_cache_hit)
 
-        return await self.wrapped.get(key, cache_fallback)
+        return await self.wrapped.get(key, cache_fallback, call_args=call_args, on_cache_hit=on_cache_hit)
 
     async def delete(self, key: GCacheKey) -> bool:
         ret = await self.wrapped.delete(key)

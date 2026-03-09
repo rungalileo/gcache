@@ -5,7 +5,7 @@ import threading
 from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 from functools import partial
-from typing import Any
+from typing import Any, Literal
 
 from gcache._internal.event_loop_thread import EventLoopThread, EventLoopThreadPool
 from gcache._internal.local_cache import LocalCache
@@ -15,6 +15,7 @@ from gcache._internal.redis_cache import RedisCache, create_default_redis_client
 from gcache._internal.state import _GLOBAL_GCACHE_STATE, GCacheContext
 from gcache._internal.wrappers import CacheChain, CacheController, DisabledReasons
 from gcache.config import (
+    CacheHitHook,
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,
@@ -28,6 +29,13 @@ from gcache.exceptions import (
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )
+
+
+class _UseGlobalOnCacheHit:
+    """Private sentinel for decorator hooks that inherit the global config hook."""
+
+
+_USE_GLOBAL_ON_CACHE_HIT = _UseGlobalOnCacheHit()
 
 
 class GCache:
@@ -154,6 +162,7 @@ class GCache:
         track_for_invalidation: bool = False,
         default_config: GCacheKeyConfig | None = None,
         serializer: Serializer | None = None,
+        on_cache_hit: CacheHitHook | Literal[False] | _UseGlobalOnCacheHit = _USE_GLOBAL_ON_CACHE_HIT,
     ) -> Any:
         """
         Decorator which caches a function which can be either sync or async.
@@ -175,6 +184,9 @@ class GCache:
         :param serializer: Optional serializer to use to serialize and deserialize cache values.  Care must be taken that
                            the returned value matches the signature of cached function, as otherwise you may get runtime
                            type/attribute errors.
+        :param on_cache_hit: Optional cache-hit hook for this use case. If omitted, the global
+                             hook from GCacheConfig is used. Pass False to explicitly disable the
+                             global hook for this decorator.
         :return:
         """
 
@@ -205,6 +217,7 @@ class GCache:
 
             adapter_for_key = not isinstance(id_arg, str)
             id_arg_name = id_arg[0] if adapter_for_key else id_arg
+            resolved_on_cache_hit = self._resolve_on_cache_hit(on_cache_hit)
 
             # If name of id arg is in arg_adapters then we should include it in the cache key args.
             # Otherwise we should ignore it.
@@ -230,6 +243,7 @@ class GCache:
 
                     bound_args = sig.bind(*args, **kwargs)
                     bound_args.apply_defaults()  # Apply default values if any
+                    call_args = dict(bound_args.arguments)
 
                     if id_arg_name in kwargs:
                         key_id = kwargs[id_arg_name]  # type: ignore[index]
@@ -288,7 +302,7 @@ class GCache:
                     async def f():  # type: ignore[no-untyped-def, misc]
                         return func(*args, **kwargs)
 
-                return await self._cache.get(key, f)
+                return await self._cache.get(key, f, call_args=call_args, on_cache_hit=resolved_on_cache_hit)
 
             if inspect.iscoroutinefunction(func):
                 return functools.wraps(func)(async_wrapped)
@@ -309,6 +323,17 @@ class GCache:
                 return functools.wraps(func)(sync_wrapped)
 
         return decorator
+
+    def _resolve_on_cache_hit(
+        self, on_cache_hit: CacheHitHook | Literal[False] | _UseGlobalOnCacheHit
+    ) -> CacheHitHook | None:
+        if on_cache_hit is _USE_GLOBAL_ON_CACHE_HIT:
+            return self.config.on_cache_hit
+        if on_cache_hit is False:
+            return None
+        if callable(on_cache_hit):
+            return on_cache_hit
+        raise TypeError("on_cache_hit must be callable, False, or omitted to use the global config hook")
 
     async def ainvalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
         """

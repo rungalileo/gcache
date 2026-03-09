@@ -12,11 +12,13 @@ from prometheus_client import generate_latest
 
 from gcache import (
     CacheLayer,
+    EvictAndFallback,
     GCache,
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,
     RedisConfig,
+    ReturnCached,
 )
 from gcache._internal.cache_interface import Fallback
 from gcache._internal.local_cache import LocalCache
@@ -79,6 +81,224 @@ def test_gcache_sync(gcache: GCache, redis_server: redislite.Redis, reset_promet
     # We should have 2 keys.  One for 123 and one for 124 args.
     keys = redis_server.keys()
     assert len(keys) == 2
+
+
+def test_global_on_cache_hit_inherited(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_global_state: None,
+) -> None:
+    redis_server.flushall()
+    calls: list[tuple[CacheLayer, dict[str, int]]] = []
+
+    def global_hook(ctx, value):  # type: ignore[no-untyped-def]
+        calls.append((ctx.layer, dict(ctx.call_args)))
+        return ReturnCached()
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:galileo:test",
+            redis_config=RedisConfig(port=REDIS_PORT),
+            on_cache_hit=global_hook,
+        )
+    )
+    try:
+        @gcache.cached(key_type="Test", id_arg="test", use_case="test_global_on_cache_hit_inherited")
+        def cached_func(test: int = 123) -> int:
+            return test
+
+        with gcache.enable():
+            assert cached_func() == 123
+            assert calls == []
+            assert cached_func() == 123
+
+        assert calls == [(CacheLayer.LOCAL, {"test": 123})]
+    finally:
+        gcache.__del__()
+
+
+def test_decorator_on_cache_hit_overrides_global(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_global_state: None,
+) -> None:
+    redis_server.flushall()
+    global_calls: list[CacheLayer] = []
+    decorator_calls: list[CacheLayer] = []
+
+    def global_hook(ctx, value):  # type: ignore[no-untyped-def]
+        global_calls.append(ctx.layer)
+        return ReturnCached()
+
+    def decorator_hook(ctx, value):  # type: ignore[no-untyped-def]
+        decorator_calls.append(ctx.layer)
+        return ReturnCached()
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:galileo:test",
+            redis_config=RedisConfig(port=REDIS_PORT),
+            on_cache_hit=global_hook,
+        )
+    )
+    try:
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test",
+            use_case="test_decorator_on_cache_hit_overrides_global",
+            on_cache_hit=decorator_hook,
+        )
+        def cached_func(test: int = 123) -> int:
+            return test
+
+        with gcache.enable():
+            assert cached_func() == 123
+            assert cached_func() == 123
+
+        assert global_calls == []
+        assert decorator_calls == [CacheLayer.LOCAL]
+    finally:
+        gcache.__del__()
+
+
+def test_decorator_can_disable_global_on_cache_hit(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_global_state: None,
+) -> None:
+    redis_server.flushall()
+    global_calls: list[CacheLayer] = []
+
+    def global_hook(ctx, value):  # type: ignore[no-untyped-def]
+        global_calls.append(ctx.layer)
+        return ReturnCached()
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:galileo:test",
+            redis_config=RedisConfig(port=REDIS_PORT),
+            on_cache_hit=global_hook,
+        )
+    )
+    try:
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test",
+            use_case="test_decorator_can_disable_global_on_cache_hit",
+            on_cache_hit=False,
+        )
+        def cached_func(test: int = 123) -> int:
+            return test
+
+        with gcache.enable():
+            assert cached_func() == 123
+            assert cached_func() == 123
+
+        assert global_calls == []
+    finally:
+        gcache.__del__()
+
+
+def test_local_on_cache_hit_evicts_and_falls_back_to_remote(gcache: GCache) -> None:
+    source_calls = 0
+    hook_layers: list[CacheLayer] = []
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        hook_layers.append(ctx.layer)
+        if ctx.layer == CacheLayer.LOCAL and value["status"] == "bad":
+            return EvictAndFallback("bad_local_payload")
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="test_local_on_cache_hit_evicts_and_falls_back_to_remote",
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> dict[str, object]:
+        nonlocal source_calls
+        source_calls += 1
+        return {"status": "good", "source_calls": source_calls}
+
+    with gcache.enable():
+        assert cached_func(test=1) == {"status": "good", "source_calls": 1}
+
+        local_cache = gcache._local_cache.wrapped.caches["test_local_on_cache_hit_evicts_and_falls_back_to_remote"]
+        cached_value = next(iter(local_cache.values()))
+        cached_value["status"] = "bad"
+
+        assert cached_func(test=1) == {"status": "good", "source_calls": 1}
+
+    assert source_calls == 1
+    assert hook_layers == [CacheLayer.LOCAL, CacheLayer.REMOTE]
+
+
+def test_remote_on_cache_hit_evicts_and_falls_back_to_source(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+) -> None:
+    source_calls = 0
+    remote_hit_enabled = False
+
+    cache_config_provider.configs["test_remote_on_cache_hit_evicts_and_falls_back_to_source"] = GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 60},
+        ramp={CacheLayer.LOCAL: 0, CacheLayer.REMOTE: 100},
+    )
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        if ctx.layer == CacheLayer.REMOTE and remote_hit_enabled:
+            return EvictAndFallback("force_remote_refetch")
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="test_remote_on_cache_hit_evicts_and_falls_back_to_source",
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> int:
+        nonlocal source_calls
+        source_calls += 1
+        return source_calls
+
+    with gcache.enable():
+        assert cached_func(test=1) == 1
+        remote_hit_enabled = True
+        assert cached_func(test=1) == 2
+
+    assert source_calls == 2
+
+
+def test_on_cache_hit_exception_bypasses_current_layer(gcache: GCache) -> None:
+    source_calls = 0
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        if ctx.layer == CacheLayer.LOCAL:
+            raise RuntimeError("boom")
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="test_on_cache_hit_exception_bypasses_current_layer",
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> dict[str, object]:
+        nonlocal source_calls
+        source_calls += 1
+        return {"source_calls": source_calls}
+
+    with gcache.enable():
+        assert cached_func(test=1) == {"source_calls": 1}
+        assert cached_func(test=1) == {"source_calls": 1}
+
+        local_cache = gcache._local_cache.wrapped.caches["test_on_cache_hit_exception_bypasses_current_layer"]
+        assert len(local_cache) == 1
+
+    assert source_calls == 1
 
 
 @pytest.mark.asyncio
@@ -327,7 +547,7 @@ def test_error_in_fallback(gcache: GCache) -> None:
 
 def test_error_in_cache(gcache: GCache, cache_config_provider: FakeCacheConfigProvider) -> None:
     class FailingCache(LocalCache):
-        async def get(self, key: GCacheKey, fallback: Fallback) -> None:
+        async def get(self, key: GCacheKey, fallback: Fallback, **kwargs) -> None:  # type: ignore[no-untyped-def]
             raise Exception("I'm giving up!")
 
     gcache._cache = CacheController(FailingCache(cache_config_provider), cache_config_provider)  # type: ignore[assignment]

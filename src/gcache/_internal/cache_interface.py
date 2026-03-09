@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
-from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, GCacheKeyConfig
+from gcache.config import CacheConfigProvider, CacheHitHook, CacheLayer, GCacheKey, GCacheKeyConfig
 
 #: Async callable that fetches the actual value on cache miss.
 #: Invoked by cache implementations when the requested key is not found or is stale.
@@ -26,7 +26,14 @@ class CacheInterface(ABC):
         return config
 
     @abstractmethod
-    async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+    async def get(
+        self,
+        key: GCacheKey,
+        fallback: Fallback,
+        *,
+        call_args: Mapping[str, Any] | None = None,
+        on_cache_hit: CacheHitHook | None = None,
+    ) -> Any:
         pass
 
     @abstractmethod

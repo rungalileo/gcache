@@ -2,18 +2,27 @@ import asyncio
 import pickle
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
 from redis.asyncio import Redis, RedisCluster
 
+from gcache._internal.cache_hit import BypassCurrentLayer, run_cache_hit_hook
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import ASYNC_PICKLE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, RedisConfig
+from gcache.config import (
+    CacheConfigProvider,
+    CacheHitHook,
+    CacheLayer,
+    EvictAndFallback,
+    GCacheKey,
+    RedisConfig,
+    ReturnCached,
+)
 from gcache.exceptions import MissingKeyConfig
 
 
@@ -128,7 +137,14 @@ class RedisCache(CacheInterface):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(RedisCache._executor, pickle.loads, data)
 
-    async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+    async def get(
+        self,
+        key: GCacheKey,
+        fallback: Fallback,
+        *,
+        call_args: Mapping[str, Any] | None = None,
+        on_cache_hit: CacheHitHook | None = None,
+    ) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
 
         watermark_ms = None
@@ -159,6 +175,21 @@ class RedisCache(CacheInterface):
                     time.monotonic() - start_sec
                 )
             )
+
+            decision = await run_cache_hit_hook(
+                key=key,
+                layer=self.layer(),
+                value=payload,
+                call_args=call_args,
+                on_cache_hit=on_cache_hit,
+            )
+            if isinstance(decision, EvictAndFallback):
+                await self.delete(key)
+                return await fallback()
+            if isinstance(decision, BypassCurrentLayer):
+                return await fallback()
+            if not isinstance(decision, ReturnCached):
+                return await fallback()
 
             # Check if cache val is expired.
             if watermark_ms is not None:

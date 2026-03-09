@@ -185,7 +185,7 @@ class RedisCache(CacheInterface):
             )
             if isinstance(decision, EvictAndFallback):
                 await self.delete(key)
-                return await fallback()
+                return await self._exec_fallback(key, watermark_ms, fallback)
             if isinstance(decision, BypassCurrentLayer):
                 return await fallback()
             if not isinstance(decision, ReturnCached):

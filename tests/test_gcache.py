@@ -239,9 +239,39 @@ def test_local_on_cache_hit_evicts_and_falls_back_to_remote(gcache: GCache) -> N
         cached_value["status"] = "bad"
 
         assert cached_func(test=1) == {"status": "good", "source_calls": 1}
+        assert cached_func(test=1) == {"status": "good", "source_calls": 1}
 
     assert source_calls == 1
-    assert hook_layers == [CacheLayer.LOCAL, CacheLayer.REMOTE]
+    assert hook_layers == [CacheLayer.LOCAL, CacheLayer.REMOTE, CacheLayer.LOCAL]
+
+
+def test_local_on_cache_hit_returns_validated_value_without_reread(gcache: GCache) -> None:
+    use_case = "test_local_on_cache_hit_returns_validated_value_without_reread"
+    hook_calls = 0
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        nonlocal hook_calls
+        hook_calls += 1
+        if ctx.layer == CacheLayer.LOCAL:
+            local_cache = get_local_cache_for_use_case(gcache, use_case)
+            local_cache.caches[use_case][ctx.key] = {"value": "replaced"}
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case=use_case,
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> dict[str, str]:
+        return {"value": "cached"}
+
+    with gcache.enable():
+        assert cached_func(test=1) == {"value": "cached"}
+        assert cached_func(test=1) == {"value": "cached"}
+        assert cached_func(test=1) == {"value": "replaced"}
+
+    assert hook_calls == 2
 
 
 def test_remote_on_cache_hit_evicts_and_falls_back_to_source(
@@ -275,6 +305,8 @@ def test_remote_on_cache_hit_evicts_and_falls_back_to_source(
     with gcache.enable():
         assert cached_func(test=1) == 1
         remote_hit_enabled = True
+        assert cached_func(test=1) == 2
+        remote_hit_enabled = False
         assert cached_func(test=1) == 2
 
     assert source_calls == 2

@@ -46,6 +46,11 @@ class LocalCache(CacheInterface):
 
         return cache
 
+    async def _exec_fallback(self, key: GCacheKey, fallback: Fallback) -> Any:
+        value = await fallback()
+        await self.put(key, value)
+        return value
+
     async def get(
         self,
         key: GCacheKey,
@@ -58,25 +63,26 @@ class LocalCache(CacheInterface):
         cache = await self._get_ttl_cache(key)
 
         if key not in cache:
-            await self.put(key, await fallback())
-            return cache[key]
+            return await self._exec_fallback(key, fallback)
+
+        cached_value = cache[key]
 
         decision = await run_cache_hit_hook(
             key=key,
             layer=self.layer(),
-            value=cache[key],
+            value=cached_value,
             call_args=call_args,
             on_cache_hit=on_cache_hit,
         )
         if isinstance(decision, ReturnCached):
-            return cache[key]
+            return cached_value
         if isinstance(decision, EvictAndFallback):
             cache.pop(key, None)
-            return await fallback()
+            return await self._exec_fallback(key, fallback)
         if isinstance(decision, BypassCurrentLayer):
             return await fallback()
 
-        return cache[key]
+        return cached_value
 
     async def put(self, key: GCacheKey, value: Any) -> None:
         (await self._get_ttl_cache(key))[key] = value

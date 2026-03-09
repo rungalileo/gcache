@@ -243,7 +243,6 @@ class GCache:
 
                     bound_args = sig.bind(*args, **kwargs)
                     bound_args.apply_defaults()  # Apply default values if any
-                    call_args = dict(bound_args.arguments)
 
                     if id_arg_name in kwargs:
                         key_id = kwargs[id_arg_name]  # type: ignore[index]
@@ -302,7 +301,7 @@ class GCache:
                     async def f():  # type: ignore[no-untyped-def, misc]
                         return func(*args, **kwargs)
 
-                return await self._cache.get(key, f, call_args=call_args, on_cache_hit=resolved_on_cache_hit)
+                return await self._cache.get(key, f, on_cache_hit=resolved_on_cache_hit)
 
             if inspect.iscoroutinefunction(func):
                 return functools.wraps(func)(async_wrapped)

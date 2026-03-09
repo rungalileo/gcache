@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from gcache.config import CacheConfigProvider, CacheHitHook, CacheLayer, GCacheKey, GCacheKeyConfig
@@ -31,7 +31,6 @@ class CacheInterface(ABC):
         key: GCacheKey,
         fallback: Fallback,
         *,
-        call_args: Mapping[str, Any] | None = None,
         on_cache_hit: CacheHitHook | None = None,
     ) -> Any:
         pass

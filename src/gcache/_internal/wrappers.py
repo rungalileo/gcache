@@ -1,5 +1,4 @@
 import time
-from collections.abc import Mapping
 from enum import Enum
 from random import random
 from typing import Any
@@ -64,7 +63,6 @@ class CacheController(CacheWrapper):
         key: GCacheKey,
         fallback: Fallback,
         *,
-        call_args: Mapping[str, Any] | None = None,
         on_cache_hit: CacheHitHook | None = None,
     ) -> Any:
         if await self._should_cache(key):
@@ -95,7 +93,6 @@ class CacheController(CacheWrapper):
                     return await self.wrapped.get(
                         key,
                         instrumented_fallback,
-                        call_args=call_args,
                         on_cache_hit=on_cache_hit,
                     )
                 except Exception as e:
@@ -179,13 +176,12 @@ class CacheChain(CacheWrapper):
         key: GCacheKey,
         fallback: Fallback,
         *,
-        call_args: Mapping[str, Any] | None = None,
         on_cache_hit: CacheHitHook | None = None,
     ) -> Any:
         async def cache_fallback() -> Any:
-            return await self.fallback_cache.get(key, fallback, call_args=call_args, on_cache_hit=on_cache_hit)
+            return await self.fallback_cache.get(key, fallback, on_cache_hit=on_cache_hit)
 
-        return await self.wrapped.get(key, cache_fallback, call_args=call_args, on_cache_hit=on_cache_hit)
+        return await self.wrapped.get(key, cache_fallback, on_cache_hit=on_cache_hit)
 
     async def delete(self, key: GCacheKey) -> bool:
         ret = await self.wrapped.delete(key)

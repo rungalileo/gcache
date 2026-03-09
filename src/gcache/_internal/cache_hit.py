@@ -1,5 +1,4 @@
 import inspect
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -30,7 +29,6 @@ async def run_cache_hit_hook(
     key: GCacheKey,
     layer: CacheLayer,
     value: Any,
-    call_args: Mapping[str, Any] | None,
     on_cache_hit: CacheHitHook | None,
 ) -> ReturnCached | EvictAndFallback | BypassCurrentLayer:
     """
@@ -43,7 +41,7 @@ async def run_cache_hit_hook(
     if on_cache_hit is None:
         return ReturnCached()
 
-    context = CacheCallContext(key=key, layer=layer, call_args=call_args or {})
+    context = CacheCallContext(key=key, layer=layer)
 
     try:
         decision = on_cache_hit(context, value)

@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from typing import Any
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
@@ -15,7 +14,6 @@ class NoopCache(CacheInterface):
         key: GCacheKey,
         fallback: Fallback,
         *,
-        call_args: Mapping[str, Any] | None = None,
         on_cache_hit: CacheHitHook | None = None,
     ) -> Any:
         return await fallback()

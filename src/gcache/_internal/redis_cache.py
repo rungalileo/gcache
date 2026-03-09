@@ -2,7 +2,7 @@ import asyncio
 import pickle
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
@@ -142,7 +142,6 @@ class RedisCache(CacheInterface):
         key: GCacheKey,
         fallback: Fallback,
         *,
-        call_args: Mapping[str, Any] | None = None,
         on_cache_hit: CacheHitHook | None = None,
     ) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
@@ -180,7 +179,6 @@ class RedisCache(CacheInterface):
                 key=key,
                 layer=self.layer(),
                 value=payload,
-                call_args=call_args,
                 on_cache_hit=on_cache_hit,
             )
             if isinstance(decision, EvictAndFallback):

@@ -1,5 +1,4 @@
 import asyncio
-from collections.abc import Mapping
 from typing import Any
 
 from cachetools import TTLCache
@@ -56,7 +55,6 @@ class LocalCache(CacheInterface):
         key: GCacheKey,
         fallback: Fallback,
         *,
-        call_args: Mapping[str, Any] | None = None,
         on_cache_hit: CacheHitHook | None = None,
     ) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling local cache")
@@ -71,7 +69,6 @@ class LocalCache(CacheInterface):
             key=key,
             layer=self.layer(),
             value=cached_value,
-            call_args=call_args,
             on_cache_hit=on_cache_hit,
         )
         if isinstance(decision, ReturnCached):

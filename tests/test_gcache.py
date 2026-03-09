@@ -94,10 +94,10 @@ def test_global_on_cache_hit_inherited(
     reset_global_state: None,
 ) -> None:
     redis_server.flushall()
-    calls: list[tuple[CacheLayer, dict[str, int]]] = []
+    calls: list[CacheLayer] = []
 
     def global_hook(ctx, value):  # type: ignore[no-untyped-def]
-        calls.append((ctx.layer, dict(ctx.call_args)))
+        calls.append(ctx.layer)
         return ReturnCached()
 
     gcache = GCache(
@@ -119,7 +119,7 @@ def test_global_on_cache_hit_inherited(
             assert calls == []
             assert cached_func() == 123
 
-        assert calls == [(CacheLayer.LOCAL, {"test": 123})]
+        assert calls == [CacheLayer.LOCAL]
     finally:
         gcache.__del__()
 

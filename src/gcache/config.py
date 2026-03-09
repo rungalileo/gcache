@@ -1,6 +1,6 @@
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger, LoggerAdapter
@@ -133,13 +133,11 @@ class CacheCallContext:
     """
     Context provided to cache-hit hooks.
 
-    The hook gets the cache key, the layer that produced the hit, and the
-    bound call arguments from the cached function invocation.
+    The hook gets the cache key and the layer that produced the hit.
     """
 
     key: "GCacheKey"
     layer: CacheLayer
-    call_args: Mapping[str, Any]
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import pickle
@@ -339,6 +340,74 @@ def test_on_cache_hit_exception_bypasses_current_layer(gcache: GCache) -> None:
         assert len(local_cache.caches["test_on_cache_hit_exception_bypasses_current_layer"]) == 1
 
     assert source_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_async_on_cache_hit_hook_is_awaited(gcache: GCache) -> None:
+    source_calls = 0
+    hook_layers: list[CacheLayer] = []
+
+    async def hook(ctx, value):  # type: ignore[no-untyped-def]
+        await asyncio.sleep(0)
+        hook_layers.append(ctx.layer)
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="test_async_on_cache_hit_hook_is_awaited",
+        on_cache_hit=hook,
+    )
+    async def cached_func(test: int) -> int:
+        nonlocal source_calls
+        source_calls += 1
+        return source_calls
+
+    with gcache.enable():
+        assert await cached_func(test=1) == 1
+        assert await cached_func(test=1) == 1
+
+    assert source_calls == 1
+    assert hook_layers == [CacheLayer.LOCAL]
+
+
+def test_invalid_on_cache_hit_decision_bypasses_current_layer(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+) -> None:
+    source_calls = 0
+    return_invalid_decision = True
+    use_case = "test_invalid_on_cache_hit_decision_bypasses_current_layer"
+
+    cache_config_provider.configs[use_case] = GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 60},
+        ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 0},
+    )
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        if ctx.layer == CacheLayer.LOCAL and return_invalid_decision:
+            return object()
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case=use_case,
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> int:
+        nonlocal source_calls
+        source_calls += 1
+        return source_calls
+
+    with gcache.enable():
+        assert cached_func(test=1) == 1
+        assert cached_func(test=1) == 2
+
+        return_invalid_decision = False
+        assert cached_func(test=1) == 1
+
+    assert source_calls == 2
 
 
 @pytest.mark.asyncio

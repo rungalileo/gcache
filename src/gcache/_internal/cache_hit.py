@@ -10,7 +10,19 @@ from gcache.config import CacheCallContext, CacheHitHook, CacheLayer, EvictAndFa
 
 @dataclass(frozen=True, slots=True)
 class BypassCurrentLayer:
-    """Internal signal to skip a cache layer without mutating its stored value."""
+    """
+    Internal signal to ignore this layer for the current request only.
+
+    This is used when the hook machinery is unreliable rather than the cached
+    value itself being known-bad. Two cases currently map here:
+    - the hook raised an exception
+    - the hook returned an unsupported decision type
+
+    In those situations we want fail-open behavior:
+    - do not fail the caller request
+    - do not evict the cached value, because the problem may be in the hook
+    - continue through the normal fallback chain as if this layer had no usable hit
+    """
 
 
 async def run_cache_hit_hook(
@@ -21,6 +33,13 @@ async def run_cache_hit_hook(
     call_args: Mapping[str, Any] | None,
     on_cache_hit: CacheHitHook | None,
 ) -> ReturnCached | EvictAndFallback | BypassCurrentLayer:
+    """
+    Execute the optional cache-hit hook and normalize the result.
+
+    Returning `BypassCurrentLayer` is reserved for hook execution/contract
+    failures. It lets cache layers skip a hit without deleting it, which keeps
+    hook bugs from turning into request failures or unnecessary evictions.
+    """
     if on_cache_hit is None:
         return ReturnCached()
 

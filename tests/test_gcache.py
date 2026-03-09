@@ -4,7 +4,7 @@ import pickle
 import threading
 from collections.abc import Generator
 from random import random
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import redislite
@@ -41,6 +41,10 @@ def get_func_metric(name: str) -> float:
         if line.startswith(name):
             return float(line.split(" ")[-1])
     return 0
+
+
+def get_local_cache_for_use_case(gcache: GCache, use_case: str) -> LocalCache:
+    return cast(LocalCache, gcache._local_cache.wrapped)
 
 
 def test_gcache_sync(gcache: GCache, redis_server: redislite.Redis, reset_prometheus_registry: Generator) -> None:
@@ -104,6 +108,7 @@ def test_global_on_cache_hit_inherited(
         )
     )
     try:
+
         @gcache.cached(key_type="Test", id_arg="test", use_case="test_global_on_cache_hit_inherited")
         def cached_func(test: int = 123) -> int:
             return test
@@ -144,6 +149,7 @@ def test_decorator_on_cache_hit_overrides_global(
         )
     )
     try:
+
         @gcache.cached(
             key_type="Test",
             id_arg="test",
@@ -184,6 +190,7 @@ def test_decorator_can_disable_global_on_cache_hit(
         )
     )
     try:
+
         @gcache.cached(
             key_type="Test",
             id_arg="test",
@@ -226,8 +233,9 @@ def test_local_on_cache_hit_evicts_and_falls_back_to_remote(gcache: GCache) -> N
     with gcache.enable():
         assert cached_func(test=1) == {"status": "good", "source_calls": 1}
 
-        local_cache = gcache._local_cache.wrapped.caches["test_local_on_cache_hit_evicts_and_falls_back_to_remote"]
-        cached_value = next(iter(local_cache.values()))
+        local_cache = get_local_cache_for_use_case(gcache, "test_local_on_cache_hit_evicts_and_falls_back_to_remote")
+        cached_entries = local_cache.caches["test_local_on_cache_hit_evicts_and_falls_back_to_remote"]
+        cached_value = next(iter(cached_entries.values()))
         cached_value["status"] = "bad"
 
         assert cached_func(test=1) == {"status": "good", "source_calls": 1}
@@ -295,8 +303,8 @@ def test_on_cache_hit_exception_bypasses_current_layer(gcache: GCache) -> None:
         assert cached_func(test=1) == {"source_calls": 1}
         assert cached_func(test=1) == {"source_calls": 1}
 
-        local_cache = gcache._local_cache.wrapped.caches["test_on_cache_hit_exception_bypasses_current_layer"]
-        assert len(local_cache) == 1
+        local_cache = get_local_cache_for_use_case(gcache, "test_on_cache_hit_exception_bypasses_current_layer")
+        assert len(local_cache.caches["test_on_cache_hit_exception_bypasses_current_layer"]) == 1
 
     assert source_calls == 1
 

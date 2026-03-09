@@ -157,6 +157,9 @@ class RedisCache(CacheInterface):
             val_pickle = await self.client.get(key.urn)
         if val_pickle is not None:
             start_sec = time.monotonic()
+            serialization_timer = GCacheMetrics.SERIALIZATION_TIMER.labels(
+                key.use_case, key.key_type, self.layer().name, "load"
+            )
 
             deserialized_value: RedisValue = (
                 pickle.loads(val_pickle)
@@ -164,16 +167,19 @@ class RedisCache(CacheInterface):
                 else await RedisCache._async_pickle_loads(val_pickle)
             )
 
+            # Ignore invalidated remote entries before payload deserialization or hook execution.
+            if watermark_ms is not None:
+                watermark_ms = int(watermark_ms)
+                if watermark_ms >= deserialized_value.created_at_ms:
+                    serialization_timer.observe(time.monotonic() - start_sec)
+                    return await self._exec_fallback(key, watermark_ms, fallback)
+
             # Load payload using custom serializer if present.
             payload = deserialized_value.payload
             if key.serializer is not None:
                 payload = await key.serializer.load(payload)
 
-            (
-                GCacheMetrics.SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "load").observe(
-                    time.monotonic() - start_sec
-                )
-            )
+            serialization_timer.observe(time.monotonic() - start_sec)
 
             decision = await run_cache_hit_hook(
                 key=key,
@@ -189,11 +195,6 @@ class RedisCache(CacheInterface):
             if not isinstance(decision, ReturnCached):
                 return await fallback()
 
-            # Check if cache val is expired.
-            if watermark_ms is not None:
-                watermark_ms = int(watermark_ms)
-                if watermark_ms >= deserialized_value.created_at_ms:
-                    return await self._exec_fallback(key, watermark_ms, fallback)
             return payload
         else:
             return await self._exec_fallback(key, watermark_ms, fallback)

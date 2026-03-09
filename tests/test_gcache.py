@@ -782,6 +782,53 @@ async def test_do_not_write_if_invalidated(
 
 
 @pytest.mark.asyncio
+async def test_invalidation_skips_remote_hook(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+) -> None:
+    use_case = "test_invalidation_skips_remote_hook"
+    source_calls = 0
+    remote_hook_calls = 0
+
+    cache_config_provider.configs[use_case] = GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 60},
+        ramp={CacheLayer.LOCAL: 0, CacheLayer.REMOTE: 100},
+    )
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        nonlocal remote_hook_calls
+        if ctx.layer == CacheLayer.REMOTE:
+            remote_hook_calls += 1
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case=use_case,
+        track_for_invalidation=True,
+        on_cache_hit=hook,
+    )
+    async def cached_func(test: int) -> int:
+        nonlocal source_calls
+        source_calls += 1
+        return source_calls
+
+    with gcache.enable():
+        assert await cached_func(123) == 1
+
+        await gcache.ainvalidate("Test", "123")
+        await asyncio.sleep(0.01)
+
+        assert await cached_func(123) == 2
+        assert remote_hook_calls == 0
+
+        assert await cached_func(123) == 2
+
+    assert source_calls == 2
+    assert remote_hook_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_flush_all(gcache: GCache, redis_server: redislite.Redis) -> None:
     with gcache.enable():
         v = 0

@@ -33,7 +33,10 @@ jobs:
       - name: Run Tets
         run: inv test
 
+      # Dependabot-triggered runs cannot access repository secrets, so this
+      # upload would fail with an empty Codecov token.
       - name: Upload Test Coverage Reports
+        if: ${{ github.actor != 'dependabot[bot]' }}
         uses: codecov/codecov-action@v5.5.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

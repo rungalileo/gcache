@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="assets/logo-wordmark.png" alt="GCache" width="520" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-wordmark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo-wordmark-light.png" />
+    <img src="assets/logo-wordmark.png" alt="GCache" width="520" />
+  </picture>
 </p>
 
 <p align="center">

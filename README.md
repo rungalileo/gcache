@@ -1,9 +1,17 @@
-# GCache
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-wordmark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo-wordmark-light.png" />
+    <img src="assets/logo-wordmark.png" alt="GCache" width="520" />
+  </picture>
+</p>
 
-[![PyPI version](https://badge.fury.io/py/gcache.svg)](https://badge.fury.io/py/gcache)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![codecov](https://codecov.io/gh/rungalileo/gcache/graph/badge.svg)](https://codecov.io/gh/rungalileo/gcache)
+<p align="center">
+  <a href="https://badge.fury.io/py/gcache"><img src="https://badge.fury.io/py/gcache.svg" alt="PyPI version" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+" /></a>
+  <a href="https://codecov.io/gh/rungalileo/gcache"><img src="https://codecov.io/gh/rungalileo/gcache/graph/badge.svg" alt="codecov" /></a>
+</p>
 
 A caching library built for moving fast without breaking things. GCache lets you rapidly add new caching use cases while maintaining structure and runtime control guardrails—so you can ramp up gradually, kill a bad cache instantly, and have full observability into what's cached across your system.
 

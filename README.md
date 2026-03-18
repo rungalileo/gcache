@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo-wordmark.png" alt="GCache" width="520" />
+  <img src="assets/logo-wordmark2.png" alt="GCache" width="520" />
 </p>
 
 <p align="center">

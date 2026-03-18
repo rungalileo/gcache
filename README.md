@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="assets/logo.png" alt="GCache logo" width="320" />
+  <img src="assets/logo-wordmark.png" alt="GCache" width="520" />
 </p>
-
-# GCache
 
 [![PyPI version](https://badge.fury.io/py/gcache.svg)](https://badge.fury.io/py/gcache)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="GCache logo" width="320" />
+  <img src="assets/logo.png" alt="GCache logo" width="320" />
 </p>
 
 # GCache

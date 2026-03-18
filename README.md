@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="GCache logo" width="320" />
+</p>
+
 # GCache
 
 [![PyPI version](https://badge.fury.io/py/gcache.svg)](https://badge.fury.io/py/gcache)

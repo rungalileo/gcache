@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">GCache logo</title>
+  <desc id="desc">A glowing electric blue G and E monogram on a dark gray background.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#575757" />
+      <stop offset="100%" stop-color="#646464" />
+    </linearGradient>
+    <linearGradient id="blue" x1="18%" y1="14%" x2="84%" y2="88%">
+      <stop offset="0%" stop-color="#1684ff" />
+      <stop offset="60%" stop-color="#0e69ef" />
+      <stop offset="100%" stop-color="#0a52db" />
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="36" result="blur" />
+    </filter>
+    <g id="logo-mark">
+      <path
+        d="M674 310
+           C633 289 584 277 531 277
+           C445 277 367 299 308 338
+           C248 378 214 433 214 495
+           C214 559 246 618 302 660
+           C359 703 432 716 456 716
+           C513 716 567 703 618 676
+           L618 511
+           L451 484
+           L451 549
+           L533 563
+           L533 606
+           C511 614 488 618 463 618
+           C399 618 352 569 352 501
+           C352 428 413 370 504 370
+           C547 370 588 378 626 394
+           L674 310
+           Z"
+        fill="url(#blue)"
+        stroke="#0044d4"
+        stroke-width="2"
+      />
+      <polygon points="592,474 645,439 842,476 688,507" fill="url(#blue)" stroke="#0044d4" stroke-width="2" />
+      <polygon points="634,522 886,489 886,533 689,576 634,573" fill="url(#blue)" stroke="#0044d4" stroke-width="2" />
+      <polygon points="634,588 886,548 886,590 634,666" fill="url(#blue)" stroke="#0044d4" stroke-width="2" />
+      <path d="M634 522 L634 666" fill="none" stroke="#0044d4" stroke-width="2" />
+    </g>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)" />
+
+  <g opacity="0.72" filter="url(#glow)">
+    <use href="#logo-mark" />
+  </g>
+
+  <g>
+    <use href="#logo-mark" />
+  </g>
+</svg>

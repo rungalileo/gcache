@@ -1,6 +1,7 @@
 import { CacheLayer, type CacheConfigProvider, type CacheRampSampler } from "../config.js";
 import type { GCacheKey } from "../key.js";
-import { resolveLayerConfig } from "./runtime-config.js";
+import type { CacheGetResult } from "./cache-result.js";
+import { resolveLayerConfigResult } from "./runtime-config.js";
 
 export type Fallback<T> = () => Promise<T>;
 
@@ -19,20 +20,27 @@ export class LocalCache {
   ) {}
 
   async get<T>(key: GCacheKey, fallback: Fallback<T>): Promise<T> {
-    const hit = await this.getIfPresent<T>(key);
-    if (hit !== undefined) {
-      return hit;
+    const result = await this.getIfPresentResult<T>(key);
+    if (result.status === "hit") {
+      return result.value;
     }
 
     const value = await fallback();
-    await this.put(key, value);
+    if (result.status === "miss") {
+      await this.put(key, value);
+    }
     return value;
   }
 
   async getIfPresent<T>(key: GCacheKey): Promise<T | undefined> {
+    const result = await this.getIfPresentResult<T>(key);
+    return result.status === "hit" ? result.value : undefined;
+  }
+
+  async getIfPresentResult<T>(key: GCacheKey): Promise<CacheGetResult<T>> {
     const layerConfig = await this.resolveLocalLayerConfig(key);
-    if (layerConfig === null) {
-      return undefined;
+    if (layerConfig.status === "disabled") {
+      return layerConfig;
     }
 
     const cache = this.caches.get(key.useCase);
@@ -40,24 +48,24 @@ export class LocalCache {
     const hit = cache?.get(key.urn) as LocalEntry<T> | undefined;
 
     if (hit !== undefined && hit.expiresAtMs > now) {
-      return hit.value;
+      return { status: "hit", value: hit.value };
     }
 
     if (hit !== undefined) {
       cache?.delete(key.urn);
     }
 
-    return undefined;
+    return { status: "miss" };
   }
 
   async put<T>(key: GCacheKey, value: T): Promise<void> {
     const layerConfig = await this.resolveLocalLayerConfig(key);
-    if (layerConfig === null) {
+    if (layerConfig.status === "disabled") {
       return;
     }
 
     const cache = this.getOrCreateUseCaseCache(key);
-    cache.set(key.urn, { expiresAtMs: Date.now() + layerConfig.ttlSec * 1000, value });
+    cache.set(key.urn, { expiresAtMs: Date.now() + layerConfig.config.ttlSec * 1000, value });
     this.evictOldestIfNeeded(cache);
   }
 
@@ -80,7 +88,7 @@ export class LocalCache {
   }
 
   private async resolveLocalLayerConfig(key: GCacheKey) {
-    return await resolveLayerConfig({
+    return await resolveLayerConfigResult({
       configProvider: this.configProvider,
       key,
       layer: CacheLayer.LOCAL,

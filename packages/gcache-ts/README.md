@@ -1,6 +1,6 @@
 # @rungalileo/gcache
 
-TypeScript port of GCache. Milestone 3 ships explicit enabled contexts, stable key construction, local/Redis TTL caching, runtime config providers, and gradual rollout ramp controls with fail-open behavior.
+TypeScript port of GCache. Milestone 4 ships explicit enabled contexts, stable key construction, local/Redis TTL caching, runtime config providers, gradual rollout ramp controls, and Prometheus-ready observability with fail-open behavior.
 
 ## Install
 
@@ -57,8 +57,8 @@ local cache -> Redis cache -> fallback function
 - Local hits return immediately.
 - Local misses try Redis and populate local on a Redis hit.
 - Redis misses call the fallback and write both Redis and local.
-- Redis read/write/delete/flush failures are logged and fail open; fallback results still return when fallback succeeds.
-- Missing per-layer config disables that layer and falls through to the next layer/fallback.
+- Redis read/write/delete/flush failures are logged, counted in metrics, and fail open; fallback results still return when fallback succeeds.
+- Missing per-layer config disables that layer, records a disabled reason, and falls through to the next layer/fallback.
 
 You can also provide `createClient` for lazy client construction:
 
@@ -143,7 +143,42 @@ const searchPosts = gcache.cached({
 });
 ```
 
-## Milestone 3 scope
+## Metrics
+
+GCache registers Prometheus metrics by default via `prom-client`. Metric names intentionally follow the Python package where practical:
+
+| Metric | Type | Labels | Description |
+| --- | --- | --- | --- |
+| `gcache_request_counter` | Counter | `use_case`, `key_type`, `layer` | Cache-layer requests that reached an enabled layer |
+| `gcache_miss_counter` | Counter | `use_case`, `key_type`, `layer` | Cache misses |
+| `gcache_disabled_counter` | Counter | `use_case`, `key_type`, `layer`, `reason` | Cache skips (`context`, `missing_config`, `invalid_ttl`, `ramped_down`, `config_error`) |
+| `gcache_error_counter` | Counter | `use_case`, `key_type`, `layer`, `error`, `in_fallback` | Cache/fallback errors, with `in_fallback` separating cache plumbing failures from application fallback failures |
+| `gcache_invalidation_counter` | Counter | `key_type`, `layer` | Delete/invalidation calls for the layers touched today |
+| `gcache_get_timer` | Histogram | `use_case`, `key_type`, `layer` | Cache get latency in seconds |
+| `gcache_fallback_timer` | Histogram | `use_case`, `key_type`, `layer` | Time spent in the underlying function |
+| `gcache_serialization_timer` | Histogram | `use_case`, `key_type`, `layer`, `operation` | Redis serializer dump/load latency |
+| `gcache_size_histogram` | Histogram | `use_case`, `key_type`, `layer` | Serialized Redis payload size in bytes |
+
+Use a custom registry or prefix when embedding GCache in an app with its own metrics endpoint:
+
+```ts
+import { Registry } from "prom-client";
+import { GCache } from "@rungalileo/gcache";
+
+const registry = new Registry();
+const gcache = new GCache({
+  metricsRegistry: registry,
+  metricsPrefix: "myapp_", // myapp_gcache_request_counter, etc.
+});
+
+app.get("/metrics", async (_req, res) => {
+  res.type(registry.contentType).send(await registry.metrics());
+});
+```
+
+For non-Prometheus telemetry, inject a `GCacheMetricsAdapter` through `new GCache({ metrics })`. Pass `metrics: false` to disable metrics entirely. GCache reuses existing collectors in a registry so repeated instances with the same prefix do not throw duplicate-registration errors.
+
+## Milestone 4 scope
 
 Included:
 
@@ -160,9 +195,13 @@ Included:
 - Per-layer TTL and ramp controls
 - Injectable ramp sampler for deterministic rollout tests
 - Missing config disables only the relevant layer and falls through
+- Prometheus metrics with duplicate-registration safety
+- Custom metrics adapter/registry/prefix hooks
+- Cache-vs-fallback error classification through the `in_fallback` label
+- Serialization latency and cached payload size metrics for Redis values
+- Logger injection for cache operational failures
 
 Not included yet:
 
-- Targeted invalidation and watermarks
-- Prometheus metrics
-- Framework middleware helpers
+- Targeted invalidation and watermarks beyond the current `delete`/placeholder invalidation counter
+- Framework middleware helpers/integrations

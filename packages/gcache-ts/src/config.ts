@@ -1,4 +1,7 @@
+import type { Registry } from "prom-client";
+
 import type { GCacheKey } from "./key.js";
+import type { GCacheMetricsAdapter } from "./metrics.js";
 import type { RedisConfig } from "./internal/redis-cache.js";
 
 export enum CacheLayer {
@@ -56,4 +59,7 @@ export interface GCacheConfig {
   readonly localMaxSize?: number;
   readonly redis?: RedisConfig;
   readonly rampSampler?: CacheRampSampler;
+  readonly metrics?: GCacheMetricsAdapter | false;
+  readonly metricsPrefix?: string;
+  readonly metricsRegistry?: Registry;
 }

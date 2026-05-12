@@ -1,6 +1,6 @@
 # @rungalileo/gcache
 
-TypeScript port of GCache. Milestone 2 ships explicit enabled contexts, stable key construction, local TTL caching, and optional Redis-backed distributed TTL caching with fail-open behavior.
+TypeScript port of GCache. Milestone 3 ships explicit enabled contexts, stable key construction, local/Redis TTL caching, runtime config providers, and gradual rollout ramp controls with fail-open behavior.
 
 ## Install
 
@@ -58,6 +58,7 @@ local cache -> Redis cache -> fallback function
 - Local misses try Redis and populate local on a Redis hit.
 - Redis misses call the fallback and write both Redis and local.
 - Redis read/write/delete/flush failures are logged and fail open; fallback results still return when fallback succeeds.
+- Missing per-layer config disables that layer and falls through to the next layer/fallback.
 
 You can also provide `createClient` for lazy client construction:
 
@@ -82,6 +83,29 @@ type RedisValueEnvelope = {
 ```
 
 `payload` is produced by the cached function's serializer, or by `JsonSerializer` by default. Custom serializers can return either `string` or `Buffer`; Buffer payloads are base64 encoded in the envelope.
+
+## Runtime config and ramp controls
+
+Every cached function can provide a decorator-local `defaultConfig`; a `cacheConfigProvider` can override it at runtime. If the provider returns `null`, GCache falls back to the cached function's `defaultConfig`. If neither exists, or a layer's TTL/ramp is missing or disabled, only that layer is skipped.
+
+```ts
+import { CacheLayer, GCache, GCacheKeyConfig } from "@rungalileo/gcache";
+
+const gcache = new GCache({
+  cacheConfigProvider: async (key) => {
+    if (key.useCase === "GetUser") {
+      return new GCacheKeyConfig({
+        ttlSec: { [CacheLayer.LOCAL]: 30, [CacheLayer.REMOTE]: 300 },
+        ramp: { [CacheLayer.LOCAL]: 100, [CacheLayer.REMOTE]: 25 },
+      });
+    }
+    return null; // use the cached function's defaultConfig
+  },
+  rampSampler: ({ key, layer }) => deterministicPercentFor(`${key.urn}:${layer}`),
+});
+```
+
+`ramp` values are percentages from 0 to 100. `0` disables the layer, `100` enables it, and intermediate values use `rampSampler`; the default sampler is random. Provider errors fail open and execute the fallback function.
 
 ## Enabled context
 
@@ -119,7 +143,7 @@ const searchPosts = gcache.cached({
 });
 ```
 
-## Milestone 2 scope
+## Milestone 3 scope
 
 Included:
 
@@ -132,10 +156,13 @@ Included:
 - Duplicate and reserved use-case validation
 - `delete` and `flushAll` across configured layers
 - Fail-open behavior for key/config/cache errors
+- Runtime config provider with fallback to cached-function `defaultConfig`
+- Per-layer TTL and ramp controls
+- Injectable ramp sampler for deterministic rollout tests
+- Missing config disables only the relevant layer and falls through
 
 Not included yet:
 
 - Targeted invalidation and watermarks
-- Runtime ramp controls
 - Prometheus metrics
 - Framework middleware helpers

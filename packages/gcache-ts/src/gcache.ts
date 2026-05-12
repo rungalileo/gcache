@@ -1,4 +1,4 @@
-import { GCacheConfig, type CacheConfigProvider, type Logger } from "./config.js";
+import { GCacheConfig, randomRampSampler, type CacheConfigProvider, type CacheRampSampler, type Logger } from "./config.js";
 import { GCacheContext } from "./context.js";
 import { UseCaseIsAlreadyRegisteredError, UseCaseNameIsReservedError } from "./errors.js";
 import { GCacheKey, normalizeArgs } from "./key.js";
@@ -30,14 +30,19 @@ export class GCache {
   private readonly configProvider: CacheConfigProvider;
   private readonly urnPrefix: string;
   private readonly logger: Logger;
+  private readonly rampSampler: CacheRampSampler;
   private readonly redisCache: RedisCache | null;
 
   constructor(config: GCacheConfig = {}) {
     this.configProvider = config.cacheConfigProvider ?? defaultConfigProvider;
     this.urnPrefix = config.urnPrefix ?? "urn";
     this.logger = config.logger ?? defaultLogger;
-    this.localCache = new LocalCache(this.configProvider, config.localMaxSize ?? DEFAULT_LOCAL_MAX_SIZE);
-    this.redisCache = config.redis === undefined ? null : new RedisCache({ configProvider: this.configProvider, redis: config.redis });
+    this.rampSampler = config.rampSampler ?? randomRampSampler;
+    this.localCache = new LocalCache(this.configProvider, this.rampSampler, config.localMaxSize ?? DEFAULT_LOCAL_MAX_SIZE);
+    this.redisCache =
+      config.redis === undefined
+        ? null
+        : new RedisCache({ configProvider: this.configProvider, rampSampler: this.rampSampler, redis: config.redis });
   }
 
   enable<T>(fn: () => Awaitable<T>): Promise<T> {

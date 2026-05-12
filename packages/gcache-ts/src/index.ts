@@ -1,5 +1,5 @@
-export { CacheLayer, GCacheKeyConfig } from "./config.js";
-export type { CacheConfigProvider, GCacheConfig, LayerConfig, Logger } from "./config.js";
+export { CacheLayer, GCacheKeyConfig, randomRampSampler } from "./config.js";
+export type { CacheConfigProvider, CacheRampSample, CacheRampSampler, GCacheConfig, LayerConfig, Logger } from "./config.js";
 export { GCacheContext } from "./context.js";
 export {
   GCacheError,

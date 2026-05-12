@@ -286,7 +286,7 @@ describe("GCache Redis TTL layer", () => {
     expect(logger.warn).toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
   });
 
-  it("fails open when remote config is missing or Redis maintenance commands fail", async () => {
+  it("falls through when remote config is missing and fails open on Redis maintenance errors", async () => {
     // Given Redis is configured but the key has no remote TTL and maintenance commands fail.
     const redis = new FakeRedis();
     redis.failDel = true;
@@ -309,11 +309,11 @@ describe("GCache Redis TTL layer", () => {
     const deleted = await gcache.delete(keyFor("123", "RedisMissingRemoteTtl"));
     await gcache.flushAll();
 
-    // Then fallback still succeeds and maintenance failures are logged without escaping.
+    // Then missing remote config disables Redis reads/writes, while maintenance failures are logged without escaping.
     expect(value).toEqual({ userId: "123", calls: 1 });
     expect(deleted).toBe(false);
-    expect(logger.warn).toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
-    expect(logger.warn).toHaveBeenCalledWith("Error putting value in Redis cache", expect.any(Error));
+    expect(redis.getCalls).toBe(0);
+    expect(redis.setCalls).toBe(0);
     expect(logger.warn).toHaveBeenCalledWith("Error deleting value from Redis cache", expect.any(Error));
     expect(logger.warn).toHaveBeenCalledWith("Error flushing Redis cache", expect.any(Error));
   });

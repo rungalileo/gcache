@@ -7,7 +7,18 @@ export enum CacheLayer {
   REMOTE = "remote",
 }
 
+export type Awaitable<T> = T | Promise<T>;
 export type LayerConfig = Partial<Record<CacheLayer, number>>;
+
+export interface CacheRampSample {
+  readonly key: GCacheKey;
+  readonly layer: CacheLayer;
+  readonly ramp: number;
+}
+
+export type CacheRampSampler = (sample: CacheRampSample) => Awaitable<number>;
+
+export const randomRampSampler: CacheRampSampler = () => Math.random() * 100;
 
 export class GCacheKeyConfig {
   readonly ttlSec: LayerConfig;
@@ -44,4 +55,5 @@ export interface GCacheConfig {
   readonly logger?: Logger;
   readonly localMaxSize?: number;
   readonly redis?: RedisConfig;
+  readonly rampSampler?: CacheRampSampler;
 }

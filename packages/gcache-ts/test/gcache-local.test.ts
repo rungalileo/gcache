@@ -6,7 +6,6 @@ import {
   GCacheKey,
   GCacheKeyConfig,
   JsonSerializer,
-  MissingKeyConfigError,
   UseCaseIsAlreadyRegisteredError,
   UseCaseNameIsReservedError,
 } from "../src/index.js";
@@ -216,7 +215,7 @@ describe("GCache local-only MVP", () => {
     expect(logger.error).toHaveBeenCalledWith("Could not construct GCache key", expect.any(Error));
   });
 
-  it("fails open when local cache config is missing", async () => {
+  it("falls through when local cache config is missing", async () => {
     // Given a cached function without any key config.
     const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const gcache = new GCache({ logger });
@@ -231,10 +230,11 @@ describe("GCache local-only MVP", () => {
     const first = await gcache.enable(async () => await getUser("123"));
     const second = await gcache.enable(async () => await getUser("123"));
 
-    // Then the fallback still succeeds and the missing config is logged.
+    // Then the local layer is disabled and fallback still succeeds without treating missing config as an error.
     expect(first).toEqual({ userId: "123", calls: 1 });
     expect(second).toEqual({ userId: "123", calls: 2 });
-    expect(logger.error).toHaveBeenCalledWith("Error getting value from local cache", expect.any(MissingKeyConfigError));
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("supports delete and flushAll for local entries", async () => {
@@ -328,7 +328,7 @@ describe("GCache local-only MVP", () => {
     });
   });
 
-  it("treats non-positive local ttl as missing config and fails open", async () => {
+  it("treats non-positive local ttl as disabled local config", async () => {
     // Given a cached function with an invalid local TTL.
     const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const gcache = new GCache({ logger });
@@ -350,7 +350,8 @@ describe("GCache local-only MVP", () => {
     // Then the local cache is bypassed and the fallback still succeeds.
     expect(first).toEqual({ userId: "123", calls: 1 });
     expect(second).toEqual({ userId: "123", calls: 2 });
-    expect(logger.error).toHaveBeenCalledWith("Error getting value from local cache", expect.any(MissingKeyConfigError));
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("evicts the oldest local entry when max size is exceeded", async () => {

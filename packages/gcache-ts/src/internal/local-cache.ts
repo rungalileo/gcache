@@ -1,6 +1,6 @@
-import { CacheLayer, type CacheConfigProvider, type GCacheKeyConfig } from "../config.js";
-import { MissingKeyConfigError } from "../errors.js";
+import { CacheLayer, type CacheConfigProvider, type CacheRampSampler } from "../config.js";
 import type { GCacheKey } from "../key.js";
+import { resolveLayerConfig } from "./runtime-config.js";
 
 export type Fallback<T> = () => Promise<T>;
 
@@ -14,6 +14,7 @@ export class LocalCache {
 
   constructor(
     private readonly configProvider: CacheConfigProvider,
+    private readonly rampSampler: CacheRampSampler,
     private readonly maxSize: number,
   ) {}
 
@@ -29,25 +30,34 @@ export class LocalCache {
   }
 
   async getIfPresent<T>(key: GCacheKey): Promise<T | undefined> {
-    const cache = await this.getUseCaseCache(key);
+    const layerConfig = await this.resolveLocalLayerConfig(key);
+    if (layerConfig === null) {
+      return undefined;
+    }
+
+    const cache = this.caches.get(key.useCase);
     const now = Date.now();
-    const hit = cache.get(key.urn) as LocalEntry<T> | undefined;
+    const hit = cache?.get(key.urn) as LocalEntry<T> | undefined;
 
     if (hit !== undefined && hit.expiresAtMs > now) {
       return hit.value;
     }
 
     if (hit !== undefined) {
-      cache.delete(key.urn);
+      cache?.delete(key.urn);
     }
 
     return undefined;
   }
 
   async put<T>(key: GCacheKey, value: T): Promise<void> {
-    const cache = await this.getUseCaseCache(key);
-    const ttlSec = await this.resolveLocalTtl(key);
-    cache.set(key.urn, { expiresAtMs: Date.now() + ttlSec * 1000, value });
+    const layerConfig = await this.resolveLocalLayerConfig(key);
+    if (layerConfig === null) {
+      return;
+    }
+
+    const cache = this.getOrCreateUseCaseCache(key);
+    cache.set(key.urn, { expiresAtMs: Date.now() + layerConfig.ttlSec * 1000, value });
     this.evictOldestIfNeeded(cache);
   }
 
@@ -60,8 +70,7 @@ export class LocalCache {
     this.caches.clear();
   }
 
-  private async getUseCaseCache(key: GCacheKey): Promise<Map<string, LocalEntry<unknown>>> {
-    await this.resolveLocalTtl(key);
+  private getOrCreateUseCaseCache(key: GCacheKey): Map<string, LocalEntry<unknown>> {
     let cache = this.caches.get(key.useCase);
     if (cache === undefined) {
       cache = new Map<string, LocalEntry<unknown>>();
@@ -70,21 +79,13 @@ export class LocalCache {
     return cache;
   }
 
-  private async resolveLocalTtl(key: GCacheKey): Promise<number> {
-    const config = await this.resolveConfig(key);
-    const ttlSec = config.ttlSec[CacheLayer.LOCAL];
-    if (ttlSec === undefined || ttlSec <= 0) {
-      throw new MissingKeyConfigError(key.useCase);
-    }
-    return ttlSec;
-  }
-
-  private async resolveConfig(key: GCacheKey): Promise<GCacheKeyConfig> {
-    const config = (await this.configProvider(key)) ?? key.defaultConfig;
-    if (config === null) {
-      throw new MissingKeyConfigError(key.useCase);
-    }
-    return config;
+  private async resolveLocalLayerConfig(key: GCacheKey) {
+    return await resolveLayerConfig({
+      configProvider: this.configProvider,
+      key,
+      layer: CacheLayer.LOCAL,
+      rampSampler: this.rampSampler,
+    });
   }
 
   private evictOldestIfNeeded(cache: Map<string, LocalEntry<unknown>>): void {

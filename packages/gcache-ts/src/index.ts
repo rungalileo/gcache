@@ -11,5 +11,12 @@ export { GCache } from "./gcache.js";
 export type { CachedOptions } from "./gcache.js";
 export { GCacheKey, normalizeArgs } from "./key.js";
 export type { GCacheKeyInit } from "./key.js";
+export type {
+  RedisCommandClient,
+  RedisConfig,
+  RedisClientFactory,
+  RedisStoredValue,
+  RedisValueEnvelope,
+} from "./internal/redis-cache.js";
 export { JsonSerializer } from "./serializer.js";
 export type { Serializer } from "./serializer.js";

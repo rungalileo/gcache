@@ -18,6 +18,17 @@ export class LocalCache {
   ) {}
 
   async get<T>(key: GCacheKey, fallback: Fallback<T>): Promise<T> {
+    const hit = await this.getIfPresent<T>(key);
+    if (hit !== undefined) {
+      return hit;
+    }
+
+    const value = await fallback();
+    await this.put(key, value);
+    return value;
+  }
+
+  async getIfPresent<T>(key: GCacheKey): Promise<T | undefined> {
     const cache = await this.getUseCaseCache(key);
     const now = Date.now();
     const hit = cache.get(key.urn) as LocalEntry<T> | undefined;
@@ -30,9 +41,7 @@ export class LocalCache {
       cache.delete(key.urn);
     }
 
-    const value = await fallback();
-    await this.put(key, value);
-    return value;
+    return undefined;
   }
 
   async put<T>(key: GCacheKey, value: T): Promise<void> {

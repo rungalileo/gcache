@@ -1,7 +1,7 @@
 {
   "name": "@rungalileo/gcache",
   "version": "0.1.0",
-  "description": "TypeScript port of GCache, starting with explicit-context local caching.",
+  "description": "TypeScript port of GCache with explicit-context local and Redis TTL caching.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",

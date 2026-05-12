@@ -4,6 +4,7 @@ import { UseCaseIsAlreadyRegisteredError, UseCaseNameIsReservedError } from "./e
 import { GCacheKey, normalizeArgs } from "./key.js";
 import type { Serializer } from "./serializer.js";
 import { LocalCache } from "./internal/local-cache.js";
+import { RedisCache } from "./internal/redis-cache.js";
 
 type Awaitable<T> = T | Promise<T>;
 type CacheableArgs = readonly unknown[];
@@ -29,12 +30,14 @@ export class GCache {
   private readonly configProvider: CacheConfigProvider;
   private readonly urnPrefix: string;
   private readonly logger: Logger;
+  private readonly redisCache: RedisCache | null;
 
   constructor(config: GCacheConfig = {}) {
     this.configProvider = config.cacheConfigProvider ?? defaultConfigProvider;
     this.urnPrefix = config.urnPrefix ?? "urn";
     this.logger = config.logger ?? defaultLogger;
     this.localCache = new LocalCache(this.configProvider, config.localMaxSize ?? DEFAULT_LOCAL_MAX_SIZE);
+    this.redisCache = config.redis === undefined ? null : new RedisCache({ configProvider: this.configProvider, redis: config.redis });
   }
 
   enable<T>(fn: () => Awaitable<T>): Promise<T> {
@@ -76,22 +79,83 @@ export class GCache {
           return await fn(...args);
         }
 
-        try {
-          return await this.localCache.get(key, async () => await fn(...args));
-        } catch (error) {
-          this.logger.error("Error getting value from local cache", error);
-          return await fn(...args);
+        if (this.redisCache === null) {
+          try {
+            return await this.localCache.get(key, async () => await fn(...args));
+          } catch (error) {
+            this.logger.error("Error getting value from local cache", error);
+            return await fn(...args);
+          }
         }
+
+        return await this.getThroughRedisChain(key, async () => await fn(...args));
       };
     };
   }
 
   async delete(key: GCacheKey): Promise<boolean> {
-    return await this.localCache.delete(key);
+    const localDeleted = await this.localCache.delete(key);
+    if (this.redisCache === null) {
+      return localDeleted;
+    }
+
+    try {
+      return (await this.redisCache.delete(key)) || localDeleted;
+    } catch (error) {
+      this.logger.warn("Error deleting value from Redis cache", error);
+      return localDeleted;
+    }
   }
 
   async flushAll(): Promise<void> {
     await this.localCache.flushAll();
+    if (this.redisCache === null) {
+      return;
+    }
+
+    try {
+      await this.redisCache.flushAll();
+    } catch (error) {
+      this.logger.warn("Error flushing Redis cache", error);
+    }
+  }
+
+  private async getThroughRedisChain<T>(key: GCacheKey, fallback: () => Promise<T>): Promise<T> {
+    try {
+      const localHit = await this.localCache.getIfPresent<T>(key);
+      if (localHit !== undefined) {
+        return localHit;
+      }
+    } catch (error) {
+      this.logger.warn("Error getting value from local cache", error);
+    }
+
+    try {
+      const redisHit = await this.redisCache?.get<T>(key);
+      if (redisHit !== undefined) {
+        await this.putLocalFailOpen(key, redisHit);
+        return redisHit;
+      }
+    } catch (error) {
+      this.logger.warn("Error getting value from Redis cache", error);
+    }
+
+    const value = await fallback();
+    try {
+      await this.redisCache?.put(key, value);
+    } catch (error) {
+      this.logger.warn("Error putting value in Redis cache", error);
+    }
+    await this.putLocalFailOpen(key, value);
+    return value;
+  }
+
+  private async putLocalFailOpen<T>(key: GCacheKey, value: T): Promise<void> {
+    try {
+      await this.localCache.put(key, value);
+    } catch (error) {
+      this.logger.warn("Error putting value in local cache", error);
+    }
   }
 
   private registerUseCase(useCase: string): void {

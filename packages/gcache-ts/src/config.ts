@@ -1,4 +1,5 @@
 import type { GCacheKey } from "./key.js";
+import type { RedisConfig } from "./internal/redis-cache.js";
 
 export enum CacheLayer {
   NOOP = "noop",
@@ -42,4 +43,5 @@ export interface GCacheConfig {
   readonly urnPrefix?: string;
   readonly logger?: Logger;
   readonly localMaxSize?: number;
+  readonly redis?: RedisConfig;
 }

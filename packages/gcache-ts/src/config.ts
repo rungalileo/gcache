@@ -23,6 +23,11 @@ export type CacheRampSampler = (sample: CacheRampSample) => Awaitable<number>;
 
 export const randomRampSampler: CacheRampSampler = () => Math.random() * 100;
 
+// Watermark TTL must be longer than the longest Redis TTL used by any
+// invalidation-tracked cached function. Otherwise the watermark can expire
+// before older cached values do, allowing stale values to become readable again.
+export const DEFAULT_WATERMARK_TTL_SEC = 3600 * 4;
+
 export class GCacheKeyConfig {
   readonly ttlSec: LayerConfig;
   readonly ramp: LayerConfig;
@@ -51,6 +56,10 @@ export class GCacheKeyConfig {
 export type CacheConfigProvider = (key: GCacheKey) => Promise<GCacheKeyConfig | null>;
 
 export type Logger = Pick<Console, "debug" | "error" | "warn">;
+
+export interface InvalidateOptions {
+  readonly futureBufferMs?: number;
+}
 
 export interface GCacheConfig {
   readonly cacheConfigProvider?: CacheConfigProvider;

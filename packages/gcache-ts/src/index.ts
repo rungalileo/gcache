@@ -1,5 +1,5 @@
-export { CacheLayer, GCacheKeyConfig, randomRampSampler } from "./config.js";
-export type { CacheConfigProvider, CacheRampSample, CacheRampSampler, GCacheConfig, LayerConfig, Logger } from "./config.js";
+export { CacheLayer, DEFAULT_WATERMARK_TTL_SEC, GCacheKeyConfig, randomRampSampler } from "./config.js";
+export type { CacheConfigProvider, CacheRampSample, CacheRampSampler, GCacheConfig, InvalidateOptions, LayerConfig, Logger } from "./config.js";
 export { GCacheContext } from "./context.js";
 export { PrometheusGCacheMetrics, createPrometheusGCacheMetrics } from "./metrics.js";
 export type {
@@ -21,7 +21,7 @@ export {
 } from "./errors.js";
 export { GCache } from "./gcache.js";
 export type { CachedOptions } from "./gcache.js";
-export { GCacheKey, normalizeArgs } from "./key.js";
+export { GCacheKey, invalidationPrefix, normalizeArgs, redisClusterHashTag } from "./key.js";
 export type { GCacheKeyInit } from "./key.js";
 export type {
   RedisCommandClient,

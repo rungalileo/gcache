@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 
-import { CacheLayer, GCacheConfig, randomRampSampler, type CacheConfigProvider, type CacheRampSampler, type Logger } from "./config.js";
+import { CacheLayer, GCacheConfig, randomRampSampler, type CacheConfigProvider, type CacheRampSampler, type InvalidateOptions, type Logger } from "./config.js";
 import { GCacheContext } from "./context.js";
 import { UseCaseIsAlreadyRegisteredError, UseCaseNameIsReservedError } from "./errors.js";
 import { GCacheKey, normalizeArgs } from "./key.js";
@@ -20,6 +20,7 @@ export interface CachedOptions<Args extends CacheableArgs> {
   readonly args?: (args: Args) => CacheArgs;
   readonly defaultConfig?: import("./config.js").GCacheKeyConfig | null;
   readonly serializer?: Serializer<unknown> | null;
+  readonly trackForInvalidation?: boolean;
 }
 
 const DEFAULT_LOCAL_MAX_SIZE = 10_000;
@@ -140,6 +141,26 @@ export class GCache {
     }
   }
 
+  async invalidate(keyType: string, id: string | number | bigint, options: InvalidateOptions = {}): Promise<void> {
+    if (this.redisCache === null) {
+      return;
+    }
+
+    this.metrics?.invalidation({ keyType, layer: CacheLayer.REMOTE });
+    try {
+      await this.redisCache.invalidate(keyType, String(id), options.futureBufferMs ?? 0, this.urnPrefix);
+    } catch (error) {
+      this.logger.warn("Error writing GCache invalidation watermark", error);
+      this.metrics?.error({
+        useCase: "watermark",
+        keyType,
+        layer: CacheLayer.REMOTE,
+        error: errorName(error),
+        inFallback: false,
+      });
+    }
+  }
+
   async flushAll(): Promise<void> {
     await this.localCache.flushAll();
     if (this.redisCache === null) {
@@ -188,7 +209,8 @@ export class GCache {
     const remoteErrored = remote.status === "disabled" && remote.reason === "config_error";
     const fallbackLayer = remote.status === "miss" || remoteErrored ? CacheLayer.REMOTE : CacheLayer.LOCAL;
     const value = await this.callFallback(labelsFor(key, fallbackLayer), fallback);
-    if (remote.status === "miss" || remoteErrored) {
+    const skipCacheWrite = (remote.status === "miss" || remote.status === "disabled") && remote.skipCacheWrite === true;
+    if (!skipCacheWrite && (remote.status === "miss" || remoteErrored)) {
       try {
         await this.redisCache?.put(key, value);
       } catch (error) {
@@ -196,7 +218,9 @@ export class GCache {
         this.recordError(key, CacheLayer.REMOTE, error, false);
       }
     }
-    await this.putLocalFailOpen(key, value);
+    if (!skipCacheWrite) {
+      await this.putLocalFailOpen(key, value);
+    }
     return value;
   }
 
@@ -244,7 +268,7 @@ export class GCache {
     } catch (error) {
       this.logger.warn("Error getting value from Redis cache", error);
       this.recordError(key, CacheLayer.REMOTE, error, false);
-      return { status: "disabled", reason: "config_error" } as const;
+      return { status: "disabled", reason: "config_error", ...(key.trackForInvalidation ? { skipCacheWrite: true } : {}) } as const;
     }
   }
 
@@ -292,6 +316,7 @@ export class GCache {
       urnPrefix: this.urnPrefix,
       defaultConfig: options.defaultConfig ?? null,
       serializer: (options.serializer as Serializer<unknown> | null | undefined) ?? null,
+      trackForInvalidation: options.trackForInvalidation ?? false,
     });
   }
 }

@@ -1,6 +1,6 @@
 # @rungalileo/gcache
 
-TypeScript port of GCache. Milestone 4 ships explicit enabled contexts, stable key construction, local/Redis TTL caching, runtime config providers, gradual rollout ramp controls, and Prometheus-ready observability with fail-open behavior.
+TypeScript port of GCache. Milestone 5 ships explicit enabled contexts, stable key construction, local/Redis TTL caching, runtime config providers, gradual rollout ramp controls, Prometheus-ready observability, and Redis watermark-based targeted invalidation with fail-open behavior.
 
 ## Install
 
@@ -83,6 +83,39 @@ type RedisValueEnvelope = {
 ```
 
 `payload` is produced by the cached function's serializer, or by `JsonSerializer` by default. Custom serializers can return either `string` or `Buffer`; Buffer payloads are base64 encoded in the envelope.
+
+## Targeted invalidation and watermarks
+
+Mutable Redis-backed use cases can opt into targeted invalidation by setting `trackForInvalidation: true` on the cached function and calling `invalidate(keyType, id)` after writes:
+
+```ts
+import { CacheLayer, GCache, GCacheKeyConfig } from "@rungalileo/gcache";
+
+const gcache = new GCache({ redis: { client: redisClient } });
+
+const getUser = gcache.cached({
+  keyType: "user_id",
+  useCase: "GetMutableUser",
+  id: ([userId]: [string]) => userId,
+  trackForInvalidation: true,
+  // Strongly invalidated mutable data should usually disable local cache.
+  defaultConfig: new GCacheKeyConfig({
+    ttlSec: { [CacheLayer.REMOTE]: 300 },
+    ramp: { [CacheLayer.REMOTE]: 100 },
+  }),
+})(async (userId: string) => db.fetchUser(userId));
+
+await updateUser("123", patch);
+await gcache.invalidate("user_id", "123");
+```
+
+Invalidation writes a Redis watermark at `{urnPrefix:keyType:id}#watermark`. Tracked Redis cache entries use the same Redis Cluster hash tag, for example `{urn:user_id:123}?locale=en#GetMutableUser`, so the value key and watermark key live in the same slot. Key components may not contain `{` or `}` because those characters would corrupt the hash tag.
+
+A cached Redis value whose `createdAtMs` is older than or equal to the watermark is treated as stale and refreshed through fallback. `invalidate(keyType, id, { futureBufferMs })` can extend the watermark into the future during write races; while the watermark is still in the future, fallback results are returned but not written to Redis or local cache.
+
+Watermarks use `DEFAULT_WATERMARK_TTL_SEC` (4 hours) by default. You can override it with `redis.watermarkTtlSec`, but it must exceed the maximum Redis cache TTL for invalidation-tracked data; otherwise a watermark can expire before old cached values do.
+
+Local cache limitation: targeted invalidation is enforced by Redis watermarks. Existing local cache hits are not synchronously invalidated across processes, so strongly invalidated mutable data should disable the local layer (or use very short local TTLs only when stale reads are acceptable).
 
 ## Runtime config and ramp controls
 
@@ -178,7 +211,7 @@ app.get("/metrics", async (_req, res) => {
 
 For non-Prometheus telemetry, inject a `GCacheMetricsAdapter` through `new GCache({ metrics })`. Pass `metrics: false` to disable metrics entirely. GCache reuses existing collectors in a registry so repeated instances with the same prefix do not throw duplicate-registration errors.
 
-## Milestone 4 scope
+## Milestone 5 scope
 
 Included:
 
@@ -200,8 +233,15 @@ Included:
 - Cache-vs-fallback error classification through the `in_fallback` label
 - Serialization latency and cached payload size metrics for Redis values
 - Logger injection for cache operational failures
+- `trackForInvalidation` on cached functions
+- `invalidate(keyType, id, { futureBufferMs })` Redis watermark API
+- Redis Cluster hash-tagged value/watermark keys for invalidation-tracked entries
+- Configurable Redis watermark TTL via `redis.watermarkTtlSec` with `DEFAULT_WATERMARK_TTL_SEC`
+- Future-buffer behavior that avoids cache writes during active invalidation windows
 
 Not included yet:
 
-- Targeted invalidation and watermarks beyond the current `delete`/placeholder invalidation counter
 - Framework middleware helpers/integrations
+- `cachedObject`
+- Expanded examples
+- Release hardening

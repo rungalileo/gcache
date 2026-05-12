@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 
-import { CacheLayer, type CacheConfigProvider, type CacheRampSampler } from "../config.js";
-import type { GCacheKey } from "../key.js";
+import { CacheLayer, DEFAULT_WATERMARK_TTL_SEC, type CacheConfigProvider, type CacheRampSampler } from "../config.js";
+import { invalidationPrefix, redisClusterHashTag, type GCacheKey } from "../key.js";
 import type { GCacheMetricsAdapter } from "../metrics.js";
 import { labelsFor } from "../metrics.js";
 import { JsonSerializer, type Serializer } from "../serializer.js";
@@ -28,6 +28,7 @@ export interface RedisConfig {
   readonly createClient?: RedisClientFactory;
   readonly keyPrefix?: string;
   readonly serializer?: Serializer<unknown>;
+  readonly watermarkTtlSec?: number;
 }
 
 export interface RedisValueEnvelope {
@@ -53,6 +54,7 @@ export class RedisCache {
   private readonly rampSampler: CacheRampSampler;
   private readonly keyPrefix: string;
   private readonly defaultSerializer: Serializer<unknown>;
+  private readonly watermarkTtlSec: number;
   private readonly createClient: RedisClientFactory | null;
   private readonly metrics: GCacheMetricsAdapter | null;
   private clientPromise: Promise<RedisCommandClient> | null;
@@ -62,6 +64,7 @@ export class RedisCache {
     this.rampSampler = options.rampSampler;
     this.keyPrefix = options.redis.keyPrefix ?? "";
     this.defaultSerializer = options.redis.serializer ?? defaultSerializer;
+    this.watermarkTtlSec = options.redis.watermarkTtlSec ?? DEFAULT_WATERMARK_TTL_SEC;
     this.metrics = options.metrics;
 
     if (options.redis.client === undefined && options.redis.createClient === undefined) {
@@ -84,15 +87,21 @@ export class RedisCache {
     }
 
     const client = await this.resolveClient();
-    const raw = await client.get(this.redisKey(key));
+    const redisKey = this.redisKey(key);
+    const watermarkMs = key.trackForInvalidation ? await this.getWatermarkMs(client, key) : null;
+    const raw = await client.get(redisKey);
     if (raw === null) {
-      return { status: "miss" };
+      return { status: "miss", ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
 
     const envelope = this.parseEnvelope(raw);
     if (envelope.expiresAtMs <= Date.now()) {
-      await client.del(this.redisKey(key));
-      return { status: "miss" };
+      await client.del(redisKey);
+      return { status: "miss", ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
+    }
+    if (watermarkMs !== null && watermarkMs >= envelope.createdAtMs) {
+      await client.del(redisKey);
+      return { status: "miss", ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
 
     const start = performance.now();
@@ -136,6 +145,12 @@ export class RedisCache {
     return (await client.del(this.redisKey(key))) > 0;
   }
 
+  async invalidate(keyType: string, id: string, futureBufferMs = 0, urnPrefix = "urn"): Promise<void> {
+    const client = await this.resolveClient();
+    const watermarkMs = Date.now() + futureBufferMs;
+    await this.setWithTtl(client, this.redisWatermarkKey(urnPrefix, keyType, id), String(watermarkMs), this.watermarkTtlSec);
+  }
+
   async flushAll(): Promise<void> {
     const client = await this.resolveClient();
     const flushAll = client.flushAll ?? client.flushall;
@@ -147,6 +162,26 @@ export class RedisCache {
 
   redisKey(key: GCacheKey): string {
     return `${this.keyPrefix}${key.urn}`;
+  }
+
+  redisWatermarkKey(urnPrefix: string, keyType: string, id: string): string {
+    return `${this.keyPrefix}${redisClusterHashTag(invalidationPrefix(urnPrefix, keyType, id))}#watermark`;
+  }
+
+  private async getWatermarkMs(client: RedisCommandClient, key: GCacheKey): Promise<number | null> {
+    const raw = await client.get(this.redisWatermarkKeyFromKey(key));
+    if (raw === null) {
+      return null;
+    }
+    const value = Number(Buffer.isBuffer(raw) ? raw.toString("utf8") : raw);
+    if (!Number.isFinite(value)) {
+      throw new Error("Invalid GCache Redis watermark");
+    }
+    return value;
+  }
+
+  private redisWatermarkKeyFromKey(key: GCacheKey): string {
+    return this.redisWatermarkKey(key.urnPrefix, key.keyType, key.id);
   }
 
   private async resolveClient(): Promise<RedisCommandClient> {
@@ -218,4 +253,8 @@ function payloadSize(payload: string | Buffer): number {
 
 function elapsedSeconds(startMs: number): number {
   return Math.max((performance.now() - startMs) / 1000, 0);
+}
+
+function watermarkIsActive(watermarkMs: number | null): boolean {
+  return watermarkMs !== null && watermarkMs >= Date.now();
 }

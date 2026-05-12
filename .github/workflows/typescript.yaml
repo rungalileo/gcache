@@ -19,4 +19,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm ts:gcache:typecheck
       - run: pnpm ts:gcache:test
+      # Dependabot-triggered runs cannot access repository secrets, so this
+      # upload would fail with an empty Codecov token.
+      - name: Upload TypeScript Coverage Reports
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        uses: codecov/codecov-action@v5.5.2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: packages/gcache-ts/coverage/lcov.info
+          flags: gcache-ts
+          name: gcache-ts
+          fail_ci_if_error: true
+          verbose: true
       - run: pnpm ts:gcache:build

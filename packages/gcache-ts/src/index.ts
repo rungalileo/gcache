@@ -1,6 +1,18 @@
 export { CacheLayer, GCacheKeyConfig, randomRampSampler } from "./config.js";
 export type { CacheConfigProvider, CacheRampSample, CacheRampSampler, GCacheConfig, LayerConfig, Logger } from "./config.js";
 export { GCacheContext } from "./context.js";
+export { PrometheusGCacheMetrics, createPrometheusGCacheMetrics } from "./metrics.js";
+export type {
+  CacheMetricLabels,
+  DisabledMetricLabels,
+  DisabledReason,
+  ErrorMetricLabels,
+  GCacheMetricsAdapter,
+  InvalidationMetricLabels,
+  MetricLayer,
+  PrometheusMetricsOptions,
+  SerializationMetricLabels,
+} from "./metrics.js";
 export {
   GCacheError,
   MissingKeyConfigError,

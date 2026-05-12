@@ -1,7 +1,7 @@
-import { CacheLayer, type CacheConfigProvider, type GCacheKeyConfig } from "../config.js";
-import { MissingKeyConfigError } from "../errors.js";
+import { CacheLayer, type CacheConfigProvider, type CacheRampSampler } from "../config.js";
 import type { GCacheKey } from "../key.js";
 import { JsonSerializer, type Serializer } from "../serializer.js";
+import { resolveLayerConfig } from "./runtime-config.js";
 
 export type Awaitable<T> = T | Promise<T>;
 export type RedisStoredValue = string | Buffer;
@@ -35,6 +35,7 @@ export interface RedisValueEnvelope {
 
 interface RedisCacheOptions {
   readonly configProvider: CacheConfigProvider;
+  readonly rampSampler: CacheRampSampler;
   readonly redis: RedisConfig;
 }
 
@@ -43,6 +44,7 @@ const defaultSerializer = new JsonSerializer<unknown>();
 
 export class RedisCache {
   private readonly configProvider: CacheConfigProvider;
+  private readonly rampSampler: CacheRampSampler;
   private readonly keyPrefix: string;
   private readonly defaultSerializer: Serializer<unknown>;
   private readonly createClient: RedisClientFactory | null;
@@ -50,6 +52,7 @@ export class RedisCache {
 
   constructor(options: RedisCacheOptions) {
     this.configProvider = options.configProvider;
+    this.rampSampler = options.rampSampler;
     this.keyPrefix = options.redis.keyPrefix ?? "";
     this.defaultSerializer = options.redis.serializer ?? defaultSerializer;
 
@@ -62,7 +65,11 @@ export class RedisCache {
   }
 
   async get<T>(key: GCacheKey): Promise<T | undefined> {
-    await this.resolveRemoteTtl(key);
+    const layerConfig = await this.resolveRemoteLayerConfig(key);
+    if (layerConfig === null) {
+      return undefined;
+    }
+
     const client = await this.resolveClient();
     const raw = await client.get(this.redisKey(key));
     if (raw === null) {
@@ -79,19 +86,23 @@ export class RedisCache {
   }
 
   async put<T>(key: GCacheKey, value: T): Promise<void> {
-    const ttlSec = await this.resolveRemoteTtl(key);
+    const layerConfig = await this.resolveRemoteLayerConfig(key);
+    if (layerConfig === null) {
+      return;
+    }
+
     const client = await this.resolveClient();
     const now = Date.now();
     const payload = await this.serializerFor(key).dump(value);
     const envelope: RedisValueEnvelope = {
       version: ENVELOPE_VERSION,
       createdAtMs: now,
-      expiresAtMs: now + ttlSec * 1000,
+      expiresAtMs: now + layerConfig.ttlSec * 1000,
       encoding: Buffer.isBuffer(payload) ? "base64" : "utf8",
       payload: Buffer.isBuffer(payload) ? payload.toString("base64") : payload,
     };
 
-    await this.setWithTtl(client, this.redisKey(key), JSON.stringify(envelope), ttlSec);
+    await this.setWithTtl(client, this.redisKey(key), JSON.stringify(envelope), layerConfig.ttlSec);
   }
 
   async delete(key: GCacheKey): Promise<boolean> {
@@ -165,20 +176,12 @@ export class RedisCache {
     throw new Error("Redis client does not implement setEx/setex/set");
   }
 
-  private async resolveRemoteTtl(key: GCacheKey): Promise<number> {
-    const config = await this.resolveConfig(key);
-    const ttlSec = config.ttlSec[CacheLayer.REMOTE];
-    if (ttlSec === undefined || ttlSec <= 0) {
-      throw new MissingKeyConfigError(key.useCase);
-    }
-    return ttlSec;
-  }
-
-  private async resolveConfig(key: GCacheKey): Promise<GCacheKeyConfig> {
-    const config = (await this.configProvider(key)) ?? key.defaultConfig;
-    if (config === null) {
-      throw new MissingKeyConfigError(key.useCase);
-    }
-    return config;
+  private async resolveRemoteLayerConfig(key: GCacheKey) {
+    return await resolveLayerConfig({
+      configProvider: this.configProvider,
+      key,
+      layer: CacheLayer.REMOTE,
+      rampSampler: this.rampSampler,
+    });
   }
 }

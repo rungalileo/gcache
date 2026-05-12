@@ -1,0 +1,13 @@
+{
+  "name": "gcache-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "ts:gcache:build": "pnpm --filter @rungalileo/gcache build",
+    "ts:gcache:test": "pnpm --filter @rungalileo/gcache test",
+    "ts:gcache:typecheck": "pnpm --filter @rungalileo/gcache typecheck"
+  }
+}

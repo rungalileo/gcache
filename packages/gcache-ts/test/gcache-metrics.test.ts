@@ -146,6 +146,37 @@ describe("GCache observability metrics", () => {
     expect(events(metrics, "get", { useCase: "CustomMetricsAdapter", layer: CacheLayer.LOCAL })).toHaveLength(2);
   });
 
+  it("fails open when an injected metrics adapter throws", async () => {
+    // Given a custom metrics adapter throws for every metric call.
+    const throwingMetrics: GCacheMetricsAdapter = {
+      request: () => { throw new Error("metrics unavailable"); },
+      miss: () => { throw new Error("metrics unavailable"); },
+      disabled: () => { throw new Error("metrics unavailable"); },
+      error: () => { throw new Error("metrics unavailable"); },
+      invalidation: () => { throw new Error("metrics unavailable"); },
+      observeGet: () => { throw new Error("metrics unavailable"); },
+      observeFallback: () => { throw new Error("metrics unavailable"); },
+      observeSerialization: () => { throw new Error("metrics unavailable"); },
+      observeSize: () => { throw new Error("metrics unavailable"); },
+    };
+    const gcache = new GCache({ metrics: throwingMetrics });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "ThrowingMetricsFailOpen",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: localOnly(),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When metrics emission fails around a cache miss and hit.
+    const first = await gcache.enable(async () => await getUser("123"));
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then metrics failures do not break application fallback or cache behavior.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 1 });
+  });
+
   it("classifies disabled cache skips by reason", async () => {
     // Given one cache call is outside context and other enabled calls have disabled layer config.
     const metrics = new RecordingMetrics();

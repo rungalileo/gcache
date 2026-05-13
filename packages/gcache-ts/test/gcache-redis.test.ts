@@ -144,6 +144,42 @@ describe("GCache Redis TTL layer", () => {
     expect(JSON.parse(envelope.payload)).toEqual({ userId: "123", calls: 1 });
   });
 
+  it("retries a lazy Redis client factory after a transient rejection", async () => {
+    // Given the first lazy Redis connection attempt fails but a later attempt can succeed.
+    const redis = new FakeRedis();
+    let factoryCalls = 0;
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const gcache = new GCache({
+      redis: {
+        createClient: async () => {
+          factoryCalls += 1;
+          if (factoryCalls === 1) {
+            throw new Error("redis boot failed");
+          }
+          return redis;
+        },
+      },
+      logger,
+    });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "RedisClientFactoryRetry",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: GCacheKeyConfig.enabled(60),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When the first call fails open and the second call retries Redis.
+    const first = await gcache.enable(async () => await getUser("123"));
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then the rejected client promise does not poison the GCache instance forever.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 1 });
+    expect(factoryCalls).toBe(2);
+    expect(redis.setCalls).toBe(1);
+  });
+
   it("uses a lazy Redis client factory once", async () => {
     // Given Redis is configured with a client factory instead of an eager client.
     const redis = new FakeRedis();
@@ -279,11 +315,12 @@ describe("GCache Redis TTL layer", () => {
     const stale = await gcache.enable(async () => await getUser("stale"));
     const malformed = await gcache.enable(async () => await getUser("bad"));
 
-    // Then expired entries are deleted, malformed payloads fail open, and fallback results are cached again.
+    // Then expired and malformed entries are deleted, fail open, and fallback results are cached again.
     expect(stale).toEqual({ userId: "stale", calls: 1 });
     expect(malformed).toEqual({ userId: "bad", calls: 2 });
     expect(redis.values.get(staleKey)).toBeDefined();
-    expect(logger.warn).toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
+    expect(redis.values.get(badKey)).toBeDefined();
+    expect(logger.warn).not.toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
   });
 
   it("falls through when remote config is missing and fails open on Redis maintenance errors", async () => {

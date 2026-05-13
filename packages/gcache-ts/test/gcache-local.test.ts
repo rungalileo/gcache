@@ -132,6 +132,34 @@ describe("GCache local-only MVP", () => {
     expect(calls).toBe(1);
   });
 
+  it("keeps delimiter-containing ids and args in distinct local cache keys", async () => {
+    // Given two calls would collide if key components were concatenated without escaping.
+    const gcache = new GCache();
+    let calls = 0;
+    const search = gcache.cached({
+      keyType: "user_id",
+      useCase: "DelimiterSafeLocalKeys",
+      id: ([userId]: [string, string | undefined]) => userId,
+      args: ([, filter]: [string, string | undefined]) => ({ filter }),
+      defaultConfig: GCacheKeyConfig.enabled(60),
+    })(async (userId: string, filter?: string) => ({ userId, filter, calls: ++calls }));
+
+    // When an id containing a query delimiter is followed by a structurally different key.
+    const [first, second, firstAgain, secondAgain] = await gcache.enable(async () => [
+      await search("123?filter=active", undefined),
+      await search("123", "active"),
+      await search("123?filter=active", undefined),
+      await search("123", "active"),
+    ]);
+
+    // Then each logical key gets its own cached value instead of sharing a colliding URN.
+    expect(first).toEqual({ userId: "123?filter=active", filter: undefined, calls: 1 });
+    expect(second).toEqual({ userId: "123", filter: "active", calls: 2 });
+    expect(firstAgain).toEqual(first);
+    expect(secondAgain).toEqual(second);
+    expect(calls).toBe(2);
+  });
+
   it("uses sorted explicit args as part of the cache key", async () => {
     // Given a cached function with explicit key args in non-sorted declaration order.
     const gcache = new GCache();
@@ -394,7 +422,7 @@ describe("GCache local-only MVP", () => {
     expect(loadedFromBuffer).toEqual({ id: "123", enabled: true });
   });
 
-  it("builds stable human-readable URNs", () => {
+  it("builds stable human-readable URNs for simple components", () => {
     // Given cache args that are not already sorted.
     const key = new GCacheKey({
       keyType: "user_id",
@@ -404,13 +432,42 @@ describe("GCache local-only MVP", () => {
         ["filter", "active"],
         ["page", "2"],
       ],
-      urnPrefix: "urn:gcache",
     });
 
     // When the key is rendered.
     const rendered = key.toString();
 
     // Then it keeps the structured key format used for debugging and grouping.
-    expect(rendered).toBe("urn:gcache:user_id:123?filter=active&page=2#GetPosts");
+    expect(rendered).toBe("urn:user_id:123?filter=active&page=2#GetPosts");
+  });
+
+  it("keeps delimiter-containing URN components and args distinct", () => {
+    // Given keys whose raw components would collide without escaping delimiter characters.
+    const prefixWithDelimiter = new GCacheKey({ keyType: "user_id", id: "123", useCase: "GetPosts", urnPrefix: "urn:gcache" });
+    const argValueWithDelimiter = new GCacheKey({
+      keyType: "user_id",
+      id: "123",
+      useCase: "GetPosts",
+      args: [["filter", "active&page=2"]],
+    });
+    const splitArgs = new GCacheKey({
+      keyType: "user_id",
+      id: "123",
+      useCase: "GetPosts",
+      args: [
+        ["filter", "active"],
+        ["page", "2"],
+      ],
+    });
+    const argValueWithFragment = new GCacheKey({ keyType: "user_id", id: "123", useCase: "GetPosts", args: [["filter", "active#Other"]] });
+    const useCaseWithFragment = new GCacheKey({ keyType: "user_id", id: "123", useCase: "Other", args: [["filter", "active"]] });
+
+    // When the keys are rendered.
+    // Then delimiter-bearing components are encoded, while simple components remain readable.
+    expect(prefixWithDelimiter.toString()).toBe("urn%3Agcache:user_id:123#GetPosts");
+    expect(argValueWithDelimiter.toString()).not.toBe(splitArgs.toString());
+    expect(argValueWithDelimiter.toString()).toContain("filter=active%26page%3D2");
+    expect(argValueWithFragment.toString()).not.toBe(useCaseWithFragment.toString());
+    expect(argValueWithFragment.toString()).toContain("filter=active%23Other#GetPosts");
   });
 });

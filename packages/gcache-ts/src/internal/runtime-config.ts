@@ -33,7 +33,7 @@ export async function resolveLayerConfigResult(options: ResolveLayerConfigOption
   if (ttlSec === undefined) {
     return { status: "disabled", reason: "missing_config" };
   }
-  if (ttlSec <= 0) {
+  if (!Number.isSafeInteger(ttlSec) || ttlSec <= 0) {
     return { status: "disabled", reason: "invalid_ttl" };
   }
 

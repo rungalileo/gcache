@@ -191,6 +191,97 @@ describe("GCache runtime config and ramp controls", () => {
     expect(blockedSampler).toHaveBeenCalledWith(expect.objectContaining({ layer: CacheLayer.REMOTE, ramp: 50 }));
   });
 
+  it("uses one ramp sample for a local miss and write decision", async () => {
+    // Given the first ramp sample admits the read path and any immediate second sample would reject the write path.
+    const rampSampler = vi.fn().mockReturnValueOnce(49).mockReturnValueOnce(50);
+    const gcache = new GCache({ rampSampler });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "LocalRampSingleSample",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: configFor({ [CacheLayer.LOCAL]: 60 }, { [CacheLayer.LOCAL]: 50 }),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When the key misses once.
+    const first = await gcache.enable(async () => await getUser("123"));
+
+    // Then the sampled-in miss writes local cache without resampling during the same call.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(rampSampler).toHaveBeenCalledTimes(1);
+
+    // When the next read is sampled into the local layer again.
+    rampSampler.mockReset();
+    rampSampler.mockReturnValueOnce(49);
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then it can hit the value written by the original sampled-in miss.
+    expect(second).toEqual({ userId: "123", calls: 1 });
+    expect(rampSampler).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses one ramp sample for a remote miss and write decision", async () => {
+    // Given the first remote ramp sample admits the read path and any immediate second sample would reject the write path.
+    const redis = new FakeRedis();
+    const rampSampler = vi.fn().mockReturnValueOnce(49).mockReturnValueOnce(50);
+    const gcache = new GCache({
+      redis: { client: redis },
+      rampSampler,
+      cacheConfigProvider: async () => configFor({ [CacheLayer.REMOTE]: 60 }, { [CacheLayer.REMOTE]: 50 }),
+    });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "RemoteRampSingleSample",
+      id: ([userId]: [string]) => userId,
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When the Redis key misses once.
+    const first = await gcache.enable(async () => await getUser("123"));
+
+    // Then the sampled-in miss writes Redis without resampling during the same call.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(redis.setCalls).toBe(1);
+    expect(rampSampler).toHaveBeenCalledTimes(1);
+
+    // When the next read is sampled into the remote layer again.
+    rampSampler.mockReset();
+    rampSampler.mockReturnValueOnce(49);
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then it can hit the value written by the original sampled-in miss.
+    expect(second).toEqual({ userId: "123", calls: 1 });
+    expect(rampSampler).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats non-finite and fractional TTLs as invalid config", async () => {
+    // Given invalid TTL values are configured for local and remote layers.
+    const redis = new FakeRedis();
+    const gcache = new GCache({ redis: { client: redis } });
+    const badTtls = [Number.NaN, Number.POSITIVE_INFINITY, 0.5];
+
+    // When each cached function is called twice.
+    for (const ttl of badTtls) {
+      let calls = 0;
+      const getUser = gcache.cached({
+        keyType: "user_id",
+        useCase: `InvalidTtl${String(ttl)}`,
+        id: ([userId]: [string]) => userId,
+        defaultConfig: configFor({ [CacheLayer.LOCAL]: ttl, [CacheLayer.REMOTE]: ttl }, { [CacheLayer.LOCAL]: 100, [CacheLayer.REMOTE]: 100 }),
+      })(async (userId: string) => ({ userId, ttl: String(ttl), calls: ++calls }));
+
+      const first = await gcache.enable(async () => await getUser("123"));
+      const second = await gcache.enable(async () => await getUser("123"));
+
+      expect(first.calls).toBe(1);
+      expect(second.calls).toBe(2);
+    }
+
+    // Then no invalid TTL reaches Redis.
+    expect(redis.getCalls).toBe(0);
+    expect(redis.setCalls).toBe(0);
+  });
+
   it("disables missing local config while allowing the remote layer to work", async () => {
     // Given runtime config only enables the remote layer.
     const redis = new FakeRedis();

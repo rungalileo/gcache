@@ -91,17 +91,23 @@ export class RedisCache {
     const watermarkMs = key.trackForInvalidation ? await this.getWatermarkMs(client, key) : null;
     const raw = await client.get(redisKey);
     if (raw === null) {
-      return { status: "miss", ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
+      return { status: "miss", config: layerConfig.config, ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
 
-    const envelope = this.parseEnvelope(raw);
+    let envelope: RedisValueEnvelope;
+    try {
+      envelope = this.parseEnvelope(raw);
+    } catch {
+      await client.del(redisKey);
+      return { status: "miss", config: layerConfig.config, ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
+    }
     if (envelope.expiresAtMs <= Date.now()) {
       await client.del(redisKey);
-      return { status: "miss", ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
+      return { status: "miss", config: layerConfig.config, ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
     if (watermarkMs !== null && watermarkMs >= envelope.createdAtMs) {
       await client.del(redisKey);
-      return { status: "miss", ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
+      return { status: "miss", config: layerConfig.config, ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
 
     const start = performance.now();
@@ -109,35 +115,40 @@ export class RedisCache {
       const value = (await this.serializerFor(key).load(this.decodePayload(envelope))) as T;
       return { status: "hit", value };
     } finally {
-      this.metrics?.observeSerialization({ ...labelsFor(key, CacheLayer.REMOTE), operation: "load" }, elapsedSeconds(start));
+      this.recordMetric((metrics) => metrics.observeSerialization({ ...labelsFor(key, CacheLayer.REMOTE), operation: "load" }, elapsedSeconds(start)));
     }
   }
 
-  async put<T>(key: GCacheKey, value: T): Promise<void> {
-    const layerConfig = await this.resolveRemoteLayerConfig(key);
-    if (layerConfig.status === "disabled") {
-      return;
+  async put<T>(key: GCacheKey, value: T, config?: { readonly ttlSec: number }): Promise<boolean> {
+    const ttlSec = config?.ttlSec ?? await this.resolveRemoteTtlSec(key);
+    if (ttlSec === null) {
+      return true;
     }
 
     const client = await this.resolveClient();
+    if (key.trackForInvalidation && watermarkIsActive(await this.getWatermarkMs(client, key))) {
+      return false;
+    }
+
     const now = Date.now();
     const start = performance.now();
     let payload: string | Buffer;
     try {
       payload = await this.serializerFor(key).dump(value);
     } finally {
-      this.metrics?.observeSerialization({ ...labelsFor(key, CacheLayer.REMOTE), operation: "dump" }, elapsedSeconds(start));
+      this.recordMetric((metrics) => metrics.observeSerialization({ ...labelsFor(key, CacheLayer.REMOTE), operation: "dump" }, elapsedSeconds(start)));
     }
-    this.metrics?.observeSize(labelsFor(key, CacheLayer.REMOTE), payloadSize(payload));
+    this.recordMetric((metrics) => metrics.observeSize(labelsFor(key, CacheLayer.REMOTE), payloadSize(payload)));
     const envelope: RedisValueEnvelope = {
       version: ENVELOPE_VERSION,
       createdAtMs: now,
-      expiresAtMs: now + layerConfig.config.ttlSec * 1000,
+      expiresAtMs: now + ttlSec * 1000,
       encoding: Buffer.isBuffer(payload) ? "base64" : "utf8",
       payload: Buffer.isBuffer(payload) ? payload.toString("base64") : payload,
     };
 
-    await this.setWithTtl(client, this.redisKey(key), JSON.stringify(envelope), layerConfig.config.ttlSec);
+    await this.setWithTtl(client, this.redisKey(key), JSON.stringify(envelope), ttlSec);
+    return true;
   }
 
   async delete(key: GCacheKey): Promise<boolean> {
@@ -191,7 +202,14 @@ export class RedisCache {
       }
       this.clientPromise = Promise.resolve(this.createClient());
     }
-    return await this.clientPromise;
+    try {
+      return await this.clientPromise;
+    } catch (error) {
+      if (this.createClient !== null) {
+        this.clientPromise = null;
+      }
+      throw error;
+    }
   }
 
   private serializerFor(key: GCacheKey): Serializer<unknown> {
@@ -244,6 +262,22 @@ export class RedisCache {
       layer: CacheLayer.REMOTE,
       rampSampler: this.rampSampler,
     });
+  }
+
+  private async resolveRemoteTtlSec(key: GCacheKey): Promise<number | null> {
+    const layerConfig = await this.resolveRemoteLayerConfig(key);
+    return layerConfig.status === "enabled" ? layerConfig.config.ttlSec : null;
+  }
+
+  private recordMetric(record: (metrics: GCacheMetricsAdapter) => void): void {
+    if (this.metrics === null) {
+      return;
+    }
+    try {
+      record(this.metrics);
+    } catch {
+      // Metrics adapters must not affect cache correctness or application fallbacks.
+    }
   }
 }
 

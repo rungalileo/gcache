@@ -109,7 +109,7 @@ await updateUser("123", patch);
 await gcache.invalidate("user_id", "123");
 ```
 
-Invalidation writes a Redis watermark at `{urnPrefix:keyType:id}#watermark`. Tracked Redis cache entries use the same Redis Cluster hash tag, for example `{urn:user_id:123}?locale=en#GetMutableUser`, so the value key and watermark key live in the same slot. Key components may not contain `{` or `}` because those characters would corrupt the hash tag.
+Invalidation writes a Redis watermark at `{encodedUrnPrefix:encodedKeyType:encodedId}#watermark`. Tracked Redis cache entries use the same Redis Cluster hash tag, for example `{urn:user_id:123}?locale=en#GetMutableUser`, so the value key and watermark key live in the same slot. Key components are percent-encoded before joining so delimiters inside IDs or args cannot collide with delimiters in the key format. Components may not contain `{` or `}` because those characters would corrupt the hash tag.
 
 A cached Redis value whose `createdAtMs` is older than or equal to the watermark is treated as stale and refreshed through fallback. `invalidate(keyType, id, { futureBufferMs })` can extend the watermark into the future during write races; while the watermark is still in the future, fallback results are returned but not written to Redis or local cache.
 

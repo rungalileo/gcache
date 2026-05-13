@@ -27,7 +27,7 @@ export class LocalCache {
 
     const value = await fallback();
     if (result.status === "miss") {
-      await this.put(key, value);
+      await this.put(key, value, result.config);
     }
     return value;
   }
@@ -55,17 +55,17 @@ export class LocalCache {
       cache?.delete(key.urn);
     }
 
-    return { status: "miss" };
+    return { status: "miss", config: layerConfig.config };
   }
 
-  async put<T>(key: GCacheKey, value: T): Promise<void> {
-    const layerConfig = await this.resolveLocalLayerConfig(key);
-    if (layerConfig.status === "disabled") {
+  async put<T>(key: GCacheKey, value: T, config?: { readonly ttlSec: number }): Promise<void> {
+    const ttlSec = config?.ttlSec ?? await this.resolveLocalTtlSec(key);
+    if (ttlSec === null) {
       return;
     }
 
     const cache = this.getOrCreateUseCaseCache(key);
-    cache.set(key.urn, { expiresAtMs: Date.now() + layerConfig.config.ttlSec * 1000, value });
+    cache.set(key.urn, { expiresAtMs: Date.now() + ttlSec * 1000, value });
     this.evictOldestIfNeeded(cache);
   }
 
@@ -94,6 +94,11 @@ export class LocalCache {
       layer: CacheLayer.LOCAL,
       rampSampler: this.rampSampler,
     });
+  }
+
+  private async resolveLocalTtlSec(key: GCacheKey): Promise<number | null> {
+    const layerConfig = await this.resolveLocalLayerConfig(key);
+    return layerConfig.status === "enabled" ? layerConfig.config.ttlSec : null;
   }
 
   private evictOldestIfNeeded(cache: Map<string, LocalEntry<unknown>>): void {

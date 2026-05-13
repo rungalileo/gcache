@@ -198,6 +198,76 @@ describe("GCache targeted invalidation watermarks", () => {
     expect([...redis.values.keys()]).toEqual([watermarkKey]);
   });
 
+  it("does not write Redis or local cache when a future invalidation arrives during fallback", async () => {
+    // Given a tracked cache miss starts before any invalidation watermark exists.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-12T18:15:00.000Z"));
+    const redis = new FakeRedis();
+    const gcache = new GCache({ redis: { client: redis } });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "FutureBufferFallbackRace",
+      id: ([userId]: [string]) => userId,
+      trackForInvalidation: true,
+      defaultConfig: localAndRemote(),
+    })(async (userId: string) => {
+      calls += 1;
+      await gcache.invalidate("user_id", userId, { futureBufferMs: 1_000 });
+      return { userId, calls };
+    });
+
+    // When the fallback writes a future-buffer watermark before returning its result.
+    const first = await gcache.enable(async () => await getUser("123"));
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then the fallback values return but neither Redis nor local cache stores stale in-flight results.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 2 });
+    expect([...redis.values.keys()]).toEqual([watermarkKey]);
+  });
+
+  it("refreshes malformed tracked Redis entries when no active watermark is present", async () => {
+    // Given a tracked key has a malformed Redis value but no watermark-read failure.
+    const redis = new FakeRedis();
+    const redisKey = valueKey("TrackedMalformedEnvelope");
+    redis.values.set(redisKey, { value: JSON.stringify({ version: 2, payload: "bad" }), ttlSec: 60, expiresAtMs: Date.now() + 60_000 });
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const gcache = new GCache({ redis: { client: redis }, logger });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "TrackedMalformedEnvelope",
+      id: ([userId]: [string]) => userId,
+      trackForInvalidation: true,
+      defaultConfig: localAndRemote(),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When the malformed value is read twice.
+    const first = await gcache.enable(async () => await getUser("123"));
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then GCache treats the bad envelope as a refreshable miss instead of a persistent cache bypass.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 1 });
+    expect(calls).toBe(1);
+    expect(logger.warn).not.toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
+  });
+
+  it("keeps delimiter-containing tracked prefixes distinct", async () => {
+    // Given two tracked key prefixes would collide if keyType/id were joined raw with colons.
+    const first = invalidationPrefix("urn", "tenant:acme", "user");
+    const second = invalidationPrefix("urn", "tenant", "acme:user");
+
+    // When the prefixes are converted into Redis Cluster hash tags.
+    const firstHashTag = redisClusterHashTag(first);
+    const secondHashTag = redisClusterHashTag(second);
+
+    // Then the tags remain distinct and safe for targeted invalidation.
+    expect(first).not.toBe(second);
+    expect(firstHashTag).not.toBe(secondHashTag);
+  });
+
   it("constructs Redis Cluster-compatible hash-tagged keys for tracked values and watermarks", async () => {
     // Given Redis uses a key prefix and GCache uses a multi-part URN prefix.
     vi.useFakeTimers();
@@ -222,10 +292,10 @@ describe("GCache targeted invalidation watermarks", () => {
 
     // Then both Redis keys share the same hash tag, custom prefix, and configured watermark TTL.
     expect([...redis.values.keys()].sort()).toEqual([
-      "gcache:{urn:galileo:test:User:123}#watermark",
-      "gcache:{urn:galileo:test:User:123}?locale=en#ClusterSlotUser",
+      "gcache:{urn%3Agalileo%3Atest:User:123}#watermark",
+      "gcache:{urn%3Agalileo%3Atest:User:123}?locale=en#ClusterSlotUser",
     ]);
-    expect(redis.values.get("gcache:{urn:galileo:test:User:123}#watermark")?.ttlSec).toBe(42);
+    expect(redis.values.get("gcache:{urn%3Agalileo%3Atest:User:123}#watermark")?.ttlSec).toBe(42);
     expect(DEFAULT_WATERMARK_TTL_SEC).toBe(3600 * 4);
     expect(redisClusterHashTag(invalidationPrefix("urn", "user_id", "123"))).toBe("{urn:user_id:123}");
     expect(() => new GCacheKey({ keyType: "user_id", id: "{123}", useCase: "BadTrackedKey", trackForInvalidation: true })).toThrow(

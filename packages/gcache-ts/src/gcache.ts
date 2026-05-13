@@ -43,7 +43,7 @@ export class GCache {
     this.urnPrefix = config.urnPrefix ?? "urn";
     this.logger = config.logger ?? defaultLogger;
     this.rampSampler = config.rampSampler ?? randomRampSampler;
-    this.metrics =
+    const metrics =
       config.metrics === false
         ? null
         : config.metrics ??
@@ -51,6 +51,7 @@ export class GCache {
             prefix: config.metricsPrefix ?? "",
             ...(config.metricsRegistry === undefined ? {} : { registry: config.metricsRegistry }),
           });
+    this.metrics = safeMetrics(metrics);
     this.localCache = new LocalCache(this.configProvider, this.rampSampler, config.localMaxSize ?? DEFAULT_LOCAL_MAX_SIZE);
     this.redisCache =
       config.redis === undefined
@@ -189,7 +190,7 @@ export class GCache {
 
     const value = await this.callFallback(labelsFor(key, CacheLayer.LOCAL), fallback);
     if (local.status === "miss") {
-      await this.putLocalFailOpen(key, value);
+      await this.putLocalFailOpen(key, value, local.config);
     }
     return value;
   }
@@ -202,7 +203,7 @@ export class GCache {
 
     const remote = await this.readRemote<T>(key);
     if (remote.status === "hit") {
-      await this.putLocalFailOpen(key, remote.value);
+      await this.putLocalFailOpen(key, remote.value, local.status === "miss" ? local.config : undefined);
       return remote.value;
     }
 
@@ -210,16 +211,19 @@ export class GCache {
     const fallbackLayer = remote.status === "miss" || remoteErrored ? CacheLayer.REMOTE : CacheLayer.LOCAL;
     const value = await this.callFallback(labelsFor(key, fallbackLayer), fallback);
     const skipCacheWrite = (remote.status === "miss" || remote.status === "disabled") && remote.skipCacheWrite === true;
-    if (!skipCacheWrite && (remote.status === "miss" || remoteErrored)) {
+    let suppressCacheWrite = skipCacheWrite;
+    if (!suppressCacheWrite && (remote.status === "miss" || remoteErrored)) {
       try {
-        await this.redisCache?.put(key, value);
+        const wroteRemote = await this.redisCache?.put(key, value, remote.status === "miss" ? remote.config : undefined);
+        suppressCacheWrite = wroteRemote === false;
       } catch (error) {
         this.logger.warn("Error putting value in Redis cache", error);
         this.recordError(key, CacheLayer.REMOTE, error, false);
+        suppressCacheWrite = key.trackForInvalidation;
       }
     }
-    if (!skipCacheWrite) {
-      await this.putLocalFailOpen(key, value);
+    if (!suppressCacheWrite) {
+      await this.putLocalFailOpen(key, value, local.status === "miss" ? local.config : undefined);
     }
     return value;
   }
@@ -272,9 +276,9 @@ export class GCache {
     }
   }
 
-  private async putLocalFailOpen<T>(key: GCacheKey, value: T): Promise<void> {
+  private async putLocalFailOpen<T>(key: GCacheKey, value: T, config?: { readonly ttlSec: number }): Promise<void> {
     try {
-      await this.localCache.put(key, value);
+      await this.localCache.put(key, value, config);
     } catch (error) {
       this.logger.warn("Error putting value in local cache", error);
       this.recordError(key, CacheLayer.LOCAL, error, false);
@@ -323,4 +327,30 @@ export class GCache {
 
 function elapsedSeconds(startMs: number): number {
   return Math.max((performance.now() - startMs) / 1000, 0);
+}
+
+function safeMetrics(metrics: GCacheMetricsAdapter | null): GCacheMetricsAdapter | null {
+  if (metrics === null) {
+    return null;
+  }
+
+  return {
+    request: (labels) => callMetric(() => metrics.request(labels)),
+    miss: (labels) => callMetric(() => metrics.miss(labels)),
+    disabled: (labels) => callMetric(() => metrics.disabled(labels)),
+    error: (labels) => callMetric(() => metrics.error(labels)),
+    invalidation: (labels) => callMetric(() => metrics.invalidation(labels)),
+    observeGet: (labels, seconds) => callMetric(() => metrics.observeGet(labels, seconds)),
+    observeFallback: (labels, seconds) => callMetric(() => metrics.observeFallback(labels, seconds)),
+    observeSerialization: (labels, seconds) => callMetric(() => metrics.observeSerialization(labels, seconds)),
+    observeSize: (labels, bytes) => callMetric(() => metrics.observeSize(labels, bytes)),
+  };
+}
+
+function callMetric(record: () => void): void {
+  try {
+    record();
+  } catch {
+    // Metrics adapters must not affect cache correctness or application fallbacks.
+  }
 }

@@ -373,4 +373,35 @@ describe("GCache targeted invalidation watermarks", () => {
       labels: { useCase: "WatermarkReadFailOpen", keyType: "user_id", layer: CacheLayer.REMOTE, error: "Error", inFallback: false },
     });
   });
+
+  it("fails open and suppresses tracked writes when watermark payloads are malformed", async () => {
+    // Given Redis contains a non-numeric invalidation watermark for a tracked mutable key.
+    const redis = new FakeRedis();
+    redis.values.set(watermarkKey, { value: "not-a-timestamp", ttlSec: 60, expiresAtMs: Date.now() + 60_000 });
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const metrics = new RecordingMetrics();
+    const gcache = new GCache({ redis: { client: redis }, logger, metrics });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "MalformedWatermarkFailOpen",
+      id: ([userId]: [string]) => userId,
+      trackForInvalidation: true,
+      defaultConfig: localAndRemote(),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When the tracked function runs while watermark state cannot be trusted.
+    const first = await gcache.enable(async () => await getUser("123"));
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then fallback values return, but neither Redis nor local cache stores potentially stale results.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 2 });
+    expect([...redis.values.keys()]).toEqual([watermarkKey]);
+    expect(logger.warn).toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
+    expect(metrics.events).toContainEqual({
+      name: "error",
+      labels: { useCase: "MalformedWatermarkFailOpen", keyType: "user_id", layer: CacheLayer.REMOTE, error: "Error", inFallback: false },
+    });
+  });
 });

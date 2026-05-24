@@ -36,6 +36,27 @@ describe("GCache local-only MVP", () => {
     expect(calls).toBe(2);
   });
 
+  it("supports metrics-disabled local caching and no-op invalidation without Redis", async () => {
+    // Given metrics may be explicitly disabled and Redis may be absent.
+    const gcache = new GCache({ metrics: false });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "MetricsDisabledNoRedis",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: GCacheKeyConfig.enabled(60),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When local caching is used and targeted invalidation is requested without a Redis layer.
+    const first = await gcache.enable(async () => await getUser("123"));
+    await gcache.invalidate("user_id", "123");
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then no metrics adapter or Redis layer is required for the local path to work.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 1 });
+  });
+
   it("caches values inside an enabled context", async () => {
     // Given a cached function called with the same cache key.
     const gcache = new GCache();
@@ -241,6 +262,70 @@ describe("GCache local-only MVP", () => {
     expect(first).toEqual({ calls: 1 });
     expect(second).toEqual({ calls: 2 });
     expect(logger.error).toHaveBeenCalledWith("Could not construct GCache key", expect.any(Error));
+  });
+
+  it("restores async context after scope failures", async () => {
+    // Given nested cache scopes can throw application errors.
+    const gcache = new GCache();
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "ScopeFailureRestore",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: GCacheKeyConfig.enabled(60),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When an enabled scope and an inner disabled scope fail.
+    await expect(
+      gcache.enable(async () => {
+        expect(gcache.isEnabled()).toBe(true);
+        await expect(
+          gcache.disable(async () => {
+            expect(gcache.isEnabled()).toBe(false);
+            throw new Error("inner failed");
+          }),
+        ).rejects.toThrow("inner failed");
+        expect(gcache.isEnabled()).toBe(true);
+        throw new Error("outer failed");
+      }),
+    ).rejects.toThrow("outer failed");
+
+    // Then the context is restored outside the failed scopes and default-disabled behavior remains intact.
+    expect(gcache.isEnabled()).toBe(false);
+    const first = await getUser("123");
+    const second = await getUser("123");
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 2 });
+  });
+
+  it("fails open when local cache writes fail", async () => {
+    // Given the local cache write path throws unexpectedly after fallback succeeds.
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const gcache = new GCache({ logger });
+    const localCache = (gcache as unknown as {
+      readonly localCache: {
+        put: (key: GCacheKey, value: unknown, config?: { readonly ttlSec: number }) => Promise<void>;
+      };
+    }).localCache;
+    vi.spyOn(localCache, "put").mockRejectedValueOnce(new Error("local write failed"));
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "LocalWriteFailOpen",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: GCacheKeyConfig.enabled(60),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When the first local write fails and later calls retry normal cache behavior.
+    const first = await gcache.enable(async () => await getUser("123"));
+    const second = await gcache.enable(async () => await getUser("123"));
+    const third = await gcache.enable(async () => await getUser("123"));
+
+    // Then the write failure does not escape, and subsequent calls can still populate/read local cache.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 2 });
+    expect(third).toEqual({ userId: "123", calls: 2 });
+    expect(logger.warn).toHaveBeenCalledWith("Error putting value in local cache", expect.any(Error));
   });
 
   it("falls through when local cache config is missing", async () => {

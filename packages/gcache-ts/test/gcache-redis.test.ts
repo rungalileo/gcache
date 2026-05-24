@@ -282,6 +282,89 @@ describe("GCache Redis TTL layer", () => {
     expect(serializer.load).toHaveBeenCalledOnce();
   });
 
+  it("fails open when Redis serializer dump fails", async () => {
+    // Given Redis serialization fails after the fallback returns but local cache is still configured.
+    const redis = new FakeRedis();
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const serializer: Serializer<{ userId: string; calls: number }> = {
+      dump: vi.fn(async () => {
+        throw new Error("dump failed");
+      }),
+      load: vi.fn(async () => ({ userId: "never", calls: 0 })),
+    };
+    const gcache = new GCache({ redis: { client: redis }, logger });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "RedisSerializerDumpFailure",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: GCacheKeyConfig.enabled(60),
+      serializer,
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When Redis write serialization fails on the first miss and the same key is read again.
+    const first = await gcache.enable(async () => await getUser("123"));
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then application results still return, Redis is not written, and local cache can still serve the second read.
+    expect(first).toEqual({ userId: "123", calls: 1 });
+    expect(second).toEqual({ userId: "123", calls: 1 });
+    expect(redis.setCalls).toBe(0);
+    expect(logger.warn).toHaveBeenCalledWith("Error putting value in Redis cache", expect.any(Error));
+  });
+
+  it("refreshes Redis values when serializer load fails", async () => {
+    // Given Redis contains an envelope whose payload cannot be decoded by the configured serializer.
+    const redis = new FakeRedis();
+    const redisKey = keyFor("123", "RedisSerializerLoadFailure").urn;
+    redis.values.set(redisKey, {
+      expiresAtMs: Date.now() + 60_000,
+      value: JSON.stringify({
+        version: 1,
+        createdAtMs: Date.now(),
+        expiresAtMs: Date.now() + 60_000,
+        encoding: "utf8",
+        payload: JSON.stringify({ userId: "123", source: "stale" }),
+      } satisfies RedisValueEnvelope),
+    });
+    let failNextLoad = true;
+    const serializer: Serializer<{ userId: string; source: string }> = {
+      dump: vi.fn(async (value) => JSON.stringify(value)),
+      load: vi.fn(async (value) => {
+        if (failNextLoad) {
+          failNextLoad = false;
+          throw new Error("load failed");
+        }
+        return JSON.parse(Buffer.isBuffer(value) ? value.toString("utf8") : value) as { userId: string; source: string };
+      }),
+    };
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const gcache = new GCache({ redis: { client: redis }, logger });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "RedisSerializerLoadFailure",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: new GCacheKeyConfig({
+        ttlSec: { [CacheLayer.LOCAL]: 0, [CacheLayer.REMOTE]: 60 },
+        ramp: { [CacheLayer.LOCAL]: 100, [CacheLayer.REMOTE]: 100 },
+      }),
+      serializer,
+    })(async (userId: string) => ({ userId, source: `fallback-${++calls}` }));
+
+    // When the first Redis hit cannot deserialize and a later read sees the refreshed value.
+    const first = await gcache.enable(async () => await getUser("123"));
+    const second = await gcache.enable(async () => await getUser("123"));
+
+    // Then the decode failure fails open through fallback, records the cache read error, and overwrites Redis.
+    expect(first).toEqual({ userId: "123", source: "fallback-1" });
+    expect(second).toEqual({ userId: "123", source: "fallback-1" });
+    expect(calls).toBe(1);
+    expect(serializer.load).toHaveBeenCalledTimes(2);
+    expect(serializer.dump).toHaveBeenCalledOnce();
+    expect(logger.warn).toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
+  });
+
   it("refreshes stale or malformed Redis envelopes by falling through to fallback", async () => {
     // Given Redis contains an expired envelope for one key and a malformed envelope for another.
     const redis = new FakeRedis();
@@ -404,6 +487,37 @@ describe("GCache Redis TTL layer", () => {
     expect(setexValues.size).toBe(0);
     expect(setValues.size).toBe(0);
     expect(logger.warn).toHaveBeenCalledWith("Error putting value in Redis cache", expect.any(Error));
+  });
+
+  it("fails open when Redis flushAll commands are unavailable", async () => {
+    // Given a Redis-like client supports normal cache reads/writes but no full-flush command spelling.
+    const values = new Map<string, RedisStoredValue>();
+    const client = {
+      get: async (key: string) => values.get(key) ?? null,
+      setEx: async (key: string, _ttlSec: number, value: RedisStoredValue) => {
+        values.set(key, value);
+      },
+      del: async (key: string) => (values.delete(key) ? 1 : 0),
+    } satisfies RedisCommandClient;
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const gcache = new GCache({ redis: { client }, logger });
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "RedisMissingFlushCommand",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: new GCacheKeyConfig({
+        ttlSec: { [CacheLayer.LOCAL]: 0, [CacheLayer.REMOTE]: 60 },
+        ramp: { [CacheLayer.LOCAL]: 100, [CacheLayer.REMOTE]: 100 },
+      }),
+    })(async (userId: string) => ({ userId }));
+
+    // When flushAll is requested after Redis has been used.
+    await gcache.enable(async () => await getUser("123"));
+    await gcache.flushAll();
+
+    // Then the missing maintenance command is logged but does not escape to callers.
+    expect(values.size).toBe(1);
+    expect(logger.warn).toHaveBeenCalledWith("Error flushing Redis cache", expect.any(Error));
   });
 
   it("rejects Redis config without a client or client factory", () => {

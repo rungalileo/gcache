@@ -191,6 +191,75 @@ describe("GCache runtime config and ramp controls", () => {
     expect(blockedSampler).toHaveBeenCalledWith(expect.objectContaining({ layer: CacheLayer.REMOTE, ramp: 50 }));
   });
 
+  it("handles out-of-range and non-finite ramp inputs defensively", async () => {
+    // Given configured ramps can come from dynamic config and may be outside the normal 0-100 range.
+    const deterministicSampler = vi.fn(() => {
+      throw new Error("clamped terminal ramps should not need random sampling");
+    });
+    const clampedCache = new GCache({ rampSampler: deterministicSampler });
+    let negativeCalls = 0;
+    const negativeRamp = clampedCache.cached({
+      keyType: "user_id",
+      useCase: "NegativeConfiguredRamp",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: configFor({ [CacheLayer.LOCAL]: 60 }, { [CacheLayer.LOCAL]: -10 }),
+    })(async (userId: string) => ({ userId, calls: ++negativeCalls }));
+    let overHundredCalls = 0;
+    const overHundredRamp = clampedCache.cached({
+      keyType: "user_id",
+      useCase: "OverHundredConfiguredRamp",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: configFor({ [CacheLayer.LOCAL]: 60 }, { [CacheLayer.LOCAL]: 150 }),
+    })(async (userId: string) => ({ userId, calls: ++overHundredCalls }));
+    let nanConfiguredCalls = 0;
+    const nanConfiguredRamp = clampedCache.cached({
+      keyType: "user_id",
+      useCase: "NanConfiguredRamp",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: configFor({ [CacheLayer.LOCAL]: 60 }, { [CacheLayer.LOCAL]: Number.NaN }),
+    })(async (userId: string) => ({ userId, calls: ++nanConfiguredCalls }));
+
+    // When the same keys are read twice.
+    const negativeFirst = await clampedCache.enable(async () => await negativeRamp("123"));
+    const negativeSecond = await clampedCache.enable(async () => await negativeRamp("123"));
+    const overHundredFirst = await clampedCache.enable(async () => await overHundredRamp("456"));
+    const overHundredSecond = await clampedCache.enable(async () => await overHundredRamp("456"));
+    const nanConfiguredFirst = await clampedCache.enable(async () => await nanConfiguredRamp("789"));
+    const nanConfiguredSecond = await clampedCache.enable(async () => await nanConfiguredRamp("789"));
+
+    // Then finite out-of-range ramps clamp to safe terminal behavior, and non-finite config disables caching.
+    expect(negativeFirst).toEqual({ userId: "123", calls: 1 });
+    expect(negativeSecond).toEqual({ userId: "123", calls: 2 });
+    expect(overHundredFirst).toEqual({ userId: "456", calls: 1 });
+    expect(overHundredSecond).toEqual({ userId: "456", calls: 1 });
+    expect(nanConfiguredFirst).toEqual({ userId: "789", calls: 1 });
+    expect(nanConfiguredSecond).toEqual({ userId: "789", calls: 2 });
+    expect(deterministicSampler).not.toHaveBeenCalled();
+
+    // Given partial ramps still depend on sampler output.
+    for (const [sample, useCase] of [
+      [Number.NaN, "NanRampSample"],
+      [Number.POSITIVE_INFINITY, "InfinityRampSample"],
+    ] as const) {
+      const sampler = vi.fn(() => sample);
+      const sampledCache = new GCache({ rampSampler: sampler });
+      let calls = 0;
+      const getUser = sampledCache.cached({
+        keyType: "user_id",
+        useCase,
+        id: ([userId]: [string]) => userId,
+        defaultConfig: configFor({ [CacheLayer.LOCAL]: 60 }, { [CacheLayer.LOCAL]: 50 }),
+      })(async (userId: string) => ({ userId, calls: ++calls }));
+
+      const first = await sampledCache.enable(async () => await getUser("123"));
+      const second = await sampledCache.enable(async () => await getUser("123"));
+
+      expect(first.calls).toBe(1);
+      expect(second.calls).toBe(2);
+      expect(sampler).toHaveBeenCalledTimes(2);
+    }
+  });
+
   it("uses one ramp sample for a local miss and write decision", async () => {
     // Given the first ramp sample admits the read path and any immediate second sample would reject the write path.
     const rampSampler = vi.fn().mockReturnValueOnce(49).mockReturnValueOnce(50);

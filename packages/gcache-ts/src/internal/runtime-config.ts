@@ -41,6 +41,9 @@ export async function resolveLayerConfigResult(options: ResolveLayerConfigOption
   if (configuredRamp === undefined) {
     return { status: "disabled", reason: "missing_config" };
   }
+  if (!Number.isFinite(configuredRamp)) {
+    return { status: "disabled", reason: "ramped_down" };
+  }
 
   const ramp = clampPercentage(configuredRamp);
   if (ramp <= 0) {

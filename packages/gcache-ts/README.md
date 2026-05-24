@@ -2,6 +2,9 @@
 
 TypeScript port of GCache. Milestone 5 ships explicit enabled contexts, stable key construction, local/Redis TTL caching, runtime config providers, gradual rollout ramp controls, Prometheus-ready observability, and Redis watermark-based targeted invalidation with fail-open behavior.
 
+> [!NOTE]
+> TypeScript support is experimental for now. This package is intended for early validation and feedback before treating the API and operational behavior as stable.
+
 ## Install
 
 ```bash

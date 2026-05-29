@@ -138,7 +138,7 @@ export class GCache {
     } catch (error) {
       this.logger.warn("Error deleting value from Redis cache", error);
       this.recordError(key, CacheLayer.REMOTE, error, false);
-      return localDeleted;
+      throw error;
     }
   }
 
@@ -159,6 +159,7 @@ export class GCache {
         error: errorName(error),
         inFallback: false,
       });
+      throw error;
     }
   }
 
@@ -179,6 +180,7 @@ export class GCache {
         error: errorName(error),
         inFallback: false,
       });
+      throw error;
     }
   }
 
@@ -203,7 +205,9 @@ export class GCache {
 
     const remote = await this.readRemote<T>(key);
     if (remote.status === "hit") {
-      await this.putLocalFailOpen(key, remote.value, local.status === "miss" ? local.config : undefined);
+      if (local.status === "miss") {
+        await this.putLocalFailOpen(key, remote.value, local.config);
+      }
       return remote.value;
     }
 
@@ -222,8 +226,8 @@ export class GCache {
         suppressCacheWrite = key.trackForInvalidation;
       }
     }
-    if (!suppressCacheWrite) {
-      await this.putLocalFailOpen(key, value, local.status === "miss" ? local.config : undefined);
+    if (!suppressCacheWrite && local.status === "miss") {
+      await this.putLocalFailOpen(key, value, local.config);
     }
     return value;
   }

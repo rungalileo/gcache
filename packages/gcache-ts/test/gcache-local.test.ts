@@ -507,6 +507,29 @@ describe("GCache local-only MVP", () => {
     expect(loadedFromBuffer).toEqual({ id: "123", enabled: true });
   });
 
+  it("round-trips undefined through the JSON serializer", async () => {
+    // Given the default JSON serializer receives a fallback result that JSON.stringify would normally drop.
+    const serializer = new JsonSerializer<undefined>();
+
+    // When undefined is dumped and loaded from both string and Buffer payloads.
+    const dumped = await serializer.dump(undefined);
+    const loadedFromString = await serializer.load(dumped);
+    const loadedFromBuffer = await serializer.load(Buffer.from(dumped));
+
+    // Then undefined is a supported cached value instead of an invalid JSON payload.
+    expect(loadedFromString).toBeUndefined();
+    expect(loadedFromBuffer).toBeUndefined();
+  });
+
+  it("rejects unsupported top-level values in the JSON serializer", async () => {
+    // Given values where JSON.stringify returns undefined instead of a payload.
+    const serializer = new JsonSerializer<unknown>();
+
+    // When dumping them, then the serializer rejects instead of storing an unusable Redis payload.
+    await expect(serializer.dump(Symbol("unsupported"))).rejects.toThrow("GCache JSON serializer cannot serialize this value");
+    await expect(serializer.dump(() => undefined)).rejects.toThrow("GCache JSON serializer cannot serialize this value");
+  });
+
   it("builds stable human-readable URNs for simple components", () => {
     // Given cache args that are not already sorted.
     const key = new GCacheKey({

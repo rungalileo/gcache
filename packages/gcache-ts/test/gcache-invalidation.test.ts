@@ -18,10 +18,12 @@ import {
   type RedisValueEnvelope,
   type SerializationMetricLabels,
 } from "../src/index.js";
+import { RedisCache } from "../src/internal/redis-cache.js";
 
 class FakeRedis implements RedisCommandClient {
   readonly values = new Map<string, { value: RedisStoredValue; ttlSec: number; expiresAtMs: number }>();
   getCalls = 0;
+  mGetCalls = 0;
   setCalls = 0;
   delCalls = 0;
   failSet = false;
@@ -29,19 +31,16 @@ class FakeRedis implements RedisCommandClient {
 
   async get(key: string): Promise<RedisStoredValue | null> {
     this.getCalls += 1;
-    if (this.failWatermarkGet && key.endsWith("#watermark")) {
-      throw new Error("watermark read failed");
-    }
+    return this.read(key);
+  }
 
-    const entry = this.values.get(key);
-    if (entry === undefined) {
-      return null;
-    }
-    if (entry.expiresAtMs <= Date.now()) {
-      this.values.delete(key);
-      return null;
-    }
-    return entry.value;
+  async mGet(keys: readonly string[]): Promise<ReadonlyArray<RedisStoredValue | null>> {
+    this.mGetCalls += 1;
+    return keys.map((key) => this.read(key));
+  }
+
+  async mget(...keys: readonly string[]): Promise<ReadonlyArray<RedisStoredValue | null>> {
+    return this.mGet(keys);
   }
 
   async setEx(key: string, ttlSec: number, value: RedisStoredValue): Promise<void> {
@@ -63,6 +62,22 @@ class FakeRedis implements RedisCommandClient {
       throw new Error(`missing string value for ${key}`);
     }
     return value;
+  }
+
+  private read(key: string): RedisStoredValue | null {
+    if (this.failWatermarkGet && key.endsWith("#watermark")) {
+      throw new Error("watermark read failed");
+    }
+
+    const entry = this.values.get(key);
+    if (entry === undefined) {
+      return null;
+    }
+    if (entry.expiresAtMs <= Date.now()) {
+      this.values.delete(key);
+      return null;
+    }
+    return entry.value;
   }
 }
 
@@ -124,6 +139,168 @@ const watermarkKey = "{urn:user_id:123}#watermark";
 describe("GCache targeted invalidation watermarks", () => {
   beforeEach(() => {
     vi.useRealTimers();
+  });
+
+  it("reads tracked Redis values and watermarks with one mGet", async () => {
+    // Given a tracked Redis value already exists without a watermark.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-12T18:00:00.000Z"));
+    const redis = new FakeRedis();
+    redis.values.set(valueKey("TrackedAtomicRead"), {
+      value: JSON.stringify({
+        version: 1,
+        createdAtMs: Date.now(),
+        expiresAtMs: Date.now() + 60_000,
+        encoding: "utf8",
+        payload: JSON.stringify({ userId: "123", source: "redis" }),
+      } satisfies RedisValueEnvelope),
+      ttlSec: 60,
+      expiresAtMs: Date.now() + 60_000,
+    });
+    const gcache = new GCache({ redis: { client: redis } });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "TrackedAtomicRead",
+      id: ([userId]: [string]) => userId,
+      trackForInvalidation: true,
+      defaultConfig: remoteOnly(),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When the tracked key is read from Redis.
+    const value = await gcache.enable(async () => await getUser("123"));
+
+    // Then value and watermark are fetched together, matching the Python mget race guard.
+    expect(value).toEqual({ userId: "123", source: "redis" });
+    expect(calls).toBe(0);
+    expect(redis.mGetCalls).toBe(1);
+    expect(redis.getCalls).toBe(0);
+  });
+
+  it("rejects tracked Redis reads when the client lacks mGet/mget", async () => {
+    // Given a tracked Redis key and a Redis-like client that only supports single-key get.
+    const client: RedisCommandClient = {
+      get: async () => null,
+      setEx: async () => undefined,
+      del: async () => 0,
+      flushAll: async () => undefined,
+    };
+    const redisCache = new RedisCache({
+      configProvider: async () => remoteOnly(),
+      rampSampler: () => 0,
+      redis: { client },
+      metrics: null,
+    });
+    const key = new GCacheKey({
+      keyType: "user_id",
+      id: "123",
+      useCase: "TrackedMissingMGet",
+      trackForInvalidation: true,
+      defaultConfig: remoteOnly(),
+    });
+
+    // When the tracked Redis key is read, then the unsafe non-atomic path is rejected.
+    await expect(redisCache.getResult(key)).rejects.toThrow("Redis client must support mGet/mget for invalidation-tracked GCache keys");
+  });
+
+  it("supports lowercase mget for tracked Redis reads", async () => {
+    // Given a Redis-compatible client exposes lowercase mget instead of node-redis mGet.
+    const key = new GCacheKey({
+      keyType: "user_id",
+      id: "123",
+      useCase: "TrackedLowercaseMget",
+      trackForInvalidation: true,
+      defaultConfig: remoteOnly(),
+    });
+    const envelope = JSON.stringify({
+      version: 1,
+      createdAtMs: Date.now(),
+      expiresAtMs: Date.now() + 60_000,
+      encoding: "utf8",
+      payload: JSON.stringify({ userId: "123", source: "redis" }),
+    } satisfies RedisValueEnvelope);
+    const mget = vi.fn(async (...keys: readonly string[]) => {
+      expect(keys).toEqual([key.urn, `${key.prefix}#watermark`]);
+      return [envelope, null];
+    });
+    const client: RedisCommandClient = {
+      get: async () => {
+        throw new Error("tracked reads must not call get");
+      },
+      mget,
+      setEx: async () => undefined,
+      del: async () => 0,
+      flushAll: async () => undefined,
+    };
+    const redisCache = new RedisCache({
+      configProvider: async () => remoteOnly(),
+      rampSampler: () => 0,
+      redis: { client },
+      metrics: null,
+    });
+
+    // When the tracked key is read, then lowercase mget supplies value and watermark together.
+    const result = await redisCache.getResult<{ userId: string; source: string }>(key);
+    expect(result).toEqual({ status: "hit", value: { userId: "123", source: "redis" } });
+    expect(mget).toHaveBeenCalledOnce();
+  });
+
+  it("rejects tracked Redis reads when mGet/mget returns too few values", async () => {
+    // Given a tracked Redis read receives a malformed multi-get response.
+    const client: RedisCommandClient = {
+      get: async () => null,
+      mGet: async () => [null],
+      setEx: async () => undefined,
+      del: async () => 0,
+      flushAll: async () => undefined,
+    };
+    const redisCache = new RedisCache({
+      configProvider: async () => remoteOnly(),
+      rampSampler: () => 0,
+      redis: { client },
+      metrics: null,
+    });
+    const key = new GCacheKey({
+      keyType: "user_id",
+      id: "123",
+      useCase: "TrackedShortMGet",
+      trackForInvalidation: true,
+      defaultConfig: remoteOnly(),
+    });
+
+    // When the tracked key is read, then the malformed Redis client response is surfaced.
+    await expect(redisCache.getResult(key)).rejects.toThrow("Redis mGet/mget returned too few values for invalidation-tracked GCache key");
+  });
+
+  it("rejects malformed Redis invalidation watermark values", async () => {
+    // Given Redis returns watermark payloads that Number() would otherwise coerce unsafely.
+    const malformedWatermarks: ReadonlyArray<RedisStoredValue> = ["-1", "1e3", "NaN", "Infinity", Buffer.from("0x10")];
+
+    for (const watermark of malformedWatermarks) {
+      const client: RedisCommandClient = {
+        get: async () => null,
+        mGet: async () => [null, watermark],
+        setEx: async () => undefined,
+        del: async () => 0,
+        flushAll: async () => undefined,
+      };
+      const redisCache = new RedisCache({
+        configProvider: async () => remoteOnly(),
+        rampSampler: () => 0,
+        redis: { client },
+        metrics: null,
+      });
+      const key = new GCacheKey({
+        keyType: "user_id",
+        id: "123",
+        useCase: `TrackedBadWatermark${String(watermark)}`,
+        trackForInvalidation: true,
+        defaultConfig: remoteOnly(),
+      });
+
+      // When a tracked read sees the malformed watermark, then it fails loudly for GCache's fail-open wrapper to handle.
+      await expect(redisCache.getResult(key)).rejects.toThrow("Invalid GCache Redis watermark");
+    }
   });
 
   it("invalidates older Redis values for all tracked use cases sharing the same key type and id", async () => {
@@ -327,7 +504,7 @@ describe("GCache targeted invalidation watermarks", () => {
     expect(after).toEqual({ userId: "123", version: 1 });
   });
 
-  it("fails open and records errors when watermark writes or reads fail", async () => {
+  it("propagates watermark write failures but fails open for tracked watermark reads", async () => {
     // Given invalidation watermark writes fail but metrics and logging are enabled.
     const writeRedis = new FakeRedis();
     writeRedis.failSet = true;
@@ -336,9 +513,9 @@ describe("GCache targeted invalidation watermarks", () => {
     const writeGCache = new GCache({ redis: { client: writeRedis }, logger, metrics: writeMetrics });
 
     // When targeted invalidation cannot write its watermark.
-    await writeGCache.invalidate("user_id", "123");
+    await expect(writeGCache.invalidate("user_id", "123")).rejects.toThrow("redis set failed");
 
-    // Then the API fails open, logs the operational failure, and records invalidation plus error metrics.
+    // Then the API logs the operational failure and records both the invalidation attempt and error.
     expect(logger.warn).toHaveBeenCalledWith("Error writing GCache invalidation watermark", expect.any(Error));
     expect(writeMetrics.events).toContainEqual({ name: "invalidation", labels: { keyType: "user_id", layer: CacheLayer.REMOTE } });
     expect(writeMetrics.events).toContainEqual({
@@ -375,9 +552,9 @@ describe("GCache targeted invalidation watermarks", () => {
   });
 
   it("fails open and suppresses tracked writes when watermark payloads are malformed", async () => {
-    // Given Redis contains a non-numeric invalidation watermark for a tracked mutable key.
+    // Given Redis contains a syntactically numeric-looking but invalid Python-incompatible watermark.
     const redis = new FakeRedis();
-    redis.values.set(watermarkKey, { value: "not-a-timestamp", ttlSec: 60, expiresAtMs: Date.now() + 60_000 });
+    redis.values.set(watermarkKey, { value: "0x10", ttlSec: 60, expiresAtMs: Date.now() + 60_000 });
     const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const metrics = new RecordingMetrics();
     const gcache = new GCache({ redis: { client: redis }, logger, metrics });

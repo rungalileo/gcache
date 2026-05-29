@@ -1,6 +1,6 @@
 # @rungalileo/gcache
 
-TypeScript port of GCache. Milestone 5 ships explicit enabled contexts, stable key construction, local/Redis TTL caching, runtime config providers, gradual rollout ramp controls, Prometheus-ready observability, and Redis watermark-based targeted invalidation with fail-open behavior.
+TypeScript port of GCache. Milestone 5 ships explicit enabled contexts, stable key construction, local/Redis TTL caching, runtime config providers, gradual rollout ramp controls, Prometheus-ready observability, and Redis watermark-based targeted invalidation.
 
 > [!NOTE]
 > TypeScript support is experimental for now. This package is intended for early validation and feedback before treating the API and operational behavior as stable.
@@ -45,7 +45,7 @@ import { GCache, GCacheKeyConfig } from "@rungalileo/gcache";
 
 const gcache = new GCache({
   redis: {
-    client: redisClient, // implements get, del, flushAll/flushall, and setEx/setex/set({ EX })
+    client: redisClient, // implements get, del, flushAll/flushall, setEx/setex/set({ EX }), and mGet/mget for tracked invalidation
     keyPrefix: "gcache:",
   },
 });
@@ -60,7 +60,7 @@ local cache -> Redis cache -> fallback function
 - Local hits return immediately.
 - Local misses try Redis and populate local on a Redis hit.
 - Redis misses call the fallback and write both Redis and local.
-- Redis read/write/delete/flush failures are logged, counted in metrics, and fail open; fallback results still return when fallback succeeds.
+- Redis cache read/write failures are logged, counted in metrics, and fail open; fallback results still return when fallback succeeds. Explicit maintenance calls (`delete`, `invalidate`, `flushAll`) log/count Redis failures and rethrow them so callers do not assume mutation succeeded.
 - Missing per-layer config disables that layer, records a disabled reason, and falls through to the next layer/fallback.
 
 You can also provide `createClient` for lazy client construction:
@@ -226,7 +226,7 @@ Included:
 - JSON and custom serializer support for Redis values
 - Duplicate and reserved use-case validation
 - `delete` and `flushAll` across configured layers
-- Fail-open behavior for key/config/cache errors
+- Fail-open behavior for key/config/cache read-write errors; maintenance mutations surface failures
 - Runtime config provider with fallback to cached-function `defaultConfig`
 - Per-layer TTL and ramp controls
 - Injectable ramp sampler for deterministic rollout tests

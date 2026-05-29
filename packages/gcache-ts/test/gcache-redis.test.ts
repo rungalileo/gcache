@@ -114,6 +114,47 @@ describe("GCache Redis TTL layer", () => {
     expect(redis.getCalls).toBe(1);
   });
 
+  it("does not populate local cache when the local layer was disabled for the read", async () => {
+    // Given one process has already written a value into the shared Redis cache.
+    const redis = new FakeRedis();
+    const writer = new GCache({ redis: { client: redis } });
+    const writeUser = writer.cached({
+      keyType: "user_id",
+      useCase: "RedisNoDisabledLocalPopulate",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: GCacheKeyConfig.enabled(60),
+    })(async (userId: string) => ({ userId, source: "redis" }));
+    await writer.enable(async () => await writeUser("123"));
+
+    // And the reader sees local cache disabled for the first read, then enabled afterward.
+    let providerCalls = 0;
+    const remoteOnlyConfig = new GCacheKeyConfig({
+      ttlSec: { [CacheLayer.REMOTE]: 60 },
+      ramp: { [CacheLayer.REMOTE]: 100 },
+    });
+    const cacheConfigProvider = vi.fn(async () => (++providerCalls <= 2 ? remoteOnlyConfig : GCacheKeyConfig.enabled(60)));
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const reader = new GCache({ redis: { client: redis }, cacheConfigProvider, logger });
+    let readerCalls = 0;
+    const readUser = reader.cached({
+      keyType: "user_id",
+      useCase: "RedisNoDisabledLocalPopulate",
+      id: ([userId]: [string]) => userId,
+    })(async (userId: string) => ({ userId, source: `fallback-${++readerCalls}` }));
+    redis.getCalls = 0;
+
+    // When the first read hits Redis while local is disabled and the next read cannot reach Redis.
+    const first = await reader.enable(async () => await readUser("123"));
+    redis.failGet = true;
+    const second = await reader.enable(async () => await readUser("123"));
+
+    // Then the Redis value was not silently written into local after a disabled local read.
+    expect(first).toEqual({ userId: "123", source: "redis" });
+    expect(second).toEqual({ userId: "123", source: "fallback-1" });
+    expect(readerCalls).toBe(1);
+    expect(redis.getCalls).toBe(2);
+  });
+
   it("writes Redis misses with a timestamped versioned envelope", async () => {
     // Given an enabled Redis-backed cache with deterministic time.
     vi.useFakeTimers();
@@ -370,6 +411,7 @@ describe("GCache Redis TTL layer", () => {
     const redis = new FakeRedis();
     const staleKey = keyFor("stale", "RedisBadEnvelope").urn;
     const badKey = keyFor("bad", "RedisBadEnvelope").urn;
+    const nonFiniteKey = keyFor("nonfinite", "RedisBadEnvelope").urn;
     redis.values.set(staleKey, {
       expiresAtMs: Date.now() + 60_000,
       value: JSON.stringify({
@@ -384,6 +426,10 @@ describe("GCache Redis TTL layer", () => {
       expiresAtMs: Date.now() + 60_000,
       value: JSON.stringify({ version: 2, payload: "not valid for v1" }),
     });
+    redis.values.set(nonFiniteKey, {
+      expiresAtMs: Date.now() + 60_000,
+      value: String.raw`{"version":1,"createdAtMs":1e309,"expiresAtMs":1e309,"encoding":"utf8","payload":"{\"bad\":true}"}`,
+    });
     const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const gcache = new GCache({ redis: { client: redis }, logger });
     let calls = 0;
@@ -397,22 +443,36 @@ describe("GCache Redis TTL layer", () => {
     // When both keys are read through the Redis chain.
     const stale = await gcache.enable(async () => await getUser("stale"));
     const malformed = await gcache.enable(async () => await getUser("bad"));
+    const nonFinite = await gcache.enable(async () => await getUser("nonfinite"));
 
     // Then expired and malformed entries are deleted, fail open, and fallback results are cached again.
     expect(stale).toEqual({ userId: "stale", calls: 1 });
     expect(malformed).toEqual({ userId: "bad", calls: 2 });
+    expect(nonFinite).toEqual({ userId: "nonfinite", calls: 3 });
     expect(redis.values.get(staleKey)).toBeDefined();
     expect(redis.values.get(badKey)).toBeDefined();
+    expect(redis.values.get(nonFiniteKey)).toBeDefined();
     expect(logger.warn).not.toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
   });
 
-  it("falls through when remote config is missing and fails open on Redis maintenance errors", async () => {
+  it("falls through when remote config is missing and propagates Redis maintenance errors", async () => {
     // Given Redis is configured but the key has no remote TTL and maintenance commands fail.
     const redis = new FakeRedis();
     redis.failDel = true;
     redis.failFlushAll = true;
     const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
-    const gcache = new GCache({ redis: { client: redis }, logger });
+    const metrics = {
+      request: vi.fn(),
+      miss: vi.fn(),
+      disabled: vi.fn(),
+      error: vi.fn(),
+      invalidation: vi.fn(),
+      observeGet: vi.fn(),
+      observeFallback: vi.fn(),
+      observeSerialization: vi.fn(),
+      observeSize: vi.fn(),
+    };
+    const gcache = new GCache({ redis: { client: redis }, logger, metrics });
     let calls = 0;
     const getUser = gcache.cached({
       keyType: "user_id",
@@ -426,16 +486,29 @@ describe("GCache Redis TTL layer", () => {
 
     // When cache reads/writes and explicit maintenance operations cannot use Redis safely.
     const value = await gcache.enable(async () => await getUser("123"));
-    const deleted = await gcache.delete(keyFor("123", "RedisMissingRemoteTtl"));
-    await gcache.flushAll();
+    await expect(gcache.delete(keyFor("123", "RedisMissingRemoteTtl"))).rejects.toThrow("redis del failed");
+    await expect(gcache.flushAll()).rejects.toThrow("redis flushAll failed");
 
-    // Then missing remote config disables Redis reads/writes, while maintenance failures are logged without escaping.
+    // Then missing remote config disables Redis reads/writes, while maintenance failures are logged and surfaced.
     expect(value).toEqual({ userId: "123", calls: 1 });
-    expect(deleted).toBe(false);
     expect(redis.getCalls).toBe(0);
     expect(redis.setCalls).toBe(0);
     expect(logger.warn).toHaveBeenCalledWith("Error deleting value from Redis cache", expect.any(Error));
     expect(logger.warn).toHaveBeenCalledWith("Error flushing Redis cache", expect.any(Error));
+    expect(metrics.error).toHaveBeenCalledWith({
+      useCase: "RedisMissingRemoteTtl",
+      keyType: "user_id",
+      layer: CacheLayer.REMOTE,
+      error: "Error",
+      inFallback: false,
+    });
+    expect(metrics.error).toHaveBeenCalledWith({
+      useCase: "flushAll",
+      keyType: "all",
+      layer: CacheLayer.REMOTE,
+      error: "Error",
+      inFallback: false,
+    });
   });
 
   it("supports Redis setex, set with EX, lowercase flushall, and missing-command failures", async () => {
@@ -489,7 +562,7 @@ describe("GCache Redis TTL layer", () => {
     expect(logger.warn).toHaveBeenCalledWith("Error putting value in Redis cache", expect.any(Error));
   });
 
-  it("fails open when Redis flushAll commands are unavailable", async () => {
+  it("propagates when Redis flushAll commands are unavailable", async () => {
     // Given a Redis-like client supports normal cache reads/writes but no full-flush command spelling.
     const values = new Map<string, RedisStoredValue>();
     const client = {
@@ -513,9 +586,9 @@ describe("GCache Redis TTL layer", () => {
 
     // When flushAll is requested after Redis has been used.
     await gcache.enable(async () => await getUser("123"));
-    await gcache.flushAll();
+    await expect(gcache.flushAll()).rejects.toThrow("Redis client does not implement flushAll/flushall");
 
-    // Then the missing maintenance command is logged but does not escape to callers.
+    // Then the missing maintenance command is logged and surfaced to callers.
     expect(values.size).toBe(1);
     expect(logger.warn).toHaveBeenCalledWith("Error flushing Redis cache", expect.any(Error));
   });

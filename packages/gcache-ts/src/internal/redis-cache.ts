@@ -13,6 +13,8 @@ export type RedisStoredValue = string | Buffer;
 
 export interface RedisCommandClient {
   get(key: string): Awaitable<RedisStoredValue | null>;
+  mGet?(keys: readonly string[]): Awaitable<ReadonlyArray<RedisStoredValue | null>>;
+  mget?(...keys: readonly string[]): Awaitable<ReadonlyArray<RedisStoredValue | null>>;
   del(key: string): Awaitable<number>;
   flushAll?(): Awaitable<unknown>;
   flushall?(): Awaitable<unknown>;
@@ -88,8 +90,7 @@ export class RedisCache {
 
     const client = await this.resolveClient();
     const redisKey = this.redisKey(key);
-    const watermarkMs = key.trackForInvalidation ? await this.getWatermarkMs(client, key) : null;
-    const raw = await client.get(redisKey);
+    const { raw, watermarkMs } = await this.getValueAndWatermark(client, key, redisKey);
     if (raw === null) {
       return { status: "miss", config: layerConfig.config, ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
@@ -179,12 +180,45 @@ export class RedisCache {
     return `${this.keyPrefix}${redisClusterHashTag(invalidationPrefix(urnPrefix, keyType, id))}#watermark`;
   }
 
+  private async getValueAndWatermark(
+    client: RedisCommandClient,
+    key: GCacheKey,
+    redisKey: string,
+  ): Promise<{ readonly raw: RedisStoredValue | null; readonly watermarkMs: number | null }> {
+    if (!key.trackForInvalidation) {
+      return { raw: await client.get(redisKey), watermarkMs: null };
+    }
+
+    const watermarkKey = this.redisWatermarkKeyFromKey(key);
+    let values: ReadonlyArray<RedisStoredValue | null>;
+    if (client.mGet !== undefined) {
+      values = await client.mGet([redisKey, watermarkKey]);
+    } else if (client.mget !== undefined) {
+      values = await client.mget(redisKey, watermarkKey);
+    } else {
+      throw new Error("Redis client must support mGet/mget for invalidation-tracked GCache keys");
+    }
+
+    if (values.length < 2) {
+      throw new Error("Redis mGet/mget returned too few values for invalidation-tracked GCache key");
+    }
+    return { raw: values[0] ?? null, watermarkMs: this.parseWatermarkMs(values[1] ?? null) };
+  }
+
   private async getWatermarkMs(client: RedisCommandClient, key: GCacheKey): Promise<number | null> {
     const raw = await client.get(this.redisWatermarkKeyFromKey(key));
+    return this.parseWatermarkMs(raw);
+  }
+
+  private parseWatermarkMs(raw: RedisStoredValue | null): number | null {
     if (raw === null) {
       return null;
     }
-    const value = Number(Buffer.isBuffer(raw) ? raw.toString("utf8") : raw);
+    const text = Buffer.isBuffer(raw) ? raw.toString("utf8") : raw;
+    if (!/^\d+(?:\.\d+)?$/.test(text)) {
+      throw new Error("Invalid GCache Redis watermark");
+    }
+    const value = Number(text);
     if (!Number.isFinite(value)) {
       throw new Error("Invalid GCache Redis watermark");
     }
@@ -225,7 +259,9 @@ export class RedisCache {
     if (
       parsed.version !== ENVELOPE_VERSION ||
       typeof parsed.createdAtMs !== "number" ||
+      !Number.isFinite(parsed.createdAtMs) ||
       typeof parsed.expiresAtMs !== "number" ||
+      !Number.isFinite(parsed.expiresAtMs) ||
       (parsed.encoding !== "utf8" && parsed.encoding !== "base64") ||
       typeof parsed.payload !== "string"
     ) {

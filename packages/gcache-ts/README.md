@@ -63,6 +63,9 @@ local cache -> Redis cache -> fallback function
 - Redis cache read/write failures are logged, counted in metrics, and fail open; fallback results still return when fallback succeeds. Explicit maintenance calls (`delete`, `invalidate`, `flushAll`) log/count Redis failures and rethrow them so callers do not assume mutation succeeded.
 - Missing per-layer config disables that layer, records a disabled reason, and falls through to the next layer/fallback.
 
+> [!WARNING]
+> `gcache.flushAll()` issues Redis `FLUSHALL`, which deletes **every key in the entire Redis instance**, not just keys under `keyPrefix`. Do not call it against a Redis instance shared with other data — use `gcache.delete(key)` or `gcache.invalidate(keyType, id)` for targeted removal.
+
 You can also provide `createClient` for lazy client construction:
 
 ```ts
@@ -118,7 +121,8 @@ A cached Redis value whose `createdAtMs` is older than or equal to the watermark
 
 Watermarks use `DEFAULT_WATERMARK_TTL_SEC` (4 hours) by default. You can override it with `redis.watermarkTtlSec`, but it must exceed the maximum Redis cache TTL for invalidation-tracked data; otherwise a watermark can expire before old cached values do.
 
-Local cache limitation: targeted invalidation is enforced by Redis watermarks. Existing local cache hits are not synchronously invalidated across processes, so strongly invalidated mutable data should disable the local layer (or use very short local TTLs only when stale reads are acceptable).
+> [!IMPORTANT]
+> **The local layer is not supported for sensitive/strong invalidation.** Targeted invalidation is enforced *only* by Redis watermarks — `trackForInvalidation` consults the watermark on the Redis layer alone. Local cache hits are not synchronously invalidated across processes, and a value can still be written to local cache while the remote layer is disabled or ramped down. Any data that must be correct after `invalidate()` should disable the local layer entirely (omit `CacheLayer.LOCAL` from `ttlSec`/`ramp`). Use a local TTL only when stale reads are acceptable.
 
 ## Runtime config and ramp controls
 

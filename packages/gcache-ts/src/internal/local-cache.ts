@@ -1,3 +1,5 @@
+import { LRUCache } from "lru-cache";
+
 import { CacheLayer, type CacheConfigProvider, type CacheRampSampler } from "../config.js";
 import type { GCacheKey } from "../key.js";
 import type { CacheGetResult } from "./cache-result.js";
@@ -5,19 +7,29 @@ import { resolveLayerConfigResult } from "./runtime-config.js";
 
 export type Fallback<T> = () => Promise<T>;
 
-interface LocalEntry<T> {
-  readonly expiresAtMs: number;
+// Each entry carries its own expiry. TTL is enforced with `Date.now()` (consistent
+// with the Redis layer and mockable in tests) rather than lru-cache's internal
+// `performance.now()` clock; lru-cache handles only LRU + max-size eviction. The
+// wrapper is always defined, so an `undefined` fallback result stays cacheable
+// (`LRUCache.set(key, undefined)` is an alias for `delete`).
+interface CachedEntry<T> {
   readonly value: T;
+  readonly expiresAtMs: number;
 }
 
 export class LocalCache {
-  private readonly caches = new Map<string, Map<string, LocalEntry<unknown>>>();
+  // A single LRU keyed by the fully-qualified URN (which already encodes the use
+  // case). One global instance bounds total local memory and gives true LRU
+  // eviction across all use cases.
+  private readonly cache: LRUCache<string, CachedEntry<unknown>>;
 
   constructor(
     private readonly configProvider: CacheConfigProvider,
     private readonly rampSampler: CacheRampSampler,
-    private readonly maxSize: number,
-  ) {}
+    maxSize: number,
+  ) {
+    this.cache = new LRUCache<string, CachedEntry<unknown>>({ max: maxSize });
+  }
 
   async get<T>(key: GCacheKey, fallback: Fallback<T>): Promise<T> {
     const result = await this.getIfPresentResult<T>(key);
@@ -43,48 +55,33 @@ export class LocalCache {
       return layerConfig;
     }
 
-    const cache = this.caches.get(key.useCase);
-    const now = Date.now();
-    const hit = cache?.get(key.urn) as LocalEntry<T> | undefined;
-
-    if (hit !== undefined && hit.expiresAtMs > now) {
+    const hit = this.cache.get(key.urn) as CachedEntry<T> | undefined;
+    if (hit !== undefined && hit.expiresAtMs > Date.now()) {
       return { status: "hit", value: hit.value };
     }
 
     if (hit !== undefined) {
-      cache?.delete(key.urn);
+      this.cache.delete(key.urn);
     }
 
     return { status: "miss", config: layerConfig.config };
   }
 
   async put<T>(key: GCacheKey, value: T, config?: { readonly ttlSec: number }): Promise<void> {
-    const ttlSec = config?.ttlSec ?? await this.resolveLocalTtlSec(key);
+    const ttlSec = config?.ttlSec ?? (await this.resolveLocalTtlSec(key));
     if (ttlSec === null) {
       return;
     }
 
-    const cache = this.getOrCreateUseCaseCache(key);
-    cache.set(key.urn, { expiresAtMs: Date.now() + ttlSec * 1000, value });
-    this.evictOldestIfNeeded(cache);
+    this.cache.set(key.urn, { value, expiresAtMs: Date.now() + ttlSec * 1000 });
   }
 
   async delete(key: GCacheKey): Promise<boolean> {
-    const cache = this.caches.get(key.useCase);
-    return cache?.delete(key.urn) ?? false;
+    return this.cache.delete(key.urn);
   }
 
   async flushAll(): Promise<void> {
-    this.caches.clear();
-  }
-
-  private getOrCreateUseCaseCache(key: GCacheKey): Map<string, LocalEntry<unknown>> {
-    let cache = this.caches.get(key.useCase);
-    if (cache === undefined) {
-      cache = new Map<string, LocalEntry<unknown>>();
-      this.caches.set(key.useCase, cache);
-    }
-    return cache;
+    this.cache.clear();
   }
 
   private async resolveLocalLayerConfig(key: GCacheKey) {
@@ -99,15 +96,5 @@ export class LocalCache {
   private async resolveLocalTtlSec(key: GCacheKey): Promise<number | null> {
     const layerConfig = await this.resolveLocalLayerConfig(key);
     return layerConfig.status === "enabled" ? layerConfig.config.ttlSec : null;
-  }
-
-  private evictOldestIfNeeded(cache: Map<string, LocalEntry<unknown>>): void {
-    while (cache.size > this.maxSize) {
-      const oldestKey = cache.keys().next().value as string | undefined;
-      if (oldestKey === undefined) {
-        return;
-      }
-      cache.delete(oldestKey);
-    }
   }
 }

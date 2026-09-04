@@ -191,7 +191,7 @@ async def test_redis_read_failure_records_subsequent_fallback_failure(
     assert read_error_metric._value.get() == read_errors_before + 1
     assert fallback_error_metric._value.get() == fallback_errors_before + 1
     assert "Error getting value from cache: redis read failed" in caplog.text
-    assert "Error getting value from cache: source unavailable" in caplog.text
+    assert "Error in fallback after cache read failure: source unavailable" in caplog.text
 
 
 @pytest.mark.asyncio

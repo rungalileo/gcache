@@ -108,7 +108,7 @@ class CacheController(CacheWrapper):
                         return await instrumented_fallback()
                     except Exception as fallback_error:
                         _GLOBAL_GCACHE_STATE.logger.error(
-                            f"Error getting value from cache: {fallback_error}", exc_info=True
+                            f"Error in fallback after cache read failure: {fallback_error}", exc_info=True
                         )
                         GCacheMetrics.ERROR_COUNTER.labels(
                             key.use_case,

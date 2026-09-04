@@ -48,7 +48,7 @@ redislite = "^6.2.912183"
 
 [tool.poetry.group.dev.dependencies]
 invoke = "^2.2.0"
-ruff = "^0.12.11"
+ruff = "^0.15.8"
 pytest-asyncio = "^1.1.0"
 mypy = "^1.17.1"
 pre-commit = "^4.3.0"

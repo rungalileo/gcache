@@ -1,7 +1,9 @@
 import logging
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+from prometheus_client import REGISTRY
 from redis.asyncio import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 
@@ -70,6 +72,10 @@ def _error_metric(controller: CacheController, key: GCacheKey, error: type[Excep
     )
 
 
+def _metric_value(name: str, labels: dict[str, str]) -> float:
+    return REGISTRY.get_sample_value(name, labels) or 0.0
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "fallback_value",
@@ -111,7 +117,10 @@ async def test_redis_put_failure_returns_successful_fallback_once(
 
 
 @pytest.mark.asyncio
-async def test_redis_read_failure_calls_fallback_once(caplog: pytest.LogCaptureFixture) -> None:
+async def test_redis_read_failure_instruments_fallback_once(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     error = RedisConnectionError("redis read failed")
     client = StubRedisClient(read_error=error)
     controller = _controller(client)
@@ -119,6 +128,20 @@ async def test_redis_read_failure_calls_fallback_once(caplog: pytest.LogCaptureF
     fallback_calls = 0
     error_metric = _error_metric(controller, key, RedisConnectionError, False)
     errors_before = error_metric._value.get()
+    metric_labels = {
+        "use_case": key.use_case,
+        "key_type": key.key_type,
+        "layer": controller.layer().name,
+    }
+    requests_before = _metric_value("api_gcache_request_counter_total", metric_labels)
+    misses_before = _metric_value("api_gcache_miss_counter_total", metric_labels)
+    fallback_time_before = _metric_value("api_gcache_fallback_timer_sum", metric_labels)
+    get_time_before = _metric_value("api_gcache_get_timer_sum", metric_labels)
+    monotonic_values = iter((0.0, 1.0, 11.0, 13.0))
+    monkeypatch.setattr(
+        "gcache._internal.wrappers.time",
+        SimpleNamespace(monotonic=lambda: next(monotonic_values)),
+    )
 
     async def fallback() -> str:
         nonlocal fallback_calls
@@ -133,7 +156,42 @@ async def test_redis_read_failure_calls_fallback_once(caplog: pytest.LogCaptureF
     assert client.get_calls == 1
     assert client.setex_calls == 0
     assert error_metric._value.get() == errors_before + 1
+    assert _metric_value("api_gcache_request_counter_total", metric_labels) == requests_before + 1
+    assert _metric_value("api_gcache_miss_counter_total", metric_labels) == misses_before + 1
+    assert _metric_value("api_gcache_fallback_timer_sum", metric_labels) == fallback_time_before + 10
+    assert _metric_value("api_gcache_get_timer_sum", metric_labels) == get_time_before + 3
     assert "Error getting value from cache: redis read failed" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_redis_read_failure_records_subsequent_fallback_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    read_error = RedisConnectionError("redis read failed")
+    client = StubRedisClient(read_error=read_error)
+    controller = _controller(client)
+    key = _key("redis_read_and_fallback_failure")
+    fallback_calls = 0
+    read_error_metric = _error_metric(controller, key, RedisConnectionError, False)
+    fallback_error_metric = _error_metric(controller, key, LookupError, True)
+    read_errors_before = read_error_metric._value.get()
+    fallback_errors_before = fallback_error_metric._value.get()
+
+    async def fallback() -> None:
+        nonlocal fallback_calls
+        fallback_calls += 1
+        raise LookupError("source unavailable")
+
+    with caplog.at_level(logging.ERROR), pytest.raises(LookupError, match="source unavailable"):
+        await _enabled_get(controller, key, fallback)
+
+    assert fallback_calls == 1
+    assert client.get_calls == 1
+    assert client.setex_calls == 0
+    assert read_error_metric._value.get() == read_errors_before + 1
+    assert fallback_error_metric._value.get() == fallback_errors_before + 1
+    assert "Error getting value from cache: redis read failed" in caplog.text
+    assert "Error in fallback after cache read failure: source unavailable" in caplog.text
 
 
 @pytest.mark.asyncio

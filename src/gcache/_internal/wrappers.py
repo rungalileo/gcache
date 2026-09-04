@@ -104,7 +104,20 @@ class CacheController(CacheWrapper):
                         raise
                     if fallback_succeeded:
                         return fallback_result
-                    return await fallback()
+                    try:
+                        return await instrumented_fallback()
+                    except Exception as fallback_error:
+                        _GLOBAL_GCACHE_STATE.logger.error(
+                            f"Error in fallback after cache read failure: {fallback_error}", exc_info=True
+                        )
+                        GCacheMetrics.ERROR_COUNTER.labels(
+                            key.use_case,
+                            key.key_type,
+                            self.layer().name,
+                            type(fallback_error).__name__,
+                            True,
+                        ).inc()
+                        raise
             finally:
                 GCacheMetrics.GET_TIMER.labels(key.use_case, key.key_type, self.layer().name).observe(
                     time.monotonic() - start_time - fallback_time

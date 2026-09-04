@@ -133,6 +133,7 @@ async def test_redis_read_failure_instruments_fallback_once(
         "key_type": key.key_type,
         "layer": controller.layer().name,
     }
+    requests_before = _metric_value("api_gcache_request_counter_total", metric_labels)
     misses_before = _metric_value("api_gcache_miss_counter_total", metric_labels)
     fallback_time_before = _metric_value("api_gcache_fallback_timer_sum", metric_labels)
     get_time_before = _metric_value("api_gcache_get_timer_sum", metric_labels)
@@ -155,10 +156,42 @@ async def test_redis_read_failure_instruments_fallback_once(
     assert client.get_calls == 1
     assert client.setex_calls == 0
     assert error_metric._value.get() == errors_before + 1
+    assert _metric_value("api_gcache_request_counter_total", metric_labels) == requests_before + 1
     assert _metric_value("api_gcache_miss_counter_total", metric_labels) == misses_before + 1
     assert _metric_value("api_gcache_fallback_timer_sum", metric_labels) == fallback_time_before + 10
     assert _metric_value("api_gcache_get_timer_sum", metric_labels) == get_time_before + 3
     assert "Error getting value from cache: redis read failed" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_redis_read_failure_records_subsequent_fallback_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    read_error = RedisConnectionError("redis read failed")
+    client = StubRedisClient(read_error=read_error)
+    controller = _controller(client)
+    key = _key("redis_read_and_fallback_failure")
+    fallback_calls = 0
+    read_error_metric = _error_metric(controller, key, RedisConnectionError, False)
+    fallback_error_metric = _error_metric(controller, key, LookupError, True)
+    read_errors_before = read_error_metric._value.get()
+    fallback_errors_before = fallback_error_metric._value.get()
+
+    async def fallback() -> None:
+        nonlocal fallback_calls
+        fallback_calls += 1
+        raise LookupError("source unavailable")
+
+    with caplog.at_level(logging.ERROR), pytest.raises(LookupError, match="source unavailable"):
+        await _enabled_get(controller, key, fallback)
+
+    assert fallback_calls == 1
+    assert client.get_calls == 1
+    assert client.setex_calls == 0
+    assert read_error_metric._value.get() == read_errors_before + 1
+    assert fallback_error_metric._value.get() == fallback_errors_before + 1
+    assert "Error getting value from cache: redis read failed" in caplog.text
+    assert "Error getting value from cache: source unavailable" in caplog.text
 
 
 @pytest.mark.asyncio

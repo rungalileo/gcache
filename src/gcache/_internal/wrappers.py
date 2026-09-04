@@ -104,7 +104,7 @@ class CacheController(CacheWrapper):
                         raise
                     if fallback_succeeded:
                         return fallback_result
-                    return await fallback()
+                    return await instrumented_fallback()
             finally:
                 GCacheMetrics.GET_TIMER.labels(key.use_case, key.key_type, self.layer().name).observe(
                     time.monotonic() - start_time - fallback_time

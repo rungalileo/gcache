@@ -163,6 +163,14 @@ export class GCache {
     }
   }
 
+  /**
+   * Clears every configured cache layer.
+   *
+   * WARNING: the Redis layer issues `FLUSHALL`, which deletes **all** keys in the
+   * entire Redis instance — not just keys under the GCache `keyPrefix`. Never call
+   * this against a Redis instance shared with other data; use {@link delete} or
+   * {@link invalidate} for targeted removal instead.
+   */
   async flushAll(): Promise<void> {
     await this.localCache.flushAll();
     if (this.redisCache === null) {

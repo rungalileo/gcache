@@ -49,7 +49,9 @@ export function normalizeArgs(args: Record<string, string | number | boolean | b
   return Object.entries(args)
     .filter(([, value]) => value !== undefined)
     .map(([name, value]) => [name, String(value)] as [string, string])
-    .sort(([left], [right]) => left.localeCompare(right));
+    // Sort by UTF-16 code unit, not localeCompare: the cache key must be byte-for-byte
+    // identical across processes, and localeCompare is locale/ICU-version dependent.
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
 }
 
 export function invalidationPrefix(urnPrefix: string, keyType: string, id: string): string {

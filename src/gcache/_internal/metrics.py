@@ -12,6 +12,8 @@ class GCacheMetrics:
     REQUEST_COUNTER: Counter
     ERROR_COUNTER: Counter
     INVALIDATION_COUNTER: Counter
+    HIT_HOOK_ACTION_COUNTER: Counter
+    HIT_HOOK_ERROR_COUNTER: Counter
 
     # Histograms
     GET_TIMER: Histogram
@@ -53,6 +55,18 @@ class GCacheMetrics:
             name=prefix + "gcache_invalidation_counter",
             labelnames=["key_type", "layer"],
             documentation="Cache invalidation counter",
+        )
+
+        cls.HIT_HOOK_ACTION_COUNTER = Counter(
+            name=prefix + "gcache_hit_hook_action_counter",
+            labelnames=["use_case", "key_type", "layer", "action", "reason"],
+            documentation="Cache hit hook action counter",
+        )
+
+        cls.HIT_HOOK_ERROR_COUNTER = Counter(
+            name=prefix + "gcache_hit_hook_error_counter",
+            labelnames=["use_case", "key_type", "layer"],
+            documentation="Cache hit hook error counter",
         )
 
         cls.GET_TIMER = Histogram(

@@ -1,7 +1,7 @@
 from typing import Any
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
-from gcache.config import CacheLayer, GCacheKey
+from gcache.config import CacheHitHook, CacheLayer, GCacheKey
 
 
 class NoopCache(CacheInterface):
@@ -9,7 +9,13 @@ class NoopCache(CacheInterface):
     NOOP Cache that does nothing but invoke fallback on get.
     """
 
-    async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+    async def get(
+        self,
+        key: GCacheKey,
+        fallback: Fallback,
+        *,
+        on_cache_hit: CacheHitHook | None = None,
+    ) -> Any:
         return await fallback()
 
     async def put(self, key: GCacheKey, value: Any) -> None:

@@ -1,10 +1,11 @@
+import asyncio
 import json
 import logging
 import pickle
 import threading
 from collections.abc import Generator
 from random import random
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import redislite
@@ -12,11 +13,13 @@ from prometheus_client import generate_latest
 
 from gcache import (
     CacheLayer,
+    EvictAndFallback,
     GCache,
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,
     RedisConfig,
+    ReturnCached,
 )
 from gcache._internal.cache_interface import Fallback
 from gcache._internal.local_cache import LocalCache
@@ -39,6 +42,10 @@ def get_func_metric(name: str) -> float:
         if line.startswith(name):
             return float(line.split(" ")[-1])
     return 0
+
+
+def get_local_cache_for_use_case(gcache: GCache, use_case: str) -> LocalCache:
+    return cast(LocalCache, gcache._local_cache.wrapped)
 
 
 def test_gcache_sync(gcache: GCache, redis_server: redislite.Redis, reset_prometheus_registry: Generator) -> None:
@@ -79,6 +86,328 @@ def test_gcache_sync(gcache: GCache, redis_server: redislite.Redis, reset_promet
     # We should have 2 keys.  One for 123 and one for 124 args.
     keys = redis_server.keys()
     assert len(keys) == 2
+
+
+def test_global_on_cache_hit_inherited(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_global_state: None,
+) -> None:
+    redis_server.flushall()
+    calls: list[CacheLayer] = []
+
+    def global_hook(ctx, value):  # type: ignore[no-untyped-def]
+        calls.append(ctx.layer)
+        return ReturnCached()
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:galileo:test",
+            redis_config=RedisConfig(port=REDIS_PORT),
+            on_cache_hit=global_hook,
+        )
+    )
+    try:
+
+        @gcache.cached(key_type="Test", id_arg="test", use_case="test_global_on_cache_hit_inherited")
+        def cached_func(test: int = 123) -> int:
+            return test
+
+        with gcache.enable():
+            assert cached_func() == 123
+            assert calls == []
+            assert cached_func() == 123
+
+        assert calls == [CacheLayer.LOCAL]
+    finally:
+        gcache.__del__()
+
+
+def test_decorator_on_cache_hit_overrides_global(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_global_state: None,
+) -> None:
+    redis_server.flushall()
+    global_calls: list[CacheLayer] = []
+    decorator_calls: list[CacheLayer] = []
+
+    def global_hook(ctx, value):  # type: ignore[no-untyped-def]
+        global_calls.append(ctx.layer)
+        return ReturnCached()
+
+    def decorator_hook(ctx, value):  # type: ignore[no-untyped-def]
+        decorator_calls.append(ctx.layer)
+        return ReturnCached()
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:galileo:test",
+            redis_config=RedisConfig(port=REDIS_PORT),
+            on_cache_hit=global_hook,
+        )
+    )
+    try:
+
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test",
+            use_case="test_decorator_on_cache_hit_overrides_global",
+            on_cache_hit=decorator_hook,
+        )
+        def cached_func(test: int = 123) -> int:
+            return test
+
+        with gcache.enable():
+            assert cached_func() == 123
+            assert cached_func() == 123
+
+        assert global_calls == []
+        assert decorator_calls == [CacheLayer.LOCAL]
+    finally:
+        gcache.__del__()
+
+
+def test_decorator_can_disable_global_on_cache_hit(
+    cache_config_provider: FakeCacheConfigProvider,
+    redis_server: redislite.Redis,
+    reset_global_state: None,
+) -> None:
+    redis_server.flushall()
+    global_calls: list[CacheLayer] = []
+
+    def global_hook(ctx, value):  # type: ignore[no-untyped-def]
+        global_calls.append(ctx.layer)
+        return ReturnCached()
+
+    gcache = GCache(
+        GCacheConfig(
+            cache_config_provider=cache_config_provider,
+            urn_prefix="urn:galileo:test",
+            redis_config=RedisConfig(port=REDIS_PORT),
+            on_cache_hit=global_hook,
+        )
+    )
+    try:
+
+        @gcache.cached(
+            key_type="Test",
+            id_arg="test",
+            use_case="test_decorator_can_disable_global_on_cache_hit",
+            on_cache_hit=False,
+        )
+        def cached_func(test: int = 123) -> int:
+            return test
+
+        with gcache.enable():
+            assert cached_func() == 123
+            assert cached_func() == 123
+
+        assert global_calls == []
+    finally:
+        gcache.__del__()
+
+
+def test_local_on_cache_hit_evicts_and_falls_back_to_remote(gcache: GCache) -> None:
+    source_calls = 0
+    hook_layers: list[CacheLayer] = []
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        hook_layers.append(ctx.layer)
+        if ctx.layer == CacheLayer.LOCAL and value["status"] == "bad":
+            return EvictAndFallback("bad_local_payload")
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="test_local_on_cache_hit_evicts_and_falls_back_to_remote",
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> dict[str, object]:
+        nonlocal source_calls
+        source_calls += 1
+        return {"status": "good", "source_calls": source_calls}
+
+    with gcache.enable():
+        assert cached_func(test=1) == {"status": "good", "source_calls": 1}
+
+        local_cache = get_local_cache_for_use_case(gcache, "test_local_on_cache_hit_evicts_and_falls_back_to_remote")
+        cached_entries = local_cache.caches["test_local_on_cache_hit_evicts_and_falls_back_to_remote"]
+        cached_value = next(iter(cached_entries.values()))
+        cached_value["status"] = "bad"
+
+        assert cached_func(test=1) == {"status": "good", "source_calls": 1}
+        assert cached_func(test=1) == {"status": "good", "source_calls": 1}
+
+    assert source_calls == 1
+    assert hook_layers == [CacheLayer.LOCAL, CacheLayer.REMOTE, CacheLayer.LOCAL]
+
+
+def test_local_on_cache_hit_returns_validated_value_without_reread(gcache: GCache) -> None:
+    use_case = "test_local_on_cache_hit_returns_validated_value_without_reread"
+    hook_calls = 0
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        nonlocal hook_calls
+        hook_calls += 1
+        if ctx.layer == CacheLayer.LOCAL:
+            local_cache = get_local_cache_for_use_case(gcache, use_case)
+            local_cache.caches[use_case][ctx.key] = {"value": "replaced"}
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case=use_case,
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> dict[str, str]:
+        return {"value": "cached"}
+
+    with gcache.enable():
+        assert cached_func(test=1) == {"value": "cached"}
+        assert cached_func(test=1) == {"value": "cached"}
+        assert cached_func(test=1) == {"value": "replaced"}
+
+    assert hook_calls == 2
+
+
+def test_remote_on_cache_hit_evicts_and_falls_back_to_source(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+) -> None:
+    source_calls = 0
+    remote_hit_enabled = False
+
+    cache_config_provider.configs["test_remote_on_cache_hit_evicts_and_falls_back_to_source"] = GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 60},
+        ramp={CacheLayer.LOCAL: 0, CacheLayer.REMOTE: 100},
+    )
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        if ctx.layer == CacheLayer.REMOTE and remote_hit_enabled:
+            return EvictAndFallback("force_remote_refetch")
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="test_remote_on_cache_hit_evicts_and_falls_back_to_source",
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> int:
+        nonlocal source_calls
+        source_calls += 1
+        return source_calls
+
+    with gcache.enable():
+        assert cached_func(test=1) == 1
+        remote_hit_enabled = True
+        assert cached_func(test=1) == 2
+        remote_hit_enabled = False
+        assert cached_func(test=1) == 2
+
+    assert source_calls == 2
+
+
+def test_on_cache_hit_exception_bypasses_current_layer(gcache: GCache) -> None:
+    source_calls = 0
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        if ctx.layer == CacheLayer.LOCAL:
+            raise RuntimeError("boom")
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="test_on_cache_hit_exception_bypasses_current_layer",
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> dict[str, object]:
+        nonlocal source_calls
+        source_calls += 1
+        return {"source_calls": source_calls}
+
+    with gcache.enable():
+        assert cached_func(test=1) == {"source_calls": 1}
+        assert cached_func(test=1) == {"source_calls": 1}
+
+        local_cache = get_local_cache_for_use_case(gcache, "test_on_cache_hit_exception_bypasses_current_layer")
+        assert len(local_cache.caches["test_on_cache_hit_exception_bypasses_current_layer"]) == 1
+
+    assert source_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_async_on_cache_hit_hook_is_awaited(gcache: GCache) -> None:
+    source_calls = 0
+    hook_layers: list[CacheLayer] = []
+
+    async def hook(ctx, value):  # type: ignore[no-untyped-def]
+        await asyncio.sleep(0)
+        hook_layers.append(ctx.layer)
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="test_async_on_cache_hit_hook_is_awaited",
+        on_cache_hit=hook,
+    )
+    async def cached_func(test: int) -> int:
+        nonlocal source_calls
+        source_calls += 1
+        return source_calls
+
+    with gcache.enable():
+        assert await cached_func(test=1) == 1
+        assert await cached_func(test=1) == 1
+
+    assert source_calls == 1
+    assert hook_layers == [CacheLayer.LOCAL]
+
+
+def test_invalid_on_cache_hit_decision_bypasses_current_layer(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+) -> None:
+    source_calls = 0
+    return_invalid_decision = True
+    use_case = "test_invalid_on_cache_hit_decision_bypasses_current_layer"
+
+    cache_config_provider.configs[use_case] = GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 60},
+        ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 0},
+    )
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        if ctx.layer == CacheLayer.LOCAL and return_invalid_decision:
+            return object()
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case=use_case,
+        on_cache_hit=hook,
+    )
+    def cached_func(test: int) -> int:
+        nonlocal source_calls
+        source_calls += 1
+        return source_calls
+
+    with gcache.enable():
+        assert cached_func(test=1) == 1
+        assert cached_func(test=1) == 2
+
+        return_invalid_decision = False
+        assert cached_func(test=1) == 1
+
+    assert source_calls == 2
 
 
 @pytest.mark.asyncio
@@ -327,7 +656,7 @@ def test_error_in_fallback(gcache: GCache) -> None:
 
 def test_error_in_cache(gcache: GCache, cache_config_provider: FakeCacheConfigProvider) -> None:
     class FailingCache(LocalCache):
-        async def get(self, key: GCacheKey, fallback: Fallback) -> None:
+        async def get(self, key: GCacheKey, fallback: Fallback, **kwargs) -> None:  # type: ignore[no-untyped-def]
             raise Exception("I'm giving up!")
 
     gcache._cache = CacheController(FailingCache(cache_config_provider), cache_config_provider)  # type: ignore[assignment]
@@ -450,6 +779,53 @@ async def test_do_not_write_if_invalidated(
         keys = redis_server.keys()
         assert 1 == len(keys)
         assert keys[0] == b"{urn:galileo:test:Test:123}#watermark"
+
+
+@pytest.mark.asyncio
+async def test_invalidation_skips_remote_hook(
+    gcache: GCache,
+    cache_config_provider: FakeCacheConfigProvider,
+) -> None:
+    use_case = "test_invalidation_skips_remote_hook"
+    source_calls = 0
+    remote_hook_calls = 0
+
+    cache_config_provider.configs[use_case] = GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: 60, CacheLayer.REMOTE: 60},
+        ramp={CacheLayer.LOCAL: 0, CacheLayer.REMOTE: 100},
+    )
+
+    def hook(ctx, value):  # type: ignore[no-untyped-def]
+        nonlocal remote_hook_calls
+        if ctx.layer == CacheLayer.REMOTE:
+            remote_hook_calls += 1
+        return ReturnCached()
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case=use_case,
+        track_for_invalidation=True,
+        on_cache_hit=hook,
+    )
+    async def cached_func(test: int) -> int:
+        nonlocal source_calls
+        source_calls += 1
+        return source_calls
+
+    with gcache.enable():
+        assert await cached_func(123) == 1
+
+        await gcache.ainvalidate("Test", "123")
+        await asyncio.sleep(0.01)
+
+        assert await cached_func(123) == 2
+        assert remote_hook_calls == 0
+
+        assert await cached_func(123) == 2
+
+    assert source_calls == 2
+    assert remote_hook_calls == 1
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger, LoggerAdapter
-from typing import Any, Union
+from typing import Any, TypeAlias, Union
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
@@ -129,6 +129,38 @@ class Serializer(ABC):
 
 
 @dataclass(frozen=True, slots=True)
+class CacheCallContext:
+    """
+    Context provided to cache-hit hooks.
+
+    The hook gets the cache key and the layer that produced the hit.
+    """
+
+    key: "GCacheKey"
+    layer: CacheLayer
+
+
+@dataclass(frozen=True, slots=True)
+class ReturnCached:
+    """Return the current cached value unchanged."""
+
+
+@dataclass(frozen=True, slots=True)
+class EvictAndFallback:
+    """
+    Evict the current layer's cached value and continue fallback resolution.
+
+    The reason is intended for low-cardinality logging and metrics.
+    """
+
+    reason: str | None = None
+
+
+CacheHitDecision: TypeAlias = ReturnCached | EvictAndFallback
+CacheHitHook: TypeAlias = Callable[[CacheCallContext, Any], CacheHitDecision | Awaitable[CacheHitDecision]]
+
+
+@dataclass(frozen=True, slots=True)
 class GCacheKey:
     key_type: str
     id: str
@@ -210,6 +242,7 @@ class GCacheConfig(BaseModel):
     metrics_prefix: str = "api_"
     redis_config: RedisConfig | None = None
     redis_client_factory: Callable[[], Redis | RedisCluster] | None = None
+    on_cache_hit: CacheHitHook | None = None
     logger: Logger | LoggerAdapter | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

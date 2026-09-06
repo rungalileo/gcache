@@ -3,10 +3,11 @@ from typing import Any
 
 from cachetools import TTLCache
 
+from gcache._internal.cache_hit import BypassCurrentLayer, run_cache_hit_hook
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import LOCAL_CACHE_MAX_SIZE
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey
+from gcache.config import CacheConfigProvider, CacheHitHook, CacheLayer, EvictAndFallback, GCacheKey, ReturnCached
 from gcache.exceptions import MissingKeyConfig
 
 
@@ -44,14 +45,41 @@ class LocalCache(CacheInterface):
 
         return cache
 
-    async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+    async def _exec_fallback(self, key: GCacheKey, fallback: Fallback) -> Any:
+        value = await fallback()
+        await self.put(key, value)
+        return value
+
+    async def get(
+        self,
+        key: GCacheKey,
+        fallback: Fallback,
+        *,
+        on_cache_hit: CacheHitHook | None = None,
+    ) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling local cache")
         cache = await self._get_ttl_cache(key)
 
         if key not in cache:
-            await self.put(key, await fallback())
+            return await self._exec_fallback(key, fallback)
 
-        return cache[key]
+        cached_value = cache[key]
+
+        decision = await run_cache_hit_hook(
+            key=key,
+            layer=self.layer(),
+            value=cached_value,
+            on_cache_hit=on_cache_hit,
+        )
+        if isinstance(decision, ReturnCached):
+            return cached_value
+        if isinstance(decision, EvictAndFallback):
+            cache.pop(key, None)
+            return await self._exec_fallback(key, fallback)
+        if isinstance(decision, BypassCurrentLayer):
+            return await fallback()
+
+        return cached_value
 
     async def put(self, key: GCacheKey, value: Any) -> None:
         (await self._get_ttl_cache(key))[key] = value

@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from functools import partial
 from typing import Any
 
+from gcache._internal.envelope import Envelope
 from gcache._internal.event_loop_thread import EventLoopThread, EventLoopThreadPool
 from gcache._internal.local_cache import LocalCache
 from gcache._internal.metrics import GCacheMetrics
@@ -154,6 +155,7 @@ class GCache:
         track_for_invalidation: bool = False,
         default_config: GCacheKeyConfig | None = None,
         serializer: Serializer | None = None,
+        envelope: Envelope = Envelope.PICKLE,
     ) -> Any:
         """
         Decorator which caches a function which can be either sync or async.
@@ -175,6 +177,11 @@ class GCache:
         :param serializer: Optional serializer to use to serialize and deserialize cache values.  Care must be taken that
                            the returned value matches the signature of cached function, as otherwise you may get runtime
                            type/attribute errors.
+        :param envelope: How the value is framed in Redis.  ``Envelope.PICKLE`` (the default) serializes arbitrary
+                         Python objects but is readable only from Python.  ``Envelope.JSON`` writes the same envelope
+                         the TypeScript and Go clients use, so the entry can be shared across languages; it requires a
+                         ``Serializer`` producing str/bytes (pass ``serializer=JsonSerializer()``).  Reads always sniff
+                         the stored envelope, so switching this on an existing key needs no flag day.
         :return:
         """
 
@@ -264,6 +271,7 @@ class GCache:
                         invalidation_tracking=track_for_invalidation,
                         default_config=default_config,
                         serializer=serializer,
+                        envelope=envelope,
                     )
                 except Exception as e:
                     # Default to fallback but instrument the error as well as log.

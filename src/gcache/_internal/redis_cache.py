@@ -11,6 +11,7 @@ from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import ASYNC_PICKLE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
+from gcache._internal.envelope import DecodedValue, Envelope, EnvelopeDecodeError, decode, encode_json, is_pickle
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, RedisConfig
@@ -124,9 +125,9 @@ class RedisCache(CacheInterface):
         await self.client.setex(key, WATERMARK_TTL_SECONDS, exp_ms)
 
     @staticmethod
-    async def _async_pickle_loads(data: bytes) -> Any:
+    async def _async_decode(data: bytes) -> DecodedValue:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(RedisCache._executor, pickle.loads, data)
+        return await loop.run_in_executor(RedisCache._executor, decode, data)
 
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
@@ -143,11 +144,20 @@ class RedisCache(CacheInterface):
         if val_pickle is not None:
             start_sec = time.monotonic()
 
-            deserialized_value: RedisValue = (
-                pickle.loads(val_pickle)
-                if len(val_pickle) < ASYNC_PICKLE_THRESHOLD_BYTES
-                else await RedisCache._async_pickle_loads(val_pickle)
-            )
+            # Sniff the envelope rather than trusting key.envelope: a key may have been
+            # written under a different envelope (mid-migration, or by another language's
+            # client), and a reader must still understand it.
+            try:
+                deserialized_value: DecodedValue = (
+                    decode(val_pickle)
+                    if not is_pickle(val_pickle) or len(val_pickle) < ASYNC_PICKLE_THRESHOLD_BYTES
+                    else await RedisCache._async_decode(val_pickle)
+                )
+            except EnvelopeDecodeError:
+                # Treat an undecodable value as a miss rather than raising: a cache must not
+                # be able to fail a request. The fallback repopulates it in our own envelope.
+                _GLOBAL_GCACHE_STATE.logger.warning("Undecodable cache value for %s; treating as miss", key.urn)
+                return await self._exec_fallback(key, watermark_ms, fallback)
 
             # Load payload using custom serializer if present.
             payload = deserialized_value.payload
@@ -176,24 +186,32 @@ class RedisCache(CacheInterface):
 
         current_time_ms = int(time.time() * 1000)
 
+        ttl = config.ttl_sec.get(self.layer(), None)
+        if ttl is None:
+            raise MissingKeyConfig(key.use_case)
+
         start_time = time.monotonic()
         serialized_value = value if key.serializer is None else await key.serializer.dump(value)
 
-        val_pickle = pickle.dumps(
-            RedisValue(created_at_ms=current_time_ms, payload=serialized_value), protocol=pickle.HIGHEST_PROTOCOL
-        )
+        if key.envelope is Envelope.JSON:
+            if not isinstance(serialized_value, str | bytes):
+                raise TypeError(
+                    f"Envelope.JSON requires a Serializer producing str or bytes for use case "
+                    f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=JsonSerializer()."
+                )
+            encoded = encode_json(current_time_ms, ttl, serialized_value)
+        else:
+            encoded = pickle.dumps(
+                RedisValue(created_at_ms=current_time_ms, payload=serialized_value), protocol=pickle.HIGHEST_PROTOCOL
+            )
 
         GCacheMetrics.SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "dump").observe(
             time.monotonic() - start_time
         )
 
-        GCacheMetrics.SIZE_HISTOGRAM.labels(key.use_case, key.key_type, self.layer().name).observe(len(val_pickle))
+        GCacheMetrics.SIZE_HISTOGRAM.labels(key.use_case, key.key_type, self.layer().name).observe(len(encoded))
 
-        ttl = config.ttl_sec.get(self.layer(), None)
-        if ttl is None:
-            raise MissingKeyConfig(key.use_case)
-
-        await self.client.setex(key.urn, ttl, val_pickle)
+        await self.client.setex(key.urn, ttl, encoded)
 
     async def delete(self, key: GCacheKey) -> bool:
         return (await self.client.delete(key.urn)) > 0

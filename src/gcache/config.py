@@ -9,6 +9,7 @@ from typing import Any, Union
 from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
 
+from gcache._internal.envelope import Envelope
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 
 
@@ -128,6 +129,21 @@ class Serializer(ABC):
         pass
 
 
+class JsonSerializer(Serializer):
+    """JSON serializer, for values shared with non-Python readers.
+
+    Pairs with ``Envelope.JSON``: that envelope carries a string payload, so a key using it
+    needs a serializer that produces one. Only JSON-representable values work -- that is the
+    trade for being readable outside Python.
+    """
+
+    async def dump(self, obj: Any) -> str:
+        return json.dumps(obj, separators=(",", ":"))
+
+    async def load(self, data: bytes | str) -> Any:
+        return json.loads(data)
+
+
 @dataclass(frozen=True, slots=True)
 class GCacheKey:
     key_type: str
@@ -137,6 +153,10 @@ class GCacheKey:
     invalidation_tracking: bool = False
     default_config: GCacheKeyConfig | None = None
     serializer: Serializer | None = None
+    # How the value is framed in Redis. PICKLE (the default) is Python-only; JSON makes the
+    # entry readable by the TypeScript and Go clients. Reads sniff the envelope regardless,
+    # so this only governs writes and a key can be switched without a flag day.
+    envelope: Envelope = Envelope.PICKLE
     # Cached computed fields (set in __post_init__)
     prefix: str = field(init=False)
     urn: str = field(init=False)

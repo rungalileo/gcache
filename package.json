@@ -1,7 +1,7 @@
 {
   "name": "dialcache",
   "version": "0.23.2",
-  "description": "Fine-grained TypeScript caching with explicit local and Redis controls.",
+  "description": "A TypeScript library that organizes caching into use cases, with runtime control and observability for each one.",
   "license": "MIT",
   "sideEffects": false,
   "type": "module",
@@ -81,6 +81,9 @@
     "benchmark:stale-on-error": "pnpm build && node scripts/benchmark-stale-on-error.mjs",
     "build": "tsup src/index.ts src/datadog.ts src/node-redis.ts src/prometheus.ts src/redis-protocol.ts src/valkey-glide.ts --format esm,cjs --dts --clean",
     "check": "pnpm typecheck && pnpm test && pnpm build && pnpm test:package",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
@@ -90,8 +93,9 @@
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "overrides": {
-      "brace-expansion@<=5.0.7": "5.0.8",
-      "esbuild@<0.28.1": "^0.28.1"
+      "brace-expansion@<5.0.9": "5.0.9",
+      "esbuild@<0.28.1": "^0.28.1",
+      "vitepress@1.6.4>vite": "^6.4.3"
     }
   },
   "engines": {
@@ -110,6 +114,7 @@
     "testcontainers": "^12.0.4",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
+    "vitepress": "1.6.4",
     "vitest": "^4.0.14"
   },
   "peerDependencies": {

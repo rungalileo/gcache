@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,20 @@ const fallbackTimeoutMarker = "dialcache-fallback-timeout-delivered";
 const nodeInvalidationMarker = "dialcache-node-invalidation-retry-verified";
 const observerIsolationMarker = "dialcache-observer-rejections-isolated";
 const shadowPayloadReleaseMarker = "dialcache-shadow-payload-released";
+// Run the actual first TypeScript block from each onboarding page, without a
+// separately maintained copy that could keep passing after the docs break.
+const documentationExamples = [
+  {
+    source: "README.md",
+    filename: "readme-example.mts",
+    stdout: "Loading from source: 123\nLoading from source: 456\nLoading from source: 123\n",
+  },
+  {
+    source: "docs/getting-started.md",
+    filename: "getting-started-example.mts",
+    stdout: "1\n2\n",
+  },
+];
 const packedInvalidationCheckSource = String.raw`
 function createPackedNodeRedisInvalidationAdapter(nodeRedis, dispatch, label) {
   const client = {
@@ -995,8 +1009,20 @@ try {
     writeFile(join(workspace, "root-consumer.cts"), rootConsumer),
     writeFile(
       join(workspace, "tsconfig.root.json"),
-      typescriptConfig(["root-consumer.mts", "root-consumer.cts"]),
+      typescriptConfig([
+        "root-consumer.mts",
+        "root-consumer.cts",
+        ...documentationExamples.map((example) => example.filename),
+      ]),
     ),
+    ...documentationExamples.map(async (example) => {
+      const markdown = await readFile(join(root, example.source), "utf8");
+      const code = markdown.match(/^```ts\r?\n([\s\S]*?)^```\s*$/m)?.[1];
+      if (code === undefined) {
+        throw new Error(`${example.source} has no runnable TypeScript example`);
+      }
+      await writeFile(join(workspace, example.filename), code);
+    }),
   ]);
 
   const { stdout: esmRootRuntimeOutput } = await exec(
@@ -1749,6 +1775,17 @@ void (async () => {
     ["--project", join(workspace, "tsconfig.root.json")],
     { cwd: workspace },
   );
+
+  for (const example of documentationExamples) {
+    const { stdout } = await exec(
+      process.execPath,
+      ["--experimental-strip-types", example.filename],
+      { cwd: workspace, timeout: 10_000 },
+    );
+    if (stdout !== example.stdout) {
+      throw new Error(`${example.source} produced unexpected output: ${JSON.stringify(stdout)}`);
+    }
+  }
 
   await exec(
     "npm",

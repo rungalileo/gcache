@@ -10,7 +10,7 @@ export default {
           // A version PR records the selected version without selecting a new
           // release itself. Earlier commits still determine the release type.
           { type: "release", release: false },
-          // Pre-1.0 policy — see README "Releasing", which owns this table.
+          // Pre-1.0 policy — see docs/maintainers.md "Releasing", which owns this table.
           // Restore "major" here when cutting 1.0.0.
           { breaking: true, release: "minor" },
           { type: "feat", release: "minor" },

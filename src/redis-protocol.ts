@@ -9,9 +9,9 @@
  * dispatch and its recovery. The
  * payload region past the header is opaque at this layer: entries written by
  * DialCache releases with payload compression may begin with a compression
- * envelope byte (0x00 escape, 0x01/0x02 zstd; see the README Compression
- * section), which DialCache core interprets above the adapter. Adapters must
- * never decompress or otherwise rewrite payload bytes.
+ * envelope byte (0x00 escape, 0x01/0x02 zstd; see docs/redis.md, Compression),
+ * which DialCache core interprets above the adapter. Adapters must never
+ * decompress or otherwise rewrite payload bytes.
  */
 export { ceilSupportedCacheTtlMs } from "./internal/duration.js";
 export type { CacheMissReason } from "./metrics.js";

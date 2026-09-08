@@ -14,5 +14,5 @@
     "types": ["node", "vitest/globals"],
     "skipLibCheck": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "docs/.vitepress/config.mts"]
 }

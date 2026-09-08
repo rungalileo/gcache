@@ -17,7 +17,7 @@ import type { RedisCachePayload } from "../redis-client.js";
  * Entries written by older releases have no envelope: a legacy binary payload
  * whose first bytes mimic the envelope (0x01/0x02 followed by a zstd-parsable
  * stream, or 0x00 followed by another envelope byte) is misread until it
- * expires. The README documents this residual and the key-versioning
+ * expires. See docs/upgrading.md for this residual and the key-versioning
  * migration for serializers whose output can begin with these bytes.
  */
 export const MARKER_ESCAPED_RAW = 0x00;
@@ -174,7 +174,7 @@ export function compressPayload(
  * whose decompressed size would exceed the cap, is returned unchanged; the
  * caller's load then fails and the existing miss path repopulates the entry.
  * zstd acceptance of a non-DialCache payload is possible only for legacy
- * entries written before escaping existed (see README residual). Never
+ * entries written before escaping existed (see docs/upgrading.md). Never
  * mutates the input and holds no state, keeping repeated loads of a retained
  * payload independent.
  */

@@ -7,6 +7,8 @@ DialCache is a TypeScript caching library with explicit request-scoped enablemen
 ## Structure
 
 ```text
+README.md              # Landing page and documentation entry point
+docs/                  # User guides and API reference
 src/
   index.ts              # Public root entry point (barrel)
   dialcache.ts          # Main DialCache API and cached-function wrapper
@@ -47,6 +49,8 @@ test/                   # Unit and Redis integration tests
 ## Conventions
 
 - Preserve strict TypeScript settings and public abstraction boundaries.
+- Keep the README focused on evaluation and getting started. Document complete
+  feature behavior in `docs/` and link it from `docs/index.md`.
 - Keep Redis client-specific behavior in adapters; core code depends on `DialCacheRedisClient`.
 - Public exports belong in the root or an explicit integration entry point such as `src/node-redis.ts`, `src/prometheus.ts`, or `src/redis-protocol.ts`.
 - Use `corepack pnpm` for project commands.

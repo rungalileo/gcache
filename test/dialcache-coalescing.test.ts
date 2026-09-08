@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CacheLayer, DialCache, DialCacheKeyConfig, type DialCacheMetricsAdapter } from "../src/index.js";
+import { CacheLayer, DialCache, DialCacheKeyConfig, JsonSerializer, type DialCacheMetricsAdapter } from "../src/index.js";
 import { FakeRedis } from "./fake-redis.js";
 
 interface Deferred<T> {
@@ -336,6 +336,66 @@ describe("DialCache request coalescing", () => {
       { id: "1", calls: 1 },
       { id: "1", calls: 1 },
     ]);
+  });
+
+  it.each([true, false])("uses coalescing policy for calls after tracked invalidation (coalesce=%s)", async (coalesce) => {
+    const redis = new FakeRedis();
+    const loadStarted = deferred<void>();
+    const loadGate = deferred<void>();
+    const { metrics, coalesced } = spyMetrics();
+    const json = new JsonSerializer<{ id: string; version: number }>();
+    const dialcache = new DialCache({ redis: { client: redis, readTimeoutMs: 1_000 }, metrics });
+    let version = 1;
+    const source = vi.fn(async (id: string) => ({ id, version }));
+    const getUser = dialcache.cached(source, {
+      keyType: "user_id",
+      useCase: "TrackedInvalidationFlight",
+      cacheKey: (id) => id,
+      trackForInvalidation: true,
+      defaultConfig: new DialCacheKeyConfig({
+        ttlSec: { [CacheLayer.REMOTE]: 60 },
+        // Exercise the default as well as the explicit opt-out.
+        ...(coalesce ? {} : { coalesce: false }),
+      }),
+      serializer: {
+        dump: (value) => json.dump(value),
+        load: async (payload) => {
+          const value = await json.load(payload);
+          loadStarted.resolve();
+          await loadGate.promise;
+          return value;
+        },
+      },
+    });
+
+    // Warm Redis, then hold a validated old snapshot inside deserialization.
+    await dialcache.enable(() => getUser("1"));
+    source.mockClear();
+    redis.mGetCalls = 0;
+    const beforeInvalidation = dialcache.enable(() => getUser("1"));
+    await loadStarted.promise;
+
+    // A separate request starts only after the source change and invalidation.
+    version = 2;
+    await dialcache.invalidateRemote("user_id", "1", 5_000);
+    const afterInvalidation = dialcache.enable(() => getUser("1"));
+    const results = Promise.all([beforeInvalidation, afterInvalidation]);
+    try {
+      await tick();
+      expect(redis.mGetCalls).toBe(coalesce ? 1 : 2);
+      expect(coalesced).toHaveBeenCalledTimes(coalesce ? 1 : 0);
+    } finally {
+      loadGate.resolve();
+    }
+
+    await expect(results).resolves.toEqual([
+      { id: "1", version: 1 },
+      { id: "1", version: coalesce ? 1 : 2 },
+    ]);
+    expect(source).toHaveBeenCalledTimes(coalesce ? 0 : 1);
+
+    // Once the earlier flight settles, both policies observe the watermark.
+    await expect(dialcache.enable(() => getUser("1"))).resolves.toEqual({ id: "1", version: 2 });
   });
 
   it("keeps different keys isolated while coalescing concurrent misses", async () => {

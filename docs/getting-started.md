@@ -76,7 +76,8 @@ to preserve a `Date` through serialization.
 The wrapper preserves the input parameters and always returns a `Promise`.
 `keyType` identifies the entity kind; `useCase` identifies the operation.
 `cacheKey` selects the result's identity. Include every input that can change
-the result, such as locale or tenant.
+the result, such as locale or tenant. [Keys and identity](keys.md) explains
+the components and how they group tracked results for invalidation.
 
 The example enables only process-local storage, with a 60-second TTL and an
 implicit 100% ramp. Its LRU holds up to 10,000 entries across all use cases on

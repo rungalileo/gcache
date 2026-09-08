@@ -18,7 +18,7 @@ const documentationExamples = [
   {
     source: "README.md",
     filename: "readme-example.mts",
-    stdout: "Loading from source: 123\nLoading from source: 456\nLoading from source: 123\n",
+    stdout: "Loading from source: 123\nLoading from source: 123\n",
   },
   {
     source: "docs/getting-started.md",

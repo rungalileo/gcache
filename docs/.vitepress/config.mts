@@ -26,25 +26,36 @@ export default defineConfig({
         items: [
           { text: "Overview", link: "/" },
           { text: "Getting started", link: "/getting-started" },
-          { text: "How DialCache works", link: "/concepts" },
         ],
       },
       {
-        text: "Features and behavior",
+        text: "Core model",
         items: [
-          { text: "Configuration", link: "/configuration" },
-          { text: "Redis and Valkey", link: "/redis" },
+          { text: "How DialCache works", link: "/concepts" },
+          { text: "Keys and identity", link: "/keys" },
+          { text: "Configuration and rollout", link: "/configuration" },
+        ],
+      },
+      {
+        text: "Feature guides",
+        items: [
           { text: "Targeted invalidation", link: "/invalidation" },
           { text: "Stale-on-error", link: "/stale-on-error" },
           { text: "Shadow validation", link: "/shadow-validation" },
           { text: "Coalescing and liveness", link: "/coalescing" },
+        ],
+      },
+      {
+        text: "Reference and integrations",
+        items: [
+          { text: "API reference", link: "/api" },
+          { text: "Redis and Valkey", link: "/redis" },
           { text: "Observability", link: "/observability" },
         ],
       },
       {
-        text: "Reference and operations",
+        text: "Maintenance",
         items: [
-          { text: "API reference", link: "/api" },
           { text: "Upgrading", link: "/upgrading" },
           { text: "Maintainer guide", link: "/maintainers" },
         ],

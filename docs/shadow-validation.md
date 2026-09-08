@@ -12,7 +12,20 @@ Shadow work is opt-in, sampled by key, and detached. Configure its own ramp and
 a metrics adapter with `shadowValidation` support. The caller does not await
 shadow reads, comparison, confirmation, or fills.
 
-## At a glance
+## What a check establishes
+
+A sampled cached value is compared with a source result. Equality reports
+`match`. On disagreement, DialCache reads Redis again: if the payload changed
+or disappeared, the observation is `superseded`; if the original payload remains,
+it reports `mismatch`. A mismatch is diagnostic and does not trigger repair.
+
+This is a sampled coherence signal, with [race boundaries](#consistency-modes-and-race-boundaries),
+not proof that every cached value is current. Missing values can be filled as a
+secondary capability.
+
+<a id="at-a-glance"></a>
+
+## Caller paths
 
 | Caller path | Additional shadow work | Caller receives |
 | --- | --- | --- |

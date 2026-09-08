@@ -2,19 +2,20 @@
 
 [Documentation](index.md) · [API reference](api.md)
 
-By default, DialCache shares same-key in-flight work within a request or a
-`DialCache` instance, according to the active layers. A per-use-case policy can
-disable that sharing. Each active remote read has a finite deadline. A separate
-default deadline begins when an initially enabled invocation starts its fallback
-loader.
+Coalescing lets concurrent same-key calls share one execution and its result,
+including errors. DialCache enables it by default when a cache layer is active;
+`coalesce: false` gives each caller an independent path. Settled cache hits still
+apply in either mode.
 
-These mechanisms reduce duplicate source work. Their deadlines help flights
-settle, but eventual cleanup still requires finite application-owned budgets
-for every injected operation. They do not replace cross-process coordination,
-source-native cancellation, admission control, or backpressure.
+Sharing happens within a request or one `DialCache` instance, according to the
+active layers. It does not coordinate across processes. [Followers inherit](#what-followers-inherit)
+the leader's execution policy, so identity must be sufficient for sharing work
+as well as values.
 
-Detached [shadow work](shadow-validation.md) has a separate instance-level
-registry and capacity limit. It is not another coalescing scope.
+[Deadlines](#fallback-deadlines) bound remote reads and source loaders separately.
+Injected operations still need [application-owned budgets](#application-owned-budgets).
+Detached [shadow work](shadow-validation.md) has its own registry and capacity;
+it is not another caller coalescing scope.
 
 ## Request coalescing
 
@@ -171,7 +172,7 @@ described below.
 
 Layer activity follows resolved TTL/ramp policy. `localMaxSize: 0` disables
 storage but does not bypass an otherwise active local layer, so concurrent calls
-can still share a process flight. See [Process-local cache](configuration.md#process-local-cache).
+can still share a process flight. See [Process-local cache](concepts.md#process-local-cache).
 
 The full constructed cache key always defines cached-value identity. Include
 locale, auth context, or any other input that can change the returned value,

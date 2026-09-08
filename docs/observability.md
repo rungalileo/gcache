@@ -10,6 +10,10 @@ DialCache provides first-party adapters for Prometheus and Datadog. Both use
 caller-created, caller-owned clients and preserve one backend-neutral set of
 bounded labels.
 
+Choose [Prometheus](#prometheus) or [Datadog](#datadog) for setup. The
+[metric catalog](#metric-catalog) defines shared semantics; the outcome tables
+below it explain individual feature signals.
+
 ## Reading the signals
 
 Start with source load and caller latency, then explain changes with the cache
@@ -104,64 +108,7 @@ Bucket boundaries are fixed; the adapter has no bucket customization option:
 
 ### Prometheus metrics
 
-The names below exclude the optional caller-selected prefix:
-
-| Metric | Type | Labels | Description |
-| --- | --- | --- | --- |
-| `dialcache_request_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer` | Cache-layer requests that reached an enabled layer |
-| `dialcache_miss_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer`, `reason` | Cache misses, classified by one required bounded reason |
-| `dialcache_disabled_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer`, `reason` | Cache skips (`context`, `policy_disabled`, `invalid_ttl`, `invalid_ramp`, `ramped_down`, `config_error`) |
-| `dialcache_error_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer`, `error`, `in_fallback` | Cache/fallback errors and the bounded `tracked_ttl_clamped` configuration signal |
-| `dialcache_invalidation_counter` | Counter | `cache_namespace`, `key_type`, `layer` | Invalidation calls for the layers touched |
-| `dialcache_coalesced_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `scope` | Coalesced requests split by `request_local` or `process` scope |
-| `dialcache_shadow_validation_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `outcome` | Sampled Redis shadow-job outcomes |
-| `dialcache_shadow_value_age_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `outcome` | Age in seconds of the validated Redis value at shadow verdict time, recorded for `match` and `mismatch` |
-| `dialcache_future_timestamp_offset_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Positive offset in seconds for a valid frame dated after the observing process clock |
-| `dialcache_stale_recovery_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `outcome` | Classifier-authorized stale-recovery checks: `served`, `miss`, or `deserialization_error` |
-| `dialcache_stale_recovery_value_age_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `outcome` | Actual return-time age in seconds of a retained value, recorded only for `served` |
-| `dialcache_compression_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer`, `outcome` | Payload compression outcomes: writes record `compressed`, `below_threshold`, `not_smaller`, or `write_over_limit`; reads record `decompressed`, `fallback_raw`, or `read_over_limit` |
-| `dialcache_get_timer` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Cache get latency in seconds |
-| `dialcache_fallback_timer` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Elapsed time until the underlying function settles or timeout rejection is delivered |
-| `dialcache_serialization_timer` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer`, `operation` | Redis serializer dump/load latency |
-| `dialcache_size_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Serialized Redis payload size in bytes, before compression |
-| `dialcache_stored_size_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Prepared Redis payload size in bytes, after compression and escaping; before dispatch |
-| `dialcache_compression_ratio_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Compressed-to-original payload size ratio for compressed writes |
-| `dialcache_compression_timer` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer`, `operation` | Payload compression and decompression latency in seconds |
-
-The disabled reasons are:
-
-- `context`;
-- `policy_disabled`;
-- `invalid_ttl`;
-- `invalid_ramp`;
-- `ramped_down`; and
-- `config_error`.
-
-`policy_disabled` means that a process-local or remote layer has no effective
-TTL after runtime overlays. This is an intentional policy result, including the
-default when `defaultConfig` is omitted, rather than a configuration-loading
-failure.
-
-Every metric includes `cache_namespace`, even disabled-context,
-key-construction, coalescing, and invalidation paths that do not have a
-constructed key. Its value is `DialCacheConfig.namespace`, which defaults to
-`urn`.
-
-The `layer` label is:
-
-- `request_local`;
-- `local`, meaning process-local;
-- `remote`;
-- `remote_shadow` for Redis reads, fills, serialization, compression, and
-  payload sizes performed by detached shadow jobs; or
-- `noop` for disabled-context, key-construction, and config-provider failures
-  where no cache layer was reached.
-
-The bounded `scope` label on `dialcache_coalesced_counter` distinguishes
-`request_local` from `process`. `scope="process"` coordinates calls only within
-one `DialCache` instance; separate instances in the same process do not share
-in-flight state. A use case with `coalesce: false` emits no coalesced counter;
-each caller instead emits its own request, miss, duration, and error metrics.
+See the [metric catalog](#metric-catalog) for names, types, labels, and meanings.
 
 ## Datadog
 
@@ -264,27 +211,29 @@ with the adapter namespace. Client-level `globalTags` are appended by
 The adapter emits exact increments of `1` for counters and preserves seconds
 and bytes without unit conversion:
 
-| Metric | Type | Tags | Description |
-| --- | --- | --- | --- |
-| `dialcache.request.count` | Count | `cache_namespace`, `use_case`, `key_type`, `layer` | Cache-layer requests that reached an enabled layer |
-| `dialcache.miss.count` | Count | `cache_namespace`, `use_case`, `key_type`, `layer`, `reason` | Cache misses, classified by one required bounded reason |
-| `dialcache.disabled.count` | Count | `cache_namespace`, `use_case`, `key_type`, `layer`, `reason` | Cache skips by bounded reason |
-| `dialcache.error.count` | Count | `cache_namespace`, `use_case`, `key_type`, `layer`, `error`, `in_fallback` | Cache/fallback errors and the bounded `tracked_ttl_clamped` configuration signal |
-| `dialcache.invalidation.count` | Count | `cache_namespace`, `key_type`, `layer` | Invalidation calls for the layers touched |
-| `dialcache.coalesced.count` | Count | `cache_namespace`, `use_case`, `key_type`, `scope` | Coalesced requests by sharing scope |
-| `dialcache.shadow.count` | Count | `cache_namespace`, `use_case`, `key_type`, `outcome` | Sampled Redis shadow-job outcomes |
-| `dialcache.shadow.value_age` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `outcome` | Age in seconds of the validated Redis value at shadow verdict time, recorded for `match` and `mismatch` |
-| `dialcache.future_timestamp_offset` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Positive offset in seconds for a valid frame dated after the observing process clock |
-| `dialcache.stale_recovery.count` | Count | `cache_namespace`, `use_case`, `key_type`, `outcome` | Classifier-authorized stale-recovery checks: `served`, `miss`, or `deserialization_error` |
-| `dialcache.stale_recovery.value_age` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `outcome` | Actual return-time age in seconds of a retained value, recorded only for `served` |
-| `dialcache.compression.count` | Count | `cache_namespace`, `use_case`, `key_type`, `layer`, `outcome` | Payload compression outcomes: writes record `compressed`, `below_threshold`, `not_smaller`, or `write_over_limit`; reads record `decompressed`, `fallback_raw`, or `read_over_limit` |
-| `dialcache.get.duration` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Cache get latency in seconds |
-| `dialcache.fallback.duration` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Elapsed time until the underlying function settles or timeout rejection is delivered |
-| `dialcache.serialization.duration` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `layer`, `operation` | Redis serializer dump/load latency in seconds |
-| `dialcache.serialization.size` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Serialized Redis payload size in bytes, before compression |
-| `dialcache.stored.size` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Prepared Redis payload size in bytes, after compression and escaping; before dispatch |
-| `dialcache.compression.ratio` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Compressed-to-original payload size ratio for compressed writes |
-| `dialcache.compression.duration` | Distribution or histogram | `cache_namespace`, `use_case`, `key_type`, `layer`, `operation` | Payload compression and decompression latency in seconds |
+| Datadog metric | Type | Prometheus equivalent |
+| --- | --- | --- |
+| `dialcache.request.count` | Count | `dialcache_request_counter` |
+| `dialcache.miss.count` | Count | `dialcache_miss_counter` |
+| `dialcache.disabled.count` | Count | `dialcache_disabled_counter` |
+| `dialcache.error.count` | Count | `dialcache_error_counter` |
+| `dialcache.invalidation.count` | Count | `dialcache_invalidation_counter` |
+| `dialcache.coalesced.count` | Count | `dialcache_coalesced_counter` |
+| `dialcache.shadow.count` | Count | `dialcache_shadow_validation_counter` |
+| `dialcache.shadow.value_age` | Distribution or histogram | `dialcache_shadow_value_age_histogram` |
+| `dialcache.future_timestamp_offset` | Distribution or histogram | `dialcache_future_timestamp_offset_histogram` |
+| `dialcache.stale_recovery.count` | Count | `dialcache_stale_recovery_counter` |
+| `dialcache.stale_recovery.value_age` | Distribution or histogram | `dialcache_stale_recovery_value_age_histogram` |
+| `dialcache.compression.count` | Count | `dialcache_compression_counter` |
+| `dialcache.get.duration` | Distribution or histogram | `dialcache_get_timer` |
+| `dialcache.fallback.duration` | Distribution or histogram | `dialcache_fallback_timer` |
+| `dialcache.serialization.duration` | Distribution or histogram | `dialcache_serialization_timer` |
+| `dialcache.serialization.size` | Distribution or histogram | `dialcache_size_histogram` |
+| `dialcache.stored.size` | Distribution or histogram | `dialcache_stored_size_histogram` |
+| `dialcache.compression.ratio` | Distribution or histogram | `dialcache_compression_ratio_histogram` |
+| `dialcache.compression.duration` | Distribution or histogram | `dialcache_compression_timer` |
+
+Labels and meanings are shared with the [metric catalog](#metric-catalog).
 
 Synchronous client throws are isolated when DialCache invokes the adapter.
 DialCache also consumes thenables returned by adapter hooks, but this adapter does
@@ -293,6 +242,59 @@ not forward every client return value: only `shadowValidation` and
 handle its own asynchronous delivery failures, including rejected promises.
 Direct adapter calls do not have DialCache's observer guard. Configure client error
 handling and shutdown as part of application ownership.
+
+## Metric catalog
+
+This table uses Prometheus names and types, without the optional prefix.
+[Datadog metrics](#datadog-metrics) map to the same observations and labels.
+
+| Metric | Type | Labels | Description |
+| --- | --- | --- | --- |
+| `dialcache_request_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer` | Cache-layer requests that reached an enabled layer |
+| `dialcache_miss_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer`, `reason` | Cache misses, classified by one required bounded reason |
+| `dialcache_disabled_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer`, `reason` | Cache skips (`context`, `policy_disabled`, `invalid_ttl`, `invalid_ramp`, `ramped_down`, `config_error`) |
+| `dialcache_error_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer`, `error`, `in_fallback` | Cache/fallback errors and the bounded `tracked_ttl_clamped` configuration signal |
+| `dialcache_invalidation_counter` | Counter | `cache_namespace`, `key_type`, `layer` | Invalidation calls for the layers touched |
+| `dialcache_coalesced_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `scope` | Coalesced requests split by `request_local` or `process` scope |
+| `dialcache_shadow_validation_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `outcome` | Sampled Redis shadow-job outcomes |
+| `dialcache_shadow_value_age_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `outcome` | Age in seconds of the validated Redis value at shadow verdict time, recorded for `match` and `mismatch` |
+| `dialcache_future_timestamp_offset_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Positive offset in seconds for a valid frame dated after the observing process clock |
+| `dialcache_stale_recovery_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `outcome` | Classifier-authorized stale-recovery checks: `served`, `miss`, or `deserialization_error` |
+| `dialcache_stale_recovery_value_age_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `outcome` | Actual return-time age in seconds of a retained value, recorded only for `served` |
+| `dialcache_compression_counter` | Counter | `cache_namespace`, `use_case`, `key_type`, `layer`, `outcome` | Payload compression outcomes: writes record `compressed`, `below_threshold`, `not_smaller`, or `write_over_limit`; reads record `decompressed`, `fallback_raw`, or `read_over_limit` |
+| `dialcache_get_timer` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Cache get latency in seconds |
+| `dialcache_fallback_timer` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Elapsed time until the underlying function settles or timeout rejection is delivered |
+| `dialcache_serialization_timer` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer`, `operation` | Redis serializer dump/load latency |
+| `dialcache_size_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Serialized Redis payload size in bytes, before compression |
+| `dialcache_stored_size_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Prepared Redis payload size in bytes, after compression and escaping; before dispatch |
+| `dialcache_compression_ratio_histogram` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer` | Compressed-to-original payload size ratio for compressed writes |
+| `dialcache_compression_timer` | Histogram | `cache_namespace`, `use_case`, `key_type`, `layer`, `operation` | Payload compression and decompression latency in seconds |
+
+`policy_disabled` means that a process-local or remote layer has no effective
+TTL after runtime overlays. This is an intentional policy result, including the
+default when `defaultConfig` is omitted, rather than a configuration-loading
+failure.
+
+Every metric includes `cache_namespace`, even disabled-context,
+key-construction, coalescing, and invalidation paths that do not have a
+constructed key. Its value is `DialCacheConfig.namespace`, which defaults to
+`urn`.
+
+The `layer` label is:
+
+- `request_local`;
+- `local`, meaning process-local;
+- `remote`;
+- `remote_shadow` for Redis reads, fills, serialization, compression, and
+  payload sizes performed by detached shadow jobs; or
+- `noop` for disabled-context, key-construction, and config-provider failures
+  where no cache layer was reached.
+
+The bounded `scope` label on `dialcache_coalesced_counter` distinguishes
+`request_local` from `process`. `scope="process"` coordinates calls only within
+one `DialCache` instance; separate instances in the same process do not share
+in-flight state. A use case with `coalesce: false` emits no coalesced counter;
+each caller instead emits its own request, miss, duration, and error metrics.
 
 ## Shadow outcomes
 

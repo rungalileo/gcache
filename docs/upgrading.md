@@ -58,7 +58,7 @@ presence even when the value is `undefined`:
 | `RedisConfig.createClient` | Create and connect the client in the application, then pass the semantic `client` |
 | `RedisConfig.watermarkTtlSec` | Remove it; DialCache derives watermark retention |
 
-See [Runtime validation](configuration.md#validation-and-snapshots) for how an
+See [Runtime validation](api.md#validation-and-snapshots) for how an
 obsolete field in a provider result differs from invalid static configuration.
 
 ## Custom Redis adapters

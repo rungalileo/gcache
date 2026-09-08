@@ -25,20 +25,14 @@ runtime control and observability for each one.
 
 ```bash
 npm install dialcache
-# Choose a Redis client when using the remote layer:
-npm install redis@~4.7.1
-# or
-npm install @valkey/valkey-glide@^2.0.0
-# Add a metrics client only when using its adapter:
-npm install prom-client@^15.1.3
-# or
-npm install hot-shots@^17.0.0
 ```
 
-DialCache requires Node.js with zstd support in `node:zlib`: 22.15.0 or newer
-within the 22.x line, or 23.8.0 and newer (23.0–23.7 lack zstd and are
-excluded). Production deployments should use a
-[currently supported LTS release](https://nodejs.org/en/about/previous-releases).
+Requires Node.js 22.15.0 or newer within 22.x, or 23.8.0 and newer, for
+`node:zlib` zstd support. Use a
+[supported LTS release](https://nodejs.org/en/about/previous-releases) in production.
+Install a [Redis or Valkey client](https://lan17.github.io/DialCache/redis.html)
+and a [metrics client](https://lan17.github.io/DialCache/observability.html)
+when using those integrations.
 
 ## Usage
 
@@ -53,9 +47,9 @@ async function fetchUser(userId: string) {
   return { id: userId, name: "Ada" };
 }
 
-// The cached function. A drop-in replacement for fetchUser.
+// Register once; use getUser at read sites.
 const getUser = dialcache.cached(fetchUser, {
-  keyType: "user_id", // Entity kind; with the id, the unit of invalidation.
+  keyType: "user_id", // Entity kind; groups tracked results by id.
   useCase: "GetUser", // Operation name; part of the key and metric labels.
   cacheKey: (userId) => userId, // Include every input that changes the result.
   defaultConfig: new DialCacheKeyConfig({
@@ -67,17 +61,6 @@ const getUser = dialcache.cached(fetchUser, {
 await dialcache.enable(async () => {
   await getUser("123"); // Loads from source and caches the result.
   await getUser("123"); // Reuses the value for up to 60 seconds.
-
-  // Inline form: a direct key instead of cacheKey, and no registration.
-  // Call sites that share a key share cached entries.
-  const inline = {
-    keyType: "user_id",
-    useCase: "GetUserInline",
-    key: "456",
-    defaultConfig: new DialCacheKeyConfig({ ttlSec: { [CacheLayer.LOCAL]: 60 } }),
-  };
-  await dialcache.getOrLoad(() => fetchUser("456"), inline); // Loads from source.
-  await dialcache.getOrLoad(() => fetchUser("456"), inline); // Reuses the value.
 });
 
 await getUser("123"); // Outside enable(): loads from source again.
@@ -88,119 +71,70 @@ explicit [typed serializer](https://lan17.github.io/DialCache/redis.html#typed-s
 even when caching only in memory. Cached objects are shared references; copy
 before modifying.
 
-## Enabled scope
 
-Caching is **off by default**. Outside an `enable()` scope, `cached()` and
-`getOrLoad()` just run the loader. **Enable once at the request boundary**, such
-as a middleware around read handlers, so call sites need no changes, and wrap
-mutation handlers in `disable()` so a write path cannot cache a read it is about
-to make stale:
+[`getOrLoad()`](https://lan17.github.io/DialCache/api.html#getorload) provides the
+same cache path for an inline loader and a direct key.
 
-```ts
-await dialcache.enable(async () => {
-  await getUser("123"); // Cached.
+<a id="enabled-scope"></a>
+<a id="cache-layers"></a>
 
-  await dialcache.disable(async () => {
-    await updateUser("123", patch); // Reads in here go to the source.
-  });
+## How reads work
 
-  await getUser("123"); // Cached again; disable() evicts nothing.
-});
-```
-
-## Cache layers
-
-Inside `enable()`, a call checks each active layer in order and stops at the
-first hit. A miss at every layer runs the loader:
+Wrap each request's reads in one `enable()` call. Use `disable()` for nested
+mutation work; it restores pass-through behavior without evicting anything.
+Within an enabled call, the first active layer with a hit returns the value:
 
 ```text
 request-local → process-local → Redis / Valkey → loader
 ```
 
-| Layer | Shares values across | Lifetime | Typical use |
-| --- | --- | --- | --- |
-| Request-local | Calls in one outer `enable()` scope | Until that scope settles | Avoid repeated reads within a request |
-| Process-local | Requests using one `DialCache` instance | TTL, bounded by LRU capacity | Avoid repeated reads between requests |
-| Remote | Application instances using the same Redis keyspace | TTL, with optional invalidation tracking | Reuse reads across processes |
+| Layer | Shared across | Lifetime |
+| --- | --- | --- |
+| Request-local | Calls in one outer `enable()` scope | Until that scope settles |
+| Process-local | Requests using one `DialCache` instance | Insertion TTL, bounded by LRU capacity |
+| Remote | Instances sharing the Redis keyspace | Physical TTL and logical age checks; optional watermarks |
 
-Layers combine: a Redis hit can warm an active process-local cache, and an
-active request-local layer memoizes what the layers below return. The
-[read-path guide](https://lan17.github.io/DialCache/concepts.html) lists what is
-stored after each kind of hit or miss.
+Local hits bypass Redis, including its invalidation checks. A Redis hit can warm
+an active local layer. Concurrent calls share work when a cache layer is active;
+set `coalesce: false` when callers need independent execution.
+[How DialCache works](https://lan17.github.io/DialCache/concepts.html) covers the
+read path, publication rules, and freshness boundaries.
 
-When a cache layer is active, concurrent calls for the same key share work by
-default. Request-local caching shares work within the outer `enable()` scope;
-process-local and remote caching share it within one `DialCache` instance.
-Set `coalesce: false` to opt out. The
-[coalescing guide](https://lan17.github.io/DialCache/coalescing.html) covers the
-results, errors, and deadlines a waiting caller inherits.
+<a id="changing-policy-at-runtime"></a>
 
-## Changing policy at runtime
+## Runtime control
 
-Each use case's `defaultConfig` is its baseline; a `cacheConfigProvider` on the
-instance overrides individual fields on every enabled call. This example starts
-with local caching ramped to zero, then opens it to a 10% cohort of keys:
+An operation's `defaultConfig` is its baseline. A `cacheConfigProvider` overrides
+individual policy fields for each enabled call. Ramps select stable cohorts of
+keys: raising a ramp adds keys, while lowering it removes keys without
+reshuffling the rest. A 10% key cohort need not account for 10% of traffic.
 
-```ts
-// The application's configuration system feeds this map.
-const policies = new Map<string, DialCacheKeyConfig>();
-const cache = new DialCache({
-  cacheConfigProvider: (key) => policies.get(key.useCase) ?? null,
-});
+Policy changes apply to new invocations. They do not evict values or cancel work
+already admitted. Shadow validation has an independent ramp and compares sampled
+Redis values with the source in the background. It can also fill misses while
+remote serving is ramped down; callers do not wait for shadow checks or fills.
 
-const readUser = cache.cached(fetchUser, {
-  keyType: "user_id",
-  useCase: "ReadUser",
-  cacheKey: (userId) => userId,
-  defaultConfig: new DialCacheKeyConfig({
-    ttlSec: { [CacheLayer.LOCAL]: 60 },
-    ramp: { [CacheLayer.LOCAL]: 0 },
-  }),
-});
+See [Configuration and rollout](https://lan17.github.io/DialCache/configuration.html)
+for precedence and runtime examples, and
+[Shadow validation](https://lan17.github.io/DialCache/shadow-validation.html)
+for sampling and comparison behavior.
 
-// Use a 10% ramp and keep the baseline TTL.
-policies.set("ReadUser", new DialCacheKeyConfig({
-  ramp: { [CacheLayer.LOCAL]: 10 },
-}));
+<a id="reference"></a>
 
-await cache.enable(() => readUser("123"));
+## Documentation
 
-// Stop cache use and new shadow work for this use case.
-policies.set("ReadUser", DialCacheKeyConfig.disabled());
-```
-
-A ramp selects a stable set of keys, not a share of traffic: raising it adds
-keys to the cohort, and lowering it removes keys without reshuffling the rest.
-Policy changes apply to new calls only. They do not evict cached values, and
-[a shorter TTL affects local and Redis entries differently](https://lan17.github.io/DialCache/configuration.html#changing-policy-on-a-running-service).
-
-Shadow validation uses sampling to check cache coherence: it compares Redis
-values with the source in the background. It can also fill misses while remote
-serving is ramped down. Callers do not wait for these checks or fills. Serving
-and shadow ramps are independent; `disabled()` stops both for new calls without
-cancelling work already admitted.
-
-[Runtime configuration](https://lan17.github.io/DialCache/configuration.html)
-· [Shadow validation](https://lan17.github.io/DialCache/shadow-validation.html)
-
-## Reference
-
-The [reference](https://lan17.github.io/DialCache/) covers setup, behavior, APIs,
-and operational details. It can also be
-[read as Markdown on GitHub](https://github.com/lan17/DialCache/tree/main/docs).
-
-| Task | Guide |
+| Topic | Guide |
 | --- | --- |
-| Add caching to a service | [Getting started](https://lan17.github.io/DialCache/getting-started.html) |
-| Understand what runs on a hit, miss, or error | [How DialCache works](https://lan17.github.io/DialCache/concepts.html) |
-| Look up methods, options, and exports | [API reference](https://lan17.github.io/DialCache/api.html) |
-| Set keys, layers, TTLs, and rollout policy | [Configuration](https://lan17.github.io/DialCache/configuration.html) |
-| Connect Redis or Valkey; customize serialization | [Redis and Valkey](https://lan17.github.io/DialCache/redis.html) |
-| Invalidate cached results when an entity changes | [Targeted invalidation](https://lan17.github.io/DialCache/invalidation.html) |
-| Serve a retained value when the source fails | [Stale-on-error](https://lan17.github.io/DialCache/stale-on-error.html) |
-| Validate cache coherence through sampling | [Shadow validation](https://lan17.github.io/DialCache/shadow-validation.html) |
-| Understand shared work and deadlines | [Coalescing and liveness](https://lan17.github.io/DialCache/coalescing.html) |
-| Build dashboards and diagnose misses | [Observability](https://lan17.github.io/DialCache/observability.html) |
-| Upgrade, validate, or contribute | [Upgrading](https://lan17.github.io/DialCache/upgrading.html) · [Maintainer guide](https://lan17.github.io/DialCache/maintainers.html) |
+| First reader and enabled scope | [Getting started](https://lan17.github.io/DialCache/getting-started.html) |
+| Result identity and invalidation groups | [Keys and identity](https://lan17.github.io/DialCache/keys.html) |
+| Defaults, overrides, and policy changes | [Configuration and rollout](https://lan17.github.io/DialCache/configuration.html) |
+| Watermarks and mutation handling | [Targeted invalidation](https://lan17.github.io/DialCache/invalidation.html) |
+| Recovery from selected source failures | [Stale-on-error](https://lan17.github.io/DialCache/stale-on-error.html) |
+| Shared execution and deadlines | [Coalescing and liveness](https://lan17.github.io/DialCache/coalescing.html) |
+| Methods, options, and exports | [API reference](https://lan17.github.io/DialCache/api.html) |
+
+The [documentation index](https://lan17.github.io/DialCache/) also links to client
+setup, observability, upgrades, and the maintainer guide. Everything is
+[readable as Markdown on GitHub](https://github.com/lan17/DialCache/tree/main/docs).
 
 MIT licensed. See [LICENSE](https://github.com/lan17/DialCache/blob/main/LICENSE).

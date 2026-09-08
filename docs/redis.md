@@ -7,6 +7,10 @@ owns cache behavior; your application owns the connected Redis client, its
 resource budgets, and shutdown. You can use either bundled adapter or implement
 `DialCacheRedisClient` for another client.
 
+Start with a client below, then choose [serialization](#serialization) and
+[compression](#compression). The [command reference](#bundled-redis-operations)
+and [wire protocol](#advanced-wire-protocol) cover adapter and operational details.
+
 ## Install a client
 
 ```bash
@@ -19,7 +23,7 @@ npm install @valkey/valkey-glide@^2.0.0
 
 Configuring a client makes the remote layer available. Each operation still
 needs an effective remote TTL, an admitted serving ramp, and an enabled scope.
-See [Configuration](configuration.md#runtime-config-and-ramp-controls).
+See [Configuration](configuration.md#baseline-and-overlay-precedence).
 
 ## node-redis
 
@@ -90,82 +94,6 @@ mode, a one-command non-atomic batch selects the primary even when the client
 has a replica-read preference. `MGET` itself supplies the atomic snapshot;
 there is no transaction and caller-owned `WATCH` state is not consumed.
 `ClusterBatch` is not required.
-
-## Bundled Redis operations
-
-### Reads
-
-| Mode | Command | Meaning |
-| --- | --- | --- |
-| Untracked | `GET valueKey` | Decode one frame; ordinary client read routing applies |
-| Tracked | `MGET valueKey watermarkKey` | Decode one authoritative value/watermark snapshot from the primary |
-
-Each semantic read is one top-level command and one round trip. The payload
-travels to Node before frame validation, watermark fencing, age checks, and
-deserialization. An invalidated large value therefore still consumes transfer
-bandwidth until it expires or is replaced.
-
-The adapter returns either `DecodedRedisFrame { payload, createdAtMs }` or
-`RedisReadMiss { kind: "miss", reason, observedWatermarkMs? }`. DialCache then checks
-logical age against the operation's effective TTL. Future-dated or invalid
-frames miss before deserialization. With recovery enabled, the initial read
-may retain expired bytes while the source runs; see [Stale-on-error](stale-on-error.md).
-
-Native wrong-type behavior is preserved. Untracked `GET` can reject with
-`WRONGTYPE`. `MGET` represents a wrong-type member as `nil`: a wrong-type value
-is absent, and a wrong-type watermark acts like a missing watermark. Explicit
-invalidation repairs a wrong-type watermark.
-
-### Writes
-
-Every dispatched write uses the same complete-frame operation:
-
-```text
-SET valueKey frame PX cacheTtlMs
-```
-
-The frame carries the writer application's epoch timestamp. There is no value
-write script, placeholder, transaction, or watermark mutation. Same-key writes
-are last-writer-wins; tracked **reads** enforce invalidation.
-
-Physical TTL is normally the remote TTL. With stale-on-error it is the maximum
-recovery age instead. DialCache separately caps tracked values at one hour and emits
-`tracked_ttl_clamped` for each dispatched write whose requested TTL exceeds the
-cap. Untracked values retain their configured TTL, up to 365 days.
-
-A tracked miss can carry a valid observed watermark. DialCache skips a replacement
-already known to be fenced, checking once before payload preparation and again
-immediately before dispatch. An admitted write uses the final timestamp exactly.
-Misses without that fence let the adapter sample `Date.now()` before dispatch.
-No path adds a fence-check command. See [Conditional refills](invalidation.md#conditional-refills).
-
-### Invalidation retries and ambiguity
-
-Invalidation is the only Lua operation. Both adapters dispatch `EVALSHA` and
-retry a rejected dispatch once using `EVAL` with the source and the same
-invalidation timestamp. The script only advances the watermark and widens its
-retention, so duplicate execution after an ambiguous response is harmless.
-Invalid reply-domain values are errors and are not retried.
-
-If the retry also fails, GLIDE attaches the original error as `cause` when
-possible. Node-redis surfaces the retry rejection unmodified because some
-client errors are shared objects. A healed retry looks like success to DialCache
-metrics; server command statistics expose unexpected `EVAL` activity.
-
-A rejected or timed-out dispatched mutation does not prove that Redis remained
-unchanged. Native writes do not implement compare-and-set or deduplicate retries
-performed by an application or client.
-
-### Redis compatibility and ACLs
-
-The integration suite covers Redis 6.2, Valkey 8, and Redis Cluster. The bundled
-operations require `GET`, `MGET`, and `SET`, plus `EVALSHA` and `EVAL` for
-invalidation. If commands called inside scripts are checked separately, allow
-`GET`, `SET`, and `PTTL` for the invalidation script.
-
-DialCache does not issue `TIME`, `MULTI`, `EXEC`, `WATCH`, `UNLINK`, or
-`SCRIPT LOAD`. Tracked invalidation also requires the
-[clock and watermark durability contract](invalidation.md#application-clock-contract).
 
 ## Remote-read deadlines and async liveness
 
@@ -328,6 +256,82 @@ open.
 
 See [Upgrading](upgrading.md#compression-and-value-schemas) for legacy binary
 collisions and readers-first deployment of the envelope.
+
+## Bundled Redis operations
+
+### Reads
+
+| Mode | Command | Meaning |
+| --- | --- | --- |
+| Untracked | `GET valueKey` | Decode one frame; ordinary client read routing applies |
+| Tracked | `MGET valueKey watermarkKey` | Decode one authoritative value/watermark snapshot from the primary |
+
+Each semantic read is one top-level command and one round trip. The payload
+travels to Node before frame validation, watermark fencing, age checks, and
+deserialization. An invalidated large value therefore still consumes transfer
+bandwidth until it expires or is replaced.
+
+The adapter returns either `DecodedRedisFrame { payload, createdAtMs }` or
+`RedisReadMiss { kind: "miss", reason, observedWatermarkMs? }`. DialCache then checks
+logical age against the operation's effective TTL. Future-dated or invalid
+frames miss before deserialization. With recovery enabled, the initial read
+may retain expired bytes while the source runs; see [Stale-on-error](stale-on-error.md).
+
+Native wrong-type behavior is preserved. Untracked `GET` can reject with
+`WRONGTYPE`. `MGET` represents a wrong-type member as `nil`: a wrong-type value
+is absent, and a wrong-type watermark acts like a missing watermark. Explicit
+invalidation repairs a wrong-type watermark.
+
+### Writes
+
+Every dispatched write uses the same complete-frame operation:
+
+```text
+SET valueKey frame PX cacheTtlMs
+```
+
+The frame carries the writer application's epoch timestamp. There is no value
+write script, placeholder, transaction, or watermark mutation. Same-key writes
+are last-writer-wins; tracked **reads** enforce invalidation.
+
+Physical TTL is normally the remote TTL. With stale-on-error it is the maximum
+recovery age instead. DialCache separately caps tracked values at one hour and emits
+`tracked_ttl_clamped` for each dispatched write whose requested TTL exceeds the
+cap. Untracked values retain their configured TTL, up to 365 days.
+
+A tracked miss can carry a valid observed watermark. DialCache skips a replacement
+already known to be fenced, checking once before payload preparation and again
+immediately before dispatch. An admitted write uses the final timestamp exactly.
+Misses without that fence let the adapter sample `Date.now()` before dispatch.
+No path adds a fence-check command. See [Conditional refills](invalidation.md#conditional-refills).
+
+### Invalidation retries and ambiguity
+
+Invalidation is the only Lua operation. Both adapters dispatch `EVALSHA` and
+retry a rejected dispatch once using `EVAL` with the source and the same
+invalidation timestamp. The script only advances the watermark and widens its
+retention, so duplicate execution after an ambiguous response is harmless.
+Invalid reply-domain values are errors and are not retried.
+
+If the retry also fails, GLIDE attaches the original error as `cause` when
+possible. Node-redis surfaces the retry rejection unmodified because some
+client errors are shared objects. A healed retry looks like success to DialCache
+metrics; server command statistics expose unexpected `EVAL` activity.
+
+A rejected or timed-out dispatched mutation does not prove that Redis remained
+unchanged. Native writes do not implement compare-and-set or deduplicate retries
+performed by an application or client.
+
+### Redis compatibility and ACLs
+
+The integration suite covers Redis 6.2, Valkey 8, and Redis Cluster. The bundled
+operations require `GET`, `MGET`, and `SET`, plus `EVALSHA` and `EVAL` for
+invalidation. If commands called inside scripts are checked separately, allow
+`GET`, `SET`, and `PTTL` for the invalidation script.
+
+DialCache does not issue `TIME`, `MULTI`, `EXEC`, `WATCH`, `UNLINK`, or
+`SCRIPT LOAD`. Tracked invalidation also requires the
+[clock and watermark durability contract](invalidation.md#application-clock-contract).
 
 ## Custom-client contract
 

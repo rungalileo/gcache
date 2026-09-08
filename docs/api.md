@@ -38,7 +38,8 @@ Enable a scope **and** configure at least one layer to store values.
 | `metrics` | Absent | `DialCacheMetricsAdapter` |
 | `logger` | `console` | `Logger`, the `debug`, `warn`, and `error` methods |
 
-See [Configuration](configuration.md) for validation and lifetime rules.
+See [Configuration and rollout](configuration.md) for policy composition and
+[validation](#validation-and-snapshots) for failure behavior.
 
 ### `RedisConfig`
 
@@ -70,7 +71,7 @@ instance and asynchronous call chain. Nested scopes restore prior state. The
 outermost `enable()` owns request-local state. New invocations become pass-through
 after it closes; already admitted work can finish. An invocation still awaiting
 its configuration provider bypasses caching after closure but retains its enabled
-fallback deadline. See [Scope lifetime](configuration.md#enable-and-disable-scopes).
+fallback deadline. See [Scope lifetime](concepts.md#enable-and-disable-scopes).
 
 `DialCacheContext` is the lower-level root export with `enable`, `disable`, and
 `isEnabled`. A separately constructed context does not enable another
@@ -80,6 +81,8 @@ fallback deadline. See [Scope lifetime](configuration.md#enable-and-disable-scop
 
 `cached(fn, options)` returns a `CachedFn<Fn>`: the same parameter types with a
 `Promise` of the resolved return value. Register each `useCase` once per instance.
+Duplicate registrations throw `UseCaseIsAlreadyRegisteredError`. Invalid static defaults or source deadlines
+fail before registration, so correcting them leaves the name available.
 Wrap a bound method or closure when the loader needs a receiver.
 
 ```ts
@@ -128,7 +131,7 @@ uncached.
 
 `CacheKeySpec` is a string, number, or bigint id, or `{ id, args? }`. Argument
 values are string, number, bigint, boolean, `null`, or `undefined`; undefined
-arguments are omitted. See [Key design](configuration.md#keys-ids-and-extra-dimensions).
+arguments are omitted. See [Key design](keys.md).
 
 Static defaults, fallback timeout, and stale-recovery classifier are validated
 and captured when registering `cached()` or invoking `getOrLoad()`.
@@ -166,6 +169,41 @@ Tracked Redis physical retention has a separate one-hour cap.
 The enabled helper does not create a Redis connection. The disabled helper is
 an invocation policy, not cancellation or eviction. See
 [overlay precedence](configuration.md#baseline-and-overlay-precedence).
+
+### Validation and snapshots
+
+Invalid instance options throw during construction. Invalid `defaultConfig`
+leaves throw when `cached()` registers a definition or `getOrLoad()` is invoked.
+Field types and bounds are listed above.
+
+`new DialCacheKeyConfig(...)` first validates object/map/group shapes,
+`requestLocal`, `coalesce`, and `remoteReadTimeoutMs`, and copies the supplied
+maps and shadow group. TTL, ramp, recovery-age, and shadow leaves are validated
+later, at static-default capture or runtime resolution. Constructing a config
+object alone therefore does not establish that all its leaves are valid.
+
+Each registration or inline invocation captures an immutable baseline snapshot,
+including nested maps and shadow policy. Mutating the original config later
+does not update that baseline. Use the provider for runtime changes.
+
+Invalid runtime policy fails open at the affected boundary:
+
+| Invalid input | Behavior |
+| --- | --- |
+| TTL or serving ramp leaf | Disable that layer with `invalid_ttl` or `invalid_ramp`; record `config_resolution`. Valid layers can continue. Values do not fall back to valid defaults and ramps are not clamped. |
+| Config object, layer-map or shadow shape; `requestLocal`, `coalesce`, or `remoteReadTimeoutMs` | Fail resolution for the whole invocation; record `config_resolution` and `config_error`, then run the loader uncached. |
+| `staleOnErrorMaxAgeSec` | Disable recovery and record `config_resolution`; a valid ordinary remote layer remains available. A positive age without a remote TTL is also an error. |
+| `shadow.ramp` | Record remote `config_resolution` and skip shadow work when an eligible Redis path evaluates it; preserve valid serving layers. |
+| `shadow.logMismatches` | Disable mismatch logging while preserving shadow work; record remote `config_resolution` only after the metrics hook, cohort, and capacity gates admit the job. |
+
+Validation of layer and shadow leaves depends on traversal: an earlier hit can
+avoid evaluating lower-layer policy. Unknown runtime fields are generally
+ignored, so validate external policy against your application's schema to catch
+misspellings such as `ramp.remtoe`.
+
+The removed `shadowRamp` field is an exception. Static config rejects it with
+`DialCacheKeyConfig.shadowRamp was replaced by "shadow.ramp"`; a provider result
+containing it fails resolution for the whole invocation.
 
 ## `invalidateRemote`
 
@@ -213,9 +251,53 @@ See [Coalescing state](coalescing.md#inspecting-process-scoped-flights).
 
 `CachedValue<Fn>` exposes a function's resolved result type. `ShadowComparator<T>`
 and `StaleRecoveryPredicate` name the corresponding synchronous callbacks.
-See [Direct key construction](configuration.md#constructing-keys-directly) for
+See [Direct key construction](#constructing-keys-directly) for
 defaults, encoding, and validation, and [Serialization](redis.md#serialization)
 for direct codec behavior, the compile-time guard, and round-trip limitations.
+
+### Constructing keys directly
+
+`cached()` and `getOrLoad()` stringify ids and normalize argument records for
+you. Custom integrations can construct the same public shape with
+`new DialCacheKey(init)`:
+
+| `DialCacheKeyInit` field | Default or requirement |
+| --- | --- |
+| `keyType`, `id`, `useCase` | Required strings |
+| `namespace` | `"urn"` |
+| `args` | Empty array; otherwise ordered, read-only `[string, string]` pairs |
+| `defaultConfig`, `serializer` | `null` |
+| `trackForInvalidation` | `false` |
+
+The direct constructor uses argument pairs in the supplied order. It does not
+normalize or sort them. Use `normalizeArgs(record)` to omit undefined values,
+convert the remaining scalar values with `String`, and sort names by JavaScript
+string comparison:
+
+```ts
+import { DialCacheKey, normalizeArgs } from "dialcache";
+
+const key = new DialCacheKey({
+  namespace: "app:prod",
+  keyType: "user_id",
+  id: "a/b",
+  useCase: "Read#User",
+  args: normalizeArgs({ z: 2, a: 1, omitted: undefined }),
+  trackForInvalidation: true,
+});
+
+key.prefix;     // "{app%3Aprod:user_id:a%2Fb}"
+key.toString(); // "{app%3Aprod:user_id:a%2Fb}?a=1&z=2#Read%23User"
+```
+
+`prefix` and `urn` are computed once; `toString()` returns `urn`. The constructor
+retains supplied argument, config, and serializer references. Read-only types
+do not deep-freeze these inputs; treat the key and its inputs as immutable.
+
+`invalidationPrefix(namespace, keyType, id)` validates the same tracked identity
+components and returns the encoded prefix **without** braces.
+`redisClusterHashTag(value)` rejects embedded braces and adds a literal pair of
+braces; it does not encode the value. Neither helper adds arguments or a use case.
 
 ## Errors
 

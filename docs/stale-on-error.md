@@ -11,6 +11,23 @@ It performs **no second Redis read**. That keeps recovery available if Redis
 becomes unavailable during the source call, but also means later invalidation,
 deletion, refresh, or expiry cannot revoke the retained snapshot.
 
+## Fresh age and maximum age
+
+| Symbol | Configuration | Meaning |
+| --- | --- | --- |
+| `F` | `ttlSec.remote` | Exclusive fresh age ceiling for ordinary Redis reads |
+| `M` | `staleOnErrorMaxAgeSec` | Exclusive recovery age ceiling, measured from the same frame timestamp |
+
+`M` is total age, not extra time after `F`. Positive configuration must satisfy
+`0 < F < M <= 31_536_000` seconds. Both ages must be safe-integer numbers.
+Omission leaves recovery off, or inherits it in a sparse runtime overlay.
+Explicit `0` disables inherited recovery.
+
+Invalid static defaults throw. Invalid runtime recovery policy records
+`config_resolution`, disables only recovery, and preserves valid ordinary Redis
+serving. A remote ramp of zero bypasses the caller-serving Redis path, including
+recovery.
+
 ## Configure the ages
 
 Use a remote TTL for ordinary freshness and a larger maximum age for recovery:
@@ -41,23 +58,6 @@ This assumes a configured semantic Redis client and application `db`. Inside
 `enable()`, a frame younger than 60 seconds can serve normally. From 60 seconds
 until strictly before 300 seconds, it can serve only after an authorized source
 rejection. The built-in classifier accepts `FallbackTimeoutError` only.
-
-### Fresh age and maximum age
-
-| Symbol | Configuration | Meaning |
-| --- | --- | --- |
-| `F` | `ttlSec.remote` | Exclusive fresh age ceiling for ordinary Redis reads |
-| `M` | `staleOnErrorMaxAgeSec` | Exclusive recovery age ceiling, measured from the same frame timestamp |
-
-`M` is total age, not extra time after `F`. Positive configuration must satisfy
-`0 < F < M <= 31_536_000` seconds. Both ages must be safe-integer numbers.
-Omission leaves recovery off, or inherits it in a sparse runtime overlay.
-Explicit `0` disables inherited recovery.
-
-Invalid static defaults throw. Invalid runtime recovery policy records
-`config_resolution`, disables only recovery, and preserves valid ordinary Redis
-serving. A remote ramp of zero bypasses the caller-serving Redis path, including
-recovery.
 
 ## Follow one invocation
 

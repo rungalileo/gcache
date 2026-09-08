@@ -1,10 +1,23 @@
 # How DialCache works
 
-[Documentation](index.md) · Next: [Configuration](configuration.md)
+[Documentation](index.md) · Next: [Keys and identity](keys.md)
 
 DialCache is a read-through cache around an application function. The function
 remains the source of truth. DialCache decides whether an invocation can reuse a
 value and calls the function when it cannot.
+
+## Identity governs reuse
+
+A key combines a namespace, entity kind and id, operation name, and optional
+arguments. Include every dimension that can affect the returned value.
+
+The same identity governs both settled cache hits and in-flight sharing. A
+missing tenant or locale can make callers reuse the wrong result. Turning off
+coalescing does not correct an incomplete key.
+
+`cached()` registers a reusable operation once. `getOrLoad()` accepts an inline
+loader and does not register its name. Both use the same read path. See
+[Keys and identity](keys.md) for the component model and normalization rules.
 
 ## The read path
 
@@ -34,6 +47,26 @@ Outside `enable()`, invocation skips key construction, runtime config, cache
 access, coalescing, and the fallback deadline. Definition-time option validation
 still happens when you create a wrapper or call `getOrLoad()`.
 
+## Enable and disable scopes
+
+Enabled state follows the asynchronous call chain through Node's
+`AsyncLocalStorage`, independently for each instance. Use one outer `enable()`
+at the request boundary. Nested enabled regions share its request-local state;
+`disable()` temporarily restores pass-through behavior without evicting values.
+Nested scopes restore the previous state when their callbacks settle.
+A nested `enable()` inside `disable()` can opt a smaller region back in.
+
+After the outermost callback settles, new invocations in detached work that
+inherited its context are pass-through. Already admitted cache operations can
+finish and publish to shared layers, but cannot repopulate closed request-local
+state. An invocation still awaiting its config provider when the scope closes
+skips cache lookup and runs its loader with its enabled fallback deadline.
+
+Keep mutation work outside the enabled boundary or inside `disable()`. Disabling
+does not invalidate anything; mutable data still needs appropriate TTLs or
+[targeted invalidation](invalidation.md). See [scope methods](api.md#scope-methods)
+for aliases and the lower-level `DialCacheContext` primitive.
+
 ## Three lifetimes
 
 | Layer | Scope | Retention | Control |
@@ -45,6 +78,25 @@ still happens when you create a wrapper or call `getOrLoad()`.
 Create a long-lived instance per intended local-cache and coalescing boundary.
 Separate instances have independent LRUs, flights, and shadow capacity, even
 when they use the same Redis server.
+
+### Request-local cache
+
+`requestLocal: true` memoizes successful results until the outermost enabled
+scope settles. State is allocated lazily. It has no TTL, ramp, capacity limit,
+or eviction; keep scopes short-lived with bounded key cardinality.
+`DialCacheKeyConfig.enabled(ttlSec)` selects only the shared layers, so opt into
+request-local caching explicitly.
+
+### Process-local cache
+
+One LRU holds entries across all use cases in an instance. `localMaxSize`
+defaults to 10,000 and counts entries, not object bytes. Reads update LRU order
+without extending insertion TTLs.
+
+`localMaxSize: 0` disables storage. A valid local TTL and admitted ramp still
+activate that path: it misses and can coalesce concurrent calls. Use a zero
+local ramp to bypass the layer, or `coalesce: false` to disable shared work.
+Sequential calls with zero storage always miss this layer.
 
 ## What gets stored after a miss?
 
@@ -67,18 +119,6 @@ the value; the default JSON codec supports all five.
 Tracked refills can be skipped when the initial read observed a watermark that
 already fences the replacement timestamp. That optimization still returns the
 loader result. It is explained in [Targeted invalidation](invalidation.md).
-
-## Identity governs reuse
-
-A key combines a namespace, entity kind and id, operation name, and optional
-arguments. Include every dimension that can affect the returned value.
-
-The same identity governs both settled cache hits and in-flight sharing. A
-missing tenant or locale can make callers reuse the wrong result. Turning off
-coalescing does not correct an incomplete key.
-
-`cached()` registers a reusable operation once. `getOrLoad()` accepts an inline
-loader and does not register its name. Both use the same read path.
 
 ## Freshness boundaries
 
@@ -129,7 +169,8 @@ not a stable API guarantee.
 
 ## Where to go next
 
-- [Configuration](configuration.md) defines keys, defaults, overlays, and layers.
+- [Keys and identity](keys.md) defines results and invalidation groups.
+- [Configuration and rollout](configuration.md) explains defaults and overlays.
 - [Coalescing and liveness](coalescing.md) explains flights and deadlines.
 - [Redis and Valkey](redis.md) explains the remote layer and client contract.
 - [API reference](api.md) provides method and option lookup.

@@ -1,6 +1,6 @@
 {
   "name": "dialcache",
-  "version": "0.23.3",
+  "version": "0.23.4",
   "description": "A TypeScript library that organizes caching into use cases, with runtime control and observability for each one.",
   "license": "MIT",
   "sideEffects": false,

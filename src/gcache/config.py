@@ -187,14 +187,24 @@ class GCacheKey:
     serializer: Serializer | None = None
     # How the value is framed in Redis. PICKLE (the default) is Python-only; JSON makes the
     # entry readable by the TypeScript and Go clients. This governs writes; reads sniff the
-    # framing they find, except that a JSON key refuses to unpickle (see envelope.decode),
-    # so switching an existing key costs one TTL of misses rather than needing a flag day.
+    # framing they find, except that a JSON key refuses to unpickle (see envelope.decode).
+    #
+    # Do NOT flip this on a live use case. Both pod generations run during a rolling deploy
+    # and overwrite each other's framing, so the key's hit rate sits near zero for the whole
+    # rollout. Migrate under a new use_case instead.
     envelope: Envelope = Envelope.PICKLE
     # Cached computed fields (set in __post_init__)
     prefix: str = field(init=False)
     urn: str = field(init=False)
 
     def __post_init__(self) -> None:
+        # GCacheKey is public API, and only GCache.cached coerced this. A caller building a
+        # key directly with envelope="jsn" would get pickle framing and no error at all,
+        # because put compares with == and get derives allow_pickle with != -- both silently
+        # select pickle. That is the same silent fallback the == change removed from the
+        # decorator path, so coerce here too and let an unrecognized value raise.
+        object.__setattr__(self, "envelope", Envelope(self.envelope))
+
         # Compute prefix
         prefix = f"{self.key_type}:{self.id}"
         if _GLOBAL_GCACHE_STATE.urn_prefix:

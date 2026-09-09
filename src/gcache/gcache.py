@@ -182,8 +182,15 @@ class GCache:
                          the TypeScript and Go clients use, so the entry can be shared across languages; it requires a
                          ``Serializer`` producing str/bytes (pass ``serializer=JsonSerializer()``).  Reads sniff the
                          framing they actually find, so a JSON key still reads a JSON entry written by any language --
-                         but a JSON key refuses to unpickle, so migrating an existing key costs one TTL of cold cache
-                         rather than leaving unpickling reachable for whoever can write the keyspace.
+                         but a JSON key refuses to unpickle, rather than leaving unpickling reachable for whoever can
+                         write the keyspace.
+
+                         Do NOT flip this on a live use case.  A rolling deploy runs both pod generations at once: an
+                         old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle over it, and a
+                         new pod refuses that pickle and writes JSON again.  Each destroys the framing the other needs,
+                         so the key's hit rate sits near zero for the whole rollout -- a load spike on the backing
+                         store, not a slow warm-up.  Migrate under a NEW ``use_case``; the two generations then use
+                         different keys and never fight.
         :return:
         """
 

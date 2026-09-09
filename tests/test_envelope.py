@@ -1,10 +1,7 @@
 import base64
 import json
-import logging
 import pickle
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
 from typing import Any
 
 import pytest
@@ -19,24 +16,6 @@ from gcache._internal.envelope import (
 )
 from gcache._internal.redis_cache import RedisValue
 from tests.conftest import FakeCacheConfigProvider
-
-
-@contextmanager
-def caplog_at_error() -> Iterator[list[str]]:
-    """Collect ERROR-level messages from gcache's logger for the duration of the block."""
-    records: list[str] = []
-
-    class _Collector(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:
-            records.append(record.getMessage() + (str(record.exc_info[1]) if record.exc_info else ""))
-
-    handler = _Collector(level=logging.ERROR)
-    logger = logging.getLogger("gcache._internal.state")
-    logger.addHandler(handler)
-    try:
-        yield records
-    finally:
-        logger.removeHandler(handler)
 
 
 def test_encode_json_shape_matches_typescript_port() -> None:
@@ -143,9 +122,9 @@ async def test_a_json_key_refuses_a_pickle_it_finds_and_falls_back(
     # that declares JSON refuses the pickle branch outright, because sniffing alone would
     # leave arbitrary-code-execution reachable for anyone who can write the keyspace.
     #
-    # The cost is one TTL of cold cache when a use case migrates pickle -> json: entries
-    # written by the old code become misses. That is the self-healing direction, and the
-    # only alternative is executing whatever a writer left behind.
+    # Migrating a live use case this way is not merely a cold TTL -- both pod generations
+    # overwrite each other's framing during a rollout, so a real migration uses a new
+    # use_case. What this test pins is only the refusal itself.
     cache_config_provider.configs["sniff_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["sniff_uc"].ramp[CacheLayer.LOCAL] = 0
 
@@ -454,3 +433,118 @@ async def test_an_expired_envelope_is_a_miss_even_when_redis_still_serves_it(
 
         assert await cached_func(1) == {"a": 1}
         assert calls == 2, "an envelope past its expiresAtMs must not be served"
+
+
+@pytest.mark.asyncio
+async def test_json_envelope_works_with_invalidation_tracking(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Cross-language invalidation is the whole reason this envelope exists, and the
+    # watermark comparison reads createdAtMs out of the JSON envelope -- so the two
+    # features had to be exercised together, not just separately.
+    cache_config_provider.configs["tracked_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["tracked_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    calls = 0
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="tracked_uc",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+        track_for_invalidation=True,
+    )
+    async def cached_func(test: int = 1) -> dict:
+        nonlocal calls
+        calls += 1
+        return {"a": calls}
+
+    with gcache.enable():
+        assert await cached_func(1) == {"a": 1}
+        assert await cached_func(1) == {"a": 1}
+        assert calls == 1, "the second read must be served from the JSON entry"
+
+        # A tracked key is brace-wrapped so the value and its watermark share a slot.
+        keys = [k.decode() for k in redis_server.keys()]
+        assert any(k.startswith("{") for k in keys), keys
+
+        await gcache.ainvalidate("Test", "1")
+
+        assert await cached_func(1) == {"a": 2}, "the watermark must supersede the JSON entry"
+        assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_a_pickle_key_with_a_serializer_reads_a_json_entry(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # The no-flag-day direction both docstrings claim: a key still declaring PICKLE, but
+    # carrying a serializer, must read what a JSON writer left. Without this the claim
+    # rested on the reverse direction only.
+    cache_config_provider.configs["pickle_reader_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["pickle_reader_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    calls = 0
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="pickle_reader_uc", serializer=JsonSerializer())
+    async def cached_func(test: int = 1) -> dict:
+        nonlocal calls
+        calls += 1
+        return {"a": 1}
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+        assert calls == 1
+
+        redis_server.setex(
+            redis_key, 60, encode_json(created_at_ms=int(time.time() * 1000), ttl_sec=60, payload='{"a": 2}')
+        )
+
+        assert await cached_func(1) == {"a": 2}, "a serializer-carrying pickle key must read JSON"
+        assert calls == 1
+
+
+def test_gcache_key_rejects_an_unrecognized_envelope() -> None:
+    # GCacheKey is public API. Before this, envelope="jsn" silently selected pickle --
+    # put compares with == and get derives allow_pickle with !=, so both fall through.
+    from gcache.config import GCacheKey
+
+    with pytest.raises(ValueError):
+        GCacheKey(key_type="Test", id="1", use_case="uc", envelope="jsn")  # type: ignore[arg-type]
+
+    # A bare string is coerced, which is the point: the field stays typed Envelope because
+    # after __post_init__ it always is one.
+    coerced = GCacheKey(key_type="Test", id="1", use_case="uc", envelope="json")  # type: ignore[arg-type]
+    assert coerced.envelope is Envelope.JSON
+
+
+@pytest.mark.parametrize("field", ["createdAtMs", "expiresAtMs"])
+def test_decode_rejects_a_non_finite_timestamp(field: str) -> None:
+    # json.loads maps 1e999 to inf, isinstance(inf, float) is True, and int(inf) then raises
+    # OverflowError -- outside this function's contract, so it escaped the caller's miss
+    # guard and left the entry poisoned for its whole TTL. parseEnvelope requires
+    # Number.isFinite for the same reason.
+    envelope = {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": "x"}
+    raw = json.dumps({**envelope, field: 1e999}).encode()
+    with pytest.raises(EnvelopeDecodeError):
+        decode(raw)
+
+
+def test_decode_accepts_a_very_large_integer_timestamp() -> None:
+    # The finiteness guard must not be applied to ints: math.isfinite raises OverflowError
+    # on a large one, which would reintroduce exactly the escape it exists to prevent.
+    big = 10**30
+    raw = json.dumps(
+        {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}
+    ).encode()
+    assert decode(raw).created_at_ms == big
+
+
+def test_decode_wraps_a_recursion_error_from_deeply_nested_json() -> None:
+    # The JSON branch caught a narrower tuple than the pickle branch, so RecursionError
+    # escaped. decode promises callers exactly one exception to treat as a miss.
+    raw = ('{"version":1,"createdAtMs":1,"expiresAtMs":2,"encoding":"utf8","payload":' + "[" * 200_000).encode()
+    with pytest.raises(EnvelopeDecodeError):
+        decode(raw)

@@ -30,12 +30,20 @@ JSON entry, and lets all three languages share one keyspace. Sniffing alone, tho
 leave the pickle path reachable for every key, including one that declares
 ``Envelope.JSON``, so ``decode`` takes ``allow_pickle`` and a JSON key refuses pickle
 outright. Choosing ``Envelope.JSON`` therefore does close the arbitrary-code-execution path
-on read; sniffing on its own would not. The cost is that migrating a key pickle -> json
-gives up one TTL of hits instead of being free.
+on read; sniffing on its own would not.
+
+Migrating a live use case pickle -> json is NOT one TTL of cold cache, which an earlier
+version of this note claimed. A rolling deploy runs both generations at once: an old pod
+(pickle, no serializer) treats a JSON entry as a miss and writes pickle over it, and a new
+pod refuses that pickle and writes JSON again. Each generation destroys the framing the
+other needs, so the key's hit rate sits near zero for the whole rollout -- a load spike on
+the backing store, not a slow warm-up. Migrate under a NEW use_case instead; the two
+generations then use different keys and never fight.
 """
 
 import base64
 import json
+import math
 import pickle
 from dataclasses import dataclass
 from typing import Any
@@ -150,6 +158,15 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
             for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
                 if isinstance(value, bool) or not isinstance(value, int | float):
                     raise EnvelopeDecodeError(f"{field} must be a number, got {type(value).__name__}")
+                # json.loads maps 1e999 to inf, which is an instance of float, and int(inf)
+                # then raises OverflowError -- past this function's contract of raising only
+                # EnvelopeDecodeError, so the entry would stay poisoned for its whole TTL.
+                # parseEnvelope requires Number.isFinite for the same reason.
+                #
+                # Guarded on float only: math.isfinite raises OverflowError on a very large
+                # int, which would reintroduce the escape it is here to prevent.
+                if isinstance(value, float) and not math.isfinite(value):
+                    raise EnvelopeDecodeError(f"{field} must be finite, got {value!r}")
             encoding = envelope.get("encoding")
             if encoding == "base64":
                 payload = base64.b64decode(payload, validate=True)
@@ -163,7 +180,11 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
             )
         except EnvelopeDecodeError:
             raise
-        except (ValueError, KeyError, TypeError) as e:
+        except Exception as e:
+            # As broad as the pickle branch, and for the same reason: this function promises
+            # callers exactly one exception to treat as a miss. A narrower tuple let
+            # RecursionError through on deeply nested JSON, and anything that escapes here
+            # leaves the entry poisoned rather than rewritten.
             raise EnvelopeDecodeError(f"malformed JSON envelope: {e}") from e
 
     raise EnvelopeDecodeError(f"unrecognized envelope, leading byte {data[0]:#04x}")

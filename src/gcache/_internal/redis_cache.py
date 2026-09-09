@@ -163,6 +163,7 @@ class RedisCache(CacheInterface):
                 # Treat an undecodable value as a miss rather than raising: a cache must not
                 # be able to fail a request. The fallback repopulates it in our own envelope.
                 _GLOBAL_GCACHE_STATE.logger.warning("Undecodable cache value for %s; treating as miss", key.urn)
+                self._record_degraded_read(key, "undecodable")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
             # A JSON entry carries a SERIALIZED payload, so only a Serializer turns it back
@@ -174,6 +175,7 @@ class RedisCache(CacheInterface):
                 _GLOBAL_GCACHE_STATE.logger.warning(
                     "JSON cache value for %s but the key has no Serializer; treating as miss", key.urn
                 )
+                self._record_degraded_read(key, "json_without_serializer")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
             # Honour the envelope's own expiry, not just Redis's TTL. The two can disagree --
@@ -181,6 +183,7 @@ class RedisCache(CacheInterface):
             # serves -- and the TypeScript reader treats a past expiresAtMs as a miss, so
             # ignoring it here makes the two languages answer differently for one key.
             if deserialized_value.expires_at_ms is not None and deserialized_value.expires_at_ms <= time.time() * 1000:
+                self._record_degraded_read(key, "envelope_expired")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
             # Load payload using custom serializer if present.
@@ -197,6 +200,7 @@ class RedisCache(CacheInterface):
                     _GLOBAL_GCACHE_STATE.logger.warning(
                         "Unloadable cache payload for %s (%s); treating as miss", key.urn, e
                     )
+                    self._record_degraded_read(key, "unloadable_payload")
                     return await self._exec_fallback(key, watermark_ms, fallback)
 
             (
@@ -256,6 +260,15 @@ class RedisCache(CacheInterface):
 
     async def delete(self, key: GCacheKey) -> bool:
         return (await self.client.delete(key.urn)) > 0
+
+    def _record_degraded_read(self, key: GCacheKey, reason: str) -> None:
+        """Count a read that found an entry it could not use.
+
+        All of these fall through to the fallback, which raises MISS_COUNTER, so without a
+        separate signal keyspace corruption and envelope thrash are indistinguishable from
+        ordinary misses on a dashboard -- and both are conditions an operator needs to see.
+        """
+        GCacheMetrics.DEGRADED_READ_COUNTER.labels(key.use_case, key.key_type, self.layer().name, reason).inc()
 
     def layer(self) -> CacheLayer:
         return CacheLayer.REMOTE

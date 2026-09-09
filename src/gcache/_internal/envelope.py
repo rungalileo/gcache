@@ -10,6 +10,20 @@ readers. It uses the same envelope the TypeScript port already writes
 (``packages/gcache-ts/src/internal/redis-cache.ts``), so Python, TypeScript and Go agree
 on one wire format.
 
+It also makes an entry readable *inside Redis*, which pickle can never be. Redis ships
+``cjson`` in its Lua interpreter, so a script can parse a stored envelope and act on its
+metadata::
+
+    local e = cjson.decode(redis.call('GET', KEYS[1]))
+    return tostring(e.createdAtMs)
+
+There is no Lua unpickler, so a pickled entry is opaque to the server no matter what.
+That forecloses server-side atomic operations on cached values -- a compare-and-set that
+only overwrites when the incoming record is newer, say -- which a JSON envelope leaves
+available. (``cmsgpack`` is built in too, and is ~25% more compact; JSON wins here on
+being what the TypeScript port already emits and on being readable straight out of
+``redis-cli``.)
+
 Reads never trust the declared envelope: :func:`decode` sniffs the first byte, so a key
 can be migrated between envelopes without a flag day and a reader always understands
 whatever the writer produced.

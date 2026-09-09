@@ -131,8 +131,6 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
         try:
             value = pickle.loads(data)
             return DecodedValue(created_at_ms=int(value.created_at_ms), payload=value.payload)
-        except EnvelopeDecodeError:
-            raise
         except Exception as e:
             # A truncated blob, or a pickle of some other type that has no created_at_ms.
             # 0x80 is also MessagePack's empty-map byte, so a non-Python writer lands here too.
@@ -169,7 +167,13 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
                     raise EnvelopeDecodeError(f"{field} must be finite, got {value!r}")
             encoding = envelope.get("encoding")
             if encoding == "base64":
-                payload = base64.b64decode(payload, validate=True)
+                # Re-pad before decoding. Python rejects unpadded base64
+                # ("YWJjZGU" -> binascii.Error) where Buffer.from(..., "base64") accepts it,
+                # so a writer using raw encoding (Go's base64.RawStdEncoding, say) would make
+                # every Python read a miss-and-rewrite while the TypeScript reader kept
+                # hitting the same key -- the two clients fighting over it indefinitely.
+                # validate=True is kept, so the alphabet is still checked.
+                payload = base64.b64decode(payload + "=" * (-len(payload) % 4), validate=True)
             elif encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")
             return DecodedValue(

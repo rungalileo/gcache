@@ -182,7 +182,17 @@ class RedisCache(CacheInterface):
             # a writer that calls PERSIST or sets a longer TTL leaves an entry Redis still
             # serves -- and the TypeScript reader treats a past expiresAtMs as a miss, so
             # ignoring it here makes the two languages answer differently for one key.
+            #
+            # Deliberately no skew tolerance. This does make a read depend on the WRITER's
+            # wall clock, which is new -- a writer running behind loses the tail of every
+            # entry's lifetime, and each affected read pays a fallback plus a rewrite. But a
+            # tolerance would serve values the TypeScript reader calls expired, which is the
+            # divergence this check exists to remove. The cost of skew is bounded and
+            # self-correcting; the cost of disagreement is two clients fighting over a key.
             if deserialized_value.expires_at_ms is not None and deserialized_value.expires_at_ms <= time.time() * 1000:
+                _GLOBAL_GCACHE_STATE.logger.warning(
+                    "Cache value for %s is past its envelope expiry; treating as miss", key.urn
+                )
                 self._record_degraded_read(key, "envelope_expired")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 

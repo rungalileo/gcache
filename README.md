@@ -247,6 +247,49 @@ def get_org_settings(org_id: str) -> dict:  # No async needed
 
 Under the hood, sync functions run through a thread pool to avoid blocking the event loop. This adds some overhead, so **prefer async functions when possible** for better performance.
 
+### Sharing a Cache With Other Languages
+
+By default a value is stored as a Python pickle, which only Python can read. `envelope=`
+switches to a JSON framing that the TypeScript and Go clients also understand, so all three
+can share one entry and one invalidation:
+
+```python
+from gcache import Envelope, JsonSerializer
+
+@gcache.cached(
+    key_type="session_id",
+    id_arg="session_id",
+    use_case="SessionService::identity",
+    envelope=Envelope.JSON,
+    serializer=JsonSerializer(),   # required: JSON carries a serialized payload
+    track_for_invalidation=True,   # so another language's invalidation reaches this entry
+)
+async def get_session(session_id: str) -> dict:
+    return await db.fetch(session_id)
+```
+
+Two constraints:
+
+- **Only JSON-representable values.** The payload is a string on the wire, so the serializer
+  has to be able to produce and restore one. `JsonSerializer` covers dicts, lists and
+  scalars; anything else needs your own `Serializer`.
+- **Never flip this on a live use case.** A rolling deploy runs both pod generations at
+  once: an old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle
+  over it, and a new pod refuses that pickle and writes JSON again. Each destroys the
+  framing the other needs, so the key's hit rate sits near zero for the whole rollout.
+  Migrate under a **new `use_case`** — the two generations then use different keys and never
+  fight.
+
+Reads sniff the framing they actually find rather than trusting `envelope=`, so a JSON key
+reads a JSON entry whoever wrote it. The one exception is that a JSON key refuses to
+unpickle: unpickling executes arbitrary code, and the reader cannot tell a migration
+leftover from a payload injected by anyone with keyspace access.
+
+Note that `track_for_invalidation=True` only reaches the Redis layer. `LocalCache` does not
+consult watermarks, so an invalidation from another language does not clear a Python pod's
+in-process copy until its local TTL expires — keep the local TTL short (or the local ramp at
+0) for a use case shared across languages.
+
 ## Redis Configuration
 
 ### No Redis (Local Only)

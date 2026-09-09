@@ -548,3 +548,61 @@ def test_decode_wraps_a_recursion_error_from_deeply_nested_json() -> None:
     raw = ('{"version":1,"createdAtMs":1,"expiresAtMs":2,"encoding":"utf8","payload":' + "[" * 200_000).encode()
     with pytest.raises(EnvelopeDecodeError):
         decode(raw)
+
+
+@pytest.mark.parametrize("field", ["createdAtMs", "expiresAtMs"])
+def test_decode_rejects_a_string_timestamp(field: str) -> None:
+    # int("5") succeeds, which is exactly why the isinstance check exists -- parseEnvelope
+    # requires a number, so without this the two readers accept different bytes.
+    envelope = {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": "x"}
+    with pytest.raises(EnvelopeDecodeError):
+        decode(json.dumps({**envelope, field: "5"}).encode())
+
+
+def test_decode_accepts_unpadded_base64() -> None:
+    # Python rejects unpadded base64 where Buffer.from(..., "base64") accepts it, so a
+    # writer using a raw encoder would make every Python read a miss-and-rewrite while the
+    # TypeScript reader kept hitting the same key.
+    raw = json.dumps(
+        {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "base64", "payload": "YWJjZGU"}
+    ).encode()
+    assert decode(raw).payload == b"abcde"
+
+
+def test_decode_still_rejects_a_bad_base64_alphabet() -> None:
+    # Re-padding must not weaken validation into accepting non-base64 characters.
+    raw = json.dumps(
+        {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "base64", "payload": "!!!!"}
+    ).encode()
+    with pytest.raises(EnvelopeDecodeError):
+        decode(raw)
+
+
+@pytest.mark.asyncio
+async def test_a_serializer_returning_a_non_string_writes_nothing(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # The decoration guard closes the serializer-is-None route, so a serializer whose dump
+    # returns a non-str/bytes value is the remaining way to reach the write guard. The
+    # caller must still get its value -- a cache must not fail a request -- and nothing
+    # unreadable may be stored.
+    cache_config_provider.configs["badser_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["badser_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    class BadSerializer(Serializer):
+        async def dump(self, obj: Any) -> Any:
+            return {"not": "a string"}
+
+        async def load(self, data: bytes | str) -> Any:
+            return data
+
+    @gcache.cached(
+        key_type="Test", id_arg="test", use_case="badser_uc", envelope=Envelope.JSON, serializer=BadSerializer()
+    )
+    async def cached_func(test: int = 1) -> dict:
+        return {"a": 1}
+
+    with gcache.enable():
+        assert await cached_func(1) == {"a": 1}
+
+    assert redis_server.keys() == [], "an unwritable value must leave no entry behind"

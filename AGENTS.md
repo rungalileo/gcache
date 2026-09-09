@@ -14,6 +14,7 @@ src/gcache/
 ├── gcache.py                # GCache main class and @cached decorator
 └── _internal/               # Implementation details (not public API)
     ├── constants.py         # Named constants (cache sizes, TTLs, thresholds)
+    ├── envelope.py           # Value framing: pickle vs the cross-language JSON envelope
     ├── event_loop_thread.py # EventLoopThread, EventLoopThreadPool
     ├── local_cache.py       # LocalCache (TTLCache-based)
     ├── metrics.py           # GCacheMetrics (Prometheus)

@@ -15,7 +15,6 @@ from gcache._internal.envelope import (
     EnvelopeDecodeError,
     decode,
     encode_json,
-    is_pickle,
 )
 from gcache._internal.redis_cache import RedisValue
 from tests.conftest import FakeCacheConfigProvider
@@ -77,11 +76,13 @@ def test_decode_rejects_unknown_envelopes(blob: bytes) -> None:
         decode(blob)
 
 
-def test_is_pickle_discriminates() -> None:
+def test_decode_discriminates_on_the_leading_byte() -> None:
     # Sniffing is only safe because the two framings can never share a leading byte.
-    assert is_pickle(pickle.dumps(RedisValue(created_at_ms=1, payload="x"), protocol=pickle.HIGHEST_PROTOCOL))
-    assert not is_pickle(encode_json(created_at_ms=1, ttl_sec=1, payload="x"))
-    assert not is_pickle(b"")
+    pickled = pickle.dumps(RedisValue(created_at_ms=1, payload="x"), protocol=pickle.HIGHEST_PROTOCOL)
+    assert pickled[0] == 0x80
+    assert encode_json(created_at_ms=1, ttl_sec=1, payload="x")[0:1] == b"{"
+    assert decode(pickled).payload == "x"
+    assert decode(encode_json(created_at_ms=1, ttl_sec=1, payload="x")).payload == "x"
 
 
 @pytest.mark.asyncio
@@ -129,38 +130,21 @@ async def test_default_envelope_is_still_pickle(
         await cached_func(1)
         (redis_key,) = redis_server.keys()
         raw = redis_server.get(redis_key)
-        assert is_pickle(raw)
+        assert raw[0] == 0x80, "pickle framing"
         assert pickle.loads(raw).payload == {"a": 1}
 
 
 @pytest.mark.asyncio
-async def test_json_envelope_without_a_serializer_writes_nothing_and_still_serves(
+async def test_a_json_key_refuses_a_pickle_it_finds_and_falls_back(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # Without a Serializer the payload is a live Python object, which the JSON envelope
-    # cannot carry. The write must fail rather than store something unreadable -- but
-    # gcache swallows cache-layer errors by design (CacheController.get), so the caller
-    # still gets its value. Assert both halves of that contract.
-    cache_config_provider.configs["bad_uc"] = GCacheKeyConfig.enabled(60)
-    cache_config_provider.configs["bad_uc"].ramp[CacheLayer.LOCAL] = 0
-
-    @gcache.cached(key_type="Test", id_arg="test", use_case="bad_uc", envelope=Envelope.JSON)
-    async def cached_func(test: int = 1) -> dict:
-        return {"a": 1}
-
-    with gcache.enable(), caplog_at_error() as records:
-        assert await cached_func(1) == {"a": 1}
-
-    assert redis_server.keys() == [], "an unreadable value must never be written"
-    assert any("Envelope.JSON requires a Serializer" in r for r in records)
-
-
-@pytest.mark.asyncio
-async def test_reader_sniffs_the_envelope_it_finds_not_the_one_declared(
-    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
-) -> None:
-    # A key mid-migration (or written by another language's client) must still be readable.
-    # Declared envelope is JSON; what's actually in Redis is a pickle.
+    # Reads still sniff the framing rather than trusting the declared envelope -- but a key
+    # that declares JSON refuses the pickle branch outright, because sniffing alone would
+    # leave arbitrary-code-execution reachable for anyone who can write the keyspace.
+    #
+    # The cost is one TTL of cold cache when a use case migrates pickle -> json: entries
+    # written by the old code become misses. That is the self-healing direction, and the
+    # only alternative is executing whatever a writer left behind.
     cache_config_provider.configs["sniff_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["sniff_uc"].ramp[CacheLayer.LOCAL] = 0
 
@@ -188,8 +172,8 @@ async def test_reader_sniffs_the_envelope_it_finds_not_the_one_declared(
                 protocol=pickle.HIGHEST_PROTOCOL,
             ),
         )
-        assert await cached_func(1) == "from-pickle"
-        assert calls == 1, "sniffing should have read the pickle, not fallen back"
+        assert await cached_func(1) == "from-fallback"
+        assert calls == 2, "the pickle must be treated as a miss, not unpickled"
 
 
 @pytest.mark.asyncio
@@ -214,3 +198,84 @@ async def test_undecodable_value_degrades_to_a_miss(
         redis_server.setex(redis_key, 60, b"\x01\x02 not an envelope")
         assert await cached_func(1) == "ok"
         assert calls == 2, "corrupt value should have been treated as a miss"
+
+
+# --- Defects found in review: each of these decoded successfully before the fix. ---
+
+
+@pytest.mark.parametrize(
+    "envelope,reason",
+    [
+        ({"version": 2, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": "x"}, "version"),
+        ({"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": None}, "null payload"),
+        ({"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": {"a": 1}}, "object payload"),
+        ({"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "rot13", "payload": "x"}, "unknown encoding"),
+    ],
+)
+def test_decode_rejects_envelopes_the_typescript_reader_rejects(envelope: dict, reason: str) -> None:
+    # The two readers must agree about the same bytes. Accepting these silently would hand
+    # a caller a future writer's data, or a non-string payload that blows up downstream in
+    # a way EnvelopeDecodeError cannot catch.
+    with pytest.raises(EnvelopeDecodeError):
+        decode(json.dumps(envelope).encode())
+
+
+@pytest.mark.parametrize(
+    "blob",
+    [
+        b"\x80\x05truncated",  # cut short mid-pickle
+        pickle.dumps({"not": "a RedisValue"}, protocol=pickle.HIGHEST_PROTOCOL),  # wrong type
+    ],
+)
+def test_decode_wraps_pickle_failures(blob: bytes) -> None:
+    # These used to escape as UnpicklingError / AttributeError, past the caller's
+    # EnvelopeDecodeError guard, so the bad entry survived its whole TTL and re-failed on
+    # every read.
+    with pytest.raises(EnvelopeDecodeError):
+        decode(blob)
+
+
+def test_json_key_refuses_to_unpickle() -> None:
+    # Sniffing alone would leave arbitrary-code-execution reachable for a key that declares
+    # JSON. Anyone who can write the keyspace could then run code in the reader.
+    pickled = pickle.dumps(RedisValue(created_at_ms=1, payload="x"), protocol=pickle.HIGHEST_PROTOCOL)
+    assert decode(pickled, allow_pickle=True).payload == "x"
+    with pytest.raises(EnvelopeDecodeError, match="refusing to unpickle"):
+        decode(pickled, allow_pickle=False)
+
+
+@pytest.mark.asyncio
+async def test_plain_string_envelope_still_opts_in(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Envelope subclasses str, so `is` comparison silently fell back to pickle for an
+    # untyped caller passing "json" -- no error, and the caller believed it had opted in.
+    cache_config_provider.configs["str_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["str_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="str_uc", envelope="json", serializer=JsonSerializer())
+    async def cached_func(test: int = 1) -> dict:
+        return {"a": 1}
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+        assert json.loads(redis_server.get(redis_key))["version"] == ENVELOPE_VERSION
+
+
+def test_json_envelope_without_a_serializer_is_rejected_at_decoration(gcache: GCache) -> None:
+    # Knowable at decoration, so fail there rather than raising per request forever.
+    with pytest.raises(ValueError, match="requires a Serializer"):
+
+        @gcache.cached(key_type="Test", id_arg="test", use_case="no_ser_uc", envelope=Envelope.JSON)
+        async def cached_func(test: int = 1) -> dict:
+            return {"a": 1}
+
+
+@pytest.mark.asyncio
+async def test_json_serializer_reads_the_typescript_undefined_sentinel() -> None:
+    # A TS writer caching `undefined` stores this sentinel; json.loads raises on it, and
+    # that error escapes the caller's EnvelopeDecodeError guard, so the entry never heals.
+    assert await JsonSerializer().load("__gcache_json_undefined_v1__") is None
+    assert await JsonSerializer().load(b"__gcache_json_undefined_v1__") is None
+    assert await JsonSerializer().load('{"a":1}') == {"a": 1}

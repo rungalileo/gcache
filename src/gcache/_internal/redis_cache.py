@@ -5,16 +5,17 @@ import time
 from collections.abc import Callable
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import ASYNC_PICKLE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
-from gcache._internal.envelope import DecodedValue, Envelope, EnvelopeDecodeError, decode, encode_json, is_pickle
+from gcache._internal.envelope import DecodedValue, EnvelopeDecodeError, decode, encode_json
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, RedisConfig
+from gcache.config import CacheConfigProvider, CacheLayer, Envelope, GCacheKey, RedisConfig
 from gcache.exceptions import MissingKeyConfig
 
 
@@ -125,9 +126,9 @@ class RedisCache(CacheInterface):
         await self.client.setex(key, WATERMARK_TTL_SECONDS, exp_ms)
 
     @staticmethod
-    async def _async_decode(data: bytes) -> DecodedValue:
+    async def _async_decode(data: bytes, *, allow_pickle: bool) -> DecodedValue:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(RedisCache._executor, decode, data)
+        return await loop.run_in_executor(RedisCache._executor, partial(decode, data, allow_pickle=allow_pickle))
 
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
@@ -135,23 +136,28 @@ class RedisCache(CacheInterface):
         watermark_ms = None
         if key.invalidation_tracking:
             vals = await self.client.mget(key.urn, key.prefix + "#watermark")
-            val_pickle = vals[0]
+            raw = vals[0]
             watermark_ms = vals[1]
             if watermark_ms is not None:
                 watermark_ms = float(watermark_ms)
         else:
-            val_pickle = await self.client.get(key.urn)
-        if val_pickle is not None:
+            raw = await self.client.get(key.urn)
+        if raw is not None:
             start_sec = time.monotonic()
 
             # Sniff the envelope rather than trusting key.envelope: a key may have been
             # written under a different envelope (mid-migration, or by another language's
-            # client), and a reader must still understand it.
+            # client), and a reader must still understand it. A JSON key still refuses a
+            # pickle blob -- see decode's allow_pickle.
+            #
+            # Route to the executor on size alone: a multi-megabyte JSON envelope blocks the
+            # loop in json.loads/b64decode just as a large pickle does.
+            allow_pickle = key.envelope != Envelope.JSON
             try:
                 deserialized_value: DecodedValue = (
-                    decode(val_pickle)
-                    if not is_pickle(val_pickle) or len(val_pickle) < ASYNC_PICKLE_THRESHOLD_BYTES
-                    else await RedisCache._async_decode(val_pickle)
+                    decode(raw, allow_pickle=allow_pickle)
+                    if len(raw) < ASYNC_PICKLE_THRESHOLD_BYTES
+                    else await RedisCache._async_decode(raw, allow_pickle=allow_pickle)
                 )
             except EnvelopeDecodeError:
                 # Treat an undecodable value as a miss rather than raising: a cache must not
@@ -193,8 +199,14 @@ class RedisCache(CacheInterface):
         start_time = time.monotonic()
         serialized_value = value if key.serializer is None else await key.serializer.dump(value)
 
-        if key.envelope is Envelope.JSON:
-            if not isinstance(serialized_value, str | bytes):
+        # `==`, not `is`: Envelope subclasses str, so an untyped caller passing the plain
+        # string "json" must opt in rather than silently fall back to pickle.
+        if key.envelope == Envelope.JSON:
+            # Require the serializer, not merely a str/bytes result. A cached function that
+            # already returns str passes a type check with no serializer and stores
+            # non-JSON text in a JSON envelope, which every other language's reader then
+            # fails to parse -- the exact breakage this envelope exists to prevent.
+            if key.serializer is None or not isinstance(serialized_value, str | bytes):
                 raise TypeError(
                     f"Envelope.JSON requires a Serializer producing str or bytes for use case "
                     f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=JsonSerializer()."

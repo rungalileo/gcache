@@ -9,7 +9,6 @@ from typing import Any, Union
 from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
 
-from gcache._internal.envelope import Envelope
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 
 
@@ -115,6 +114,22 @@ class GCacheKeyConfig(BaseModel):
         return config
 
 
+class Envelope(str, Enum):
+    """How a cached value is framed in Redis.
+
+    ``PICKLE`` is the default and serializes arbitrary Python objects, but is readable only
+    from Python. ``JSON`` writes the cross-language envelope the TypeScript and Go clients
+    also use, so an entry can be shared between them and inspected server-side from Redis's
+    Lua interpreter.
+
+    Public API: this lives here rather than in ``gcache._internal`` so callers do not have
+    to import from a private path to name it.
+    """
+
+    PICKLE = "pickle"
+    JSON = "json"
+
+
 class Serializer(ABC):
     """
     Serializer that can be overloaded to allow for custom loading/dumping of values into cache.
@@ -129,18 +144,35 @@ class Serializer(ABC):
         pass
 
 
+# The TypeScript JsonSerializer cannot represent `undefined` in JSON, so it writes this
+# sentinel instead (packages/gcache-ts/src/serializer.ts). Python has no `undefined`; the
+# closest value is None, and mapping it keeps a TS-written entry readable here. Without the
+# mapping json.loads raises on the sentinel, that error escapes the EnvelopeDecodeError
+# guard in RedisCache.get, and the entry never self-heals -- every read fails for the full
+# TTL.
+_TS_UNDEFINED_SENTINEL = "__gcache_json_undefined_v1__"
+
+
 class JsonSerializer(Serializer):
     """JSON serializer, for values shared with non-Python readers.
 
     Pairs with ``Envelope.JSON``: that envelope carries a string payload, so a key using it
     needs a serializer that produces one. Only JSON-representable values work -- that is the
     trade for being readable outside Python.
+
+    Reads are wire-compatible with the TypeScript serializer, including its `undefined`
+    sentinel, which loads as ``None``. Writes never emit the sentinel: Python cannot
+    distinguish "absent" from ``None``, so ``None`` round-trips as JSON ``null``.
     """
 
     async def dump(self, obj: Any) -> str:
         return json.dumps(obj, separators=(",", ":"))
 
     async def load(self, data: bytes | str) -> Any:
+        if isinstance(data, bytes):
+            data = data.decode("utf-8")
+        if data == _TS_UNDEFINED_SENTINEL:
+            return None
         return json.loads(data)
 
 
@@ -154,8 +186,9 @@ class GCacheKey:
     default_config: GCacheKeyConfig | None = None
     serializer: Serializer | None = None
     # How the value is framed in Redis. PICKLE (the default) is Python-only; JSON makes the
-    # entry readable by the TypeScript and Go clients. Reads sniff the envelope regardless,
-    # so this only governs writes and a key can be switched without a flag day.
+    # entry readable by the TypeScript and Go clients. This governs writes; reads sniff the
+    # framing they find, except that a JSON key refuses to unpickle (see envelope.decode),
+    # so switching an existing key costs one TTL of misses rather than needing a flag day.
     envelope: Envelope = Envelope.PICKLE
     # Cached computed fields (set in __post_init__)
     prefix: str = field(init=False)

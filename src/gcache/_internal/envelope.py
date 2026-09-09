@@ -24,16 +24,20 @@ available. (``cmsgpack`` is built in too, and is ~25% more compact; JSON wins he
 being what the TypeScript port already emits and on being readable straight out of
 ``redis-cli``.)
 
-Reads never trust the declared envelope: :func:`decode` sniffs the first byte, so a key
-can be migrated between envelopes without a flag day and a reader always understands
-whatever the writer produced.
+Reads sniff the first byte rather than trusting the declared envelope, so a reader
+understands whatever the writer actually produced -- which is what lets a pickle key read a
+JSON entry, and lets all three languages share one keyspace. Sniffing alone, though, would
+leave the pickle path reachable for every key, including one that declares
+``Envelope.JSON``, so ``decode`` takes ``allow_pickle`` and a JSON key refuses pickle
+outright. Choosing ``Envelope.JSON`` therefore does close the arbitrary-code-execution path
+on read; sniffing on its own would not. The cost is that migrating a key pickle -> json
+gives up one TTL of hits instead of being free.
 """
 
 import base64
 import json
 import pickle
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any
 
 ENVELOPE_VERSION = 1
@@ -41,13 +45,6 @@ ENVELOPE_VERSION = 1
 # Every pickle protocol >= 2 blob starts with the PROTO opcode (0x80). JSON objects start
 # with '{'. The two can never collide, which is what makes sniffing safe.
 _PICKLE_PROTO_OPCODE = 0x80
-
-
-class Envelope(str, Enum):
-    """How a cached value is framed on the wire."""
-
-    PICKLE = "pickle"
-    JSON = "json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,31 +85,63 @@ def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes
     ).encode("utf-8")
 
 
-def decode(data: bytes) -> DecodedValue:
-    """Decode a stored value, sniffing the envelope rather than trusting the key's config.
+def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
+    """Decode a stored value, sniffing the framing rather than trusting the key's config.
 
-    :raises EnvelopeDecodeError: if the blob is neither a pickle nor a JSON envelope.
+    Sniffing is what lets a key move between envelopes with no flag day: a reader handles
+    whatever the writer left.
+
+    ``allow_pickle`` gates the pickle branch. A key that declares ``Envelope.JSON`` passes
+    ``False``, because unpickling executes arbitrary code and the reader cannot tell a
+    migration leftover from an attack payload written by anyone with keyspace access. A
+    refused pickle blob raises, which the caller turns into a miss -- so a JSON-declared key
+    still migrates cleanly off an old pickle value, it just takes one fallback to do it.
+
+    Every failure mode raises :class:`EnvelopeDecodeError` so callers have a single
+    exception to treat as "miss"; letting anything else escape leaves the bad entry in place
+    for its full TTL, re-failing on every read.
     """
     if not data:
         raise EnvelopeDecodeError("empty value")
 
     if data[0] == _PICKLE_PROTO_OPCODE:
-        value = pickle.loads(data)
-        return DecodedValue(created_at_ms=value.created_at_ms, payload=value.payload)
+        if not allow_pickle:
+            raise EnvelopeDecodeError(
+                "refusing to unpickle a value for a JSON-envelope key: unpickling executes "
+                "arbitrary code and this reader cannot distinguish a migration leftover from "
+                "an injected payload"
+            )
+        try:
+            value = pickle.loads(data)
+            return DecodedValue(created_at_ms=int(value.created_at_ms), payload=value.payload)
+        except EnvelopeDecodeError:
+            raise
+        except Exception as e:
+            # A truncated blob, or a pickle of some other type that has no created_at_ms.
+            # 0x80 is also MessagePack's empty-map byte, so a non-Python writer lands here too.
+            raise EnvelopeDecodeError(f"malformed pickle envelope: {e}") from e
 
     if data[0:1] == b"{":
         try:
             envelope = json.loads(data)
+            # Validate the same three fields the TypeScript reader validates. Skipping them
+            # makes the two readers disagree about the same bytes -- the version field in
+            # particular exists precisely to turn a future writer's data into a miss.
+            version = envelope.get("version")
+            if version != ENVELOPE_VERSION:
+                raise EnvelopeDecodeError(f"unsupported envelope version {version!r}")
             payload = envelope["payload"]
-            if envelope.get("encoding") == "base64":
-                payload = base64.b64decode(payload)
+            if not isinstance(payload, str):
+                raise EnvelopeDecodeError(f"payload must be a string, got {type(payload).__name__}")
+            encoding = envelope.get("encoding")
+            if encoding == "base64":
+                payload = base64.b64decode(payload, validate=True)
+            elif encoding != "utf8":
+                raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")
             return DecodedValue(created_at_ms=int(envelope["createdAtMs"]), payload=payload)
+        except EnvelopeDecodeError:
+            raise
         except (ValueError, KeyError, TypeError) as e:
             raise EnvelopeDecodeError(f"malformed JSON envelope: {e}") from e
 
     raise EnvelopeDecodeError(f"unrecognized envelope, leading byte {data[0]:#04x}")
-
-
-def is_pickle(data: bytes) -> bool:
-    """Whether ``data`` is a pickle blob. Exposed so callers can route large-blob decoding."""
-    return bool(data) and data[0] == _PICKLE_PROTO_OPCODE

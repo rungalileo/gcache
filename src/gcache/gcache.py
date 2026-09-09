@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from functools import partial
 from typing import Any
 
-from gcache._internal.envelope import Envelope
 from gcache._internal.event_loop_thread import EventLoopThread, EventLoopThreadPool
 from gcache._internal.local_cache import LocalCache
 from gcache._internal.metrics import GCacheMetrics
@@ -16,6 +15,7 @@ from gcache._internal.redis_cache import RedisCache, create_default_redis_client
 from gcache._internal.state import _GLOBAL_GCACHE_STATE, GCacheContext
 from gcache._internal.wrappers import CacheChain, CacheController, DisabledReasons
 from gcache.config import (
+    Envelope,
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,
@@ -155,7 +155,7 @@ class GCache:
         track_for_invalidation: bool = False,
         default_config: GCacheKeyConfig | None = None,
         serializer: Serializer | None = None,
-        envelope: Envelope = Envelope.PICKLE,
+        envelope: Envelope | str = Envelope.PICKLE,
     ) -> Any:
         """
         Decorator which caches a function which can be either sync or async.
@@ -180,10 +180,26 @@ class GCache:
         :param envelope: How the value is framed in Redis.  ``Envelope.PICKLE`` (the default) serializes arbitrary
                          Python objects but is readable only from Python.  ``Envelope.JSON`` writes the same envelope
                          the TypeScript and Go clients use, so the entry can be shared across languages; it requires a
-                         ``Serializer`` producing str/bytes (pass ``serializer=JsonSerializer()``).  Reads always sniff
-                         the stored envelope, so switching this on an existing key needs no flag day.
+                         ``Serializer`` producing str/bytes (pass ``serializer=JsonSerializer()``).  Reads sniff the
+                         framing they actually find, so a JSON key still reads a JSON entry written by any language --
+                         but a JSON key refuses to unpickle, so migrating an existing key costs one TTL of cold cache
+                         rather than leaving unpickling reachable for whoever can write the keyspace.
         :return:
         """
+
+        # Accept the bare string an untyped caller passes, but resolve it here so an
+        # unrecognized value raises instead of silently falling back to pickle -- the whole
+        # point of declaring an envelope is that both languages agree on the framing.
+        envelope = Envelope(envelope)
+
+        # Fail at decoration rather than per-request: Envelope.JSON with no serializer can
+        # never produce a valid entry, and it is knowable here. Deferring it yields a
+        # TypeError plus an error log on every single call to a misconfigured key.
+        if envelope == Envelope.JSON and serializer is None:
+            raise ValueError(
+                f"use case {use_case!r}: envelope=Envelope.JSON requires a Serializer producing "
+                "str or bytes (pass serializer=JsonSerializer())"
+            )
 
         def decorator(func: Any) -> Any:
             nonlocal use_case

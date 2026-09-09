@@ -1,7 +1,7 @@
-from gcache._internal.envelope import Envelope
 from gcache.config import (
     CacheConfigProvider,
     CacheLayer,
+    Envelope,
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,

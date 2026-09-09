@@ -14,6 +14,7 @@ from gcache._internal.envelope import (
     decode,
     encode_json,
 )
+from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.redis_cache import RedisValue
 from tests.conftest import FakeCacheConfigProvider
 
@@ -606,3 +607,67 @@ async def test_a_serializer_returning_a_non_string_writes_nothing(
         assert await cached_func(1) == {"a": 1}
 
     assert redis_server.keys() == [], "an unwritable value must leave no entry behind"
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_read_increments_its_counter_with_a_reason(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    """The degraded-read counter is the only signal that separates corruption from a miss.
+
+    All of these paths fall through to the fallback, which raises MISS_COUNTER, so without
+    this counter keyspace corruption and envelope thrash look exactly like ordinary misses
+    on a dashboard. Nothing asserted it before -- `_record_degraded_read` could have been
+    deleted outright and the suite would still have passed.
+    """
+    cache_config_provider.configs["degraded_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["degraded_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="degraded_uc")
+    async def cached_func(test: int = 1) -> str:
+        return "ok"
+
+    counter = GCacheMetrics.DEGRADED_READ_COUNTER.labels("degraded_uc", "Test", CacheLayer.REMOTE.name, "undecodable")
+    before = counter._value.get()
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+        redis_server.setex(redis_key, 60, b"\x99 not an envelope")
+        assert await cached_func(1) == "ok"
+
+    assert counter._value.get() == before + 1, "an undecodable entry must be counted under its own reason"
+
+
+@pytest.mark.asyncio
+async def test_an_expired_envelope_is_counted_separately_from_corruption(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Distinct reasons are the point: an operator needs to tell "a foreign writer is using a
+    # longer TTL than we are" apart from "the keyspace is corrupt".
+    cache_config_provider.configs["expired_reason_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["expired_reason_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    @gcache.cached(
+        key_type="Test",
+        id_arg="test",
+        use_case="expired_reason_uc",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    async def cached_func(test: int = 1) -> dict:
+        return {"a": 1}
+
+    counter = GCacheMetrics.DEGRADED_READ_COUNTER.labels(
+        "expired_reason_uc", "Test", CacheLayer.REMOTE.name, "envelope_expired"
+    )
+    before = counter._value.get()
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+        now_ms = int(time.time() * 1000)
+        redis_server.setex(redis_key, 3600, encode_json(created_at_ms=now_ms - 10_000, ttl_sec=5, payload='{"a": 2}'))
+        await cached_func(1)
+
+    assert counter._value.get() == before + 1

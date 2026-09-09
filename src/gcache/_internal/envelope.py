@@ -53,6 +53,15 @@ class DecodedValue:
 
     created_at_ms: int
     payload: Any
+    # Which framing the bytes actually used, as opposed to what the key declared. The
+    # caller needs this: a JSON payload is SERIALIZED, so it is only a value once a
+    # Serializer has loaded it, and a key carrying no serializer must treat the entry as a
+    # miss rather than hand back the raw string.
+    is_json: bool = False
+    # Only JSON envelopes carry one; None for pickle. The reader is expected to honour it,
+    # because the Redis TTL and this field can disagree -- a writer that calls PERSIST or
+    # sets a longer TTL leaves an entry Redis still serves but the envelope calls expired.
+    expires_at_ms: int | None = None
 
 
 class EnvelopeDecodeError(Exception):
@@ -133,12 +142,25 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
             payload = envelope["payload"]
             if not isinstance(payload, str):
                 raise EnvelopeDecodeError(f"payload must be a string, got {type(payload).__name__}")
+            # Both timestamps must be real numbers, as parseEnvelope requires. int("5")
+            # would otherwise accept a string where the TypeScript reader rejects it, so the
+            # two would disagree about the same bytes.
+            created_at_ms = envelope["createdAtMs"]
+            expires_at_ms = envelope["expiresAtMs"]
+            for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
+                if isinstance(value, bool) or not isinstance(value, int | float):
+                    raise EnvelopeDecodeError(f"{field} must be a number, got {type(value).__name__}")
             encoding = envelope.get("encoding")
             if encoding == "base64":
                 payload = base64.b64decode(payload, validate=True)
             elif encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")
-            return DecodedValue(created_at_ms=int(envelope["createdAtMs"]), payload=payload)
+            return DecodedValue(
+                created_at_ms=int(created_at_ms),
+                payload=payload,
+                is_json=True,
+                expires_at_ms=int(expires_at_ms),
+            )
         except EnvelopeDecodeError:
             raise
         except (ValueError, KeyError, TypeError) as e:

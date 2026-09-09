@@ -5,11 +5,12 @@ import pickle
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 import pytest
 import redislite
 
-from gcache import CacheLayer, Envelope, GCache, GCacheKeyConfig, JsonSerializer
+from gcache import CacheLayer, Envelope, GCache, GCacheKeyConfig, JsonSerializer, Serializer
 from gcache._internal.envelope import (
     ENVELOPE_VERSION,
     EnvelopeDecodeError,
@@ -279,3 +280,177 @@ async def test_json_serializer_reads_the_typescript_undefined_sentinel() -> None
     assert await JsonSerializer().load("__gcache_json_undefined_v1__") is None
     assert await JsonSerializer().load(b"__gcache_json_undefined_v1__") is None
     assert await JsonSerializer().load('{"a":1}') == {"a": 1}
+
+
+# --- Read-path defects: each of these returned a wrong value or poisoned an entry. ---
+
+
+@pytest.mark.asyncio
+async def test_a_pickle_key_without_a_serializer_treats_a_json_entry_as_a_miss(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # A JSON payload is SERIALIZED, so only a Serializer turns it back into a value. Without
+    # one this used to hand back the raw string -- worse than a miss, because the caller got
+    # a str where it expected a dict and nothing raised or logged.
+    #
+    # A rolling deploy reaches this exact state: old pods still declare Envelope.PICKLE with
+    # no serializer while new pods have started writing JSON.
+    cache_config_provider.configs["mixed_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["mixed_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    calls = 0
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="mixed_uc")
+    async def cached_func(test: int = 1) -> dict:
+        nonlocal calls
+        calls += 1
+        return {"a": 1}
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+        assert calls == 1
+
+        # What a newer, JSON-writing pod would have left behind.
+        redis_server.setex(
+            redis_key, 60, encode_json(created_at_ms=int(time.time() * 1000), ttl_sec=60, payload='{"a":2}')
+        )
+
+        assert await cached_func(1) == {"a": 1}, "must recompute, not return the raw payload string"
+        assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_a_payload_the_serializer_cannot_load_is_a_miss_and_heals(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # serializer.load used to run outside the EnvelopeDecodeError guard, so a payload it
+    # could not parse raised straight past it: the caller logged an error, re-ran the
+    # fallback, and never wrote back -- leaving the entry poisoned for its whole TTL, with
+    # every later read paying the fallback again. Any non-Python writer can produce one.
+    cache_config_provider.configs["badpayload_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["badpayload_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    calls = 0
+
+    @gcache.cached(
+        key_type="Test", id_arg="test", use_case="badpayload_uc", envelope=Envelope.JSON, serializer=JsonSerializer()
+    )
+    async def cached_func(test: int = 1) -> dict:
+        nonlocal calls
+        calls += 1
+        return {"a": 1}
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+
+        # A structurally valid envelope whose payload is not JSON.
+        redis_server.setex(
+            redis_key, 60, encode_json(created_at_ms=int(time.time() * 1000), ttl_sec=60, payload="not-json")
+        )
+
+        assert await cached_func(1) == {"a": 1}
+        assert calls == 2
+        # Healed, not left poisoned: the next read is served from cache.
+        assert await cached_func(1) == {"a": 1}
+        assert calls == 2, "the miss must have rewritten the entry"
+
+
+@pytest.mark.asyncio
+async def test_an_undecodable_value_is_rewritten_not_just_skipped(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Degrading to a miss is only half the contract. If the fallback's value is never
+    # written back, the corrupt bytes sit there for the full TTL and every read pays twice.
+    cache_config_provider.configs["rewrite_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["rewrite_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    calls = 0
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="rewrite_uc")
+    async def cached_func(test: int = 1) -> str:
+        nonlocal calls
+        calls += 1
+        return "ok"
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+        redis_server.setex(redis_key, 60, b"\x99 not an envelope")
+
+        assert await cached_func(1) == "ok"
+        assert calls == 2
+        assert redis_server.get(redis_key) != b"\x99 not an envelope", "the corrupt value must be replaced"
+        assert await cached_func(1) == "ok"
+        assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_a_bytes_payload_round_trips_through_the_cache(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # base64 had unit coverage on decode only. This drives it through the real read/write
+    # path, which is where an encoding mismatch would actually bite.
+    cache_config_provider.configs["bytes_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["bytes_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    payload = b"\x00\xffbinary\x80"
+
+    class BytesSerializer(Serializer):
+        async def dump(self, obj: Any) -> bytes:
+            return obj
+
+        async def load(self, data: bytes | str) -> bytes:
+            return data if isinstance(data, bytes) else data.encode()
+
+    calls = 0
+
+    @gcache.cached(
+        key_type="Test", id_arg="test", use_case="bytes_uc", envelope=Envelope.JSON, serializer=BytesSerializer()
+    )
+    async def cached_func(test: int = 1) -> bytes:
+        nonlocal calls
+        calls += 1
+        return payload
+
+    with gcache.enable():
+        assert await cached_func(1) == payload
+        (redis_key,) = redis_server.keys()
+        assert json.loads(redis_server.get(redis_key))["encoding"] == "base64"
+        assert await cached_func(1) == payload
+        assert calls == 1, "the second read must come from cache"
+
+
+@pytest.mark.asyncio
+async def test_an_expired_envelope_is_a_miss_even_when_redis_still_serves_it(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # The envelope's expiresAtMs and the Redis TTL can disagree -- a writer that calls
+    # PERSIST or sets a longer TTL leaves an entry Redis happily returns. The TypeScript
+    # reader treats a past expiresAtMs as a miss, so ignoring it here made one key answer
+    # differently in each language.
+    cache_config_provider.configs["expired_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["expired_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    calls = 0
+
+    @gcache.cached(
+        key_type="Test", id_arg="test", use_case="expired_uc", envelope=Envelope.JSON, serializer=JsonSerializer()
+    )
+    async def cached_func(test: int = 1) -> dict:
+        nonlocal calls
+        calls += 1
+        return {"a": 1}
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+        assert calls == 1
+
+        # Written 10s ago with a 5s lifetime, but given a long Redis TTL.
+        now_ms = int(time.time() * 1000)
+        redis_server.setex(redis_key, 3600, encode_json(created_at_ms=now_ms - 10_000, ttl_sec=5, payload='{"a": 2}'))
+
+        assert await cached_func(1) == {"a": 1}
+        assert calls == 2, "an envelope past its expiresAtMs must not be served"

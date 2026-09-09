@@ -193,13 +193,12 @@ class GCache:
         envelope = Envelope(envelope)
 
         # Fail at decoration rather than per-request: Envelope.JSON with no serializer can
-        # never produce a valid entry, and it is knowable here. Deferring it yields a
-        # TypeError plus an error log on every single call to a misconfigured key.
-        if envelope == Envelope.JSON and serializer is None:
-            raise ValueError(
-                f"use case {use_case!r}: envelope=Envelope.JSON requires a Serializer producing "
-                "str or bytes (pass serializer=JsonSerializer())"
-            )
+        # never produce a valid entry, and it is knowable at decoration. Deferring it to
+        # call time yields a TypeError plus an error log on every single call instead.
+        #
+        # Raised inside `decorator`, not here, so the default use case has resolved to
+        # module.function by then -- at this point it is still None, and the message would
+        # name no code at all.
 
         def decorator(func: Any) -> Any:
             nonlocal use_case
@@ -211,6 +210,12 @@ class GCache:
 
             if use_case is None:
                 use_case = f"{func.__module__}.{func.__name__}"
+
+            if envelope == Envelope.JSON and serializer is None:
+                raise ValueError(
+                    f"use case {use_case!r}: envelope=Envelope.JSON requires a Serializer producing "
+                    "str or bytes (pass serializer=JsonSerializer())"
+                )
 
             if use_case in self._use_case_registry:
                 raise UseCaseIsAlreadyRegistered(use_case)

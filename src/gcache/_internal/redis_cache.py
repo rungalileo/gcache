@@ -165,10 +165,39 @@ class RedisCache(CacheInterface):
                 _GLOBAL_GCACHE_STATE.logger.warning("Undecodable cache value for %s; treating as miss", key.urn)
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
+            # A JSON entry carries a SERIALIZED payload, so only a Serializer turns it back
+            # into a value. Without one, the raw string would be handed to a caller
+            # expecting its own type -- worse than a miss, because nothing raises and
+            # nothing logs. A rolling deploy reaches this directly: old pods still declare
+            # Envelope.PICKLE with no serializer while new pods have started writing JSON.
+            if deserialized_value.is_json and key.serializer is None:
+                _GLOBAL_GCACHE_STATE.logger.warning(
+                    "JSON cache value for %s but the key has no Serializer; treating as miss", key.urn
+                )
+                return await self._exec_fallback(key, watermark_ms, fallback)
+
+            # Honour the envelope's own expiry, not just Redis's TTL. The two can disagree --
+            # a writer that calls PERSIST or sets a longer TTL leaves an entry Redis still
+            # serves -- and the TypeScript reader treats a past expiresAtMs as a miss, so
+            # ignoring it here makes the two languages answer differently for one key.
+            if deserialized_value.expires_at_ms is not None and deserialized_value.expires_at_ms <= time.time() * 1000:
+                return await self._exec_fallback(key, watermark_ms, fallback)
+
             # Load payload using custom serializer if present.
             payload = deserialized_value.payload
             if key.serializer is not None:
-                payload = await key.serializer.load(payload)
+                try:
+                    payload = await key.serializer.load(payload)
+                except Exception as e:
+                    # Same reasoning as the decode guard above, which this sat outside of: a
+                    # payload the serializer cannot parse used to raise past it, so the
+                    # caller logged an error, re-ran the fallback and never wrote back --
+                    # leaving the entry poisoned for its whole TTL. Any non-Python writer can
+                    # produce one.
+                    _GLOBAL_GCACHE_STATE.logger.warning(
+                        "Unloadable cache payload for %s (%s); treating as miss", key.urn, e
+                    )
+                    return await self._exec_fallback(key, watermark_ms, fallback)
 
             (
                 GCacheMetrics.SERIALIZATION_TIMER.labels(key.use_case, key.key_type, self.layer().name, "load").observe(

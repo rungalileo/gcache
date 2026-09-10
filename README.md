@@ -281,9 +281,12 @@ Four constraints:
 - **TypeScript interop needs URL-safe key components and a matching prefix.** `gcache-ts`
   percent-encodes every key component and Python interpolates raw, so a `use_case` like
   `SessionService::identity` renders as `SessionService%3A%3Aidentity` there and the two
-  compute different keys — zero sharing, no error. `gcache-ts` also defaults `urnPrefix` to
-  `"urn"` where Python defaults to none. Until the encoding is unified, keep key components
-  URL-safe and set the prefixes to match. Go and Python agree today.
+  compute different keys — zero sharing, no error. Until the encoding is unified, keep key
+  components URL-safe. Go and Python agree today.
+
+  (An earlier version of this bullet also claimed the two disagree on the default
+  `urnPrefix`. They do not — both default to `"urn"`, `_internal/state.py` and
+  `redis-cache.ts` respectively. Only the percent-encoding half was ever real.)
 - **Never flip this on a live use case.** A rolling deploy runs both pod generations at
   once: an old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle
   over it, and a new pod refuses that pickle and writes JSON again. Each destroys the
@@ -300,6 +303,44 @@ Note that `track_for_invalidation=True` only reaches the Redis layer. `LocalCach
 consult watermarks, so an invalidation from another language does not clear a Python pod's
 in-process copy until its local TTL expires — keep the local TTL short (or the local ramp at
 0) for a use case shared across languages.
+
+#### Prefer a protobuf payload over a hand-written dict
+
+`JsonSerializer` leaves the payload *schema* as something each language writes by hand, and
+that is where cross-language caches actually break: not in the framing, which is tested, but
+in a field one side renamed, retyped, or made optional. Review of the first shared use case
+here turned up six such divergences, every one found by a person rather than a test.
+
+`ProtoJsonSerializer` takes a generated protobuf message instead, so one `.proto` defines
+the payload for every language:
+
+```python
+from gcache import Envelope, ProtoJsonSerializer
+from libs.python.schemas.cache.proto import session_identity_pb2
+
+@gcache.cached(
+    key_type="session_id",
+    id_arg="session_id",
+    use_case="session-identity",
+    envelope=Envelope.JSON,
+    serializer=ProtoJsonSerializer(session_identity_pb2.SessionIdentity),
+    track_for_invalidation=True,
+)
+async def get_session(session_id: str) -> session_identity_pb2.SessionIdentity: ...
+```
+
+Requires the extra: `pip install 'gcache[protobuf]'`. Importing gcache without it is fine;
+only constructing `ProtoJsonSerializer` raises.
+
+The Go counterpart is `orbit/libs/go/gcache/protocodec.ProtoJSON`, and the two set the same
+two non-default options — snake_case field names, and tolerating unknown fields so a rolling
+deploy that adds a field does not make each pod generation reject the other's entries. Both
+are enforced by tests on each side.
+
+**Do not compare the two languages' bytes.** Go's protojson deliberately emits unstable
+whitespace — it appends a random extra space after each comma, decided per binary build — and
+Python's `MessageToJson` spaces differently again. This is harmless, because both sides parse
+JSON, but it means a conformance test has to compare parsed values, never raw output.
 
 ## Redis Configuration
 

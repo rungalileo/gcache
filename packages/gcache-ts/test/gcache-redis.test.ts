@@ -425,13 +425,18 @@ describe("GCache Redis TTL layer", () => {
     // When it is read.
     const result = await gcache.enable(async () => await getUser("pickled"));
 
-    // Then it is a miss and the fallback answers -- but the entry is NOT deleted.
-    //
-    // Deleting would destroy a valid entry another language just wrote. That language would
-    // rewrite it, this one would delete it again, and the two would thrash on the key for as
-    // long as both run. Unparseable here means "not an envelope I understand", not "junk".
+    // Then it is a miss, the fallback answers, and no DEL is issued.
     expect(result).toEqual({ userId: "pickled", calls: 1 });
     expect(redis.delCalls).toBe(0);
+
+    // The entry is still replaced, though -- by the write-back, not by a delete. Asserting
+    // that keeps this test honest about what dropping the DEL actually buys: one less round
+    // trip, and survival only when skipCacheWrite suppresses the write. A foreign entry does
+    // NOT survive an ordinary read here, and the comment above must not imply it does.
+    const stored = redis.values.get(pickleKey);
+    expect(stored).toBeDefined();
+    expect(stored?.value).not.toBe(pickleBytes);
+    expect(JSON.parse(String(stored?.value)).version).toBe(1);
   });
 
   it("refreshes stale or malformed Redis envelopes by falling through to fallback", async () => {

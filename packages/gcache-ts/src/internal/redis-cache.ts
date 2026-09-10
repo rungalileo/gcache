@@ -102,10 +102,14 @@ export class RedisCache {
       // Deliberately NOT deleting. This branch means "these bytes are not an envelope I
       // understand", which is not the same as "these bytes are junk": the Python and Go
       // clients share this keyspace and the Python default is still a pickle envelope,
-      // which will never parse here. Deleting it would destroy a valid entry another
-      // language just wrote, that language would rewrite it, and the two would thrash on
-      // the key for as long as both run. A miss is enough -- the write-back below replaces
-      // the value, and a genuinely corrupt entry expires on its own TTL.
+      // which never parses here.
+      //
+      // Note what this does NOT fix. The miss still reaches gcache.ts, which calls
+      // redisCache.put and overwrites the key with a JSON envelope, so a foreign entry does
+      // not survive an ordinary read and the two clients still overwrite each other. What
+      // dropping the delete buys is narrower: one less Redis round trip, and the entry does
+      // survive when skipCacheWrite suppresses the write-back. Ending the overwriting needs
+      // the key-space split fixed, which is tracked separately.
       return { status: "miss", config: layerConfig.config, ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
     if (envelope.expiresAtMs <= Date.now()) {

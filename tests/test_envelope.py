@@ -570,6 +570,19 @@ def test_decode_accepts_unpadded_base64() -> None:
     assert decode(raw).payload == b"abcde"
 
 
+def test_decode_accepts_the_url_safe_base64_alphabet() -> None:
+    # Node's Buffer.from(x, "base64") accepts "-" and "_"; Python's b64decode rejects them.
+    # A Go writer using base64.RawURLEncoding would otherwise make every Python read a
+    # miss-and-rewrite while the TypeScript reader kept hitting the same key. Same
+    # divergence class as the padding case.
+    payload = base64.urlsafe_b64encode(b"\xf8\xff\xfe binary").decode().rstrip("=")
+    assert "-" in payload or "_" in payload, f"fixture must exercise the URL-safe chars: {payload}"
+    raw = json.dumps(
+        {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "base64", "payload": payload}
+    ).encode()
+    assert decode(raw).payload == b"\xf8\xff\xfe binary"
+
+
 def test_decode_still_rejects_a_bad_base64_alphabet() -> None:
     # Re-padding must not weaken validation into accepting non-base64 characters.
     raw = json.dumps(

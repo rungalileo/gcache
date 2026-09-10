@@ -259,7 +259,7 @@ from gcache import Envelope, JsonSerializer
 @gcache.cached(
     key_type="session_id",
     id_arg="session_id",
-    use_case="SessionService::identity",
+    use_case="session-identity",
     envelope=Envelope.JSON,
     serializer=JsonSerializer(),   # required: JSON carries a serialized payload
     track_for_invalidation=True,   # so another language's invalidation reaches this entry
@@ -268,7 +268,7 @@ async def get_session(session_id: str) -> dict:
     return await db.fetch(session_id)
 ```
 
-Two constraints:
+Four constraints:
 
 - **Only JSON-representable values.** The payload is a string on the wire, so the serializer
   has to be able to produce and restore one. `JsonSerializer` covers dicts, lists and
@@ -278,6 +278,12 @@ Two constraints:
   caller instead of the value, with nothing logged. The JSON case *is* caught — the reader
   knows it needs a serializer and treats the entry as a miss — but the pickle one cannot be.
   New `use_case` for that too.
+- **TypeScript interop needs URL-safe key components and a matching prefix.** `gcache-ts`
+  percent-encodes every key component and Python interpolates raw, so a `use_case` like
+  `SessionService::identity` renders as `SessionService%3A%3Aidentity` there and the two
+  compute different keys — zero sharing, no error. `gcache-ts` also defaults `urnPrefix` to
+  `"urn"` where Python defaults to none. Until the encoding is unified, keep key components
+  URL-safe and set the prefixes to match. Go and Python agree today.
 - **Never flip this on a live use case.** A rolling deploy runs both pod generations at
   once: an old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle
   over it, and a new pod refuses that pickle and writes JSON again. Each destroys the

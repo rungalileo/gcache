@@ -167,13 +167,14 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
                     raise EnvelopeDecodeError(f"{field} must be finite, got {value!r}")
             encoding = envelope.get("encoding")
             if encoding == "base64":
-                # Re-pad before decoding. Python rejects unpadded base64
-                # ("YWJjZGU" -> binascii.Error) where Buffer.from(..., "base64") accepts it,
-                # so a writer using raw encoding (Go's base64.RawStdEncoding, say) would make
-                # every Python read a miss-and-rewrite while the TypeScript reader kept
-                # hitting the same key -- the two clients fighting over it indefinitely.
-                # validate=True is kept, so the alphabet is still checked.
-                payload = base64.b64decode(payload + "=" * (-len(payload) % 4), validate=True)
+                # Normalize before decoding. Node's Buffer.from(x, "base64") accepts both
+                # the URL-safe alphabet ("a-_8") and unpadded input ("YWJjZGU"); Python
+                # rejects both. So a Go writer using base64.RawURLEncoding would make every
+                # Python read a miss-and-rewrite while the TypeScript reader kept hitting
+                # the same key. validate=True is kept, so a genuinely wrong alphabet still
+                # fails after the two URL-safe characters are mapped back.
+                normalized = payload.replace("-", "+").replace("_", "/")
+                payload = base64.b64decode(normalized + "=" * (-len(normalized) % 4), validate=True)
             elif encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")
             return DecodedValue(

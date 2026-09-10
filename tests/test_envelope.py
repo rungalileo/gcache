@@ -684,3 +684,60 @@ async def test_an_expired_envelope_is_counted_separately_from_corruption(
         await cached_func(1)
 
     assert counter._value.get() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_switching_a_live_use_case_to_json_heals_rather_than_raising(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    """The pickle -> JSON migration read, end to end.
+
+    This is the question an operator asks before flipping an envelope: what happens to the
+    entries already in Redis? Three things have to hold together, and asserting only the
+    first would pass in a world where the entry stays poisoned for its whole TTL --
+    precisely the bug that shipped twice on this branch, where the fallback ran but the
+    write-back never did.
+    """
+    cache_config_provider.configs["migrate_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["migrate_uc"].ramp[CacheLayer.LOCAL] = 0
+
+    calls = 0
+
+    @gcache.cached(
+        key_type="Test", id_arg="test", use_case="migrate_uc", envelope=Envelope.JSON, serializer=JsonSerializer()
+    )
+    async def cached_func(test: int = 1) -> dict:
+        nonlocal calls
+        calls += 1
+        return {"calls": calls}
+
+    counter = GCacheMetrics.DEGRADED_READ_COUNTER.labels("migrate_uc", "Test", CacheLayer.REMOTE.name, "undecodable")
+    before = counter._value.get()
+
+    with gcache.enable():
+        await cached_func(1)
+        (redis_key,) = redis_server.keys()
+
+        # Exactly what the pre-migration code left behind: a real pickle envelope.
+        legacy = pickle.dumps(
+            RedisValue(created_at_ms=int(time.time() * 1000), payload={"calls": 999}),
+            protocol=pickle.HIGHEST_PROTOCOL,
+        )
+        redis_server.setex(redis_key, 60, legacy)
+        assert redis_server.get(redis_key)[0] == 0x80, "fixture must be a genuine pickle"
+
+        # 1. The caller gets a real value. A refused pickle must never surface as an
+        #    exception -- a cache cannot be allowed to fail a request.
+        assert await cached_func(1) == {"calls": 2}
+
+        # 2. The entry is REWRITTEN in the new framing, so the cost is one miss per key and
+        #    not a permanently poisoned entry re-failing for the whole TTL.
+        assert redis_server.get(redis_key)[0:1] == b"{", "the legacy pickle must be replaced"
+
+        # 3. Which means the very next read is a hit.
+        assert await cached_func(1) == {"calls": 2}
+        assert calls == 2, "the healed entry must serve without re-running the fallback"
+
+    # And it is observable: a migration shows up on the degraded-read counter rather than
+    # being indistinguishable from ordinary misses.
+    assert counter._value.get() == before + 1

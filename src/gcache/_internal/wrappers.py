@@ -187,6 +187,28 @@ class CacheChain(CacheWrapper):
 
         return await self.wrapped.get(key, cache_fallback)
 
+    async def put(self, key: GCacheKey, value: Any) -> None:
+        """Write BOTH layers, unlike the inherited single-layer put.
+
+        Inheriting CacheWrapper.put here wrote only ``wrapped`` -- the local, in-process
+        layer -- and never Redis. That was invisible while nothing called it: each layer
+        populates itself from its own miss path inside ``get``, so the chain's ``put`` was
+        effectively dead code. It stopped being dead when GCache.aput exposed it, and the
+        one thing that method is for is priming an entry for ANOTHER process, which a
+        local-only write cannot do.
+
+        Both layers are written even if one fails, and the first error is re-raised, so a
+        caller learns something went wrong without losing the layer that did work.
+        """
+        first_error: Exception | None = None
+        for cache in (self.wrapped, self.fallback_cache):
+            try:
+                await cache.put(key, value)
+            except Exception as e:  # noqa: PERF203 - both layers must be attempted
+                first_error = first_error or e
+        if first_error is not None:
+            raise first_error
+
     async def delete(self, key: GCacheKey) -> bool:
         ret = await self.wrapped.delete(key)
         ret = await self.fallback_cache.delete(key) or ret

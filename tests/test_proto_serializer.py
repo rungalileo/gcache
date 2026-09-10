@@ -27,25 +27,23 @@ def _options() -> descriptor_pb2.FileOptions:
 
 @pytest.mark.asyncio
 async def test_dump_uses_snake_case_field_names() -> None:
-    # The cross-language contract in one assertion. The default is lowerCamelCase, which Go
-    # would not fail on -- it would return a message with every field at its zero value.
+    # The contract in one assertion. Default is lowerCamelCase, which Go does not fail
+    # on -- it returns a message with every field at its zero value.
     payload = await ProtoJsonSerializer(descriptor_pb2.FileOptions).dump(_options())
     assert set(json.loads(payload)) == {"go_package", "java_package"}
 
 
 @pytest.mark.asyncio
 async def test_dump_is_single_line() -> None:
-    # MessageToJson DEFAULTS to indent=2, i.e. pretty-printed with newlines. That still
-    # works, so nothing would fail -- every cached value would just carry the whitespace.
+    # Default is indent=2, pretty-printed. Works, but inflates every cached value.
     payload = await ProtoJsonSerializer(descriptor_pb2.FileOptions).dump(_options())
     assert "\n" not in payload
 
 
 @pytest.mark.asyncio
 async def test_load_ignores_a_field_it_does_not_know() -> None:
-    # Matches Go's protojson.UnmarshalOptions{DiscardUnknown: true}. The default on both
-    # sides raises, which would make every old pod reject every new-format entry for the
-    # whole duration of a rolling deploy that adds a field.
+    # Matches Go's DiscardUnknown. The default raises, which during a rolling deploy
+    # that adds a field makes every old pod reject every new entry.
     loaded = await ProtoJsonSerializer(descriptor_pb2.FileOptions).load(
         '{"go_package":"example/v1","field_from_a_newer_writer":7}'
     )
@@ -54,9 +52,8 @@ async def test_load_ignores_a_field_it_does_not_know() -> None:
 
 @pytest.mark.asyncio
 async def test_load_reads_what_go_writes() -> None:
-    # Go's protojson emits a RANDOM extra space after each comma -- decided per binary
-    # build, see internal/detrand -- so a reader must not be whitespace-sensitive and the
-    # two languages' bytes must never be compared directly. Both spacings must parse.
+    # Go's protojson adds a random extra space after each comma (per binary build, see
+    # internal/detrand), so readers must not be whitespace-sensitive.
     serializer = ProtoJsonSerializer(descriptor_pb2.FileOptions)
     for raw in (
         '{"java_package":"com.example","go_package":"example/v1"}',
@@ -68,16 +65,14 @@ async def test_load_reads_what_go_writes() -> None:
 
 @pytest.mark.asyncio
 async def test_load_accepts_bytes_as_well_as_str() -> None:
-    # RedisCache hands the serializer whatever the envelope carried, which is bytes on the
-    # base64 path.
+    # RedisCache passes bytes on the base64 path.
     loaded = await ProtoJsonSerializer(descriptor_pb2.FileOptions).load(b'{"go_package":"example/v1"}')
     assert loaded.go_package == "example/v1"
 
 
 @pytest.mark.asyncio
 async def test_dump_rejects_the_wrong_message_type() -> None:
-    # Without the explicit check this surfaces as an AttributeError from inside
-    # json_format naming neither the value nor the expected type.
+    # Without the explicit check this is an AttributeError naming neither type.
     with pytest.raises(TypeError, match="FileOptions"):
         await ProtoJsonSerializer(descriptor_pb2.FileOptions).dump(descriptor_pb2.FieldOptions())
 
@@ -86,8 +81,7 @@ async def test_dump_rejects_the_wrong_message_type() -> None:
 async def test_round_trip_through_the_cache_stores_readable_protojson(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # End to end: what actually lands in Redis has to be a JSON envelope whose payload is
-    # protojson another language can read. Asserting the stored bytes, not the round trip.
+    # End to end: assert the stored bytes, not the round trip.
     cache_config_provider.configs["proto_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["proto_uc"].ramp[CacheLayer.LOCAL] = 0
 
@@ -107,8 +101,7 @@ async def test_round_trip_through_the_cache_stores_readable_protojson(
         (redis_key,) = redis_server.keys()
         stored = json.loads(redis_server.get(redis_key))
         assert stored["version"] == ENVELOPE_VERSION
-        # utf8, not base64: protojson is text, so it needs no encoding hop. A base64
-        # payload here would mean the value stopped being readable from redis-cli.
+        # utf8, not base64: a base64 payload would stop being readable from redis-cli.
         assert stored["encoding"] == "utf8"
         assert json.loads(stored["payload"]) == {"go_package": "example/v1", "java_package": "com.example"}
 

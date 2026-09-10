@@ -396,19 +396,14 @@ class GCache:
         """
         Read one key, computing and caching the value on a miss (async version).
 
-        The ``@cached`` decorator is the right tool whenever the cached value is a pure
-        function of a call's arguments. This is for the case it cannot express: an entry
-        in a cache SHARED with another service, where the key is assembled from data that
-        is not this function's parameters and the value has to be produced by whatever
-        the caller was going to do anyway.
+        Use ``@cached`` when the value is a pure function of a call's arguments. This is
+        for what it cannot express: an entry in a cache SHARED with another service,
+        where the key comes from data that is not this function's parameters. Go's client
+        has always had a plain ``Get``; without this, a Python participant had to reach
+        into ``_internal`` or read its source of truth twice on a miss.
 
-        The Go client (``orbit/libs/go/gcache``) has always had a plain ``Get``; without an
-        equivalent here, a Python participant in a shared cache had to either reach into
-        ``_internal`` or re-read the source of truth twice on a miss -- once to populate the
-        entry through a decorated helper, once to use the result.
-
-        ``fallback`` runs ONLY on a miss, so a caller that wants the value it computed
-        there can capture it from inside the closure rather than reading again::
+        ``fallback`` runs only on a miss, so a caller can capture what it fetched there
+        and reuse it instead of reading again::
 
             fetched = None
 
@@ -417,13 +412,11 @@ class GCache:
                 fetched = await expensive_read()
                 return identity_of(fetched)
 
-            identity = await gcache.aget(key, _load)
-            #  fetched is not None  -> miss: reuse it, no second read
-            #  fetched is None      -> hit:  use identity for a cheap read
+            identity = await gcache.aget(key, _load)   # fetched is set only on a miss
 
-        :param key: The cache key. For a shared entry, every component -- ``key_type``,
-            ``id``, ``use_case``, ``envelope``, ``serializer`` -- must match what the other
-            language writes, or the two simply occupy different key spaces and never hit.
+        :param key: Every component -- ``key_type``, ``id``, ``use_case``, ``envelope``,
+            ``serializer`` -- must match what the other language writes, or the two
+            occupy different key spaces and never hit.
         :param fallback: Async callable invoked on a miss to produce the value.
         :return: The cached value, or whatever ``fallback`` returned.
         """
@@ -437,12 +430,9 @@ class GCache:
         """
         Write one key without reading it first (async version).
 
-        For priming: the caller already knows the value -- it just created the row -- and
-        wants other services to find it without paying the read that would otherwise
-        populate the entry. The Go client's ``Put`` is the counterpart.
-
-        :param key: The cache key. See :meth:`aget` on matching a shared entry.
-        :param value: The value to store.
+        For priming: the caller already knows the value and wants other services to find
+        it without paying the read that would otherwise populate the entry. Go's ``Put``
+        is the counterpart. See :meth:`aget` on matching a shared entry's key.
         """
         await self._cache.put(key, value)
 

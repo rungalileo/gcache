@@ -1,13 +1,11 @@
 """GCache.aget / GCache.aput -- reading and writing one key directly.
 
-These exist for entries in a cache SHARED with another service, where the key is built
-from data that is not some function's parameters and the value is produced by whatever
-the caller was doing anyway. The @cached decorator cannot express that, and the Go client
-has always had a plain Get/Put, so a Python participant previously had to reach into
-_internal or read its source of truth twice on a miss.
+For entries in a cache SHARED with another service, where the key comes from data that is
+not some function's parameters. @cached cannot express that.
 """
 
 import json
+from typing import Any
 
 import pytest
 import redislite
@@ -16,7 +14,7 @@ from gcache import CacheLayer, Envelope, GCache, GCacheKey, GCacheKeyConfig, Jso
 from tests.conftest import FakeCacheConfigProvider
 
 
-def _key(use_case: str = "direct_uc", **kw) -> GCacheKey:
+def _key(use_case: str = "direct_uc", **kw: Any) -> GCacheKey:
     return GCacheKey(
         key_type="session_id",
         id="p:r:s",
@@ -46,15 +44,14 @@ async def test_aget_runs_the_fallback_once_then_serves_from_cache(gcache: GCache
         assert await gcache.aget(_key(), load) == {"session_id": "abc"}
         assert await gcache.aget(_key(), load) == {"session_id": "abc"}
 
-    # The whole point: the expensive read happens once, not once per caller.
+    # The point: the expensive read happens once, not once per caller.
     assert calls == 1
 
 
 @pytest.mark.asyncio
 async def test_aget_lets_the_caller_tell_a_hit_from_a_miss(gcache: GCache, enabled_uc: None) -> None:
-    # The pattern the docstring documents, and the reason fallback beats a plain get:
-    # a miss already fetched the underlying row, so the caller must be able to reuse it
-    # instead of reading a second time.
+    # Why fallback beats a plain get: a miss already fetched the row, so the caller can
+    # reuse it instead of reading twice.
     with gcache.enable():
         ran = []
 
@@ -74,7 +71,7 @@ async def test_aget_lets_the_caller_tell_a_hit_from_a_miss(gcache: GCache, enabl
 async def test_aput_primes_an_entry_no_one_has_read(
     gcache: GCache, redis_server: redislite.Redis, enabled_uc: None
 ) -> None:
-    # Priming: the caller just created the row, so nobody should pay a read to discover it.
+    # Priming: the caller just created the row; nobody should read to discover it.
     with gcache.enable():
         await gcache.aput(_key(), {"session_id": "abc", "created_at": "2026-09-08T02:42:19Z"})
 
@@ -91,8 +88,7 @@ async def test_aput_primes_an_entry_no_one_has_read(
 async def test_aput_writes_the_cross_language_envelope(
     gcache: GCache, redis_server: redislite.Redis, enabled_uc: None
 ) -> None:
-    # Assert the stored bytes: a round trip would pass for a Python-only framing too, and
-    # the entire reason this method exists is for another language to read the result.
+    # Assert the stored bytes: a round trip would pass for a Python-only framing too.
     with gcache.enable():
         await gcache.aput(_key(), {"session_id": "abc"})
 
@@ -107,9 +103,9 @@ async def test_aput_writes_the_cross_language_envelope(
 async def test_direct_access_respects_a_disabled_use_case(
     gcache: GCache, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # A disabled use case must degrade to "always call the fallback", not fail the caller.
-    # Configured explicitly rather than left unset: the test provider hands out an ENABLED
-    # config for any use case it does not know, so "no config" would have proved nothing.
+    # A disabled use case must degrade to "always call the fallback". Configured
+    # explicitly: the test provider returns an ENABLED config for unknown use cases, so
+    # leaving it unset would prove nothing.
     disabled = GCacheKeyConfig.enabled(60)
     for layer in CacheLayer:
         disabled.ramp[layer] = 0
@@ -130,8 +126,7 @@ async def test_direct_access_respects_a_disabled_use_case(
 
 @pytest.mark.asyncio
 async def test_invalidate_reaches_an_entry_written_by_aput(gcache: GCache, enabled_uc: None) -> None:
-    # Tracked entries are the shared-cache case, so the other language's invalidation has
-    # to land on one this path wrote.
+    # The other language's invalidation must land on an entry this path wrote.
     key = _key(invalidation_tracking=True)
     with gcache.enable():
         await gcache.aput(key, {"session_id": "abc"})

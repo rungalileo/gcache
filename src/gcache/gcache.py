@@ -177,6 +177,12 @@ class GCache:
         :param serializer: Optional serializer to use to serialize and deserialize cache values.  Care must be taken that
                            the returned value matches the signature of cached function, as otherwise you may get runtime
                            type/attribute errors.
+
+                           Do NOT add this to a live use case either.  A serialized payload is indistinguishable from a
+                           normally-cached value once it is inside a pickle envelope, so a pod running the older code --
+                           same use case, no serializer -- hands the raw payload back to its caller instead of the value,
+                           silently.  A JSON envelope is caught (the reader knows it needs a serializer and treats the
+                           entry as a miss); the pickle case cannot be detected at all.  Migrate under a new ``use_case``.
         :param envelope: How the value is framed in Redis.  ``Envelope.PICKLE`` (the default) serializes arbitrary
                          Python objects but is readable only from Python.  ``Envelope.JSON`` writes the same envelope
                          the TypeScript and Go clients use, so the entry can be shared across languages; it requires a
@@ -191,6 +197,11 @@ class GCache:
                          so the key's hit rate sits near zero for the whole rollout -- a load spike on the backing
                          store, not a slow warm-up.  Migrate under a NEW ``use_case``; the two generations then use
                          different keys and never fight.
+
+                         Note also that cross-language invalidation reaches the REDIS layer only.  ``ainvalidate``
+                         writes a watermark, and ``LocalCache`` does not read watermarks, so a Go or TypeScript
+                         invalidation does not clear a Python pod's in-process copy until the local TTL expires.  For a
+                         use case shared across languages, keep the local TTL short or set the local ramp to 0.
         :return:
         """
 

@@ -273,6 +273,11 @@ Two constraints:
 - **Only JSON-representable values.** The payload is a string on the wire, so the serializer
   has to be able to produce and restore one. `JsonSerializer` covers dicts, lists and
   scalars; anything else needs your own `Serializer`.
+- **`serializer=` is the same trap.** Adding one to a live use case is undetectable in a
+  pickle envelope: a pod on the older code hands the raw serialized payload back to its
+  caller instead of the value, with nothing logged. The JSON case *is* caught — the reader
+  knows it needs a serializer and treats the entry as a miss — but the pickle one cannot be.
+  New `use_case` for that too.
 - **Never flip this on a live use case.** A rolling deploy runs both pod generations at
   once: an old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle
   over it, and a new pod refuses that pickle and writes JSON again. Each destroys the

@@ -99,7 +99,13 @@ export class RedisCache {
     try {
       envelope = this.parseEnvelope(raw);
     } catch {
-      await client.del(redisKey);
+      // Deliberately NOT deleting. This branch means "these bytes are not an envelope I
+      // understand", which is not the same as "these bytes are junk": the Python and Go
+      // clients share this keyspace and the Python default is still a pickle envelope,
+      // which will never parse here. Deleting it would destroy a valid entry another
+      // language just wrote, that language would rewrite it, and the two would thrash on
+      // the key for as long as both run. A miss is enough -- the write-back below replaces
+      // the value, and a genuinely corrupt entry expires on its own TTL.
       return { status: "miss", config: layerConfig.config, ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
     if (envelope.expiresAtMs <= Date.now()) {

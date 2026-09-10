@@ -11,7 +11,7 @@ from typing import Any
 from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
-from gcache._internal.constants import ASYNC_PICKLE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
+from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
 from gcache._internal.envelope import DecodedValue, EnvelopeDecodeError, decode, encode_json
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
@@ -156,7 +156,7 @@ class RedisCache(CacheInterface):
             try:
                 deserialized_value: DecodedValue = (
                     decode(raw, allow_pickle=allow_pickle)
-                    if len(raw) < ASYNC_PICKLE_THRESHOLD_BYTES
+                    if len(raw) < ASYNC_DECODE_THRESHOLD_BYTES
                     else await RedisCache._async_decode(raw, allow_pickle=allow_pickle)
                 )
             except EnvelopeDecodeError:

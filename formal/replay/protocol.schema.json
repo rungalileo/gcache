@@ -139,7 +139,8 @@
               "const": "causally-ready-v1"
             },
             "observed": {
-              "type": "object"
+              "type": "object",
+              "description": "The driver's complete current observation, encoded per profile: $defs/behaviorObservation for every feature profile and for effects, $defs/coreObservation for core, $defs/localClockObservation for local-clock. The coordinator validates it against the session profile's definition before any comparison and reports a violation as 'Malformed replay observation: <definition> at <path>', so a shape error is an infrastructure failure, never an observation mismatch."
             },
             "environment": {
               "type": "object",
@@ -147,7 +148,8 @@
                 "wallMs": {
                   "type": "integer",
                   "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
+                  "maximum": 9007199254740991,
+                  "description": "The driver's actual wall clock in epoch milliseconds when this observation was taken. Behavior, effects and core drivers start their controlled wall clock at 2026-09-08T12:00:00.000Z (1788868800000 ms) and move it only through advance, shiftWall and advanceWall commands; frame timestamps and marker cutoffs are computed relative to that epoch. The local-clock driver reports its real process clock, which no mapping consumes."
                 }
               },
               "required": [
@@ -221,7 +223,7 @@
                       "const": "causally-ready-v1"
                     },
                     "fixture": {
-                      "type": "object"
+                      "$ref": "#/$defs/fixture"
                     },
                     "setup": {
                       "type": "array",
@@ -520,10 +522,16 @@
               ]
             },
             "ageMs": {
-              "type": "number"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Frame age at seed time in whole milliseconds; negative ages stamp a future frame."
             },
             "ttlMs": {
-              "type": "number"
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Redis TTL of the seeded frame in whole milliseconds. Default 60000."
             }
           },
           "required": [
@@ -541,7 +549,10 @@
               "type": "string"
             },
             "futureBufferMs": {
-              "type": "number"
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Watermark future buffer in whole milliseconds. Default 0."
             }
           },
           "required": [
@@ -931,6 +942,1213 @@
             "offered"
           ],
           "additionalProperties": false
+        }
+      ]
+    },
+    "primitive": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "null"
+      ],
+      "description": "Metric label or diagnostic detail. Labels never carry nested records; a strongly typed port can keep its own label struct and serialize it flat."
+    },
+    "absent": {
+      "type": "object",
+      "description": "A call that completed without a value (TypeScript undefined, Go zero value with no payload). Distinct from null.",
+      "properties": {
+        "absent": {
+          "const": true
+        }
+      },
+      "required": [
+        "absent"
+      ],
+      "additionalProperties": false
+    },
+    "callResult": {
+      "description": "Outcome of one begun getOrLoad call, in begin order. Error identities are driver-local indices, never messages: source:N is the N-th controlled source failure, timeout:N the N-th fallback deadline error, unexpected:<text> anything else.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "pending"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "value"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": [
+                    "number",
+                    "string",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                {
+                  "$ref": "#/$defs/absent"
+                }
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string",
+              "pattern": "^(source|timeout):(0|[1-9][0-9]*)$|^unexpected:"
+            }
+          },
+          "required": [
+            "status",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "observedEvent": {
+      "description": "One journal entry recorded only when the fixture's observe list names its kind. Metric events carry the observer's flat labels; readContext, readAbort, writeDispatch and marker are driver-side environment probes. Order is the driver's actual callback order.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "readContext"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Zero-based remote read index, equal to reads before this read started."
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Remote read budget handed to the adapter."
+            },
+            "aborted": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "event",
+            "index",
+            "timeoutMs",
+            "aborted"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "readAbort"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "event",
+            "index"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "request"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "miss"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "reason"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "disabled"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "reason"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "error"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "inFallback": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "error",
+            "inFallback"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "coalesced"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "scope"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "description": "Maintenance metrics carry no use case.",
+          "properties": {
+            "event": {
+              "const": "invalidation"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "keyType",
+            "layer"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "shadowAge"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Duration or age in seconds as reported to the metrics observer."
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "outcome",
+            "seconds"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "recoveryAge"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Duration or age in seconds as reported to the metrics observer."
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "outcome",
+            "seconds"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "futureOffset"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Duration or age in seconds as reported to the metrics observer."
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "seconds"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "size"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "bytes"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "storedSize"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "bytes"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "compression"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "outcome"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "get"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Duration or age in seconds as reported to the metrics observer."
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "seconds"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "fallback"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Duration or age in seconds as reported to the metrics observer."
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "seconds"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "serialization"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "layer": {
+              "type": "string"
+            },
+            "operation": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Duration or age in seconds as reported to the metrics observer."
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "layer",
+            "operation",
+            "seconds"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "description": "Details object of the shadow validation mismatch warning log. Value previews are present only when the policy enables mismatch logging with details.",
+          "properties": {
+            "event": {
+              "const": "mismatchWarning"
+            },
+            "cacheNamespace": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "keyType": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            },
+            "cacheKey": {
+              "type": "string"
+            },
+            "cachedValueJson": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceValueJson": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "event",
+            "cacheNamespace",
+            "useCase",
+            "keyType",
+            "outcome"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event": {
+              "const": "writeDispatch"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Zero-based remote write index, equal to writes before this write started."
+            }
+          },
+          "required": [
+            "event",
+            "index"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        },
+        {
+          "type": "object",
+          "description": "Controlled Redis environment probe, never DialCache internal state.",
+          "properties": {
+            "event": {
+              "const": "marker"
+            },
+            "cutoffMs": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Invalidation watermark relative to the fixed wall epoch, or -1 when no watermark exists."
+            },
+            "ttlMs": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Remaining watermark TTL in the controlled Redis environment; negative sentinels follow the driver's Redis fake."
+            }
+          },
+          "required": [
+            "event",
+            "cutoffMs",
+            "ttlMs"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/primitive"
+          }
+        }
+      ]
+    },
+    "behaviorObservation": {
+      "type": "object",
+      "description": "Observation of the behavior driver used by every feature profile and by effects. Counters count started effects, including held ones. Lists preserve observed order.",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/observedEvent"
+          },
+          "description": "Present exactly when the fixture declares an observe list."
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/callResult"
+          }
+        },
+        "loaders": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reads": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "writes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "invalidations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "loads": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "dumps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "policyCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "classifications": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "comparisons": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maintenance": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "ok",
+              "mutation_error",
+              "missing_remote"
+            ]
+          },
+          "description": "Outcome of each invalidateRemote command in order."
+        },
+        "sourceScopes": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "description": "isEnabled() observed inside each source invocation when the fixture probes source scope."
+        },
+        "writeTtls": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "description": "cacheTtlMs of each remote write request in dispatch order."
+        },
+        "shadow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "shadowValidation outcomes in order."
+        },
+        "recovery": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "staleRecovery outcomes in order."
+        }
+      },
+      "required": [
+        "calls",
+        "loaders",
+        "reads",
+        "writes",
+        "invalidations",
+        "loads",
+        "dumps",
+        "policyCalls",
+        "classifications",
+        "comparisons",
+        "maintenance",
+        "sourceScopes",
+        "writeTtls",
+        "shadow",
+        "recovery"
+      ],
+      "additionalProperties": false
+    },
+    "coreObservation": {
+      "type": "object",
+      "description": "Flat integer observation of the core conformance driver.",
+      "properties": {
+        "sourceVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lastResult": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "outsideLoaderCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requestLoaderCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "localLoaderCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "coalescedLoaderCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "remoteLoaderCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "redisReads": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "redisWrites": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "sourceVersion",
+        "lastResult",
+        "outsideLoaderCalls",
+        "requestLoaderCalls",
+        "localLoaderCalls",
+        "coalescedLoaderCalls",
+        "remoteLoaderCalls",
+        "redisReads",
+        "redisWrites"
+      ],
+      "additionalProperties": false
+    },
+    "localClockObservation": {
+      "type": "object",
+      "description": "Behavior-shaped observation of the local-clock driver: calls are the plain integers returned by each call, loaders counts source invocations, every other counter stays zero and every other list stays empty. No events key.",
+      "properties": {
+        "loaders": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reads": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "writes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "invalidations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "loads": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "dumps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "policyCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "classifications": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "comparisons": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maintenance": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "ok",
+              "mutation_error",
+              "missing_remote"
+            ]
+          },
+          "description": "Outcome of each invalidateRemote command in order."
+        },
+        "sourceScopes": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "description": "isEnabled() observed inside each source invocation when the fixture probes source scope."
+        },
+        "writeTtls": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "description": "cacheTtlMs of each remote write request in dispatch order."
+        },
+        "shadow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "shadowValidation outcomes in order."
+        },
+        "recovery": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "staleRecovery outcomes in order."
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "required": [
+        "calls",
+        "loaders",
+        "reads",
+        "writes",
+        "invalidations",
+        "loads",
+        "dumps",
+        "policyCalls",
+        "classifications",
+        "comparisons",
+        "maintenance",
+        "sourceScopes",
+        "writeTtls",
+        "shadow",
+        "recovery"
+      ],
+      "additionalProperties": false
+    },
+    "behaviorFixture": {
+      "type": "object",
+      "description": "Construction-time configuration of the behavior driver. Omitted fields take the driver default named in each description; sentinel strings select the library default instead of the driver default.",
+      "properties": {
+        "localFaultInjection": {
+          "type": "boolean",
+          "description": "Bind the model's fallible local-storage boundary to a controlled exception hook."
+        },
+        "policy": {
+          "type": "object",
+          "description": "Default key configuration passed to every call. Explicit runtime configuration input; omitted fields, null, false and zero are distinct."
+        },
+        "tracked": {
+          "type": "boolean",
+          "description": "trackForInvalidation for every call and seed. Default false."
+        },
+        "fallbackTimeoutMs": {
+          "oneOf": [
+            {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            {
+              "const": "default"
+            }
+          ],
+          "description": "Source deadline. Omitted: 10 ms. null: no deadline. \"default\": leave the library default in place."
+        },
+        "readTimeoutMs": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "const": "default"
+            }
+          ],
+          "description": "Remote read timeout. Omitted: 50 ms. \"default\": leave the library default in place."
+        },
+        "localMaxSize": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Local cache capacity. Omitted: library default."
+        },
+        "shadowMaxInFlight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Shadow validation concurrency. Omitted: library default."
+        },
+        "recovery": {
+          "enum": [
+            "allow",
+            "deny",
+            "error",
+            "default"
+          ],
+          "description": "Instance-wide stale recovery classifier: allow/deny return that verdict and count a classification, error throws. Omitted or \"default\": no instance classifier."
+        },
+        "comparator": {
+          "enum": [
+            "equal",
+            "unequal",
+            "error"
+          ],
+          "description": "Per-call shadow comparator verdict; each invocation counts a comparison. Omitted: library comparator."
+        },
+        "comparisonMs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Elapsed wall time consumed inside each comparator invocation without delivering timers."
+        },
+        "sourceWorkMs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Elapsed wall time consumed inside each source invocation without delivering timers."
+        },
+        "shadowHook": {
+          "type": "boolean",
+          "description": "false removes the shadowValidation metrics hook. Default true."
+        },
+        "observerFailure": {
+          "type": "boolean",
+          "description": "Every observer and logger callback throws. Default false."
+        },
+        "remote": {
+          "type": "boolean",
+          "description": "false constructs the cache without a Redis client. Default true."
+        },
+        "probeSourceScope": {
+          "type": "boolean",
+          "description": "Record isEnabled() inside each source invocation into sourceScopes."
+        },
+        "observe": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "readContext",
+              "readAbort",
+              "request",
+              "miss",
+              "disabled",
+              "error",
+              "coalesced",
+              "invalidation",
+              "shadowAge",
+              "recoveryAge",
+              "futureOffset",
+              "size",
+              "storedSize",
+              "compression",
+              "get",
+              "fallback",
+              "serialization",
+              "mismatchWarning",
+              "writeDispatch",
+              "marker"
+            ]
+          },
+          "description": "Event kinds journaled into observation.events. Its presence, even empty, makes events required in every observation."
+        }
+      },
+      "required": [
+        "policy"
+      ],
+      "additionalProperties": false
+    },
+    "emptyFixture": {
+      "type": "object",
+      "description": "Core and local-clock drivers take no construction-time fixture.",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "fixture": {
+      "description": "Fixture returned by prepare. Feature profiles and effects return a behaviorFixture; core and local-clock return an empty object.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/emptyFixture"
+        },
+        {
+          "$ref": "#/$defs/behaviorFixture"
         }
       ]
     }

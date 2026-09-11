@@ -11,10 +11,11 @@ import { expectedCoreObservation, parseItfTrace } from "../formal/replay/core.mj
 import { featureInput, profiles } from "../formal/replay/features.mjs";
 import { inputsFor } from "../formal/replay/effects.mjs";
 import { emptyObservation } from "../formal/replay/observation.mjs";
-import { assertSchema, schema } from "../formal/replay/schema.mjs";
+import { assertSchema, schema, schemaViolation } from "../formal/replay/schema.mjs";
 import { parseJSON, replayLines } from "../formal/replay/validation.mjs";
 import { replaySources } from "../formal/replay/sources.mjs";
 import type { Fixture } from "./formal/behavior-driver.js";
+import { replayThroughCoordinator, smokeTracePath } from "./formal/coordinated-replay.js";
 
 type Raw = { states: Array<Record<string, unknown> & { s: Record<string, unknown> }> };
 function smoke(profile: string): Raw {
@@ -114,7 +115,7 @@ describe("shared observation assertion attribution", () => {
     { name: "compression outcome", profile: "recovery-read", field: "outcome",
       event: { event: "compression", layer: "remote", outcome: "compressed" } },
     { name: "read event kind", profile: "independent", field: "event",
-      event: { event: "marker" } },
+      event: { event: "marker", cutoffMs: -1, ttlMs: -2 } },
     { name: "future offset layer", profile: "shadow", field: "layer",
       event: { event: "futureOffset", layer: "remote", seconds: 1 } },
     { name: "nonpositive future offset", profile: "shadow", field: "seconds",
@@ -151,6 +152,108 @@ describe("shared observation assertion attribution", () => {
     expect(error).not.toBeInstanceOf(AssertionError);
     const session = replaySession(raw, profile);
     expect(String(failureOf(() => session.observe(0, observed)))).not.toMatch(/expected:[\s\S]*actual:/);
+  });
+});
+
+describe("observation encoding contract", () => {
+  const failureOf = (action: () => unknown) => {
+    try { action(); }
+    catch (error) { return String(error); }
+    throw new Error("Expected the coordinator to reject the observation");
+  };
+  const coreObservation = () => expectedCoreObservation(parseItfTrace(smoke("core"), "core").states[0]!.state);
+  const behaviorObservation = (profile: string) => emptyObservation(bindTrace(profile, smoke(profile), profile).fixture as unknown as Fixture);
+
+  it.each([
+    { profile: "independent", definition: "behaviorObservation", path: "observed.calls", observed: () => ({ ...behaviorObservation("independent"), calls: "none" }) },
+    { profile: "independent", definition: "behaviorObservation", path: "observed.calls[0].value", observed: () => ({ ...behaviorObservation("independent"), calls: [{ status: "value" }] }) },
+    { profile: "independent", definition: "behaviorObservation", path: "observed.calls[0].error", observed: () => ({ ...behaviorObservation("independent"), calls: [{ status: "error", error: "boom" }] }) },
+    { profile: "independent", definition: "behaviorObservation", path: "observed.events[0]", observed: () => ({ ...behaviorObservation("independent"), events: [{ event: "invented" }] }) },
+    { profile: "independent", definition: "behaviorObservation", path: "observed.events[0].timeoutMs", observed: () => ({ ...behaviorObservation("independent"), events: [{ event: "readContext", index: 0, aborted: false }] }) },
+    { profile: "independent", definition: "behaviorObservation", path: "observed.maintenance[0]", observed: () => ({ ...behaviorObservation("independent"), maintenance: ["exploded"] }) },
+    { profile: "independent", definition: "behaviorObservation", path: "observed.events", observed: () => ({ ...behaviorObservation("independent"), events: 5 }) },
+    { profile: "independent", definition: "behaviorObservation", path: "observed.extra", observed: () => ({ ...behaviorObservation("independent"), extra: 1 }) },
+    { profile: "shadow", definition: "behaviorObservation", path: "observed.events[0].seconds", observed: () => ({ ...behaviorObservation("shadow"), events: [{ event: "shadowAge", cacheNamespace: "urn", useCase: "Behavior", keyType: "id", outcome: "match", seconds: "1" }] }) },
+    { profile: "effects", definition: "behaviorObservation", path: "observed.writeTtls[0]", observed: () => ({ ...behaviorObservation("effects"), writeTtls: [60000.5] }) },
+    { profile: "core", definition: "coreObservation", path: "observed.redisReads", observed: () => ({ ...coreObservation(), redisReads: -1 }) },
+    { profile: "core", definition: "coreObservation", path: "observed.redisWrites", observed: () => { const { redisWrites: _writes, ...rest } = coreObservation(); return rest; } },
+    { profile: "local-clock", definition: "localClockObservation", path: "observed.calls[0]", observed: () => ({ ...emptyObservation(), calls: [{ status: "pending" }] }) },
+    { profile: "local-clock", definition: "localClockObservation", path: "observed.events", observed: () => ({ ...emptyObservation(), calls: [], events: [] }) },
+  ])("rejects a malformed $profile observation at $path as infrastructure failure", ({ profile, definition, path, observed }) => {
+    const raw = smoke(profile);
+    expect(schemaViolation(observed(), definition, "observed")).toBe(path);
+    const session = replaySession(raw, profile);
+    const rendered = failureOf(() => session.observe(0, observed()));
+    expect(rendered).toContain(`Malformed replay observation: ${definition} at ${path}`);
+    expect(rendered).not.toMatch(/expected:[\s\S]*actual:/);
+    expect(rendered).not.toMatch(/Observation mismatch/);
+    // The session is released like any other failed step; no partial credit.
+    expect(failureOf(() => session.observe(0, observed()))).toMatch(/Unknown replay session/);
+  });
+
+  it("accepts every declared empty observation and names the definition in schema failures", () => {
+    for (const profile of Object.keys(profileActions())) {
+      const binding = bindTrace(profile, smoke(profile), profile);
+      const observed = profile === "core" ? coreObservation() : emptyObservation(binding.fixture as unknown as Fixture);
+      expect(schemaViolation(observed, binding.observation)).toBeUndefined();
+    }
+    expect(() => assertSchema({ status: "value" }, "callResult")).toThrow(/^Malformed replay callResult at callResult\.value$/);
+    expect(() => assertSchema({ version: 1, id: 1, op: "observe", session: "1", index: 0, settlement, observed: {}, environment: { wallMs: 0.5 } }, "request"))
+      .toThrow(/^Malformed replay request at request\.environment\.wallMs$/);
+    expect(() => assertSchema({ op: "seed", ageMs: 1.5 }, "command")).toThrow(/^Malformed replay command at command\.ageMs$/);
+    expect(() => assertSchema({ op: "invalidate", futureBufferMs: -1 }, "behaviorCommand")).toThrow(/^Malformed replay behaviorCommand at behaviorCommand\.futureBufferMs$/);
+    // Two command families share the invalidate discriminator, so the union reports only itself.
+    expect(() => assertSchema({ op: "invalidate", futureBufferMs: -1 }, "command")).toThrow(/^Malformed replay command$/);
+    expect(() => assertSchema({ op: "seed", ageMs: -1, ttlMs: 1000 }, "command")).not.toThrow();
+  });
+
+  it("rejects fixtures outside the declared sentinel domains, including through the prepare response", () => {
+    const fixture = bindTrace("independent", smoke("independent"), "fixture").fixture;
+    expect(() => assertSchema(fixture, "fixture")).not.toThrow();
+    expect(() => assertSchema({}, "fixture")).not.toThrow();
+    const malformed: Array<[Record<string, unknown>, string]> = [
+      [{ ...fixture, recovery: "maybe" }, "recovery"],
+      [{ ...fixture, fallbackTimeoutMs: "none" }, "fallbackTimeoutMs"],
+      [{ ...fixture, readTimeoutMs: null }, "readTimeoutMs"],
+      [{ ...fixture, comparator: "same" }, "comparator"],
+      [{ ...fixture, observe: ["invented"] }, "observe[0]"],
+      [{ ...fixture, localMaxSize: -1 }, "localMaxSize"],
+      [{ ...fixture, remote: "yes" }, "remote"],
+      [{ ...fixture, invented: true }, "invented"],
+    ];
+    for (const [candidate, path] of malformed) {
+      expect(schemaViolation(candidate, "behaviorFixture")).toBe(`behaviorFixture.${path}`);
+      expect(() => assertSchema(candidate, "fixture")).toThrow(/^Malformed replay fixture$/);
+    }
+    // A fixture without a policy is neither the empty core fixture nor a behavior fixture.
+    expect(() => assertSchema({ tracked: true }, "fixture")).toThrow(/Malformed replay fixture/);
+    const response = (candidate: unknown) => ({ version: 1, id: 1, ok: true, result: {
+      session: "1", settlement, fixture: candidate, setup: [], actions: ["beginCall"], steps: 2 } });
+    expect(() => assertSchema(response(fixture), "response")).not.toThrow();
+    expect(() => assertSchema(response({ ...fixture, recovery: "maybe" }), "response")).toThrow(/^Malformed replay response/);
+    // Every profile's prepared fixture crosses the response schema.
+    for (const profile of Object.keys(profileActions())) {
+      const prepared = new ReplayCoordinator().dispatch({ version: 1, id: 1, op: "prepare", profile, path: smokeTracePath(profile) });
+      expect(() => assertSchema(prepared.fixture, "fixture")).not.toThrow();
+    }
+  });
+});
+
+describe("coordinated end-to-end replay with the real drivers", () => {
+  it.each(Object.keys(profileActions()))("replays the committed %s smoke trace through the coordinator", async profile => {
+    const result = await replayThroughCoordinator(profile, smokeTracePath(profile));
+    expect(result.steps).toBe(smoke(profile).states.length);
+  });
+
+  it("reports a driver observation the model did not predict as a mismatch, not a shape error", async () => {
+    const raw = smoke("core");
+    raw.states[1]!.s.redisReads = { "#bigint": "999" };
+    const directory = mkdtempSync(resolve(tmpdir(), "dialcache-coordinated-replay-"));
+    try {
+      const path = resolve(directory, "tampered.itf.json");
+      writeFileSync(path, JSON.stringify(raw));
+      await expect(replayThroughCoordinator("core", path)).rejects.toThrow(/step 1 action outsideCall: Observation mismatch\nexpected: .*"redisReads":999/);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 });
 

@@ -352,6 +352,11 @@ Three things to know:
 - **`aput` raises on a cache-layer failure**, unlike a read. That matches `adelete` and
   `ainvalidate`. "Prime" reads as best-effort, so a caller on a request path should decide
   what to do with a Redis timeout rather than let it propagate.
+- **A prime is sampled by the ramp, like a read.** `_should_cache` calls `random()` per
+  invocation, per layer, so a use case at ramp 50 drops about half its primes and `aput`
+  still returns normally. On a read that costs one uncached call; on a prime it throws away
+  work already done and the entry another process waits for never appears. Ramp a shared
+  use case to 100 or 0, not through the middle.
 - **A prime inside an active invalidation window is lost silently — on the Redis layer.**
   The entry is written with `createdAtMs` below the watermark, so remote reads find it stale
   until the window closes and a read rewrites it. That is the invalidation doing its job, but
@@ -505,7 +510,8 @@ GCache exports Prometheus metrics automatically:
 | `gcache_request_counter` | Counter | Total cache requests |
 | `gcache_miss_counter` | Counter | Cache misses |
 | `gcache_disabled_counter` | Counter | Requests where caching was skipped (labels: `reason`) |
-| `gcache_error_counter` | Counter | Errors during cache operations |
+| `gcache_error_counter` | Counter | Errors during cache operations (labels: `layer`, `error`, `in_fallback`) |
+| `gcache_degraded_read_counter` | Counter | Reads that found an entry but could not use it, so degraded to a miss and rewrote it (labels: `reason`) |
 | `gcache_invalidation_counter` | Counter | Invalidation calls |
 | `gcache_get_timer` | Histogram | Cache get latency |
 | `gcache_fallback_timer` | Histogram | Time spent in the underlying function |
@@ -531,6 +537,27 @@ GCache is designed to fail open. If Redis is down or an error occurs:
 3. Your request succeeds (just without caching)
 
 This means a cache failure never breaks your application.
+
+### ⚠️ Alerting change: two signals moved off `gcache_error_counter`
+
+A **corrupt pickle** and a **serializer `load` failure** used to raise out of
+`RedisCache.get`, which incremented `gcache_error_counter` and re-ran the fallback
+*without* writing back — so the bad entry stayed for its whole TTL and failed every read.
+
+Both are now a **miss that heals**: the entry is rewritten, and the event is counted in
+`gcache_degraded_read_counter` instead. Strictly better behaviour, but an operator alerting
+on `gcache_error_counter` loses both signals silently. The `reason` label distinguishes
+them:
+
+| `reason` | What was found |
+|---|---|
+| `undecodable` | The envelope itself could not be parsed (corrupt, or an unknown version) |
+| `json_without_serializer` | A JSON entry on a key that declares no `Serializer` — typically a rolling deploy where new pods have started writing JSON |
+| `envelope_expired` | Present in Redis but past the writer's own `expiresAtMs` (see the clock-skew requirement under interop) |
+| `unloadable_payload` | The envelope parsed, but the `Serializer` could not load the payload — e.g. another language changed the payload schema |
+
+A sustained nonzero rate on any of these means the entry is being rewritten on every read,
+which costs a fallback each time even though the answers stay correct.
 
 ## Caching Strategy Guide
 

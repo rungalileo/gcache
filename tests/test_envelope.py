@@ -1,10 +1,8 @@
-import asyncio
 import base64
 import json
 import pickle
 import time
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 import redislite
@@ -537,9 +535,14 @@ def test_gcache_key_rejects_json_without_a_serializer() -> None:
     # inside RedisCache, gcache swallowed it, and only a log line said the entry never
     # landed. Pickle needs no serializer, so that pair stays legal.
     from gcache.config import GCacheKey
+    from gcache.exceptions import GCacheError, JsonEnvelopeRequiresSerializer
 
-    with pytest.raises(ValueError, match="requires a serializer"):
-        GCacheKey(key_type="Test", id="1", use_case="uc", envelope=Envelope.JSON)
+    # Catchable as all three: GCacheError like every other gcache failure (a caller
+    # wrapping key construction in `except GCacheError` missed it as a bare ValueError),
+    # and still ValueError, which is what the Envelope coercion two lines above it raises.
+    for expected in (JsonEnvelopeRequiresSerializer, GCacheError, ValueError):
+        with pytest.raises(expected, match="requires a serializer"):
+            GCacheKey(key_type="Test", id="1", use_case="uc", envelope=Envelope.JSON)
 
     GCacheKey(key_type="Test", id="1", use_case="uc", envelope=Envelope.PICKLE)
 
@@ -807,33 +810,16 @@ def test_envelope_rejects_a_boolean_version() -> None:
         decode(raw, allow_pickle=False)
 
 
-@pytest.mark.asyncio
-async def test_json_serializer_offloads_a_large_payload() -> None:
-    # RedisCache offloads decode() above ASYNC_DECODE_THRESHOLD_BYTES, but decode returns
-    # the payload as ONE string; this parse turns it into the real structure and allocates
-    # more. So a multi-megabyte entry blocked the loop right after the envelope offload had
-    # avoided exactly that.
-    from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
+def test_json_serializer_parses_inline_even_when_large() -> None:
+    # Deliberately NOT offloaded. An earlier revision sent a large payload to an executor;
+    # measured on 5.3 MB that changed the maximum event-loop tick delay not at all (0.007s
+    # inline vs 0.007-0.014s offloaded), because json.loads runs in C and holds the GIL for
+    # its whole run -- so the worker thread blocks the loop thread just the same. It also
+    # used the default pool, which asyncio shares with getaddrinfo.
+    #
+    # This asserts the absence, because re-adding the offload looks like an obvious
+    # improvement and is not one. ProtoJsonSerializer.load is the case where it does help.
+    import inspect
 
-    big = {"k": "x" * (ASYNC_DECODE_THRESHOLD_BYTES + 1000)}
-    payload = await JsonSerializer().dump(big)
-    assert len(payload) > ASYNC_DECODE_THRESHOLD_BYTES
-
-    ran_on: list[str] = []
-    loop = asyncio.get_running_loop()
-    original = loop.run_in_executor
-
-    def spy(executor: Any, func: Any, *args: Any) -> Any:
-        ran_on.append("executor")
-        return original(executor, func, *args)
-
-    with patch.object(loop, "run_in_executor", spy):
-        assert await JsonSerializer().load(payload) == big
-    assert ran_on == ["executor"], "a payload past the threshold must not parse on the loop"
-
-    # Below the threshold it stays inline -- an executor hop would cost more than the parse.
-    ran_on.clear()
-    small = await JsonSerializer().dump({"k": "x"})
-    with patch.object(loop, "run_in_executor", spy):
-        assert await JsonSerializer().load(small) == {"k": "x"}
-    assert ran_on == []
+    src = inspect.getsource(JsonSerializer.load)
+    assert "run_in_executor" not in src

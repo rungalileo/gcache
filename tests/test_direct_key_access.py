@@ -328,12 +328,13 @@ async def test_a_direct_key_cannot_contradict_a_decorated_use_case(
         # aget fails OPEN -- the README's contract is that a read never breaks the
         # request, and the decorator degrades the same way on a bad key.
         assert await gcache.aget(_key(use_case="clash_uc"), load) == {"session_id": "abc"}
-        # aput and adelete raise: a silent no-op write, or a delete reporting "no entry",
-        # is a lie the caller cannot detect.
+        # aput raises: a silent no-op write is a lie the caller cannot detect.
         with pytest.raises(EnvelopeMismatchWithRegisteredUseCase):
             await gcache.aput(_key(use_case="clash_uc"), {"session_id": "abc"})
-        with pytest.raises(EnvelopeMismatchWithRegisteredUseCase):
-            await gcache.adelete(_key(use_case="clash_uc"))
+        # adelete does NOT. A delete needs only the urn, and both keys render the same one,
+        # so rejecting it would break the documented way to delete a decorated entry --
+        # test_gcache.py::test_delete_key passes a bare GCacheKey.
+        await gcache.adelete(_key(use_case="clash_uc"))
 
 
 @pytest.mark.asyncio
@@ -456,8 +457,8 @@ async def test_a_direct_key_cannot_contradict_a_decorated_serializer(
     with gcache.enable():
         with pytest.raises(SerializerMismatchWithRegisteredUseCase):
             await gcache.aput(clashing, {"a": 1})
-        with pytest.raises(SerializerMismatchWithRegisteredUseCase):
-            await gcache.adelete(clashing)
+        # Deleting is fine -- same urn, and framing is irrelevant to a delete.
+        await gcache.adelete(clashing)
 
     # The mirror -- two DIFFERENT serializer types on one JSON use case, which this change
     # makes likely by shipping a second one. (Decorator-with, direct-without is already
@@ -550,3 +551,118 @@ async def test_a_failed_direct_key_check_is_counted_on_read(
     with gcache.enable():
         assert await gcache.aget(_key(use_case="counted_uc"), load) == {"a": 1}
     assert error_count() > before, "a fail-open read must still be counted"
+
+
+@pytest.mark.asyncio
+async def test_delete_works_with_a_bare_key_for_a_serializer_use_case(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # The regression the framing checks introduced. delete/adelete is public API on main,
+    # and the only way to delete a decorated entry is a hand-built key -- test_gcache.py
+    # ::test_delete_key does exactly this. Applying the framing checks here broke every
+    # use case declaring serializer=, for a call that needs nothing but the urn.
+    cache_config_provider.configs["del_uc"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="Test", id_arg="test", use_case="del_uc", serializer=JsonSerializer())
+    async def cached_func(test: int = 123) -> dict:
+        return {"v": next(counter)}
+
+    counter = iter(range(10))
+
+    with gcache.enable():
+        first = await cached_func(test=123)
+        assert await cached_func(test=123) == first, "second call must be a hit"
+
+        # A bare key: no serializer, default envelope. Same urn.
+        await gcache.adelete(GCacheKey(key_type="Test", id="123", use_case="del_uc"))
+
+        assert await cached_func(test=123) != first, "the entry must actually be gone"
+
+
+@pytest.mark.asyncio
+async def test_delete_still_rejects_a_wrong_namespace(gcache: GCache, enabled_uc: None) -> None:
+    # The one check a delete must keep: a stale urn_prefix deletes a urn in another
+    # namespace and returns False, which a caller reads as "no entry existed" while the
+    # real entry survives.
+    from gcache._internal.state import _GLOBAL_GCACHE_STATE
+    from gcache.exceptions import GCacheKeyPrefixMismatch
+
+    stale = _key()
+    object.__setattr__(stale, "urn_prefix", _GLOBAL_GCACHE_STATE.urn_prefix + ":stale")
+
+    with gcache.enable():
+        with pytest.raises(GCacheKeyPrefixMismatch):
+            await gcache.adelete(stale)
+
+
+@pytest.mark.asyncio
+async def test_two_proto_serializers_for_different_messages_are_not_interchangeable(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Comparing by type alone accepted these, and it is the quietest mismatch of all:
+    # load() passes ignore_unknown_fields=True, so reading a FileOptions payload as a
+    # FieldOptions yields an EMPTY message with no error at all.
+    from google.protobuf import descriptor_pb2
+
+    from gcache import ProtoJsonSerializer
+    from gcache.exceptions import SerializerMismatchWithRegisteredUseCase
+
+    cache_config_provider.configs["proto_uc"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(
+        key_type="session_id",
+        id_arg="sid",
+        use_case="proto_uc",
+        envelope=Envelope.JSON,
+        serializer=ProtoJsonSerializer(descriptor_pb2.FileOptions),
+    )
+    async def decorated(sid: str) -> object:
+        return descriptor_pb2.FileOptions()
+
+    other_message = GCacheKey(
+        key_type="session_id",
+        id="p:r:s",
+        use_case="proto_uc",
+        envelope=Envelope.JSON,
+        serializer=ProtoJsonSerializer(descriptor_pb2.FieldOptions),
+    )
+    same_message = GCacheKey(
+        key_type="session_id",
+        id="p:r:s",
+        use_case="proto_uc",
+        envelope=Envelope.JSON,
+        serializer=ProtoJsonSerializer(descriptor_pb2.FileOptions),
+    )
+
+    with gcache.enable():
+        with pytest.raises(SerializerMismatchWithRegisteredUseCase):
+            await gcache.aput(other_message, descriptor_pb2.FieldOptions())
+        # A different INSTANCE for the same message is interchangeable, and must pass.
+        await gcache.aput(same_message, descriptor_pb2.FileOptions(go_package="x"))
+
+
+@pytest.mark.asyncio
+async def test_a_partial_ramp_drops_some_primes(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Documented, and pinned so it is not mistaken for a bug later. _should_cache samples
+    # random() per invocation, so unlike ramp 0 -- which is the kill switch and drops
+    # everything -- a partial ramp drops SOME primes while aput returns normally either
+    # way. Asserted by fixing the sample rather than by sampling, so it cannot flake.
+    half = GCacheKeyConfig.enabled(60)
+    half.ramp[CacheLayer.LOCAL] = 0
+    half.ramp[CacheLayer.REMOTE] = 50
+    cache_config_provider.configs["half_uc"] = half
+
+    def keys() -> set:
+        return {k for k in redis_server.keys() if b"half_uc" in k}
+
+    with patch("gcache._internal.wrappers.random", return_value=0.99):  # above 50/100
+        with gcache.enable():
+            await gcache.aput(_key(use_case="half_uc"), {"session_id": "abc"})
+    assert keys() == set(), "a sample above the ramp drops the prime, silently"
+
+    with patch("gcache._internal.wrappers.random", return_value=0.01):  # below 50/100
+        with gcache.enable():
+            await gcache.aput(_key(use_case="half_uc"), {"session_id": "abc"})
+    assert keys(), "a sample below the ramp writes it"

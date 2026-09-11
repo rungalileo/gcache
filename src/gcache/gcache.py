@@ -36,6 +36,21 @@ from gcache.exceptions import (
 )
 
 
+def _serializer_identity(serializer: Serializer | None) -> tuple[type | None, str | None]:
+    """What makes two serializers interchangeable on the wire.
+
+    Type alone is not enough: two ProtoJsonSerializers carrying different messages share a
+    type, and reading one's payload as the other yields an empty message with no error,
+    because load() passes ignore_unknown_fields=True. The message's full name is the rest of
+    the identity. Any other Serializer contributes only its type, which is all it has.
+    """
+    if serializer is None:
+        return (None, None)
+    message_type = getattr(serializer, "_message_type", None)
+    name = getattr(getattr(message_type, "DESCRIPTOR", None), "full_name", None)
+    return (type(serializer), name)
+
+
 class GCache:
     """
     Main entry point for the GCache caching library.
@@ -426,23 +441,40 @@ class GCache:
         compare against, which is why both still have to agree by convention across
         languages -- there the library cannot see the other side at all.
         """
-        if key.use_case in self._use_case_registry:
-            declared = self._use_case_envelopes.get(key.use_case)
-            if declared is not None and declared != key.envelope:
-                raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
+        self._check_key_namespace(key)
 
-            # Compared by TYPE: serializers are instances and two JsonSerializer()s are
-            # never ==, so identity or equality would reject every legitimate caller.
-            declared_ser = self._use_case_serializers.get(key.use_case)
-            if type(declared_ser) is not type(key.serializer):
-                raise SerializerMismatchWithRegisteredUseCase(key.use_case, declared_ser, key.serializer)
+        if key.use_case not in self._use_case_registry:
+            return
 
-        # A key built BEFORE GCache() ran captured the default urn_prefix, while
-        # ainvalidate uses the configured one -- so the value and its watermark land in
-        # different namespaces (and different cluster hash slots) and tracked invalidation
-        # silently does nothing. Checked here rather than forbidden at construction: a
-        # module-level key constant is the natural thing to write and the only thing that
-        # reaches this state.
+        declared = self._use_case_envelopes.get(key.use_case)
+        if declared is not None and declared != key.envelope:
+            raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
+
+        # By (type, message type). Type alone accepted two ProtoJsonSerializers carrying
+        # DIFFERENT messages, which is the likeliest mismatch now that a second serializer
+        # ships -- and the quietest, because load() passes ignore_unknown_fields=True, so
+        # reading a FileOptions payload as a FieldOptions yields an empty message and no
+        # error. Never by identity or equality: two JsonSerializer()s are never ==, so that
+        # would reject every legitimate caller.
+        if _serializer_identity(self._use_case_serializers.get(key.use_case)) != _serializer_identity(key.serializer):
+            raise SerializerMismatchWithRegisteredUseCase(
+                key.use_case, self._use_case_serializers.get(key.use_case), key.serializer
+            )
+
+    def _check_key_namespace(self, key: GCacheKey) -> None:
+        """Reject a key that renders into the wrong namespace.
+
+        Separate from the framing checks because this is the only one that changes the
+        urn, so it is the only one a DELETE needs -- and the only one it must have: a key
+        built before ``GCache()`` captured the default ``urn_prefix``, so it deletes a urn
+        in another namespace and reports ``False``, which a caller reads as "no entry
+        existed" while the real entry survives. (On a read or write the same mismatch also
+        splits the value from its watermark, into different cluster hash slots, so tracked
+        invalidation silently does nothing.)
+
+        Checked at use rather than forbidden at construction: a module-level key constant
+        is the natural thing to write and the only thing that reaches this state.
+        """
         live = _GLOBAL_GCACHE_STATE.urn_prefix
         if key.urn_prefix != live:
             raise GCacheKeyPrefixMismatch(key.use_case, key.urn_prefix, live)
@@ -513,6 +545,13 @@ class GCache:
         a silent failure here means the entry another process is waiting for never appears.
         A caller priming off a request path should not let that propagate.
 
+        A prime is also **sampled**, like a read. ``_should_cache`` calls ``random()`` on
+        every invocation and each layer samples independently, so a use case at ramp 50
+        drops about half its primes and this call still returns normally. On a read a
+        sampled skip costs one uncached call; on a prime it discards work the caller has
+        already done, and the entry another process is waiting for never appears. Ramp a
+        shared use case to 100 or 0, not through the middle.
+
         A prime landing inside an active invalidation window is lost **on the Redis layer**,
         silently: the entry is written with ``createdAtMs`` below the watermark, so remote
         reads find it stale until the window closes and a read rewrites it. That is the
@@ -536,15 +575,19 @@ class GCache:
         """
         Delete a specific cache entry (async version).
 
-        Raises on an unusable key, like :meth:`aput` and unlike :meth:`aget`. Returning
-        ``False`` would be a lie a caller cannot detect: a key carrying a stale
-        ``urn_prefix`` deletes a urn in the wrong namespace, reports "no entry existed",
-        and leaves the real entry in place.
+        Validates the NAMESPACE only, not the framing. A delete needs nothing but the urn,
+        and a key whose ``envelope`` or ``serializer`` differs from a decorator's renders
+        the same urn, so rejecting it would break the documented way to delete a decorated
+        entry -- ``test_delete_key`` does exactly that with a bare ``GCacheKey``.
+
+        The namespace check does raise, because returning ``False`` there is a lie a caller
+        cannot detect: the key deletes a urn in another namespace, reports "no entry
+        existed", and leaves the real entry in place.
 
         :param key: The cache key to delete.
         :return: True if the key was deleted, False otherwise.
         """
-        self._check_direct_key(key)
+        self._check_key_namespace(key)
         return await self._cache.delete(key)
 
     def delete(self, key: GCacheKey) -> bool:

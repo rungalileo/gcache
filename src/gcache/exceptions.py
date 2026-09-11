@@ -64,6 +64,21 @@ class GCacheKeyPrefixMismatch(GCacheError):
         )
 
 
+class JsonEnvelopeRequiresSerializer(GCacheError, ValueError):
+    """Envelope.JSON was declared with no Serializer to produce its string payload.
+
+    Also a ValueError, so it stays catchable the same way as the Envelope coercion two
+    lines above it in __post_init__ -- a caller validating key construction should not
+    need to know which of the two adjacent failures it hit.
+    """
+
+    def __init__(self, key_type: str, id: str, use_case: str) -> None:
+        super().__init__(
+            f"GCacheKey {key_type}:{id}#{use_case} uses Envelope.JSON, which requires a "
+            "serializer producing str or bytes (e.g. JsonSerializer())"
+        )
+
+
 class SerializerMismatchWithRegisteredUseCase(GCacheError):
     """A direct key's serializer contradicts the one a @cached decorator declared."""
 

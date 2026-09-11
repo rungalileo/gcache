@@ -1,4 +1,3 @@
-import asyncio
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
@@ -10,9 +9,8 @@ from typing import Any, Union
 from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
 
-from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache.exceptions import UseCaseNameIsReserved
+from gcache.exceptions import JsonEnvelopeRequiresSerializer, UseCaseNameIsReserved
 
 #: Async callable that fetches the actual value on a cache miss.
 #: Public because GCache.aget/get take one: annotating a fallback should not mean
@@ -190,15 +188,18 @@ class JsonSerializer(Serializer):
             data = data.decode("utf-8")
         if data == _TS_UNDEFINED_SENTINEL:
             return None
-        # Offloaded above the same threshold RedisCache uses for the envelope. That offload
-        # covers decode() only, which parses the envelope and hands back the payload as ONE
-        # string; this parse turns that string into the real structure and allocates more.
-        # So a multi-megabyte JSON entry blocked the loop here, immediately after the
-        # envelope offload had avoided exactly that. A pickle key has no serializer and does
-        # all of its work inside decode, which is why only Envelope.JSON has this shape.
-        if len(data) < ASYNC_DECODE_THRESHOLD_BYTES:
-            return json.loads(data)
-        return await asyncio.get_running_loop().run_in_executor(None, json.loads, data)
+        # Inline on purpose. An earlier revision offloaded a large payload to an executor;
+        # measured on a 5.3 MB payload that moved the maximum event-loop tick delay not at
+        # all -- 0.007s inline against 0.007-0.014s via executor -- because json.loads runs
+        # in C and holds the GIL for its whole run, so the worker thread blocks the loop
+        # thread exactly as an inline call does. It was also actively worse: asyncio runs
+        # getaddrinfo in the default pool, so a multi-megabyte parse there delays DNS for
+        # new connections.
+        #
+        # ProtoJsonSerializer.load offloads and that IS worth it: json_format.Parse is
+        # Python driving upb per field, so it yields between bytecodes. Same harness, 1.18
+        # MB payload: 0.104s inline against 0.014s offloaded.
+        return json.loads(data)
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,11 +241,11 @@ class GCacheKey:
         # GCache.aget/aput -- was the one route left open, and it fails per request
         # instead: the write raises inside RedisCache, gcache swallows it, Redis stays
         # empty, and only a log line says cross-process sharing never happened.
+        # A GCacheError subclass, not a bare ValueError: every other gcache failure is one,
+        # including the reserved-name check below, so a caller wrapping key construction in
+        # `except GCacheError` would otherwise miss exactly this one.
         if self.envelope is Envelope.JSON and self.serializer is None:
-            raise ValueError(
-                f"GCacheKey {self.key_type}:{self.id}#{self.use_case} uses Envelope.JSON, "
-                "which requires a serializer producing str or bytes (e.g. JsonSerializer())"
-            )
+            raise JsonEnvelopeRequiresSerializer(self.key_type, self.id, self.use_case)
 
         # "watermark" is reserved. cached() rejects it at decoration time; a key built
         # directly for aget/aput skipped that. With invalidation_tracking the urn is then

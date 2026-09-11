@@ -73,8 +73,15 @@ class ProtoJsonSerializer(Serializer):
             # Matches Go's protojson.UnmarshalOptions{DiscardUnknown: true}.
             return self._parse(data, self._message_type(), ignore_unknown_fields=True)
 
-        # Offloaded above the same threshold RedisCache uses for the envelope; see
-        # JsonSerializer.load for why the envelope offload does not already cover this.
+        # Offloaded above the threshold RedisCache uses for the envelope, and unlike
+        # JsonSerializer.load this one measurably helps: Parse is Python driving upb per
+        # field, so it yields between bytecodes. On a 1.18 MB payload the maximum
+        # event-loop tick delay was 0.104s inline against 0.014s offloaded. (json.loads
+        # holds the GIL in C and shows no such gain -- see JsonSerializer.load.)
+        #
+        # Uses the default executor, which asyncio shares with getaddrinfo, so a parse
+        # this large can delay DNS for a new connection. Accepted over adding a second
+        # thread pool to the library; a dedicated executor is the fix if it ever bites.
         if len(data) < ASYNC_DECODE_THRESHOLD_BYTES:
             return parse()
         return await asyncio.get_running_loop().run_in_executor(None, parse)

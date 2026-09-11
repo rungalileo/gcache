@@ -27,8 +27,10 @@ def _options() -> descriptor_pb2.FileOptions:
 
 @pytest.mark.asyncio
 async def test_dump_uses_snake_case_field_names() -> None:
-    # The contract in one assertion. Default is lowerCamelCase, which Go does not fail
-    # on -- it returns a message with every field at its zero value.
+    # The contract in one assertion. Default is lowerCamelCase on WRITE. Both protojson
+    # readers accept either spelling, so getting this wrong costs two wire forms for one
+    # key rather than a failed read -- and the value's non-protojson readers (cjson in a
+    # Redis Lua script, jq) see raw keys with no field-name mapping.
     payload = await ProtoJsonSerializer(descriptor_pb2.FileOptions).dump(_options())
     assert set(json.loads(payload)) == {"go_package", "java_package"}
 

@@ -51,8 +51,13 @@ class ProtoJsonSerializer(Serializer):
             raise TypeError(f"{type(self).__name__} expected {self._message_type.__name__}, got {type(obj).__name__}")
         return self._message_to_json(
             obj,
-            # snake_case. Default is lowerCamelCase, which Go parses into a
-            # zero-valued message rather than an error.
+            # snake_case, so both languages write ONE wire form. Default is
+            # lowerCamelCase on WRITE; both protojson readers accept either spelling
+            # (verified against protoc-gen-go v1.36.11 and protobuf 6.33.6), so the cost
+            # of getting it wrong is two wire forms for one key -- not a failed read.
+            # That matters because the value's other readers are not protojson
+            # implementations: cjson in a Redis Lua script, jq, a dashboard query. They
+            # see raw keys and have no field-name mapping to fall back on.
             preserving_proto_field_name=True,
             # Compact. Default is indent=2, which inflates every cached value.
             indent=None,

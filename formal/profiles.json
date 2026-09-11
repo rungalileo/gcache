@@ -34,13 +34,12 @@
       ],
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/effects-authority-witnesses.ts",
-        "test/formal-effects-authority-witnesses.test.ts",
-        "test/fixtures/effects-authority-witnesses.json",
-        "test/formal-effects.test.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/effects.mjs",
+        "formal/replay/witnesses/effects-authority.mjs"
       ]
     },
     {
@@ -51,11 +50,12 @@
       "smoke": "formal/scope-smoke.itf.json",
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/runtime-boundary-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/scope.mjs",
+        "formal/replay/witnesses/runtime.mjs"
       ]
     },
     {
@@ -65,10 +65,14 @@
       "model": "formal/dialcache-recovery-conformance.qnt",
       "smoke": "formal/recovery-smoke.itf.json",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/recovery.mjs",
+        "formal/replay/witnesses/policy.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/recovery-shadow.mjs"
       ],
       "inputEncoding": "explicit-v1"
     },
@@ -80,11 +84,12 @@
       "smoke": "formal/policy-smoke.itf.json",
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/runtime-boundary-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/policy.mjs",
+        "formal/replay/witnesses/runtime.mjs"
       ]
     },
     {
@@ -95,13 +100,15 @@
       "smoke": "formal/shadow-smoke.itf.json",
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/shadow-diagnostics-witnesses.ts",
-        "test/formal-shadow-diagnostics-witnesses.test.ts",
-        "test/formal/public-prefix-witnesses.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/itf.ts",
-        "test/formal/behavior-driver.ts",
-        "formal/replay-inputs.mjs"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/shadow.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/recovery-shadow.mjs",
+        "formal/replay/witnesses/shadow-diagnostics.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     },
     {
@@ -111,10 +118,11 @@
       "model": "formal/dialcache-admission-conformance.qnt",
       "smoke": "formal/admission-smoke.itf.json",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/admission.mjs"
       ],
       "inputEncoding": "explicit-v1"
     },
@@ -126,11 +134,12 @@
       "smoke": "formal/layers-smoke.itf.json",
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/runtime-boundary-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/layers.mjs",
+        "formal/replay/witnesses/runtime.mjs"
       ]
     },
     {
@@ -141,10 +150,11 @@
       "smoke": "formal/independent-smoke.itf.json",
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/independent.mjs"
       ]
     },
     {
@@ -156,15 +166,14 @@
       "limits": "Bounded request/local/remote composition with held reads/decode, tracked/untracked encoding failures, logical versus physical retention, compressed recovery, original indexed source errors, and external marker lifetime observations. No concurrent active sources, source timeout, read timeout, or shadow jobs; those remain separate profiles.",
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/recovery-read-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/recovery-read-witnesses.ts",
-        "test/formal/recovery-admission-witnesses.ts",
-        "test/formal-recovery-shadow-witnesses.test.ts",
-        "test/formal/public-prefix-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/recovery-read.mjs",
+        "formal/replay/witnesses/recovery-admission.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     },
     {
@@ -176,14 +185,13 @@
       "inputEncoding": "explicit-v1",
       "limits": "One pending untracked source, two request memos, and local storage failure at the native storage/clock boundary; no elapsed time or concurrency.",
       "witnessSources": [
-        "test/formal/local-failure-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/local-failure-witnesses.ts",
-        "test/formal/public-prefix-witnesses.ts",
-        "test/formal-public-prefix-witnesses.test.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/local-failure.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     },
     {
@@ -194,13 +202,12 @@
       "smoke": "formal/runtime-boundaries-smoke.itf.json",
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/runtime-boundaries-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/runtime-boundary-witnesses.ts",
-        "test/formal-runtime-boundary-witnesses.test.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/runtime-boundaries.mjs"
       ]
     },
     {
@@ -211,14 +218,13 @@
       "smoke": "formal/shadow-layers-smoke.itf.json",
       "inputEncoding": "explicit-v1",
       "witnessSources": [
-        "test/formal/shadow-layers-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/shadow-layers-witnesses.ts",
-        "test/formal-shadow-layers-witnesses.test.ts",
-        "test/formal/public-prefix-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/shadow-layers.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     },
     {
@@ -230,10 +236,11 @@
       "inputEncoding": "explicit-v1",
       "limits": "Microsecond environment advances, whole monotonic millisecond insertion and expiry projection, one-second local TTL, two real default cache instances constructed at distinct fractional process times, immediate healthy sources. No request memo, remote, policy provider, custom clocks, or precise source/read/shadow budgets in this profile.",
       "witnessSources": [
-        "test/formal-local-clock.test.ts",
-        "test/formal/local-clock-profile.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/local-clock.mjs"
       ]
     },
     {
@@ -245,14 +252,13 @@
       "inputEncoding": "explicit-v1",
       "limits": "Eight calls, one local key, held policy/source gates, default/unbounded/ten-millisecond source budgets, enabled/outside/invalid identities; no remote, request memo or shadow jobs.",
       "witnessSources": [
-        "test/formal/source-budgets-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/source-budgets-witnesses.ts",
-        "test/formal/public-prefix-witnesses.ts",
-        "test/formal-public-prefix-witnesses.test.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/source-budgets.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     }
   ],
@@ -336,6 +342,54 @@
     "formal/replay/sources.d.mts",
     "formal/replay/sources.mjs",
     "formal/replay/validation.d.mts",
-    "formal/replay/validation.mjs"
+    "formal/replay/validation.mjs",
+    "formal/replay/witnesses/admission.d.mts",
+    "formal/replay/witnesses/admission.mjs",
+    "formal/replay/witnesses/effects-authority.d.mts",
+    "formal/replay/witnesses/effects-authority.mjs",
+    "formal/replay/witnesses/effects.d.mts",
+    "formal/replay/witnesses/effects.mjs",
+    "formal/replay/witnesses/evidence.d.mts",
+    "formal/replay/witnesses/evidence.mjs",
+    "formal/replay/witnesses/independent.d.mts",
+    "formal/replay/witnesses/independent.mjs",
+    "formal/replay/witnesses/index.d.mts",
+    "formal/replay/witnesses/index.mjs",
+    "formal/replay/witnesses/labels.d.mts",
+    "formal/replay/witnesses/labels.mjs",
+    "formal/replay/witnesses/layers.d.mts",
+    "formal/replay/witnesses/layers.mjs",
+    "formal/replay/witnesses/local-clock.d.mts",
+    "formal/replay/witnesses/local-clock.mjs",
+    "formal/replay/witnesses/local-failure.d.mts",
+    "formal/replay/witnesses/local-failure.mjs",
+    "formal/replay/witnesses/policy.d.mts",
+    "formal/replay/witnesses/policy.mjs",
+    "formal/replay/witnesses/public-prefix.d.mts",
+    "formal/replay/witnesses/public-prefix.mjs",
+    "formal/replay/witnesses/recovery-admission.d.mts",
+    "formal/replay/witnesses/recovery-admission.mjs",
+    "formal/replay/witnesses/recovery-read.d.mts",
+    "formal/replay/witnesses/recovery-read.mjs",
+    "formal/replay/witnesses/recovery-shadow.d.mts",
+    "formal/replay/witnesses/recovery-shadow.mjs",
+    "formal/replay/witnesses/recovery.d.mts",
+    "formal/replay/witnesses/recovery.mjs",
+    "formal/replay/witnesses/runtime-boundaries.d.mts",
+    "formal/replay/witnesses/runtime-boundaries.mjs",
+    "formal/replay/witnesses/runtime.d.mts",
+    "formal/replay/witnesses/runtime.mjs",
+    "formal/replay/witnesses/scope.d.mts",
+    "formal/replay/witnesses/scope.mjs",
+    "formal/replay/witnesses/shadow-diagnostics.d.mts",
+    "formal/replay/witnesses/shadow-diagnostics.mjs",
+    "formal/replay/witnesses/shadow-layers.d.mts",
+    "formal/replay/witnesses/shadow-layers.mjs",
+    "formal/replay/witnesses/shadow.d.mts",
+    "formal/replay/witnesses/shadow.mjs",
+    "formal/replay/witnesses/source-budgets.d.mts",
+    "formal/replay/witnesses/source-budgets.mjs",
+    "formal/replay/witnesses/trace.d.mts",
+    "formal/replay/witnesses/trace.mjs"
   ]
 }

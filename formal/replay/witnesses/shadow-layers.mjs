@@ -1,17 +1,16 @@
-import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command,
-  type PublicPrefixWitnessRule } from "./public-prefix-witnesses.js";
+import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command } from "./public-prefix.mjs";
 
 const init = command("init");
-const policy = (choice: number) => command("policy", choice);
-const begin = (choice: number) => command("beginCall", choice);
-const seed = (choice: number) => command("seed", choice);
-const resolve = (choice: number) => command("resolveLoader", choice);
-const advance = (ms: number) => command("advance", ms);
+const policy = choice => command("policy", choice);
+const begin = choice => command("beginCall", choice);
+const seed = choice => command("seed", choice);
+const resolve = choice => command("resolveLoader", choice);
+const advance = ms => command("advance", ms);
 const dump = command("releaseDump", 0), write = command("releaseWrite", 0);
 // A schedule alone cannot earn a witness. Each rule requires public outcomes at
 // its distinguishing boundary, often before and after a probe. These are exact
 // replayable prefixes, independent of filenames and private model cache state.
-export const shadowLayersWitnessRules: readonly PublicPrefixWitnessRule[] = [
+export const shadowLayersWitnessRules = [
   rule("dark-local-source-publication-stops-later-shadow", "darkSourcePublishesLocalBeforeShadowWriteTest",
     [init, policy(2), begin(9), resolve(1), policy(12), begin(9)],
     check(3, { calls: [1], dumps: 1, writes: 0 }),
@@ -111,6 +110,6 @@ export const shadowLayersWitnessRules: readonly PublicPrefixWitnessRule[] = [
     check(4, { calls: [1], loaders: 1, sourceScopes: [false], dumps: 0, writes: 0, shadow: ["source_error"] })),
 ];
 
-export function shadowLayersWitnesses(paths: readonly string[]): Set<string> {
+export function shadowLayersWitnesses(paths) {
   return publicPrefixWitnesses(paths, shadowLayersWitnessRules);
 }

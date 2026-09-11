@@ -1,34 +1,18 @@
-import { readFileSync } from "node:fs";
-import { itfInteger, itfSignedInteger, record } from "./itf.js";
+import { itfInteger, record } from "../itf.mjs";
+import { explicitInput, readTrace, traceStates, witnessCommand as cmd } from "./trace.mjs";
 
-interface PublicState {
-  calls: number[];
-  reads: number;
-  loaders: number;
-  loads: number;
-  dumps: number;
-  writes: number;
-  events: Array<{ event: string; location: string; detail: string; amount: number }>;
-}
-interface Rule {
-  name: string;
-  regression: string;
-  commands: string[];
-  consequence: (state: PublicState) => boolean;
-}
-const cmd = (name: string, choice = -1) => `${name}:${choice}`;
 const init = cmd("init", 2), begin = cmd("beginCall"), read = cmd("releaseRead", 0);
 const resolve = cmd("resolveLoader", 0), reject = cmd("rejectLoader", 0);
 const load = cmd("releaseLoad"), dump = cmd("releaseDump"), write = cmd("releaseWrite");
 const fault = cmd("observerFault", 1);
-const same = (actual: unknown, expected: unknown) => JSON.stringify(actual) === JSON.stringify(expected);
-const hit = (s: PublicState) => same(s.calls, [1]) && s.reads === 1 && s.loads === 1 && s.loaders === 0 && s.writes === 0;
-const publishedAndRead = (s: PublicState) => same(s.calls, [1, 1]) && s.reads === 2 && s.loads === 1 && s.loaders === 1 && s.dumps === 1 && s.writes === 1;
+const same = (actual, expected) => JSON.stringify(actual) === JSON.stringify(expected);
+const hit = s => same(s.calls, [1]) && s.reads === 1 && s.loads === 1 && s.loaders === 0 && s.writes === 0;
+const publishedAndRead = s => same(s.calls, [1, 1]) && s.reads === 2 && s.loads === 1 && s.loaders === 1 && s.dumps === 1 && s.writes === 1;
 
 // Inputs identify a deliberately narrow distinguishing schedule. Credit then
-// depends only on observations asserted by both drivers: no phase, private
+// depends only on observations asserted by every driver: no phase, private
 // timestamp, stored value, or model authorization predicate enters these rules.
-export const effectsAuthorityRules: readonly Rule[] = [
+export const effectsAuthorityRules = [
   { name: "observer-failure-hit", regression: "observerFailuresCannotPreventCacheHitTest",
     commands: [init, fault, cmd("seedRemote"), begin, read, load], consequence: hit },
   { name: "observer-failure-publication", regression: "observerFailuresCannotPreventPublicationTest",
@@ -54,16 +38,14 @@ export const effectsAuthorityRules: readonly Rule[] = [
       ]) },
 ];
 
-export function effectsAuthorityWitnesses(paths: readonly string[]): Set<string> {
-  const found = new Set<string>();
+export function effectsAuthorityWitnesses(paths) {
+  const found = new Set();
   for (const path of paths) {
-    const raw = record(JSON.parse(readFileSync(path, "utf8")), path);
-    if (!Array.isArray(raw.states)) throw new Error("Missing effects witness states");
-    const commands: string[] = [];
-    const states = raw.states.map(rawState => {
-      const state = record(rawState, path), input = record(state.input, path), s = record(state.s, path);
-      if (typeof input.name !== "string") throw new Error("Missing effects witness input");
-      commands.push(cmd(input.name, itfSignedInteger(input.choice, path)));
+    const commands = [];
+    const states = traceStates(readTrace(path), path).map(rawState => {
+      const state = record(rawState, path), s = record(state.s, path);
+      const input = explicitInput(state, path);
+      commands.push(cmd(input.name, input.choice));
       if (!Array.isArray(s.calls) || !Array.isArray(s.events)) throw new Error("Missing effects public observations");
       return {
         ...Object.fromEntries(["reads", "loaders", "loads", "dumps", "writes"].map(key => [key, itfInteger(s[key], path)])),
@@ -75,11 +57,11 @@ export function effectsAuthorityWitnesses(paths: readonly string[]): Set<string>
           return { event: event.event, location: event.location, detail: event.detail,
             amount: ["get", "fallback", "serialization", "futureOffset"].includes(event.event) ? ms / 1000 : ms };
         }),
-      } as PublicState;
+      };
     });
     for (const rule of effectsAuthorityRules) {
       if (commands.length >= rule.commands.length && rule.commands.every((value, index) => commands[index] === value)
-        && rule.consequence(states[rule.commands.length - 1]!)) found.add(rule.name);
+        && rule.consequence(states[rule.commands.length - 1])) found.add(rule.name);
     }
   }
   return found;

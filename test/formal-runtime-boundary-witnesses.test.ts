@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, it } from "vitest";
 
-import { runtimeBoundaryTraceWitnesses } from "./formal/runtime-boundary-witnesses.js";
+import { runtimeBoundaryTraceWitnesses } from "../formal/replay/witnesses/runtime-boundaries.mjs";
 
 interface Fixture { states: Array<{ input: { name: string; choice: { "#bigint": string } }; s: { o: { calls: Array<{ "#bigint": string }>; loaders: { "#bigint": string } } } }> }
 const fixtures = JSON.parse(readFileSync("test/fixtures/formal-runtime-boundary-witnesses.json", "utf8")) as Record<string, Fixture>;

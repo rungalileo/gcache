@@ -2,8 +2,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { localFailureWitnessRules, localFailureWitnesses } from "./formal/local-failure-witnesses.js";
-import { sourceBudgetsWitnessRules, sourceBudgetsWitnesses } from "./formal/source-budgets-witnesses.js";
+import { localFailureWitnessRules, localFailureWitnesses } from "../formal/replay/witnesses/local-failure.mjs";
+import { sourceBudgetsWitnessRules, sourceBudgetsWitnesses } from "../formal/replay/witnesses/source-budgets.mjs";
 
 interface Trace { states: Array<{ input: { name: string; choice: unknown }; s: { o: Record<string, unknown> } }> }
 const suites = [

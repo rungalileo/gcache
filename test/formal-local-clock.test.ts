@@ -4,8 +4,9 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { recordWitnesses } from "./formal/coverage-evidence.js";
-import { localClockWitnesses, parseLocalClockTrace, replayLocalClockTrace } from "./formal/local-clock-profile.js";
+import { checkWitnesses } from "../formal/replay/witnesses/index.mjs";
+import { localClockWitnesses } from "../formal/replay/witnesses/local-clock.mjs";
+import { parseLocalClockTrace, replayLocalClockTrace } from "./formal/local-clock-profile.js";
 
 const profile = "local-clock";
 const single = process.env.DIALCACHE_FEATURE_TRACE_FILE;
@@ -24,10 +25,7 @@ const traces = paths.map(path => parseLocalClockTrace(JSON.parse(readFileSync(pa
 describe("generated local-clock conformance", () => {
   for (const trace of traces) it(`replays ${trace.path}`, async () => { await replayLocalClockTrace(trace); });
   if (directory !== undefined && single === undefined) it("reaches fractional expiry and shared instance grid", () => {
-    const required = ["fractional-insertion-expiry", "shared-instance-grid"];
-    const seen = localClockWitnesses(traces);
-    expect(required.filter(witness => !seen.has(witness))).toEqual([]);
-    recordWitnesses(profile, seen, required, traces);
+    expect(checkWitnesses(profile, paths).missing).toEqual([]);
   });
   if (traces.length > 0) {
     it("rejects missing observations and unsupported inputs", () => {

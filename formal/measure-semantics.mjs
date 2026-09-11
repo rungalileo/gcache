@@ -95,7 +95,7 @@ function run(label, cohort, baseline) {
     // Vitest bail can cancel workers before their failing assertions reach the
     // JSON reporter. Complete each cohort so detection has recorded evidence.
     '--coverage.enabled=false', '--reporter=json', '--reporter=./formal/semantic-reporter.mjs', `--outputFile=${json}`], {
-    cwd: workspace, env: { ...env, DIALCACHE_PROTOCOL_CORPUS: cohort === 'generated' ? 'generated' : 'fixed', DIALCACHE_SEMANTIC_RUN_META: meta, ...(baseline ? { DIALCACHE_COVERAGE_EVIDENCE_DIR: resolve(output, 'witnesses') } : {}) },
+    cwd: workspace, env: { ...env, DIALCACHE_PROTOCOL_CORPUS: cohort === 'generated' ? 'generated' : 'fixed', DIALCACHE_SEMANTIC_RUN_META: meta },
     encoding: 'utf8', timeout: 180_000, maxBuffer: 32 * 1024 * 1024,
   });
   writeFileSync(resolve(output, `${label}-${cohort}.log`), (result.stdout ?? '') + (result.stderr ?? ''));
@@ -128,6 +128,11 @@ try {
     save();
   }
   report.baselines.portable = portableResult(report.baselines);
+  // The shared language-neutral evaluator produces the baseline witness
+  // evidence over the unmodified corpus; the TypeScript suite only checks the gate.
+  const evaluated = spawnSync(process.execPath, [resolve(root, 'formal/witnesses.mjs'), 'evaluate', '--profile', 'all', '--out', resolve(output, 'witnesses')],
+    { cwd: root, env, encoding: 'utf8', timeout: 180_000 });
+  if (evaluated.error || evaluated.status !== 0) throw new Error(`baseline witness evaluation failed: ${evaluated.error ?? evaluated.stderr}`);
   const witnesses = JSON.parse(read('formal/coverage-witnesses.json'));
   report.reachedWitnesses = {};
   for (const [profile, required] of Object.entries(witnesses)) {

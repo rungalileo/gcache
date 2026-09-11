@@ -1,116 +1,43 @@
-import { readFileSync } from "node:fs";
+import { explicitInput, privateStates, readTrace, traceStates } from "./trace.mjs";
 
-interface Observation {
-  calls: number[];
-  policyCalls: number;
-  reads: number;
-  loads: number;
-  loaders: number;
-  dumps: number;
-  writes: number;
-  invalidations: number;
-}
-interface Source {
-  key: number;
-  localTtl: number;
-  remoteTtl: number;
-  shared: boolean;
-  result: number;
-  slot: number;
-  instance: number;
-  local: boolean;
-  remote: boolean;
-}
-interface State {
-  o: Observation;
-  sources: Source[];
-  owners: number[];
-  policyCall: number;
-  overlay: number;
-  key: number;
-  now: number;
-  wall: number;
-  localKey: number;
-  localValue: number;
-  localExpires: number;
-  remoteValues: number[];
-  remoteCreated: number[];
-  remoteExpires: number[];
-  providerFailed: boolean;
-  readFailed: boolean;
-  dumpFailed: boolean;
-  writeFailed: boolean;
-  registered: number[];
-  scope: number;
-  completed: boolean[];
-  memo: number[];
-  memoSlots: number[];
-  policy: number;
-  tracked: boolean;
-  remoteAvailable: boolean;
-  localValues: number[];
-  processFlights: number[];
-  requestFlights: number[];
-  closed: boolean[];
-  watermark: number[];
-}
-interface Step {
-  s: State;
-  "mbt::actionTaken": string;
-  "mbt::nondetPicks": { choice: { tag: string; value: number } };
-}
-interface Published {
-  loader: number;
-  value: number;
-  kind: "local" | "remote" | "request";
-}
-
-const successful = (value: number | undefined): value is number => value !== undefined && value > 0 && value !== 3 && value !== 4;
-const baseOverlay = (overlay: number) => overlay < 20 ? overlay % 10 : 0;
-const independent = (overlay: number) => overlay >= 10 && overlay < 20;
-const localActive = (s: State) => !s.providerFailed && ![20, 21].includes(s.overlay) && ![3, 5, 8].includes(baseOverlay(s.overlay));
-const remoteActive = (s: State) => !s.providerFailed && ![20, 22].includes(s.overlay) && ![4, 6, 8].includes(baseOverlay(s.overlay));
-const remoteTtl = (s: State) => baseOverlay(s.overlay) === 2 ? 2000 : baseOverlay(s.overlay) === 9 ? 4000 : 1000;
+const successful = value => value !== undefined && value > 0 && value !== 3 && value !== 4;
+const baseOverlay = overlay => overlay < 20 ? overlay % 10 : 0;
+const independent = overlay => overlay >= 10 && overlay < 20;
+const localActive = s => !s.providerFailed && ![20, 21].includes(s.overlay) && ![3, 5, 8].includes(baseOverlay(s.overlay));
+const remoteActive = s => !s.providerFailed && ![20, 22].includes(s.overlay) && ![4, 6, 8].includes(baseOverlay(s.overlay));
+const remoteTtl = s => baseOverlay(s.overlay) === 2 ? 2000 : baseOverlay(s.overlay) === 9 ? 4000 : 1000;
 
 // These classifiers inspect only Quint schedules already replayed through the
-// public TS and Go APIs. Private cache predictions select a schedule; a later
-// public call must expose retained values, skipped work, or independent work.
-// They neither drive implementations nor add an alternative behavioral oracle.
-export function runtimeWitnesses(profile: string, paths: readonly string[]): Set<string> {
-  const seen = new Set<string>();
+// public APIs of every port. Private cache predictions select a schedule; a
+// later public call must expose retained values, skipped work, or independent
+// work. They neither drive implementations nor add a behavioral oracle.
+export function runtimeWitnesses(profile, paths) {
+  const seen = new Set();
   if (!["policy", "scope", "layers"].includes(profile)) return seen;
   for (const path of paths) {
-    const raw = JSON.parse(readFileSync(path, "utf8"), (_key: string, value: unknown) => {
-      if (value !== null && typeof value === "object" && "#bigint" in value) {
-        const text = (value as { "#bigint": unknown })["#bigint"];
-        if (typeof text !== "string" || !/^-?(0|[1-9][0-9]*)$/.test(text) || !Number.isSafeInteger(Number(text))) {
-          throw new Error(`${path}: unsafe runtime witness integer`);
-        }
-        return Number(text);
-      }
-      return value;
-    }) as { states: Step[] };
-    if (!Array.isArray(raw.states)) throw new Error(`${path}: missing runtime witness states`);
+    const raw = readTrace(path);
+    const states = traceStates(raw, path);
     // Published smoke fixtures deliberately retain only public observations.
-    if (raw.states[0]?.s.sources === undefined) continue;
-    if (profile === "policy") policyWitnesses(raw.states, seen);
-    if (profile === "scope") scopeWitnesses(raw.states, seen);
-    if (profile === "layers") layersWitnesses(raw.states, seen);
+    if (states[0]?.s?.sources === undefined) continue;
+    const steps = privateStates(raw, path).map((s, index) => ({ s, input: index === 0 ? undefined : explicitInput(states[index], `${path} step ${index}`) }));
+    if (profile === "policy") policyWitnesses(steps, seen);
+    if (profile === "scope") scopeWitnesses(steps, seen);
+    if (profile === "layers") layersWitnesses(steps, seen);
   }
   return seen;
 }
 
-function policyWitnesses(steps: Step[], seen: Set<string>): void {
-  const overlaps = new Set<string>();
-  const previousPublication = new Map<string, Published>();
-  const lastWriter = new Map<string, Published>();
-  const bypassed = new Map<number, { value: number; expires: number; reason: string; loader: number; settled: boolean }>();
-  const warmed = new Map<number, { value: number; expires: number; freshUntil: number }>();
-  const failedReadSources = new Set<number>();
-  const failedReadValues = new Map<number, number>();
+function policyWitnesses(steps, seen) {
+  const overlaps = new Set();
+  const previousPublication = new Map();
+  const lastWriter = new Map();
+  const bypassed = new Map();
+  const warmed = new Map();
+  const failedReadSources = new Set();
+  const failedReadValues = new Map();
   for (let i = 1; i < steps.length; i++) {
-    const step = steps[i]!, before = steps[i - 1]!.s, after = step.s;
-    const prior = before.o, current = after.o, action = step["mbt::actionTaken"];
+    const step = steps[i], before = steps[i - 1].s, after = step.s;
+    const prior = before.o, current = after.o, action = step.input.name, choice = step.input.choice;
     if (action === "releasePolicy") {
       const key = before.key, call = before.policyCall;
       const value = current.calls[call];
@@ -122,10 +49,10 @@ function policyWitnesses(steps: Step[], seen: Set<string>): void {
         const loader = after.sources.length - 1;
         for (const [other, source] of before.sources.entries()) {
           if (source.key !== key || source.result !== 0) continue;
-          if (!source.shared && !after.sources[loader]!.shared) overlaps.add(`${Math.min(other, loader)}:${Math.max(other, loader)}`);
+          if (!source.shared && !after.sources[loader].shared) overlaps.add(`${Math.min(other, loader)}:${Math.max(other, loader)}`);
           if (base === 8 && source.localTtl === 0 && source.remoteTtl === 0 && current.reads === prior.reads) seen.add("inactive-layers-independent-sources");
         }
-        if (before.readFailed && current.reads > prior.reads && after.sources[loader]!.localTtl > 0) failedReadSources.add(loader);
+        if (before.readFailed && current.reads > prior.reads && after.sources[loader].localTtl > 0) failedReadSources.add(loader);
         if (before.localKey === key && before.localValue > 0 && before.now < before.localExpires) {
           if (before.providerFailed) bypassed.set(key, { value: before.localValue, expires: before.localExpires, loader, settled: false, reason: "provider-failure" });
           else if (base === 8) bypassed.set(key, { value: before.localValue, expires: before.localExpires, loader, settled: false, reason: "serving-disabled" });
@@ -158,22 +85,22 @@ function policyWitnesses(steps: Step[], seen: Set<string>): void {
         failedReadValues.delete(key);
         if (independent(before.overlay)) seen.add("uncoalesced-remote-settled-hit");
         if (lastWriter.get(`remote:${key}`)?.value === value) seen.add("independent-remote-last-completion-probed");
-        const age = before.wall - before.remoteCreated[key]!;
+        const age = before.wall - before.remoteCreated[key];
         if (age >= 1000 && remoteTtl(before) > 1000) seen.add("increased-fresh-ttl-reuses-retained-frame");
         if (localActive(before) && age > 0) warmed.set(key, {
-          value, expires: after.localExpires, freshUntil: before.remoteCreated[key]! + remoteTtl(before),
+          value, expires: after.localExpires, freshUntil: before.remoteCreated[key] + remoteTtl(before),
         });
       }
-      if (starts && current.reads > prior.reads && !before.readFailed && before.remoteValues[key]! > 0 && remoteActive(before)) {
-        const age = before.wall - before.remoteCreated[key]!;
-        if (before.now < before.remoteExpires[key]! && age === remoteTtl(before)) seen.add("remote-exact-fresh-boundary-miss");
-        if (before.now >= before.remoteExpires[key]! && age >= 0 && age < remoteTtl(before)) seen.add("increased-fresh-ttl-cannot-resurrect-expired-storage");
+      if (starts && current.reads > prior.reads && !before.readFailed && before.remoteValues[key] > 0 && remoteActive(before)) {
+        const age = before.wall - before.remoteCreated[key];
+        if (before.now < before.remoteExpires[key] && age === remoteTtl(before)) seen.add("remote-exact-fresh-boundary-miss");
+        if (before.now >= before.remoteExpires[key] && age >= 0 && age < remoteTtl(before)) seen.add("increased-fresh-ttl-cannot-resurrect-expired-storage");
       }
     }
     if (action === "resolveLoader") {
-      const loader = Math.floor((step["mbt::nondetPicks"].choice.value - 1) / 7);
-      const source = before.sources[loader]!, value = after.sources[loader]!.result;
-      for (const kind of ["local", "remote"] as const) {
+      const loader = Math.floor((choice - 1) / 7);
+      const source = before.sources[loader], value = after.sources[loader].result;
+      for (const kind of ["local", "remote"]) {
         const published = kind === "local" ? source.localTtl > 0 : current.writes > prior.writes && !before.writeFailed;
         if (!published) continue;
         const key = `${kind}:${source.key}`, preceding = previousPublication.get(key);
@@ -196,27 +123,26 @@ function policyWitnesses(steps: Step[], seen: Set<string>): void {
       }
     }
     if (action === "rejectLoader") {
-      const loader = step["mbt::nondetPicks"].choice.value;
-      const key = before.sources[loader]!.key;
-      if (bypassed.get(key)?.loader === loader) bypassed.delete(key);
+      const key = before.sources[choice].key;
+      if (bypassed.get(key)?.loader === choice) bypassed.delete(key);
     }
     if (action === "seed") {
-      const key = Math.floor(step["mbt::nondetPicks"].choice.value / 2);
+      const key = Math.floor(choice / 2);
       lastWriter.delete(`remote:${key}`);
     }
   }
 }
 
-function scopeWitnesses(steps: Step[], seen: Set<string>): void {
-  const overlaps = new Set<string>();
-  const publications = new Map<number, Published>();
-  const lastWriter = new Map<number, Published>();
+function scopeWitnesses(steps, seen) {
+  const overlaps = new Set();
+  const publications = new Map();
+  const lastWriter = new Map();
   for (let i = 1; i < steps.length; i++) {
-    const step = steps[i]!, before = steps[i - 1]!.s, after = step.s;
-    const prior = before.o, current = after.o, action = step["mbt::actionTaken"];
+    const step = steps[i], before = steps[i - 1].s, after = step.s;
+    const prior = before.o, current = after.o, action = step.input.name, choice = step.input.choice;
     if (action === "releasePolicy") {
       if (current.loaders > prior.loaders) {
-        const loader = after.sources.length - 1, admitted = after.sources[loader]!;
+        const loader = after.sources.length - 1, admitted = after.sources[loader];
         for (const [other, source] of before.sources.entries()) if (admitted.slot >= 0 && source.slot === admitted.slot &&
           source.result === 0 && !source.shared && !admitted.shared) overlaps.add(`${other}:${loader}`);
       } else if (successful(current.calls[before.policyCall]) && before.overlay === 2) {
@@ -226,8 +152,8 @@ function scopeWitnesses(steps: Step[], seen: Set<string>): void {
       }
     }
     if (action === "resolveLoader") {
-      const loader = Math.floor((step["mbt::nondetPicks"].choice.value - 1) / 7);
-      const source = before.sources[loader]!, value = after.sources[loader]!.result;
+      const loader = Math.floor((choice - 1) / 7);
+      const source = before.sources[loader], value = after.sources[loader].result;
       if (source.slot < 0 || before.completed[source.slot]) continue;
       const preceding = publications.get(source.slot);
       lastWriter.delete(source.slot);
@@ -237,37 +163,37 @@ function scopeWitnesses(steps: Step[], seen: Set<string>): void {
       }
       publications.set(source.slot, { loader, value, kind: "request" });
     }
-    if (action === "closeScope" && step["mbt::nondetPicks"].choice.value < 2) {
-      publications.delete(step["mbt::nondetPicks"].choice.value);
-      lastWriter.delete(step["mbt::nondetPicks"].choice.value);
+    if (action === "closeScope" && choice < 2) {
+      publications.delete(choice);
+      lastWriter.delete(choice);
     }
   }
 }
 
-function layersWitnesses(steps: Step[], seen: Set<string>): void {
-  const sourcePublications = new Map<number, { value: number; request: Set<number>; local: boolean; remote: boolean }>();
-  const probed = new Map<number, Set<string>>();
-  const localOwners = new Map<number, number>();
-  const remoteOwners = new Map<number, number>();
-  const memoOwners = new Map<number, number>();
-  const trackedLocalOnly = new Map<number, number>();
+function layersWitnesses(steps, seen) {
+  const sourcePublications = new Map();
+  const probed = new Map();
+  const localOwners = new Map();
+  const remoteOwners = new Map();
+  const memoOwners = new Map();
+  const trackedLocalOnly = new Map();
   // A preservation witness must start with an acquired memo. Clear ownership
   // on every later publication, even if the replacement has the same value.
-  const memoBeforeInvalidation = new Map<number, number>();
+  const memoBeforeInvalidation = new Map();
   for (let i = 1; i < steps.length; i++) {
-    const step = steps[i]!, before = steps[i - 1]!.s, after = step.s;
-    const prior = before.o, current = after.o, action = step["mbt::actionTaken"];
+    const step = steps[i], before = steps[i - 1].s, after = step.s;
+    const prior = before.o, current = after.o, action = step.input.name, choice = step.input.choice;
     if (action === "invalidate" && current.invalidations === prior.invalidations + 1) {
-      const entity = step["mbt::nondetPicks"].choice.value;
+      const entity = choice;
       before.memo.forEach((value, slot) => {
         if (Math.floor((slot % 4) / 2) !== entity) return;
         if (successful(value)) memoBeforeInvalidation.set(slot, value);
         else memoBeforeInvalidation.delete(slot);
       });
     }
-    if (action === "seed") remoteOwners.delete(Math.floor(step["mbt::nondetPicks"].choice.value / 2));
+    if (action === "seed") remoteOwners.delete(Math.floor(choice / 2));
     if (action === "closeScope") {
-      const context = step["mbt::nondetPicks"].choice.value;
+      const context = choice;
       for (let key = 0; key < 4; key++) {
         memoOwners.delete(context * 4 + key);
         memoBeforeInvalidation.delete(context * 4 + key);
@@ -275,11 +201,11 @@ function layersWitnesses(steps: Step[], seen: Set<string>): void {
     }
     for (let key = 0; key < after.localValues.length; key++) if (after.localValues[key] === 0) localOwners.delete(key);
     if (action === "resolveLoader") {
-      const loader = Math.floor((step["mbt::nondetPicks"].choice.value - 1) / 2);
-      const source = before.sources[loader]!, value = after.sources[loader]!.result;
-      const request = new Set<number>();
+      const loader = Math.floor((choice - 1) / 2);
+      const source = before.sources[loader], value = after.sources[loader].result;
+      const request = new Set();
       before.owners.forEach((owner, call) => {
-        const slot = before.memoSlots[call]!;
+        const slot = before.memoSlots[call];
         if (owner === loader && slot >= 0 && !before.closed[Math.floor(slot / 4)]) request.add(slot);
       });
       sourcePublications.set(loader, { value, request, local: source.local, remote: current.writes > prior.writes });
@@ -293,7 +219,6 @@ function layersWitnesses(steps: Step[], seen: Set<string>): void {
       else if (source.local) trackedLocalOnly.delete(source.instance * 4 + source.key);
     }
     if (action !== "beginCall") continue;
-    const choice = step["mbt::nondetPicks"].choice.value;
     const context = Math.floor(choice / 4), key = choice % 4;
     const instance = context === 2 || context === 4 ? 1 : 0, identity = instance * 4 + key;
     const value = current.calls.at(-1), starts = current.loaders > prior.loaders;
@@ -330,9 +255,9 @@ function layersWitnesses(steps: Step[], seen: Set<string>): void {
       if (owner === undefined) memoOwners.delete(slot); else memoOwners.set(slot, owner);
     }
     for (const [loader, publication] of sourcePublications) {
-      const source = before.sources[loader]!;
+      const source = before.sources[loader];
       if (source.key !== key || publication.value !== value) continue;
-      const observations = probed.get(loader) ?? new Set<string>();
+      const observations = probed.get(loader) ?? new Set();
       if (memoHit && publication.request.has(slot) && memoOwners.get(slot) === loader) observations.add("request");
       if (localHit && source.instance === instance && publication.local && localOwners.get(identity) === loader) observations.add("local");
       if (remoteHit && publication.remote && remoteOwners.get(key) === loader) observations.add("remote");

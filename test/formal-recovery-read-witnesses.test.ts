@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { recoveryReadWitnesses, recoveryReadWitnessRules } from "./formal/recovery-read-witnesses.js";
+import { recoveryReadWitnesses, recoveryReadWitnessRules } from "../formal/replay/witnesses/recovery-read.mjs";
 
 // Actual Quint input/observation excerpts; private state is deliberately absent.
 // These tests challenge classification, not a language implementation, and must

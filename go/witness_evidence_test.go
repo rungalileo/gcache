@@ -83,12 +83,11 @@ func checkWitnessEvidenceAt(root, profile, directory string, paths []string) err
 			return fmt.Errorf("%s missing witness %s", profile, name)
 		}
 	}
-	expectedInputs := []string{"formal/profiles.json", "formal/coverage-witnesses.json", "formal/execution.json", "formal/dialcache-" + profile + "-conformance.qnt", "formal/conformance-observations.qnt", "test/formal-features.test.ts", "test/formal/coverage-evidence.ts"}
-	if profile == "effects" {
-		expectedInputs[5] = "test/formal-effects.test.ts"
-	} else {
-		expectedInputs = append(expectedInputs, "test/formal/runtime-witnesses.ts", "test/formal/recovery-shadow-witnesses.ts")
-	}
+	// The evidence binds language-neutral definitions only: the registry, the
+	// required witnesses, the execution manifest, the profile's model and the
+	// observation library, then every Quint library, the shared replay closure
+	// (which holds the witness classifiers) and the profile's witness sources.
+	expectedInputs := []string{"formal/profiles.json", "formal/coverage-witnesses.json", "formal/execution.json", "formal/dialcache-" + profile + "-conformance.qnt", "formal/conformance-observations.qnt"}
 	var execution struct {
 		Libraries []string `json:"libraries"`
 	}
@@ -279,7 +278,7 @@ func TestWitnessEvidenceBindsSharedReplaySources(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	inputs := []string{"formal/profiles.json", "formal/coverage-witnesses.json", "formal/execution.json", "formal/dialcache-effects-conformance.qnt", "formal/conformance-observations.qnt", "test/formal-effects.test.ts", "test/formal/coverage-evidence.ts", "formal/replay/coordinator.mjs", "formal/replay/mapping.mjs"}
+	inputs := []string{"formal/profiles.json", "formal/coverage-witnesses.json", "formal/execution.json", "formal/dialcache-effects-conformance.qnt", "formal/conformance-observations.qnt", "formal/replay/coordinator.mjs", "formal/replay/mapping.mjs"}
 	for _, path := range inputs {
 		write(path, "reviewed input")
 	}

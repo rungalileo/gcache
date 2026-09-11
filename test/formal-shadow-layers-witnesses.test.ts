@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { shadowLayersWitnesses, shadowLayersWitnessRules } from "./formal/shadow-layers-witnesses.js";
+import { shadowLayersWitnesses, shadowLayersWitnessRules } from "../formal/replay/witnesses/shadow-layers.mjs";
 
 // These excerpts come from actual Quint regressions. They contain only inputs
 // and public observations. Mutated excerpts test attribution, never the port.

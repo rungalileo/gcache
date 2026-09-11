@@ -1,13 +1,12 @@
-import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command,
-  type PublicPrefixWitnessRule } from "./public-prefix-witnesses.js";
+import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command } from "./public-prefix.mjs";
 
-const init = (mode: number) => command("init", mode);
-const begin = (kind: number) => command("beginCall", kind);
-const policy = (index: number) => command("releasePolicy", index);
-const resolve = (choice: number) => command("resolveLoader", choice);
-const advance = (ms: number) => command("advance", ms);
+const init = mode => command("init", mode);
+const begin = kind => command("beginCall", kind);
+const policy = index => command("releasePolicy", index);
+const resolve = choice => command("resolveLoader", choice);
+const advance = ms => command("advance", ms);
 
-export const sourceBudgetsWitnessRules: readonly PublicPrefixWitnessRule[] = [
+export const sourceBudgetsWitnessRules = [
   rule("outside-calls-skip-source-deadlines-sharing-and-publication", "outsideAndInvalidOutsideCallsIgnoreDeadlineAndSharingTest",
     [init(2), begin(1), begin(3), advance(100), resolve(1), resolve(4), begin(0), policy(0)],
     check(3, { calls: [0, 0], policyCalls: 0, loaders: 2, reads: 0, writes: 0 }),
@@ -45,6 +44,6 @@ export const sourceBudgetsWitnessRules: readonly PublicPrefixWitnessRule[] = [
     check(9, { calls: [4, 2, 2], loaders: 2, policyCalls: 3 })),
 ];
 
-export function sourceBudgetsWitnesses(paths: readonly string[]): Set<string> {
+export function sourceBudgetsWitnesses(paths) {
   return publicPrefixWitnesses(paths, sourceBudgetsWitnessRules);
 }

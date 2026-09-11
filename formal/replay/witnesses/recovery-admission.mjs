@@ -1,5 +1,4 @@
-import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command,
-  type PublicPrefixWitnessRule } from "./public-prefix-witnesses.js";
+import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command } from "./public-prefix.mjs";
 
 const init = command("init", 2), begin = command("beginCall", 0);
 const read = command("releaseRead"), reject = command("rejectLoader"), load = command("releaseLoad");
@@ -8,7 +7,7 @@ const noShadow = { shadow: [], dumps: 0, writes: 0 };
 // Mode 2 supplies a selected shadow policy, an outcome hook and available job
 // capacity. Source/read counts distinguish skipped diagnostic admission from a
 // detached job that simply has not emitted its outcome yet.
-export const recoveryAdmissionWitnessRules: readonly PublicPrefixWitnessRule[] = [
+export const recoveryAdmissionWitnessRules = [
   rule("recovered-absence-skips-selected-shadow-and-memoizes", "recoveredAbsenceSkipsSelectedShadowTest",
     [init, command("seed", 18), begin, read, reject, load, begin,
       command("beginCall", 1), read, reject, load],
@@ -22,6 +21,6 @@ export const recoveryAdmissionWitnessRules: readonly PublicPrefixWitnessRule[] =
     check(6, { calls: [1, 1], reads: 1, loaders: 1, loads: 1, classifications: 1, recovery: ["served"], ...noShadow })),
 ];
 
-export function recoveryAdmissionWitnesses(paths: readonly string[]): Set<string> {
+export function recoveryAdmissionWitnesses(paths) {
   return publicPrefixWitnesses(paths, recoveryAdmissionWitnessRules);
 }

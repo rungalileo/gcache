@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { effectsAuthorityRules, effectsAuthorityWitnesses } from "./formal/effects-authority-witnesses.js";
+import { effectsAuthorityRules, effectsAuthorityWitnesses } from "../formal/replay/witnesses/effects-authority.mjs";
 
 // Public excerpts of real Quint regressions, used solely as classifier controls.
 // These tests do not add behavioral examples or mutation assertion detections.

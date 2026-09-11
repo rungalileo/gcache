@@ -19,6 +19,8 @@ export function profileActions() {
 // This object is coordinator-owned. Only fixture/setup/command results cross
 // the native boundary. The input mapping receives a fresh action descriptor,
 // actual observations, and actual clocks; it cannot inspect model predictions.
+// `observation` names the protocol.schema.json definition every observation
+// for this binding must satisfy before any comparison runs.
 export function bindTrace(name, raw, path) {
   if (Object.hasOwn(profiles, name)) {
     const profile = profiles[name];
@@ -27,7 +29,7 @@ export function bindTrace(name, raw, path) {
       ? profile.fixture(trace.steps[0].choice)
       : profile.fixture;
     return {
-      trace, fixture, setup: profile.setup,
+      trace, fixture, setup: profile.setup, observation: "behaviorObservation",
       commands(index, observed, environment) {
         const { action, choice } = trace.steps[index];
         return action === "init" ? [] : [featureInput(profile, action, choice, observed, environment)];
@@ -41,7 +43,7 @@ export function bindTrace(name, raw, path) {
     const parsed = core.parseItfTrace(raw, path);
     const trace = { path, steps: parsed.states };
     return {
-      trace, fixture: {}, setup: [],
+      trace, fixture: {}, setup: [], observation: "coreObservation",
       commands(index) {
         return core.coreCommands(trace.steps[index].action);
       },
@@ -53,7 +55,7 @@ export function bindTrace(name, raw, path) {
   if (name === "local-clock") {
     const trace = localClock.parseLocalClockTrace(raw, path);
     return {
-      trace, fixture: {}, setup: [],
+      trace, fixture: {}, setup: [], observation: "localClockObservation",
       commands(index) {
         const { action, choice } = trace.steps[index];
         return localClock.localClockInput(action, choice);
@@ -69,7 +71,7 @@ export function bindTrace(name, raw, path) {
     const expected = effects.expectedObservations(trace);
     const initialInput = { action: "init", choice: trace.steps[0].choice };
     return {
-      trace, fixture,
+      trace, fixture, observation: "behaviorObservation",
       setup: [
         { op: "faults", value: { holdReads: true, holdLoads: true, holdDumps: true, holdWrites: true } },
         ...effects.inputsFor(initialInput, emptyObservation(fixture), { wallMs: 0 }),

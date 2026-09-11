@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { profileActions, bindTrace } from "./bindings.mjs";
 import { parseJSON, replayLines } from "./validation.mjs";
-import { assertSchema } from "./schema.mjs";
+import { assertSchema, schemaViolation } from "./schema.mjs";
 
 export const protocolVersion = 1;
 export const settlement = "causally-ready-v1";
@@ -49,6 +49,10 @@ export class ReplayCoordinator {
     const { binding, trace, index } = session;
     try {
       if (request.index !== index) throw new Error("Duplicate or skipped replay observation");
+      // A malformed observation is a driver or transport defect, never
+      // comparison evidence: report it as a plain infrastructure error.
+      const malformed = schemaViolation(request.observed, binding.observation, "observed");
+      if (malformed !== undefined) throw new Error(`Malformed replay observation: ${binding.observation} at ${malformed}`);
       try {
         binding.assert(index, request.observed);
       } catch (cause) {

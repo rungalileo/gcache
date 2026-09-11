@@ -22,12 +22,15 @@ function supported(node) {
 }
 supported(schema);
 
+function resolve(rule) {
+  if (rule.$ref === undefined) return rule;
+  const name = rule.$ref.replace(/^#\/\$defs\//, "");
+  if (!Object.hasOwn(schema.$defs, name)) throw new Error(`Unknown replay schema reference: ${rule.$ref}`);
+  return schema.$defs[name];
+}
+
 function matches(value, rule) {
-  if (rule.$ref !== undefined) {
-    const name = rule.$ref.replace(/^#\/\$defs\//, "");
-    if (!Object.hasOwn(schema.$defs, name)) throw new Error(`Unknown replay schema reference: ${rule.$ref}`);
-    return matches(value, schema.$defs[name]);
-  }
+  if (rule.$ref !== undefined) return matches(value, resolve(rule));
   if (rule.oneOf && rule.oneOf.filter(option => matches(value, option)).length !== 1) return false;
   if (rule.anyOf && !rule.anyOf.some(option => matches(value, option))) return false;
   if (Object.hasOwn(rule, "const") && value !== rule.const) return false;
@@ -63,7 +66,55 @@ function matches(value, rule) {
   return true;
 }
 
-export function assertSchema(value, definition) {
+// An alternative is a candidate for a record when every constant-valued
+// property it declares (op, event, status, ...) agrees with the record. This
+// is only a diagnostic aid: acceptance is decided by matches() alone.
+function candidate(value, option) {
+  option = resolve(option);
+  if (option.oneOf || option.anyOf) return (option.oneOf ?? option.anyOf).some(nested => candidate(value, nested));
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return true;
+  return Object.entries(option.properties ?? {}).every(([key, property]) =>
+    !Object.hasOwn(property, "const") || value[key] === property.const);
+}
+
+// Path of the first violation, or undefined when the value matches. Paths name
+// members only; observed values never enter a diagnostic.
+function violation(value, rule, path) {
+  if (matches(value, rule)) return undefined;
+  if (rule.$ref !== undefined) return violation(value, resolve(rule), path);
+  const options = rule.oneOf ?? rule.anyOf;
+  if (options) {
+    const candidates = options.filter(option => candidate(value, option));
+    return candidates.length === 1 ? violation(value, candidates[0], path) : path;
+  }
+  if (Array.isArray(value)) {
+    const index = rule.items ? value.findIndex(item => !matches(item, rule.items)) : -1;
+    return index < 0 ? path : violation(value[index], rule.items, `${path}[${index}]`);
+  }
+  if (value !== null && typeof value === "object") {
+    for (const key of rule.required ?? []) if (!Object.hasOwn(value, key)) return `${path}.${key}`;
+    for (const [key, item] of Object.entries(value)) {
+      if (Object.hasOwn(rule.properties ?? {}, key)) {
+        if (!matches(item, rule.properties[key])) return violation(item, rule.properties[key], `${path}.${key}`);
+      } else if (rule.additionalProperties === false) return `${path}.${key}`;
+      else if (typeof rule.additionalProperties === "object" && !matches(item, rule.additionalProperties)) {
+        return violation(item, rule.additionalProperties, `${path}.${key}`);
+      }
+    }
+  }
+  return path;
+}
+
+function definitionRule(definition) {
   if (!Object.hasOwn(schema.$defs, definition)) throw new Error(`Unknown replay schema definition: ${definition}`);
-  if (!matches(value, schema.$defs[definition])) throw new Error(`Malformed replay ${definition}`);
+  return schema.$defs[definition];
+}
+
+export function schemaViolation(value, definition, root = definition) {
+  return violation(value, definitionRule(definition), root);
+}
+
+export function assertSchema(value, definition) {
+  const path = schemaViolation(value, definition);
+  if (path !== undefined) throw new Error(`Malformed replay ${definition}${path === definition ? "" : ` at ${path}`}`);
 }

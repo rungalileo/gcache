@@ -283,10 +283,6 @@ Four constraints:
   `SessionService::identity` renders as `SessionService%3A%3Aidentity` there and the two
   compute different keys — zero sharing, no error. Until the encoding is unified, keep key
   components URL-safe. Go and Python agree today.
-
-  (An earlier version of this bullet also claimed the two disagree on the default
-  `urnPrefix`. They do not — both default to `"urn"`, `_internal/state.py` and
-  `redis-cache.ts` respectively. Only the percent-encoding half was ever real.)
 - **Never flip this on a live use case.** A rolling deploy runs both pod generations at
   once: an old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle
   over it, and a new pod refuses that pickle and writes JSON again. Each destroys the

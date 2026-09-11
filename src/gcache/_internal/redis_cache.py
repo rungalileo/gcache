@@ -185,10 +185,15 @@ class RedisCache(CacheInterface):
             #
             # Deliberately no skew tolerance. This does make a read depend on the WRITER's
             # wall clock, which is new -- a writer running behind loses the tail of every
-            # entry's lifetime, and each affected read pays a fallback plus a rewrite. But a
+            # entry's lifetime, and each affected read pays a fallback plus a rewrite. A
             # tolerance would serve values the TypeScript reader calls expired, which is the
-            # divergence this check exists to remove. The cost of skew is bounded and
-            # self-correcting; the cost of disagreement is two clients fighting over a key.
+            # divergence this check exists to remove.
+            #
+            # It is NOT self-correcting: a writer lagging by more than the use case's TTL
+            # stamps an already-past expiry on every entry, so the key's hit rate sits at
+            # zero indefinitely. That is an operational requirement, not a tolerance --
+            # clocks must agree within the shortest TTL of any JSON use case. The
+            # envelope_expired degraded-read reason is the alarm for it.
             if deserialized_value.expires_at_ms is not None and deserialized_value.expires_at_ms <= time.time() * 1000:
                 _GLOBAL_GCACHE_STATE.logger.warning(
                     "Cache value for %s is past its envelope expiry; treating as miss", key.urn

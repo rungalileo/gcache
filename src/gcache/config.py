@@ -10,6 +10,12 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
+from gcache.exceptions import UseCaseNameIsReserved
+
+#: Async callable that fetches the actual value on a cache miss.
+#: Public because GCache.aget/get take one: annotating a fallback should not mean
+#: importing from gcache._internal.
+Fallback = Callable[..., Awaitable[Any]]
 
 
 class CacheLayer(Enum):
@@ -166,7 +172,12 @@ class JsonSerializer(Serializer):
     """
 
     async def dump(self, obj: Any) -> str:
-        return json.dumps(obj, separators=(",", ":"))
+        # allow_nan=False because json.dumps otherwise emits the bare tokens NaN, Infinity
+        # and -Infinity, which are not JSON: JSON.parse throws on them and Go's
+        # encoding/json rejects them. The write would succeed and the entry would be
+        # unreadable from every non-Python client until its TTL ran out. Failing the write
+        # is the rule the rest of this envelope follows.
+        return json.dumps(obj, separators=(",", ":"), allow_nan=False)
 
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, bytes):
@@ -215,6 +226,14 @@ class GCacheKey:
                 f"GCacheKey {self.key_type}:{self.id}#{self.use_case} uses Envelope.JSON, "
                 "which requires a serializer producing str or bytes (e.g. JsonSerializer())"
             )
+
+        # "watermark" is reserved. cached() rejects it at decoration time; a key built
+        # directly for aget/aput skipped that. With invalidation_tracking the urn is then
+        # byte-identical to the key invalidate() writes, so a put would overwrite the
+        # watermark with a cache value -- silently disabling invalidation for every use
+        # case on that entity, and making the next tracked read raise on float().
+        if self.use_case == "watermark":
+            raise UseCaseNameIsReserved()
 
         # Compute prefix
         prefix = f"{self.key_type}:{self.id}"

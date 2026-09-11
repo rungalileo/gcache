@@ -762,3 +762,18 @@ async def test_switching_a_live_use_case_to_json_heals_rather_than_raising(
     # And it is observable: a migration shows up on the degraded-read counter rather than
     # being indistinguishable from ordinary misses.
     assert counter._value.get() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_json_serializer_refuses_nan_and_infinity() -> None:
+    # json.dumps defaults to allow_nan=True and emits the bare tokens NaN / Infinity /
+    # -Infinity. Those are not JSON: JSON.parse throws and Go's encoding/json rejects
+    # them, so the write would succeed and leave an entry no other language can read
+    # until its TTL ran out. Failing the write is the rule the rest of this envelope
+    # follows -- gcache swallows the error, so the caller still gets its value.
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError):
+            await JsonSerializer().dump({"score": bad})
+
+    # A finite float still round-trips.
+    assert await JsonSerializer().dump({"score": 1.5}) == '{"score":1.5}'

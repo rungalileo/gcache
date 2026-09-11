@@ -32,8 +32,7 @@ leave the pickle path reachable for every key, including one that declares
 outright. Choosing ``Envelope.JSON`` therefore does close the arbitrary-code-execution path
 on read; sniffing on its own would not.
 
-Migrating a live use case pickle -> json is NOT one TTL of cold cache, which an earlier
-version of this note claimed. A rolling deploy runs both generations at once: an old pod
+Migrating a live use case pickle -> json is NOT one TTL of cold cache. A rolling deploy runs both generations at once: an old pod
 (pickle, no serializer) treats a JSON entry as a miss and writes pickle over it, and a new
 pod refuses that pickle and writes JSON again. Each generation destroys the framing the
 other needs, so the key's hit rate sits near zero for the whole rollout -- a load spike on

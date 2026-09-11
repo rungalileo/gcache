@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from functools import partial
 from typing import Any
 
-from gcache._internal.cache_interface import Fallback
 from gcache._internal.event_loop_thread import EventLoopThread, EventLoopThreadPool
 from gcache._internal.local_cache import LocalCache
 from gcache._internal.metrics import GCacheMetrics
@@ -17,6 +16,7 @@ from gcache._internal.state import _GLOBAL_GCACHE_STATE, GCacheContext
 from gcache._internal.wrappers import CacheChain, CacheController, DisabledReasons
 from gcache.config import (
     Envelope,
+    Fallback,
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,
@@ -435,11 +435,16 @@ class GCache:
         For priming: the caller already knows the value and wants other services to find
         it without paying the read that would otherwise populate the entry. Go's ``Put``
         is the counterpart. See :meth:`aget` on matching a shared entry's key.
+
+        Unlike a read, this RAISES on a cache-layer failure -- a Redis timeout reaches the
+        caller. That matches :meth:`adelete` and :meth:`ainvalidate`, and it is deliberate:
+        a silent failure here means the entry another process is waiting for never appears.
+        A caller priming off a request path should not let that propagate.
         """
         await self._cache.put(key, value)
 
     def put(self, key: GCacheKey, value: Any) -> None:
-        """Write one key without reading it first (sync version)."""
+        """Write one key without reading it first (sync version). Raises like :meth:`aput`."""
         self._run_coroutine_in_thread(partial(self.aput, key, value))
 
     async def adelete(self, key: GCacheKey) -> bool:

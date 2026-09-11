@@ -38,7 +38,7 @@ class ProtoJsonSerializer(Serializer):
         try:
             from google.protobuf.json_format import MessageToJson, Parse
         except ImportError as exc:  # pragma: no cover - needs the extra uninstalled
-            raise RuntimeError("ProtoJsonSerializer needs: pip install 'gcache[protobuf]'") from exc
+            raise ImportError("ProtoJsonSerializer needs: pip install 'gcache[protobuf]'") from exc
         self._message_to_json = MessageToJson
         self._parse = Parse
         self._message_type = message_type

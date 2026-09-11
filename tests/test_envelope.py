@@ -559,15 +559,47 @@ def test_decode_rejects_a_non_finite_timestamp(field: str) -> None:
         decode(raw)
 
 
-def test_decode_accepts_a_large_but_representable_integer_timestamp() -> None:
-    # Large is fine as long as a double can hold it -- that is the line the other two
-    # clients can read. math.isfinite must still not be called on the int directly: it
-    # raises OverflowError, escaping decode's contract of raising only EnvelopeDecodeError.
-    big = 10**30
+def test_decode_accepts_a_large_in_range_integer_timestamp() -> None:
+    # A timestamp far beyond any real one is fine while it fits int64 -- the bound is the
+    # range the Go client can hold, not plausibility.
+    #
+    # The guard must still never call math.isfinite on the int directly: it raises
+    # OverflowError on a very large one, escaping decode's contract of raising only
+    # EnvelopeDecodeError. That is why the float() conversion comes first and the int64
+    # comparison is done on the original int.
+    big = 2**62  # ~year 146 million, and comfortably inside int64
     raw = json.dumps(
         {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}
     ).encode()
     assert decode(raw).created_at_ms == big
+
+    # And a value that would make math.isfinite raise still yields EnvelopeDecodeError.
+    huge = json.dumps(
+        {"version": 1, "createdAtMs": 10**400, "expiresAtMs": 1, "encoding": "utf8", "payload": "x"}
+    ).encode()
+    with pytest.raises(EnvelopeDecodeError):
+        decode(huge)
+
+
+def test_decode_rejects_a_timestamp_outside_int64() -> None:
+    # Double-representability was not a tight enough bound. 1e300 passed the finiteness
+    # check and kept an exact 301-digit int, and no real watermark can satisfy
+    # `watermark_ms >= created_at_ms` against that -- so the entry was permanent and immune
+    # to invalidation, the one thing the watermark exists to prevent. int64 is the bound
+    # the Go client applies, and nothing legitimate is excluded: int64 milliseconds runs to
+    # year ~292 million.
+    #
+    # Stricter than the TypeScript reader, which accepts anything finite. That asymmetry is
+    # the safe direction: an entry it writes and we reject is a miss that gets rewritten,
+    # not one served forever.
+    for value in ("1e300", "-1e300", "9223372036854775808"):
+        raw = f'{{"version":1,"createdAtMs":{value},"expiresAtMs":1,"encoding":"utf8","payload":"x"}}'.encode()
+        with pytest.raises(EnvelopeDecodeError):
+            decode(raw)
+
+    # The boundary itself is legal.
+    edge = f'{{"version":1,"createdAtMs":{2**63 - 1},"expiresAtMs":1,"encoding":"utf8","payload":"x"}}'.encode()
+    assert decode(edge).created_at_ms == 2**63 - 1
 
 
 def test_decode_rejects_an_integer_timestamp_past_a_double() -> None:

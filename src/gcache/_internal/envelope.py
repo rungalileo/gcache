@@ -49,6 +49,10 @@ from typing import Any
 
 ENVELOPE_VERSION = 1
 
+# Envelope timestamps are int64 milliseconds, matching the Go client. See decode().
+_INT64_MAX = 2**63 - 1
+_INT64_MIN = -(2**63)
+
 # Every pickle protocol >= 2 blob starts with the PROTO opcode (0x80). JSON objects start
 # with '{'. The two can never collide, which is what makes sniffing safe.
 _PICKLE_PROTO_OPCODE = 0x80
@@ -177,6 +181,19 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
                     raise EnvelopeDecodeError(f"{field} exceeds a double, got {value!r}") from exc
                 if not math.isfinite(as_double):
                     raise EnvelopeDecodeError(f"{field} must be finite, got {value!r}")
+                # Also bounded to int64, which is stricter than the TypeScript reader's
+                # Number.isFinite. Double-representability is not enough: 1e300 passed the
+                # check above and kept an exact 301-digit int, and no real watermark can
+                # ever satisfy `watermark_ms >= created_at_ms` against that -- so the entry
+                # became permanent and immune to invalidation, which is the one thing the
+                # watermark exists to prevent. Same bound the Go client applies.
+                #
+                # Nothing legitimate is excluded: int64 milliseconds runs to year ~292
+                # million, and all three writers stamp Date.now()-scale values. Being
+                # stricter than TypeScript is the safe direction -- an entry it writes and
+                # we reject is a miss that gets rewritten, not one served forever.
+                if not (_INT64_MIN <= value <= _INT64_MAX):
+                    raise EnvelopeDecodeError(f"{field} is outside int64, got {value!r}")
             encoding = envelope.get("encoding")
             if encoding == "base64":
                 # Normalize before decoding. Node's Buffer.from(x, "base64") accepts both

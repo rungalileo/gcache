@@ -58,6 +58,19 @@ class CacheController(CacheWrapper):
         super().__init__(cache_config_provider, cache)
         GCacheMetrics.initialize(metrics_prefix)
 
+    async def put(self, key: GCacheKey, value: Any) -> None:
+        """Write only if policy allows it, mirroring get.
+
+        Without this, CacheController inherits CacheWrapper.put and writes
+        unconditionally: a use case ramped to 0 -- the kill switch -- still gets written,
+        and so does one written outside an ``enable()`` block, while ``get`` on the same
+        key honours both. _should_cache also covers a config that omits this layer, whose
+        ttl_sec lookup would otherwise raise KeyError out of LocalCache.
+        """
+        if not await self._should_cache(key):
+            return
+        await self.wrapped.put(key, value)
+
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         if await self._should_cache(key):
             start_time = time.monotonic()

@@ -205,6 +205,17 @@ class GCacheKey:
         # decorator path, so coerce here too and let an unrecognized value raise.
         object.__setattr__(self, "envelope", Envelope(self.envelope))
 
+        # JSON framing carries a string payload, so it needs a serializer to produce one.
+        # cached() rejects this pair at decoration time; a key built directly -- for
+        # GCache.aget/aput -- was the one route left open, and it fails per request
+        # instead: the write raises inside RedisCache, gcache swallows it, Redis stays
+        # empty, and only a log line says cross-process sharing never happened.
+        if self.envelope is Envelope.JSON and self.serializer is None:
+            raise ValueError(
+                f"GCacheKey {self.key_type}:{self.id}#{self.use_case} uses Envelope.JSON, "
+                "which requires a serializer producing str or bytes (e.g. JsonSerializer())"
+            )
+
         # Compute prefix
         prefix = f"{self.key_type}:{self.id}"
         if _GLOBAL_GCACHE_STATE.urn_prefix:

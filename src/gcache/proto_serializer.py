@@ -1,7 +1,10 @@
 """Protobuf serializer for cache values shared with another language.
 
-Separate module so importing gcache never imports protobuf; the dependency is an
-optional extra (``pip install gcache[protobuf]``).
+protobuf is an optional extra (``pip install gcache[protobuf]``) and is imported inside
+``__init__`` rather than at module scope. gcache/__init__.py imports this module, so a
+module-scope import would pull protobuf -- roughly 30 ``google.*`` modules, including the
+``google._upb._message`` extension -- into every ``import gcache``, whether the caller
+uses this class or not.
 """
 
 from __future__ import annotations
@@ -12,13 +15,6 @@ from gcache.config import Serializer
 
 if TYPE_CHECKING:
     from google.protobuf.message import Message
-
-try:
-    from google.protobuf.json_format import MessageToJson, Parse
-
-    _PROTOBUF_IMPORT_ERROR: ImportError | None = None
-except ImportError as exc:  # pragma: no cover - exercised only without the extra
-    _PROTOBUF_IMPORT_ERROR = exc
 
 
 class ProtoJsonSerializer(Serializer):
@@ -39,15 +35,19 @@ class ProtoJsonSerializer(Serializer):
     """
 
     def __init__(self, message_type: type[Message]) -> None:
-        if _PROTOBUF_IMPORT_ERROR is not None:
-            raise RuntimeError("ProtoJsonSerializer needs: pip install 'gcache[protobuf]'") from _PROTOBUF_IMPORT_ERROR
+        try:
+            from google.protobuf.json_format import MessageToJson, Parse
+        except ImportError as exc:  # pragma: no cover - needs the extra uninstalled
+            raise RuntimeError("ProtoJsonSerializer needs: pip install 'gcache[protobuf]'") from exc
+        self._message_to_json = MessageToJson
+        self._parse = Parse
         self._message_type = message_type
 
     async def dump(self, obj: Any) -> str:
         if not isinstance(obj, self._message_type):
             # Otherwise MessageToJson raises an AttributeError naming neither type.
             raise TypeError(f"{type(self).__name__} expected {self._message_type.__name__}, got {type(obj).__name__}")
-        return MessageToJson(
+        return self._message_to_json(
             obj,
             # snake_case. Default is lowerCamelCase, which Go parses into a
             # zero-valued message rather than an error.
@@ -62,4 +62,4 @@ class ProtoJsonSerializer(Serializer):
         # Tolerate a field a newer writer added; the default raises, which would make
         # each pod generation reject the other's entries for a whole rolling deploy.
         # Matches Go's protojson.UnmarshalOptions{DiscardUnknown: true}.
-        return Parse(data, self._message_type(), ignore_unknown_fields=True)
+        return self._parse(data, self._message_type(), ignore_unknown_fields=True)

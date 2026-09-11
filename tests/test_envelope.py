@@ -516,9 +516,30 @@ def test_gcache_key_rejects_an_unrecognized_envelope() -> None:
         GCacheKey(key_type="Test", id="1", use_case="uc", envelope="jsn")  # type: ignore[arg-type]
 
     # A bare string is coerced, which is the point: the field stays typed Envelope because
-    # after __post_init__ it always is one.
-    coerced = GCacheKey(key_type="Test", id="1", use_case="uc", envelope="json")  # type: ignore[arg-type]
+    # after __post_init__ it always is one. A serializer is required alongside JSON, so
+    # one is passed here -- that rule has its own test below.
+    coerced = GCacheKey(
+        key_type="Test",
+        id="1",
+        use_case="uc",
+        envelope="json",  # type: ignore[arg-type]
+        serializer=JsonSerializer(),
+    )
     assert coerced.envelope is Envelope.JSON
+
+
+def test_gcache_key_rejects_json_without_a_serializer() -> None:
+    # JSON framing carries a string payload, so it needs a serializer to make one.
+    # cached() rejects the pair at decoration; a directly built key (GCache.aget/aput)
+    # was the one route left open, and it failed per request instead -- the write raised
+    # inside RedisCache, gcache swallowed it, and only a log line said the entry never
+    # landed. Pickle needs no serializer, so that pair stays legal.
+    from gcache.config import GCacheKey
+
+    with pytest.raises(ValueError, match="requires a serializer"):
+        GCacheKey(key_type="Test", id="1", use_case="uc", envelope=Envelope.JSON)
+
+    GCacheKey(key_type="Test", id="1", use_case="uc", envelope=Envelope.PICKLE)
 
 
 @pytest.mark.parametrize("field", ["createdAtMs", "expiresAtMs"])

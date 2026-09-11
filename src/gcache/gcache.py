@@ -414,9 +414,11 @@ class GCache:
 
             identity = await gcache.aget(key, _load)   # fetched is set only on a miss
 
-        :param key: Every component -- ``key_type``, ``id``, ``use_case``, ``envelope``,
-            ``serializer`` -- must match what the other language writes, or the two
-            occupy different key spaces and never hit.
+        :param key: ``key_type``, ``id``, ``args`` and ``use_case`` are the key space --
+            get any of them wrong and the two languages never see each other's entries.
+            ``envelope`` and ``serializer`` are NOT in the key, which is worse: both
+            clients then share one key with incompatible framing, so each overwrites the
+            other and neither can read what it finds.
         :param fallback: Async callable invoked on a miss to produce the value.
         :return: The cached value, or whatever ``fallback`` returned.
         """

@@ -140,3 +140,50 @@ async def test_invalidate_reaches_an_entry_written_by_aput(gcache: GCache, enabl
 
         assert await gcache.aget(key, load) == {"session_id": "fresh"}
         assert ran, "the invalidated entry must not have been served"
+
+
+@pytest.mark.asyncio
+async def test_aput_respects_a_ramped_down_use_case(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # A ramp of 0 is the kill switch for a use case. CacheController inherited an
+    # ungated put, so aput wrote anyway while aget on the same key honoured the ramp --
+    # one half of the API caching and the other half not.
+    off = GCacheKeyConfig.enabled(60)
+    for layer in CacheLayer:
+        off.ramp[layer] = 0
+    cache_config_provider.configs["off_uc"] = off
+
+    before = {k for k in redis_server.keys()}
+    with gcache.enable():
+        await gcache.aput(_key(use_case="off_uc"), {"session_id": "abc"})
+    assert {k for k in redis_server.keys()} == before, "a ramped-down use case must not be written"
+
+
+@pytest.mark.asyncio
+async def test_aput_writes_nothing_outside_an_enable_block(
+    gcache: GCache, redis_server: redislite.Redis, enabled_uc: None
+) -> None:
+    # Same asymmetry from the other direction: the context switch gates reads, so it
+    # has to gate writes.
+    before = {k for k in redis_server.keys()}
+    await gcache.aput(_key(), {"session_id": "abc"})
+    assert {k for k in redis_server.keys()} == before, "aput outside enable() must not write"
+
+
+@pytest.mark.asyncio
+async def test_aput_survives_a_config_that_omits_the_local_layer(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # LocalCache reads config.ttl_sec[LOCAL] to size its TTLCache, so a config naming
+    # only REMOTE raised KeyError straight out of aput. _should_cache now screens it.
+    remote_only = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: 60}, ramp={CacheLayer.REMOTE: 100})
+    cache_config_provider.configs["remote_only_uc"] = remote_only
+
+    with gcache.enable():
+        await gcache.aput(_key(use_case="remote_only_uc"), {"session_id": "abc"})
+
+        async def must_not_run() -> dict:
+            raise AssertionError("the remote layer should have served this")
+
+        assert await gcache.aget(_key(use_case="remote_only_uc"), must_not_run) == {"session_id": "abc"}

@@ -61,6 +61,19 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
+      # Small companion to the full corpus so the aggregate can retain the
+      # TypeScript completion without downloading every generated history.
+      - name: Preserve TypeScript completion evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: typescript-completion-evidence
+          path: |
+            .formal-traces/ts-completion.json
+            .formal-traces/ts-context.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
 
   symbolic:
     runs-on: ubuntu-latest
@@ -86,7 +99,8 @@ jobs:
   typescript-mutations:
     needs: corpus
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Run 34646653122 took 17 minutes; leave headroom for corpus growth.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
@@ -138,7 +152,8 @@ jobs:
   go-mutations:
     needs: [corpus, go-parity]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Run 34646653122 took 22.5 minutes; leave headroom for corpus growth.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
@@ -171,6 +186,53 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Long-retention summary: completion/context reports and the symbolic and
+      # exploration reports, without the multi-hundred-megabyte trace corpus.
+      # Each download tolerates a missing artifact from a job that failed early.
+      - name: Collect TypeScript completion evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: typescript-completion-evidence
+          path: formal-summary/typescript
+      - name: Collect Go completion evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: go-parity-evidence
+          path: formal-summary/go
+      - name: Collect symbolic verification report
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-symbolic
+          path: formal-summary/symbolic
+      - name: Collect exploration report
+        if: always() && (github.event_name == 'schedule' || inputs.exploration == true)
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-exploration
+          path: formal-summary/exploration
+      - name: Preserve the long-retention summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-summary
+          path: |
+            formal-summary/typescript/ts-completion.json
+            formal-summary/typescript/ts-context.json
+            formal-summary/go/go-completion.json
+            formal-summary/go/go-context.json
+            formal-summary/go/go-replay-summary.json
+            formal-summary/symbolic/report.json
+            formal-summary/exploration/*/report.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 90
       - name: Require the complete corpus, both ports and both mutation measurements
         env:
           CORPUS_RESULT: ${{ needs.corpus.result }}

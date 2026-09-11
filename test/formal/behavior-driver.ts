@@ -128,7 +128,12 @@ export class BehaviorDriver {
   readonly redis: FakeRedis;
   readonly cache: DialCache;
 
-  constructor(private readonly fixture: Fixture, private readonly overrides: DialCacheConfig = {}) {
+  // `settle: false` is a harness control only: it skips the end-of-apply
+  // drain that implements the causally-ready-v1 settlement contract so a
+  // control test can prove the replays depend on it. Conformance replays
+  // must never pass this option.
+  constructor(private readonly fixture: Fixture, private readonly overrides: DialCacheConfig = {},
+    private readonly harness: { settle?: boolean } = {}) {
     this.observed = emptyObservation(fixture);
     if (fixture.localFaultInjection) {
       // Native binding for the model's fallible local-storage boundary. These
@@ -413,7 +418,7 @@ export class BehaviorDriver {
     }
     // Drain ready executor work while unresolved external gates remain held.
     // No guessed number of Promise turns and no advancing deadline time.
-    await vi.advanceTimersByTimeAsync(0);
+    if (this.harness.settle !== false) await vi.advanceTimersByTimeAsync(0);
     assertPublicationCausality(this.causalHistory);
   }
 

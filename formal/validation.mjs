@@ -145,6 +145,9 @@ export function checkPrerequisites(target, { directory = root, environment = pro
   if (targets.includes('model-check')) {
     const version = probe('java', ['--version'], { directory, environment });
     if (!/^(?:openjdk|java) 21(?:\.|\s)/.test(version)) throw new Error(`Symbolic checking requires Java 21; found ${version.split('\n')[0]}. Put Java 21 on PATH.`);
+    // The pinned Apalache distribution is unpacked from a checksummed tarball.
+    try { probe('tar', ['--version'], { directory, environment }); }
+    catch (error) { throw new Error(`Symbolic checking requires tar to unpack the pinned Apalache archive. ${error.message}`); }
   }
   if (targets.some(name => name.startsWith('integration-'))) probe('docker', ['info', '--format', '{{.ServerVersion}}'], { directory, environment });
   if (targets.includes('package-floor')) {
@@ -155,64 +158,86 @@ export function checkPrerequisites(target, { directory = root, environment = pro
   }
 }
 
+// Scan rather than only tail: a failed subtest can precede many passes.
+// Retained lines and printed text stay bounded even for malformed or
+// oversized JSONL. Each failure receives its own budget (a header plus the
+// last lines buffered for that test), so one noisy failure cannot starve the
+// others; failures beyond the cap are counted rather than dropped silently.
+const excerptLimits = { failures: 24, bufferLines: 40, tailLines: 20, pendingTests: 64, line: 32 * 1024, output: 12 * 1024 };
+const crashMarker = /(?:--- FAIL:|panic:|fatal error:|DATA RACE)/;
+async function failureExcerpt(path) {
+  const { createReadStream } = await import('node:fs');
+  const selected = [], tail = [], pending = new Map();
+  let line = '', truncated = false, failures = 0;
+  const clip = text => text.length > 2048 ? `${text.slice(0, 2048)} … [line truncated]` : text;
+  const consume = raw => {
+    let event;
+    try { event = JSON.parse(raw); } catch { /* Plain or truncated report line. */ }
+    if (typeof event !== 'object' || event === null) event = undefined;
+    // Go 1.24+ reports compiler diagnostics as build-output/build-fail events
+    // keyed by ImportPath; older releases only had Test/Package.
+    const key = event?.Test ?? event?.Package ?? event?.ImportPath ?? 'native process';
+    const action = event?.Action;
+    const hasOutput = typeof event?.Output === 'string';
+    let text;
+    if (event === undefined) text = raw;
+    else if (hasOutput) text = event.Output.trimEnd();
+    // Bare lifecycle events carry no diagnostic text: name the failures, skip the rest.
+    else if (action === 'fail' || action === 'build-fail') text = `[${action} ${key}]`;
+    else return;
+    if (!text.trim()) return;
+    tail.push(clip(text));
+    if (tail.length > excerptLimits.tailLines) tail.shift();
+    if (action === 'output' || action === 'build-output') {
+      // Ordinary buffers keep their most recent lines. A race report is long
+      // and its head names the conflicting accesses, so the marker anchors the
+      // buffer: later lines are counted instead of evicting the head.
+      const buffer = /WARNING: DATA RACE/.test(text) ? { lines: [], anchored: true, omitted: 0 }
+        : pending.get(key) ?? { lines: [], anchored: false, omitted: 0 };
+      if (buffer.lines.length < excerptLimits.bufferLines) buffer.lines.push(clip(text));
+      else if (buffer.anchored) buffer.omitted++;
+      else { buffer.lines.shift(); buffer.lines.push(clip(text)); }
+      pending.delete(key); pending.set(key, buffer);
+      if (pending.size > excerptLimits.pendingTests) pending.delete(pending.keys().next().value);
+    }
+    if (action === 'fail' || action === 'build-fail') {
+      failures++;
+      if (failures <= excerptLimits.failures) {
+        const buffer = pending.get(key);
+        selected.push(`Failed: ${key}`, ...(buffer?.lines ?? []));
+        if (buffer?.omitted) selected.push(`… ${buffer.omitted} more lines for ${key}`);
+      }
+      pending.delete(key);
+    } else if (action === 'pass' || action === 'skip') pending.delete(key);
+    // Crashes may prevent a final Go fail event; plain/truncated lines still
+    // expose the diagnostic instead of turning the excerpt into a JSON dump.
+    // Output belonging to a test is attributed through its fail event only,
+    // so a passing test that merely prints "panic:" is not selected.
+    if (event === undefined && crashMarker.test(text) && selected.length < excerptLimits.failures * excerptLimits.bufferLines) selected.push(clip(text));
+  };
+  for await (const chunk of createReadStream(path, { encoding: 'utf8', highWaterMark: 64 * 1024 })) {
+    let start = 0;
+    for (let end = chunk.indexOf('\n', start); end !== -1; end = chunk.indexOf('\n', start)) {
+      const part = chunk.slice(start, end);
+      truncated ||= line.length + part.length > excerptLimits.line;
+      line += part.slice(0, Math.max(0, excerptLimits.line - line.length));
+      consume(line + (truncated ? ' … [line truncated]' : ''));
+      line = ''; truncated = false; start = end + 1;
+    }
+    const part = chunk.slice(start);
+    truncated ||= line.length + part.length > excerptLimits.line;
+    line += part.slice(0, Math.max(0, excerptLimits.line - line.length));
+  }
+  if (line || truncated) consume(line + (truncated ? ' … [line truncated]' : ''));
+  if (failures > excerptLimits.failures) selected.push(`… ${failures - excerptLimits.failures} more failed tests`);
+  const excerpt = (selected.length ? selected : tail).join('\n');
+  return excerpt.length > excerptLimits.output ? `${excerpt.slice(0, excerptLimits.output)}\n… [diagnostics truncated]` : excerpt;
+}
+
 // No shell pipeline: each child exit status is checked before the next step.
 // Native JSON reports go directly to files, avoiding enormous CI log streams.
 export async function executeSteps(steps, { directory = root, environment = process.env, log = message => console.log(message) } = {}) {
   const baseEnvironment = cleanEnvironment(environment);
-  const failureExcerpt = async path => {
-    // Scan rather than only tail: a failed subtest can precede many passes.
-    // Bound retained lines and printed text even for malformed/oversized JSONL.
-    const { createReadStream } = await import('node:fs');
-    const selected = [], tail = [], pending = new Map();
-    const lineLimit = 32 * 1024, outputLimit = 12 * 1024;
-    let line = '', truncated = false;
-    const keep = (target, text) => {
-      target.push(text.length > 2048 ? `${text.slice(0, 2048)} … [line truncated]` : text);
-      if (target === tail && tail.length > 20) tail.shift();
-    };
-    const consume = raw => {
-      let event;
-      try { event = JSON.parse(raw); } catch { /* Plain or truncated report line. */ }
-      const text = typeof event?.Output === 'string' ? event.Output.trimEnd() : raw;
-      if (!text.trim()) return;
-      keep(tail, text);
-      const key = event?.Test ?? event?.Package ?? 'native process';
-      if (event?.Action === 'output') {
-        const lines = pending.get(key) ?? [];
-        keep(lines, text);
-        if (lines.length > 12) lines.shift();
-        pending.delete(key); pending.set(key, lines);
-        if (pending.size > 64) pending.delete(pending.keys().next().value);
-      }
-      if (event?.Action === 'fail' || event?.Action === 'build-fail') {
-        if (selected.length < 24) {
-          keep(selected, `Failed: ${key}`);
-          for (const text of pending.get(key) ?? []) if (selected.length < 24) keep(selected, text);
-        }
-        pending.delete(key);
-      } else if (event?.Action === 'pass') pending.delete(key);
-      // Crashes may prevent a final Go fail event; plain/truncated lines still
-      // expose the diagnostic instead of turning the excerpt into a JSON dump.
-      if (selected.length < 24 && /(?:--- FAIL:|panic:|fatal error:|DATA RACE)/.test(text)
-          && event?.Action !== 'output') keep(selected, text);
-    };
-    for await (const chunk of createReadStream(path, { encoding: 'utf8', highWaterMark: 64 * 1024 })) {
-      let start = 0;
-      for (let end = chunk.indexOf('\n', start); end !== -1; end = chunk.indexOf('\n', start)) {
-        const part = chunk.slice(start, end);
-        truncated ||= line.length + part.length > lineLimit;
-        line += part.slice(0, Math.max(0, lineLimit - line.length));
-        consume(line + (truncated ? ' … [line truncated]' : ''));
-        line = ''; truncated = false; start = end + 1;
-      }
-      const part = chunk.slice(start);
-      truncated ||= line.length + part.length > lineLimit;
-      line += part.slice(0, Math.max(0, lineLimit - line.length));
-    }
-    if (line || truncated) consume(line + (truncated ? ' … [line truncated]' : ''));
-    const excerpt = (selected.length ? selected : tail).join('\n');
-    return excerpt.length > outputLimit ? `${excerpt.slice(0, outputLimit)}\n… [diagnostics truncated]` : excerpt;
-  };
   for (const step of steps) {
     log(`→ ${step.label}`);
     if (step.remove) {
@@ -272,7 +297,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (extra.length) throw new Error('Use node formal/validation.mjs <target>; run make help for targets.');
   if (target === 'help') {
     console.log(Object.entries(targetDescriptions).map(([name, description]) => `make ${name.padEnd(17)} ${description}`).join('\n'));
-    console.log('\nPrerequisites: frozen pnpm install; Node 24, pinned pnpm; Go 1.27.1 / Quint 0.32.0 / Docker where required.');
+    console.log('\nPrerequisites: frozen pnpm install; Node 24, pinned pnpm; Go 1.27.1 / Quint 0.32.0 / Docker where required; Java 21 and tar for model-check and ci.');
     console.log('Full local CI: make ci NODE22_BIN=/absolute/path/to/node22/bin/node (exact 22.15.0).');
   } else {
     try { await runTarget(target); }

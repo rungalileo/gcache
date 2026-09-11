@@ -3303,6 +3303,12 @@
       "scope": "Two enabled local calls around an external source update return the original value with one local source execution in the introductory profile. No request-memo warming claim."
     },
     {
+      "case": "C05.local-hit-stops-traversal",
+      "reference": "formal/dialcache-conformance.qnt:servedLayerValueMatchesCache",
+      "kind": "invariant",
+      "scope": "After each public local, coalesced or remote call in the introductory profile, the served layer holds exactly the returned value and a semantic miss leaves that layer readable. The receipt reads the input record, not the transition helpers; it makes no claim about request-memo warming or remote read counts."
+    },
+    {
       "case": "C11.one-registered-flight",
       "reference": "formal/dialcache-conformance.qnt:coalescedPairPublishesOneReusableValueTest",
       "kind": "regression",

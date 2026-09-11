@@ -187,6 +187,16 @@ module dialcache_conformance {
 
   val readableRemoteHasValue =
     not(s.remoteReadable) or s.remoteValue > 0
+
+  // Receipt over the last public call: a served layer holds exactly the value
+  // it returned, so a hit can neither bypass its cache nor return a value the
+  // layer never stored, and a semantic miss leaves the layer readable for the
+  // next call. Stated over the input record, not the transitions.
+  val servedLayerValueMatchesCache = and {
+    input.name != "localCall" or (s.localCached and s.lastResult == s.localValue),
+    input.name != "coalescedLocalPair" or (s.coalescedCached and s.lastResult == s.coalescedValue),
+    input.name != "remoteCall" or (s.remoteReadable and s.lastResult == s.remoteValue),
+  }
   // Public sequences keep the introductory behaviors executable in every port.
   run disabledAndRequestCallsKeepTheirOwnLifetimesTest = init
     .then(outsideCall).then(requestLocalPair).then(bumpSource)

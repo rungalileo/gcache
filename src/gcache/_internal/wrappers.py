@@ -217,6 +217,12 @@ class CacheChain(CacheWrapper):
         for another PROCESS, which a local-only write cannot do.
 
         Both layers are attempted even if one fails; the first error is re-raised.
+
+        "Fails" means Exception. asyncio.CancelledError is a BaseException and deliberately
+        propagates on the spot, leaving the remote write undone -- prompt cancellation is
+        the correct behaviour when the caller is already gone, and suppressing it to finish
+        a best-effort write would delay it. The layers are then in the same state a remote
+        failure leaves them in.
         """
         first_error: Exception | None = None
         for cache in (self.wrapped, self.fallback_cache):

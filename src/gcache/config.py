@@ -1,7 +1,7 @@
 import asyncio
 import json
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger, LoggerAdapter
@@ -206,7 +206,10 @@ class GCacheKey:
     key_type: str
     id: str
     use_case: str
-    args: list[tuple[str, str]] = field(default_factory=list)
+    # Normalized to a tuple in __post_init__. The dataclass is frozen, but a list field
+    # makes that a lie for the one field the urn is built from: key.args.append(...) left
+    # the rendered urn -- and therefore the Redis key and this object's identity -- stale.
+    args: Sequence[tuple[str, str]] = field(default_factory=tuple)
     invalidation_tracking: bool = False
     default_config: GCacheKeyConfig | None = None
     serializer: Serializer | None = None
@@ -221,6 +224,8 @@ class GCacheKey:
     # Cached computed fields (set in __post_init__)
     prefix: str = field(init=False)
     urn: str = field(init=False)
+    # The GCache urn_prefix in force when this key was built; see __post_init__.
+    urn_prefix: str = field(init=False)
 
     def __post_init__(self) -> None:
         # GCacheKey is public API, and only GCache.cached coerced this. A caller building a
@@ -249,6 +254,8 @@ class GCacheKey:
         if self.use_case == "watermark":
             raise UseCaseNameIsReserved()
 
+        object.__setattr__(self, "args", tuple(self.args))
+
         # Compute prefix
         prefix = f"{self.key_type}:{self.id}"
         if _GLOBAL_GCACHE_STATE.urn_prefix:
@@ -262,6 +269,13 @@ class GCacheKey:
         if self.args:
             args_str = "?" + "&".join([f"{arg[0]}={arg[1]}" for arg in self.args])
         object.__setattr__(self, "urn", f"{prefix}{args_str}#{self.use_case}")
+
+        # The prefix is global mutable state that GCache() sets from its config, so a key
+        # built before then captures the DEFAULT namespace while invalidate() uses the
+        # configured one -- the watermark and the value land in different namespaces (and
+        # different cluster hash slots), so tracked invalidation silently does nothing.
+        # Recorded here and checked at use; see GCache._check_direct_key.
+        object.__setattr__(self, "urn_prefix", _GLOBAL_GCACHE_STATE.urn_prefix)
 
     # Identity IS the rendered urn, which is the Redis key. urn is precomputed in
     # __post_init__, so this allocates nothing.

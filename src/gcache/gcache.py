@@ -25,6 +25,7 @@ from gcache.config import (
 from gcache.exceptions import (
     EnvelopeMismatchWithRegisteredUseCase,
     GCacheAlreadyInstantiated,
+    GCacheKeyPrefixMismatch,
     KeyArgDoesNotExist,
     RedisConfigConflict,
     ReentrantSyncFunctionDetected,
@@ -412,6 +413,16 @@ class GCache:
         declared = self._use_case_registry.get(key.use_case)
         if declared is not None and declared != key.envelope:
             raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
+
+        # A key built BEFORE GCache() ran captured the default urn_prefix, while
+        # ainvalidate uses the configured one -- so the value and its watermark land in
+        # different namespaces (and different cluster hash slots) and tracked invalidation
+        # silently does nothing. Checked here rather than forbidden at construction: a
+        # module-level key constant is the natural thing to write and the only thing that
+        # reaches this state.
+        live = _GLOBAL_GCACHE_STATE.urn_prefix
+        if key.urn_prefix != live:
+            raise GCacheKeyPrefixMismatch(key.use_case, key.urn_prefix, live)
 
     async def aget(self, key: GCacheKey, fallback: Fallback) -> Any:
         """

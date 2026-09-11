@@ -350,3 +350,50 @@ async def test_a_disabled_context_is_counted_not_silent(gcache: GCache, enabled_
     before = disabled_count()
     await gcache.aput(_key(), {"session_id": "abc"})  # no enable() block
     assert disabled_count() > before, "a disabled context must be counted, not silently skipped"
+
+
+def test_args_are_frozen_so_the_urn_cannot_go_stale() -> None:
+    # GCacheKey is frozen=True, but args was a LIST -- so key.args.append(...) left the
+    # rendered urn (the Redis key, and now this object's identity) describing the
+    # pre-mutation args. Normalising to a tuple makes the freeze real.
+    key = GCacheKey(
+        key_type="session_id",
+        id="p:r:s",
+        use_case="direct_uc",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+        args=[("a", "1")],
+    )
+    assert isinstance(key.args, tuple)
+    with pytest.raises(AttributeError):
+        key.args.append(("b", "2"))  # type: ignore[attr-defined]
+    assert key.urn.endswith("?a=1#direct_uc")
+
+
+@pytest.mark.asyncio
+async def test_a_key_built_before_gcache_is_rejected(gcache: GCache, enabled_uc: None) -> None:
+    # The prefix is global state GCache() sets from its config, so a module-level key
+    # constant captures the DEFAULT namespace while ainvalidate uses the configured one:
+    # the value and its watermark land in different namespaces and different cluster hash
+    # slots, and tracked invalidation silently does nothing.
+    from gcache._internal.state import _GLOBAL_GCACHE_STATE
+    from gcache.exceptions import GCacheKeyPrefixMismatch
+
+    stale = GCacheKey(
+        key_type="session_id",
+        id="p:r:s",
+        use_case="direct_uc",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+        invalidation_tracking=True,
+    )
+    object.__setattr__(stale, "urn_prefix", _GLOBAL_GCACHE_STATE.urn_prefix + ":stale")
+
+    async def load() -> dict:
+        return {"session_id": "abc"}
+
+    with gcache.enable():
+        with pytest.raises(GCacheKeyPrefixMismatch):
+            await gcache.aget(stale, load)
+        with pytest.raises(GCacheKeyPrefixMismatch):
+            await gcache.aput(stale, {"session_id": "abc"})

@@ -52,6 +52,18 @@ class UseCaseNameIsReserved(GCacheError):
         super().__init__("Use case name is reserved.")
 
 
+class GCacheKeyPrefixMismatch(GCacheError):
+    """A key was built under a different urn_prefix than the one now in force."""
+
+    def __init__(self, use_case: str, key_prefix: str, live_prefix: str) -> None:
+        super().__init__(
+            f"use case {use_case!r}: key was built with urn_prefix {key_prefix!r} but "
+            f"{live_prefix!r} is in force. Build GCacheKeys after GCache() -- a key built "
+            "earlier renders a value key in one namespace while invalidation writes its "
+            "watermark in another, so invalidation silently does nothing."
+        )
+
+
 class EnvelopeMismatchWithRegisteredUseCase(GCacheError):
     """A direct key contradicts the envelope a @cached decorator declared for the same use case."""
 

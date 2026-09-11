@@ -24,6 +24,15 @@ classifiers = [
 ]
 dynamic = ["dependencies"]
 
+# protobuf is optional on purpose. Only callers using ProtoJsonSerializer need
+# it, and gcache is a widely-imported library -- forcing a protobuf runtime on
+# every consumer to serve a minority of them is the wrong trade. The range is
+# wide because the caller's own protobuf pin, not gcache's, has to win: the
+# generated *_pb2 modules assert against the runtime version they were built
+# with, so a narrow pin here would fight that.
+[project.optional-dependencies]
+protobuf = ["protobuf>=5.0.0,<8.0.0"]
+
 [project.urls]
 homepage = "https://github.com/rungalileo/gcache"
 repository = "https://github.com/rungalileo/gcache"
@@ -39,6 +48,7 @@ uvloop = ">=0.21.0,<1.0.0"
 
 
 [tool.poetry.group.test.dependencies]
+protobuf = ">=5.0.0,<8.0.0"
 pytest = "^8.4.1"
 pytest-xdist = "^3.6.1"
 coverage = "^7.13.5"

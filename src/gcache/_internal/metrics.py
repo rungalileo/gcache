@@ -9,6 +9,7 @@ class GCacheMetrics:
     # Counters
     DISABLED_COUNTER: Counter
     MISS_COUNTER: Counter
+    DEGRADED_READ_COUNTER: Counter
     REQUEST_COUNTER: Counter
     ERROR_COUNTER: Counter
     INVALIDATION_COUNTER: Counter
@@ -35,6 +36,16 @@ class GCacheMetrics:
             name=prefix + "gcache_miss_counter",
             labelnames=["use_case", "key_type", "layer"],
             documentation="Cache miss counter",
+        )
+
+        cls.DEGRADED_READ_COUNTER = Counter(
+            name=prefix + "gcache_degraded_read_counter",
+            labelnames=["use_case", "key_type", "layer", "reason"],
+            documentation=(
+                "Reads that found an entry but could not use it. These also raise the miss "
+                "counter via the fallback, so without this a corrupt or foreign entry is "
+                "indistinguishable from an ordinary miss on a dashboard."
+            ),
         )
 
         cls.REQUEST_COUNTER = Counter(

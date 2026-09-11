@@ -50,3 +50,55 @@ class MissingKeyConfig(GCacheError):
 class UseCaseNameIsReserved(GCacheError):
     def __init__(self) -> None:
         super().__init__("Use case name is reserved.")
+
+
+class GCacheKeyPrefixMismatch(GCacheError):
+    """A key was built under a different urn_prefix than the one now in force."""
+
+    def __init__(self, use_case: str, key_prefix: str, live_prefix: str) -> None:
+        super().__init__(
+            f"use case {use_case!r}: key was built with urn_prefix {key_prefix!r} but "
+            f"{live_prefix!r} is in force. Build GCacheKeys after GCache() -- a key built "
+            "earlier renders a value key in one namespace while invalidation writes its "
+            "watermark in another, so invalidation silently does nothing."
+        )
+
+
+class JsonEnvelopeRequiresSerializer(GCacheError, ValueError):
+    """Envelope.JSON was declared with no Serializer to produce its string payload.
+
+    Also a ValueError, so it stays catchable the same way as the Envelope coercion two
+    lines above it in __post_init__ -- a caller validating key construction should not
+    need to know which of the two adjacent failures it hit.
+    """
+
+    def __init__(self, key_type: str, id: str, use_case: str) -> None:
+        super().__init__(
+            f"GCacheKey {key_type}:{id}#{use_case} uses Envelope.JSON, which requires a "
+            "serializer producing str or bytes (e.g. JsonSerializer())"
+        )
+
+
+class SerializerMismatchWithRegisteredUseCase(GCacheError):
+    """A direct key's serializer contradicts the one a @cached decorator declared."""
+
+    def __init__(self, use_case: str, declared: object, given: object) -> None:
+        def name(v: object) -> str:
+            return "no serializer" if v is None else type(v).__name__
+
+        super().__init__(
+            f"use case {use_case!r} is registered with {name(declared)}, but this key "
+            f"declares {name(given)}. They render the same Redis key, so one side would "
+            "hand the other a raw payload string where it expected its own type -- with "
+            "nothing raised, logged or counted."
+        )
+
+
+class EnvelopeMismatchWithRegisteredUseCase(GCacheError):
+    """A direct key contradicts the envelope a @cached decorator declared for the same use case."""
+
+    def __init__(self, use_case: str, declared: object, given: object) -> None:
+        super().__init__(
+            f"use case {use_case!r} is registered with {declared}, but this key declares {given}. "
+            "They render the same Redis key, so the two framings would overwrite each other."
+        )

@@ -9,11 +9,14 @@ gcache is a fine-grained caching library with multi-layer support (local + Redis
 ```
 src/gcache/
 ├── __init__.py              # Public API exports
-├── config.py                # GCacheKey, GCacheKeyConfig, GCacheConfig, RedisConfig, Serializer
+├── config.py                # GCacheKey, GCacheKeyConfig, GCacheConfig, RedisConfig, Envelope,
+│                            #   Serializer, JsonSerializer, Fallback
 ├── exceptions.py            # All exception classes
-├── gcache.py                # GCache main class and @cached decorator
+├── gcache.py                # GCache main class, @cached decorator, aget/aput direct keys
+├── proto_serializer.py      # ProtoJsonSerializer (protobuf extra; imported lazily)
 └── _internal/               # Implementation details (not public API)
     ├── constants.py         # Named constants (cache sizes, TTLs, thresholds)
+    ├── envelope.py          # Value framing: pickle vs the cross-language JSON envelope
     ├── event_loop_thread.py # EventLoopThread, EventLoopThreadPool
     ├── local_cache.py       # LocalCache (TTLCache-based)
     ├── metrics.py           # GCacheMetrics (Prometheus)
@@ -60,7 +63,7 @@ poetry run pytest tests/
 ## Common Gotchas
 
 - GCache is singleton - second instantiation raises `GCacheAlreadyInstantiated`
-- "watermark" is reserved use_case name
+- "watermark" is reserved use_case name - rejected by both `@cached` and `GCacheKey`
 - Local cache cannot be invalidated across instances (TTL-only)
 - `WATERMARK_TTL_SECONDS` (4 hours) must exceed your longest cache TTL for invalidation to work
 - uvloop is optional - falls back to asyncio on Windows/PyPy
@@ -68,4 +71,4 @@ poetry run pytest tests/
 ## Dependencies
 
 Core: pydantic, prometheus-client, cachetools, redis
-Optional: uvloop
+Optional: uvloop; protobuf (extra `protobuf`, needed only for `ProtoJsonSerializer`)

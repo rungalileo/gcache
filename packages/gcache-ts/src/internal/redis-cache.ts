@@ -99,7 +99,17 @@ export class RedisCache {
     try {
       envelope = this.parseEnvelope(raw);
     } catch {
-      await client.del(redisKey);
+      // Deliberately NOT deleting. This branch means "these bytes are not an envelope I
+      // understand", which is not the same as "these bytes are junk": the Python and Go
+      // clients share this keyspace and the Python default is still a pickle envelope,
+      // which never parses here.
+      //
+      // Note what this does NOT fix. The miss still reaches gcache.ts, which calls
+      // redisCache.put and overwrites the key with a JSON envelope, so a foreign entry does
+      // not survive an ordinary read and the two clients still overwrite each other. What
+      // dropping the delete buys is narrower: one less Redis round trip, and the entry does
+      // survive when skipCacheWrite suppresses the write-back. Ending the overwriting needs
+      // the key-space split fixed, which is tracked separately.
       return { status: "miss", config: layerConfig.config, ...(watermarkIsActive(watermarkMs) ? { skipCacheWrite: true } : {}) };
     }
     if (envelope.expiresAtMs <= Date.now()) {

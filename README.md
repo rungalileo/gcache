@@ -247,6 +247,172 @@ def get_org_settings(org_id: str) -> dict:  # No async needed
 
 Under the hood, sync functions run through a thread pool to avoid blocking the event loop. This adds some overhead, so **prefer async functions when possible** for better performance.
 
+### Sharing a Cache With Other Languages
+
+By default a value is stored as a Python pickle, which only Python can read. `envelope=`
+switches to a JSON framing that the TypeScript and Go clients also understand, so all three
+can share one entry and one invalidation:
+
+```python
+from gcache import Envelope, JsonSerializer
+
+@gcache.cached(
+    key_type="session_id",
+    id_arg="session_id",
+    use_case="session-identity",
+    envelope=Envelope.JSON,
+    serializer=JsonSerializer(),   # required: JSON carries a serialized payload
+    track_for_invalidation=True,   # so another language's invalidation reaches this entry
+)
+async def get_session(session_id: str) -> dict:
+    return await db.fetch(session_id)
+```
+
+Four constraints:
+
+- **Only JSON-representable values.** The payload is a string on the wire, so the serializer
+  has to be able to produce and restore one. `JsonSerializer` covers dicts, lists and
+  scalars; anything else needs your own `Serializer`.
+- **`serializer=` is the same trap.** Adding one to a live use case is undetectable in a
+  pickle envelope: a pod on the older code hands the raw serialized payload back to its
+  caller instead of the value, with nothing logged. The JSON case *is* caught — the reader
+  knows it needs a serializer and treats the entry as a miss — but the pickle one cannot be.
+  New `use_case` for that too.
+- **TypeScript interop is broken today, and the prefix is why.** `gcache-ts` percent-encodes
+  *every* component — `joinUrnComponents` maps all of them through `encodeURIComponent`
+  (`packages/gcache-ts/src/key.ts:73`) — while Python interpolates raw. A `use_case` like
+  `SessionService::identity` renders as `SessionService%3A%3Aidentity` there, and the same
+  applies to `urn_prefix`, which is the part that makes this unavoidable rather than
+  avoidable: a namespaced prefix is the normal case and contains colons. This repo's own
+  fixture uses `urn:galileo:test`, and orbit uses `urn:galileo:<customer>`.
+
+      Python      urn:galileo:test:kt:id
+      TypeScript  urn%3Agalileo%3Atest:kt:id
+
+  So there is no configuration of key components that makes the two share a key space —
+  zero sharing, no error, for every key. Keeping a `use_case` URL-safe is not sufficient;
+  the prefix would have to be too, and a colon-free prefix defeats the namespacing it
+  exists for. Unifying the encoding is the only real fix. Go and Python agree today.
+- **Never flip this on a live use case.** A rolling deploy runs both pod generations at
+  once: an old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle
+  over it, and a new pod refuses that pickle and writes JSON again. Each destroys the
+  framing the other needs, so the key's hit rate sits near zero for the whole rollout.
+  Migrate under a **new `use_case`** — the two generations then use different keys and never
+  fight.
+
+Reads sniff the framing they actually find rather than trusting `envelope=`, so a JSON key
+reads a JSON entry whoever wrote it. The one exception is that a JSON key refuses to
+unpickle: unpickling executes arbitrary code, and the reader cannot tell a migration
+leftover from a payload injected by anyone with keyspace access.
+
+Note that `track_for_invalidation=True` only reaches the Redis layer. `LocalCache` does not
+consult watermarks, so an invalidation from another language does not clear a Python pod's
+in-process copy until its local TTL expires — keep the local TTL short (or the local ramp at
+0) for a use case shared across languages.
+
+#### Reading and writing one key directly
+
+`@cached` fits whenever the value is a pure function of a call's arguments. A shared cache
+often is not: the key comes from data that is nobody's parameter, and the value is something
+the caller already fetched. `aget`/`aput` (and their sync `get`/`put`) take a key you build:
+
+```python
+from gcache import Envelope, GCacheKey, JsonSerializer
+
+def identity_key(project_id: str, session_id: str) -> GCacheKey:
+    return GCacheKey(
+        key_type="session_id",
+        id=f"{project_id}:{session_id}",
+        use_case="session-identity",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+        invalidation_tracking=True,
+    )
+
+# Read. The fallback runs only on a miss, so the caller can reuse whatever it fetched --
+# a plain get would make it read its source of truth twice.
+async def resolve(project_id: str, session_id: str) -> dict:
+    fetched: dict | None = None
+
+    async def load() -> dict:
+        nonlocal fetched
+        fetched = await db.fetch_session(project_id, session_id)
+        return fetched
+
+    with gcache.enable():
+        return await gcache.aget(identity_key(project_id, session_id), load)
+
+# Write. For priming an entry ANOTHER process will read, when this one already has the
+# value and does not want the read that would otherwise populate it.
+with gcache.enable():
+    await gcache.aput(identity_key(project_id, session_id), {"session_id": session_id})
+```
+
+Both honour `enable()` and the use case's ramp, exactly as the decorator does — a write
+outside an `enable()` block, or for a use case ramped to 0, does nothing.
+
+Three things to know:
+
+- **`envelope` and `serializer` are not part of the key.** `key_type`, `id`, `args` and
+  `use_case` are, so getting one of those wrong just means the two participants never see
+  each other's entries. Getting the envelope wrong is worse: both then share one key with
+  incompatible framing, each overwrites the other, and neither can read what it finds. Within
+  one process the library now catches it — a direct key whose envelope contradicts a
+  `@cached` declaration on the same `use_case` raises — but across languages it cannot.
+- **`aput` raises on a cache-layer failure**, unlike a read. That matches `adelete` and
+  `ainvalidate`. "Prime" reads as best-effort, so a caller on a request path should decide
+  what to do with a Redis timeout rather than let it propagate.
+- **A prime is sampled by the ramp, like a read.** `_should_cache` calls `random()` per
+  invocation, per layer, so a use case at ramp 50 drops about half its primes and `aput`
+  still returns normally. On a read that costs one uncached call; on a prime it throws away
+  work already done and the entry another process waits for never appears. Ramp a shared
+  use case to 100 or 0, not through the middle.
+- **A prime inside an active invalidation window is lost silently — on the Redis layer.**
+  The entry is written with `createdAtMs` below the watermark, so remote reads find it stale
+  until the window closes and a read rewrites it. That is the invalidation doing its job, but
+  `aput` still returns normally. Go behaves the same way; the TypeScript client returns
+  `false` here. The **local** layer never reads watermarks, so a later `aget` in the same
+  process returns the primed value regardless — keep the local ramp at 0 for a shared use
+  case, as above.
+
+#### Prefer a protobuf payload over a hand-written dict
+
+`JsonSerializer` leaves the payload *schema* as something each language writes by hand, and
+that is where cross-language caches actually break: not in the framing, which is tested, but
+in a field one side renamed, retyped, or made optional. Review of the first shared use case
+here turned up six such divergences, every one found by a person rather than a test.
+
+`ProtoJsonSerializer` takes a generated protobuf message instead, so one `.proto` defines
+the payload for every language:
+
+```python
+from gcache import Envelope, ProtoJsonSerializer
+from libs.python.schemas.cache.proto import session_identity_pb2
+
+@gcache.cached(
+    key_type="session_id",
+    id_arg="session_id",
+    use_case="session-identity",
+    envelope=Envelope.JSON,
+    serializer=ProtoJsonSerializer(session_identity_pb2.SessionIdentity),
+    track_for_invalidation=True,
+)
+async def get_session(session_id: str) -> session_identity_pb2.SessionIdentity: ...
+```
+
+Requires the extra: `pip install 'gcache[protobuf]'`. Importing gcache without it is fine;
+only constructing `ProtoJsonSerializer` raises.
+
+The Go counterpart is `orbit/libs/go/gcache/protocodec.ProtoJSON`, and the two set the same
+two non-default options — snake_case field names, and tolerating unknown fields so a rolling
+deploy that adds a field does not make each pod generation reject the other's entries. Both
+are enforced by tests on each side.
+
+**Do not compare the two languages' bytes.** Go's protojson deliberately emits unstable
+whitespace — it appends a random extra space after each comma, decided per binary build — and
+Python's `MessageToJson` spaces differently again. This is harmless, because both sides parse
+JSON, but it means a conformance test has to compare parsed values, never raw output.
+
 ## Redis Configuration
 
 ### No Redis (Local Only)
@@ -354,7 +520,8 @@ GCache exports Prometheus metrics automatically:
 | `gcache_request_counter` | Counter | Total cache requests |
 | `gcache_miss_counter` | Counter | Cache misses |
 | `gcache_disabled_counter` | Counter | Requests where caching was skipped (labels: `reason`) |
-| `gcache_error_counter` | Counter | Errors during cache operations |
+| `gcache_error_counter` | Counter | Errors during cache operations (labels: `layer`, `error`, `in_fallback`) |
+| `gcache_degraded_read_counter` | Counter | Reads that found an entry but could not use it, so degraded to a miss and rewrote it (labels: `reason`) |
 | `gcache_invalidation_counter` | Counter | Invalidation calls |
 | `gcache_get_timer` | Histogram | Cache get latency |
 | `gcache_fallback_timer` | Histogram | Time spent in the underlying function |
@@ -380,6 +547,27 @@ GCache is designed to fail open. If Redis is down or an error occurs:
 3. Your request succeeds (just without caching)
 
 This means a cache failure never breaks your application.
+
+### ⚠️ Alerting change: two signals moved off `gcache_error_counter`
+
+A **corrupt pickle** and a **serializer `load` failure** used to raise out of
+`RedisCache.get`, which incremented `gcache_error_counter` and re-ran the fallback
+*without* writing back — so the bad entry stayed for its whole TTL and failed every read.
+
+Both are now a **miss that heals**: the entry is rewritten, and the event is counted in
+`gcache_degraded_read_counter` instead. Strictly better behaviour, but an operator alerting
+on `gcache_error_counter` loses both signals silently. The `reason` label distinguishes
+them:
+
+| `reason` | What was found |
+|---|---|
+| `undecodable` | The envelope itself could not be parsed (corrupt, or an unknown version) |
+| `json_without_serializer` | A JSON entry on a key that declares no `Serializer` — typically a rolling deploy where new pods have started writing JSON |
+| `envelope_expired` | Present in Redis but past the writer's own `expiresAtMs` (see the clock-skew requirement under interop) |
+| `unloadable_payload` | The envelope parsed, but the `Serializer` could not load the payload — e.g. another language changed the payload schema |
+
+A sustained nonzero rate on any of these means the entry is being rewritten on every read,
+which costs a fallback each time even though the answers stay correct.
 
 ## Caching Strategy Guide
 

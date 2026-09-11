@@ -406,6 +406,39 @@ describe("GCache Redis TTL layer", () => {
     expect(logger.warn).toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
   });
 
+  it("does not delete a value it merely cannot parse", async () => {
+    // Given Redis holds a pickle-framed value, which is what the Python client writes under
+    // its default envelope and this reader can never parse.
+    const redis = new FakeRedis();
+    const pickleKey = keyFor("pickled", "RedisForeignEnvelope").urn;
+    const pickleBytes = "\x80\x05not-json-at-all";
+    redis.values.set(pickleKey, { expiresAtMs: Date.now() + 60_000, value: pickleBytes });
+    const gcache = new GCache({ redis: { client: redis } });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "RedisForeignEnvelope",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: GCacheKeyConfig.enabled(60),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When it is read.
+    const result = await gcache.enable(async () => await getUser("pickled"));
+
+    // Then it is a miss, the fallback answers, and no DEL is issued.
+    expect(result).toEqual({ userId: "pickled", calls: 1 });
+    expect(redis.delCalls).toBe(0);
+
+    // The entry is still replaced, though -- by the write-back, not by a delete. Asserting
+    // that keeps this test honest about what dropping the DEL actually buys: one less round
+    // trip, and survival only when skipCacheWrite suppresses the write. A foreign entry does
+    // NOT survive an ordinary read here, and the comment above must not imply it does.
+    const stored = redis.values.get(pickleKey);
+    expect(stored).toBeDefined();
+    expect(stored?.value).not.toBe(pickleBytes);
+    expect(JSON.parse(String(stored?.value)).version).toBe(1);
+  });
+
   it("refreshes stale or malformed Redis envelopes by falling through to fallback", async () => {
     // Given Redis contains an expired envelope for one key and a malformed envelope for another.
     const redis = new FakeRedis();
@@ -445,7 +478,8 @@ describe("GCache Redis TTL layer", () => {
     const malformed = await gcache.enable(async () => await getUser("bad"));
     const nonFinite = await gcache.enable(async () => await getUser("nonfinite"));
 
-    // Then expired and malformed entries are deleted, fail open, and fallback results are cached again.
+    // Then all three fail open and the fallback results are cached again. (An expired entry is
+    // deleted; an unparseable one is only a miss -- see the pickle test below for why.)
     expect(stale).toEqual({ userId: "stale", calls: 1 });
     expect(malformed).toEqual({ userId: "bad", calls: 2 });
     expect(nonFinite).toEqual({ userId: "nonfinite", calls: 3 });

@@ -1,5 +1,6 @@
 module dialcache_admission_conformance {
   import conformance_observations.* from "./conformance-observations"
+  import cache_rules.* from "./cache-rules"
   // Served Redis hits: three keys, two instances, two shadow slots per instance.
   // Read/decode effects are held explicitly. Only shadow jobs invoke sources.
   // Caller phases: 1 read, 2 decode, 3 done. Job phases: 1 source, 2 decode,
@@ -70,17 +71,21 @@ module dialcache_admission_conformance {
     loads: List[Effect]
   }
   var s: State
-  action init = s' = {
-    o: empty,
-    now: 0,
-    overlay: POLICY_DEFAULT,
-    frames: List(VALUE_ONE, VALUE_ONE, VALUE_ONE),
-    calls: List(),
-    owners: List(),
-    registered: List(NO_OWNER, NO_OWNER, NO_OWNER, NO_OWNER, NO_OWNER, NO_OWNER),
-    jobs: List(),
-    reads: List(),
-    loads: List()
+  var input: { name: str, choice: int }
+  action init = all {
+    input' = { name: "init", choice: -1 },
+    s' = {
+      o: empty,
+      now: 0,
+      overlay: POLICY_DEFAULT,
+      frames: List(VALUE_ONE, VALUE_ONE, VALUE_ONE),
+      calls: List(),
+      owners: List(),
+      registered: List(NO_OWNER, NO_OWNER, NO_OWNER, NO_OWNER, NO_OWNER, NO_OWNER),
+      jobs: List(),
+      reads: List(),
+      loads: List()
+    }
   }
 
   // -- Caller admission and job capacity -------------------------------------
@@ -116,12 +121,15 @@ module dialcache_admission_conformance {
       ...state
     }
   }
+  action beginWith(choice: int): bool = all {
+    (0.to(MAX_IDENTITY_CHOICE)).contains(choice),
+    input' = { name: "beginCall", choice: choice },
+    s.o.calls.length() < MAX_CALLERS,
+    s' = begin(s, choice)
+  }
   action beginCall = {
     nondet choice = 0.to(MAX_IDENTITY_CHOICE).oneOf()
-    all {
-      s.o.calls.length() < MAX_CALLERS,
-      s' = begin(s, choice)
-    }
+    beginWith(choice)
   }
   pure def finishJob(state: State, job: int, outcome: str): State = {
     val entry = state.jobs.nth(job)
@@ -195,9 +203,14 @@ module dialcache_admission_conformance {
       }
     }
   }
+  action readWith(choice: int): bool = all {
+    (s.reads.indices().filter(i => s.reads.nth(i).pending)).contains(choice),
+    input' = { name: "releaseRead", choice: choice },
+    s' = readReply(s, choice)
+  }
   action releaseRead = {
     nondet choice = s.reads.indices().filter(i => s.reads.nth(i).pending).oneOf()
-    s' = readReply(s, choice)
+    readWith(choice)
   }
   pure def loadReply(state: State, index: int): State = {
     val effect = state.loads.nth(index)
@@ -220,9 +233,14 @@ module dialcache_admission_conformance {
       }
     } else finishCall(updated, effect.owner)
   }
+  action loadWith(choice: int): bool = all {
+    (s.loads.indices().filter(i => s.loads.nth(i).pending)).contains(choice),
+    input' = { name: "releaseLoad", choice: choice },
+    s' = loadReply(s, choice)
+  }
   action releaseLoad = {
     nondet choice = s.loads.indices().filter(i => s.loads.nth(i).pending).oneOf()
-    s' = loadReply(s, choice)
+    loadWith(choice)
   }
   pure def settle(state: State, loader: int, value: int): State = {
     val job = state.jobs.nth(loader)
@@ -243,21 +261,32 @@ module dialcache_admission_conformance {
     }
   }
   val pendingSources = s.jobs.indices().filter(i => s.jobs.nth(i).phase == JOB_SOURCE_PENDING)
+  action resolveWith(choice: int): bool = all {
+    (1.to(MAX_RESOLVE_CHOICE)
+      .filter(code => pendingSources.contains((code - 1) / SOURCE_VALUE_COUNT))).contains(choice),
+    input' = { name: "resolveLoader", choice: choice },
+    s' = settle(s, (choice - 1) / SOURCE_VALUE_COUNT, (choice - 1) % SOURCE_VALUE_COUNT + VALUE_ONE)
+  }
   action resolveLoader = {
     nondet choice = 1.to(MAX_RESOLVE_CHOICE)
       .filter(code => pendingSources.contains((code - 1) / SOURCE_VALUE_COUNT)).oneOf()
-    s' = settle(s, (choice - 1) / SOURCE_VALUE_COUNT, (choice - 1) % SOURCE_VALUE_COUNT + VALUE_ONE)
+    resolveWith(choice)
+  }
+  action rejectWith(choice: int): bool = all {
+    (pendingSources).contains(choice),
+    input' = { name: "rejectLoader", choice: choice },
+    s' = settle(s, choice, SOURCE_ERROR)
   }
   action rejectLoader = {
     nondet choice = pendingSources.oneOf()
-    s' = settle(s, choice, SOURCE_ERROR)
+    rejectWith(choice)
   }
 
   // -- External time, policy, and remote replacement -------------------------
 
   pure def tick(state: State, ms: int): State = {
     val expired = liveJobs(state).filter(i => not(state.jobs.nth(i).timedOut)
-      and state.now + ms >= state.jobs.nth(i).deadline)
+      and not(deadlinePendingAt(state.now + ms, state.jobs.nth(i).deadline)))
     {
       now: state.now + ms,
       jobs: state.jobs.foldl(List(), (out, job) => out.append({ timedOut: job.timedOut
@@ -269,25 +298,40 @@ module dialcache_admission_conformance {
       ...state
     }
   }
-  action advance = {
-    nondet choice = Set(1, SHADOW_TIMEOUT_MS).oneOf()
+  action advanceBy(choice: int): bool = all {
+    (Set(1, SHADOW_TIMEOUT_MS)).contains(choice),
+    input' = { name: "advance", choice: choice },
     // Stay below read deadlines and Redis expiry even in longer explorations.
     all {
       s.now + choice <= MAX_ELAPSED_MS,
       s' = tick(s, choice)
     }
   }
+  action advance = {
+    nondet choice = Set(1, SHADOW_TIMEOUT_MS).oneOf()
+    advanceBy(choice)
+  }
   // 0: defaults; 1: shadow off; 2: coalescing off; 3: both off.
-  action policy = {
-    nondet choice = POLICY_DEFAULT.to(POLICY_NO_SHADOW_OR_COALESCING).oneOf()
+  action policyWith(choice: int): bool = all {
+    (POLICY_DEFAULT.to(POLICY_NO_SHADOW_OR_COALESCING)).contains(choice),
+    input' = { name: "policy", choice: choice },
     s' = { overlay: choice, ...s }
   }
-  action seed = {
-    nondet choice = 0.to(MAX_IDENTITY_CHOICE).oneOf()
+  action policy = {
+    nondet choice = POLICY_DEFAULT.to(POLICY_NO_SHADOW_OR_COALESCING).oneOf()
+    policyWith(choice)
+  }
+  action seedWith(choice: int): bool = all {
+    (0.to(MAX_IDENTITY_CHOICE)).contains(choice),
+    input' = { name: "seed", choice: choice },
     s' = {
       frames: s.frames.replaceAt(choice / 2, choice % 2 + 1),
       ...s
     }
+  }
+  action seed = {
+    nondet choice = 0.to(MAX_IDENTITY_CHOICE).oneOf()
+    seedWith(choice)
   }
 
   // -- Exploration schedule (nesting/order preserve sampling weights) ---------
@@ -330,66 +374,82 @@ module dialcache_admission_conformance {
   // -- Deterministic regression schedules ------------------------------------
 
   run coalescedHitAdmitsOneJobTest = init
-    .then(s' = begin(s, 0))
-    .then(s' = begin(s, 0))
-    .then(s' = readReply(s, 0))
-    .then(s' = loadReply(s, 0))
+    .then(beginWith(0))
+    .then(beginWith(0))
+    .then(readWith(0))
+    .then(loadWith(0))
     .expect(s.o.calls == List(VALUE_ONE, VALUE_ONE) and s.o.loaders == 1 and s.o.reads == 1 and s.o.shadow == List())
 
   run duplicateDropsBeforeCapacityIsFullTest = init
-    .then(s' = begin(s, 0))
-    .then(s' = readReply(s, 0))
-    .then(s' = loadReply(s, 0))
-    .then(s' = begin(s, 0))
-    .then(s' = readReply(s, 1))
-    .then(s' = loadReply(s, 1))
+    .then(beginWith(0))
+    .then(readWith(0))
+    .then(loadWith(0))
+    .then(beginWith(0))
+    .then(readWith(1))
+    .then(loadWith(1))
     .expect(s.o.calls == List(VALUE_ONE, VALUE_ONE) and s.o.loaders == 1 and s.o.shadow == List("dropped"))
 
   run timeoutRetainsSourceCapacityTest = init
-    .then(s' = begin(s, 0))
-    .then(s' = readReply(s, 0))
-    .then(s' = loadReply(s, 0))
-    .then(s' = tick(s, SHADOW_TIMEOUT_MS))
+    .then(beginWith(0))
+    .then(readWith(0))
+    .then(loadWith(0))
+    .then(advanceBy(SHADOW_TIMEOUT_MS))
     .expect(liveJobs(s) == Set(0) and s.o.shadow == List("timeout"))
-    .then(s' = settle(s, 0, VALUE_TWO))
-    .expect(liveJobs(s) == Set() and s.o.loads == 1 and s.o.calls == List(VALUE_ONE)
-      and s.o.shadow == List("timeout"))
+    // A later caller still receives its cache hit, but its duplicate job drops
+    // while the timed-out source owns the slot. Settlement permits admission.
+    .then(beginWith(0)).then(readWith(1)).then(loadWith(1))
+    .expect(s.o.loaders == 1 and s.o.shadow == List("timeout", "dropped"))
+    .then(resolveWith(2))
+    .expect(liveJobs(s) == Set())
+    .then(beginWith(0)).then(readWith(2)).then(loadWith(2))
+    .expect(s.o.loaders == 2 and s.o.loads == 3 and s.o.calls == List(VALUE_ONE, VALUE_ONE, VALUE_ONE)
+      and s.o.shadow == List("timeout", "dropped"))
 
   run timeoutRetainsDecodeCapacityTest = init
-    .then(s' = begin(s, 0))
-    .then(s' = readReply(s, 0))
-    .then(s' = loadReply(s, 0))
-    .then(s' = settle(s, 0, VALUE_TWO))
-    .then(s' = tick(s, SHADOW_TIMEOUT_MS))
+    .then(beginWith(0))
+    .then(readWith(0))
+    .then(loadWith(0))
+    .then(resolveWith(2))
+    .then(advanceBy(SHADOW_TIMEOUT_MS))
     .expect(liveJobs(s) == Set(0))
-    .then(s' = loadReply(s, 1))
-    .expect(liveJobs(s) == Set() and s.o.reads == 1 and s.o.shadow == List("timeout"))
+    .then(beginWith(0)).then(readWith(1)).then(loadWith(2))
+    .expect(s.o.loaders == 1 and s.o.shadow == List("timeout", "dropped"))
+    .then(loadWith(1))
+    .expect(liveJobs(s) == Set() and s.o.reads == 2)
+    .then(beginWith(0)).then(readWith(2)).then(loadWith(3))
+    .expect(s.o.loaders == 2 and s.o.calls == List(VALUE_ONE, VALUE_ONE, VALUE_ONE)
+      and s.o.shadow == List("timeout", "dropped"))
 
   run timeoutRetainsConfirmationCapacityTest = init
-    .then(s' = begin(s, 0))
-    .then(s' = readReply(s, 0))
-    .then(s' = loadReply(s, 0))
-    .then(s' = settle(s, 0, VALUE_TWO))
-    .then(s' = loadReply(s, 1))
-    .then(s' = tick(s, SHADOW_TIMEOUT_MS))
+    .then(beginWith(0))
+    .then(readWith(0))
+    .then(loadWith(0))
+    .then(resolveWith(2))
+    .then(loadWith(1))
+    .then(advanceBy(SHADOW_TIMEOUT_MS))
     .expect(liveJobs(s) == Set(0))
-    .then(s' = readReply(s, 1))
-    .expect(liveJobs(s) == Set() and s.o.calls == List(VALUE_ONE) and s.o.shadow == List("timeout"))
+    .then(beginWith(0)).then(readWith(2)).then(loadWith(2))
+    .expect(s.o.loaders == 1 and s.o.shadow == List("timeout", "dropped"))
+    .then(readWith(1))
+    .expect(liveJobs(s) == Set())
+    .then(beginWith(0)).then(readWith(3)).then(loadWith(3))
+    .expect(s.o.loaders == 2 and s.o.calls == List(VALUE_ONE, VALUE_ONE, VALUE_ONE)
+      and s.o.shadow == List("timeout", "dropped"))
 
   run fullInstanceDoesNotBlockOtherInstanceTest = init
-    .then(s' = begin(s, 0))
-    .then(s' = readReply(s, 0))
-    .then(s' = loadReply(s, 0))
-    .then(s' = begin(s, 1))
-    .then(s' = readReply(s, 1))
-    .then(s' = loadReply(s, 1))
-    .then(s' = begin(s, 2))
-    .then(s' = readReply(s, 2))
-    .then(s' = loadReply(s, 2))
+    .then(beginWith(0))
+    .then(readWith(0))
+    .then(loadWith(0))
+    .then(beginWith(1))
+    .then(readWith(1))
+    .then(loadWith(1))
+    .then(beginWith(2))
+    .then(readWith(2))
+    .then(loadWith(2))
     .expect(s.o.loaders == 2 and s.o.shadow == List("dropped"))
-    .then(s' = begin(s, 3))
-    .then(s' = readReply(s, 3))
-    .then(s' = loadReply(s, 3))
+    .then(beginWith(3))
+    .then(readWith(3))
+    .then(loadWith(3))
     .expect(s.o.loaders == 3 and s.o.calls == List(VALUE_ONE, VALUE_ONE, VALUE_ONE, VALUE_ONE)
       and s.o.shadow == List("dropped"))
 }

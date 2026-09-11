@@ -1005,26 +1005,26 @@
   "reviewedGuides": [
     {
       "path": "formal/AUTHORING.md",
-      "sha256": "4fef356a76d16630283e164b223b96dc6c577f73fae2a5acf132b155bb9df10b",
+      "sha256": "e6261de1e6fae314b3d86b206063de75737dd803418f4c295fa0a03de8ae6220",
       "entries": [
         {"line":1,"title":"Reading and extending the DialCache models"},
         {"line":16,"title":"Reading a model"},
-        {"line":51,"title":"Writing conventions"},
-        {"line":92,"title":"Codifying the next behavior"},
-        {"line":122,"title":"Give reviewers focused context"},
-        {"line":137,"title":"Exporting a deterministic regression"},
-        {"line":170,"title":"Maintaining case and witness evidence"},
-        {"line":211,"title":"Reproducible committed fixtures"},
-        {"line":221,"title":"Refactoring and execution"}
+        {"line":56,"title":"Writing conventions"},
+        {"line":115,"title":"Codifying the next behavior"},
+        {"line":148,"title":"Give reviewers focused context"},
+        {"line":163,"title":"Exporting a deterministic regression"},
+        {"line":199,"title":"Maintaining case and witness evidence"},
+        {"line":240,"title":"Reproducible committed fixtures"},
+        {"line":250,"title":"Refactoring and execution"}
       ],
       "review": {
         "kind": "tooling-guide",
-        "scope": "Quint notation and authoring conventions, catalog ownership, independent properties, explicit action inputs, witness attribution and reproducible validation. Human and automated contributors follow the same reviewed evidence chain."
+        "scope": "Readable Quint authoring, canonical transition ownership, acquired-record connection checks, independent properties, model faults, public-action regressions and exact replay evidence. Larger compositions remain sampled and every connection states its scope."
       }
     },
     {
       "path": "formal/BEHAVIOR.md",
-      "sha256": "c848844a063f4c3379c01a1a4c3eff2acf6526d114ab479de85077af66796cc0",
+      "sha256": "b105f74669b84992eddac4920c34445088512fbe543d8b18e17f8dd7549ad100",
       "entries": [
         {"line":1,"title":"Portable behavioral scenarios and generated feature profiles"},
         {"line":17,"title":"Scenario format"},
@@ -1032,19 +1032,19 @@
         {"line":50,"title":"Fixture"},
         {"line":62,"title":"Inputs and completion boundaries"},
         {"line":82,"title":"Additional composition profiles"},
-        {"line":129,"title":"Observations"},
-        {"line":141,"title":"Additional fixed-scenario inputs"},
-        {"line":147,"title":"Generated pending-effect profile"},
-        {"line":191,"title":"Generated feature profiles"},
-        {"line":290,"title":"Generated independent-caller profile"},
-        {"line":311,"title":"Generated layer-composition profile"},
-        {"line":344,"title":"Generated request-scope profile"},
-        {"line":367,"title":"Generated served-hit shadow admission profile"},
-        {"line":391,"title":"Port workflow and limits"}
+        {"line":134,"title":"Observations"},
+        {"line":146,"title":"Additional fixed-scenario inputs"},
+        {"line":152,"title":"Generated pending-effect profile"},
+        {"line":203,"title":"Generated feature profiles"},
+        {"line":303,"title":"Generated independent-caller profile"},
+        {"line":324,"title":"Generated layer-composition profile"},
+        {"line":358,"title":"Generated request-scope profile"},
+        {"line":381,"title":"Generated served-hit shadow admission profile"},
+        {"line":405,"title":"Port workflow and limits"}
       ],
       "review": {
         "kind": "contract-guide",
-        "scope": "Controlled scenario and profile input/observation mappings, including pending effects and additional composition profiles. Each profile retains its stated finite scope; separate profiles supply additional evidence without broadening older properties.",
+        "scope": "Explicit public inputs, optional compatibility annotations, missing wall-only shadow action and sixth layers fixture; precise links to executable composition mappings. Native observations remain separate from predictions.",
         "contracts": [
           "C01",
           "C02",
@@ -1120,18 +1120,18 @@
     },
     {
       "path": "formal/CONFORMANCE.md",
-      "sha256": "dbad37e1fe0d6e76cc04abcb4a7d110080bef1cd6e496253081112bf7423c309",
+      "sha256": "b73a1093794566545c102bcdebb0fda9f5d984698e5f3a1c9cd7f4e5a9eece21",
       "entries": [
         {"line":1,"title":"Core behavioral conformance profile"},
         {"line":5,"title":"Trace format and trust boundary"},
-        {"line":26,"title":"Controlled environment"},
-        {"line":36,"title":"Actions"},
-        {"line":54,"title":"Compared observations"},
-        {"line":72,"title":"Adding a language implementation"}
+        {"line":31,"title":"Controlled environment"},
+        {"line":41,"title":"Actions"},
+        {"line":59,"title":"Compared observations"},
+        {"line":77,"title":"Adding a language implementation"}
       ],
       "review": {
         "kind": "contract-guide",
-        "scope": "The core profile specifies controlled public actions, observations and exclusions. Its completion is one part of port acceptance; remaining registered profiles and native obligations are required separately.",
+        "scope": "Core explicit-v1 input record is authoritative; optional MBT compatibility fields must agree, including empty or None picks. Observation and action scope is unchanged.",
         "contracts": [
           "C01",
           "C05",
@@ -1254,66 +1254,67 @@
     },
     {
       "path": "formal/FEATURE-COVERAGE.md",
-      "sha256": "37ab10c6617dfbf507d7b9e363e2b1ba90e1495c4273595a273fb7e131aca6ed",
+      "sha256": "b218c442c6202f08497c92fed024210e466b1ab28bf686c618c9fd7122b7ba37",
       "entries": [
         {"line":1,"title":"DialCache features and known behavioral corners"},
         {"line":16,"title":"What is accounted for"},
-        {"line":44,"title":"Feature map"},
-        {"line":64,"title":"How a corner earns evidence"},
-        {"line":113,"title":"Native adaptations are explicit contracts"},
-        {"line":151,"title":"Remaining finite limits"}
+        {"line":43,"title":"Feature map"},
+        {"line":63,"title":"How a corner earns evidence"},
+        {"line":112,"title":"Native adaptations are explicit contracts"},
+        {"line":150,"title":"Remaining finite limits"}
       ],
       "review": {
         "kind": "coverage-guide",
-        "scope": "Reviewed feature families, case accounting and consequential witness standards. Native adaptations and finite limits remain explicit; a complete named-case inventory does not imply exhaustive behavior."
+        "scope": "Reviewed feature families, case accounting and consequential witness standards. Links now describe current validation procedures; complete named-case accounting does not imply exhaustive behavior."
       }
     },
     {
       "path": "formal/GO-PARITY.md",
-      "sha256": "fcd32784517e0fb4ae9d7dc9c957b8756e01272e93383022add97f3d3ad35b15",
+      "sha256": "ef91eae01b3c7e532291b8db0a75088749d3af16e29327b48c4e5fe67fff62c3",
       "entries": [
         {"line":1,"title":"Go parity acceptance"},
-        {"line":48,"title":"Required evidence"},
-        {"line":105,"title":"Reading and updating the ledger"},
-        {"line":149,"title":"Native clock precision"},
-        {"line":182,"title":"Current configuration and observability bindings"}
+        {"line":49,"title":"Required evidence"},
+        {"line":107,"title":"Reading and updating the ledger"},
+        {"line":151,"title":"Native clock precision"},
+        {"line":184,"title":"Current configuration and observability bindings"}
       ],
       "review": {
         "kind": "tooling-guide",
-        "scope": "Go acceptance, shared local/hosted validation targets and native clock/configuration/exporter adaptations. Fast PR checks remain separate from complete replay, mutation and interoperability evidence; historical reports retain original identities."
+        "scope": "Go acceptance and native adaptations, with current source/corpus-bound completion requirements. Fast PR checks do not enforce the full pre-merge validation policy; historical results remain linked by original identity."
       }
     },
     {
       "path": "formal/PORTING.md",
-      "sha256": "f14759d49a6ea65d5be2df3f467a599412ae1b6c50cc51290471fc52c58d6fa5",
+      "sha256": "df8798d90e22d14e9c749be689cb43ee1d6dd8f91fba56b5258c90623dfd1f12",
       "entries": [
         {"line":1,"title":"Implementing another DialCache port"},
         {"line":14,"title":"What a port supplies"},
-        {"line":39,"title":"Trace and observation contract"},
-        {"line":87,"title":"Generated fixtures and fast local tests"},
-        {"line":122,"title":"Complete corpus and reusable acceptance checks"},
-        {"line":220,"title":"New-port acceptance"}
+        {"line":44,"title":"Shared coordinator protocol"},
+        {"line":77,"title":"Trace and observation contract"},
+        {"line":139,"title":"Generated fixtures and fast local tests"},
+        {"line":174,"title":"Complete corpus and reusable acceptance checks"},
+        {"line":274,"title":"New-port acceptance"}
       ],
       "review": {
         "kind": "tooling-guide",
-        "scope": "Native driver operations, linked source-deadline walkthrough, reproducible artifacts and strict complete-corpus acceptance. TypeScript witness completion precedes Go preparation; smoke and full acceptance retain different evidence scopes."
+        "scope": "Shared JSON-lines replay protocol, expectation isolation, native command and causal settlement obligations, explicit ITF inputs, reproducible generation and strict complete-corpus acceptance. Node coordinates tests; implementations execute native cache behavior."
       }
     },
     {
       "path": "formal/PROTOCOL.md",
-      "sha256": "4f01d2abbb8af4c782a6221061f11f1afe20ac2050021500d348f621221134ec",
+      "sha256": "a1c7968445ced9922e7fc90dd6653e174e7f8890b5b2f8eeea053bec30648ffb",
       "entries": [
         {"line":1,"title":"Portable keys, frames, envelopes and invalidation"},
         {"line":10,"title":"Authority and generated artifacts"},
-        {"line":41,"title":"Text payload domain"},
-        {"line":87,"title":"Input strings and key escaping"},
-        {"line":102,"title":"Key normalization and rollout"},
-        {"line":128,"title":"Envelope selection and codec environment"},
-        {"line":164,"title":"Invalidation vector schema 2"}
+        {"line":40,"title":"Text payload domain"},
+        {"line":86,"title":"Input strings and key escaping"},
+        {"line":101,"title":"Key normalization and rollout"},
+        {"line":127,"title":"Envelope selection and codec environment"},
+        {"line":163,"title":"Invalidation vector schema 2"}
       ],
       "review": {
         "kind": "contract-guide",
-        "scope": "Portable key/text/frame/envelope/invalidation transformations and their generated artifacts. Exact numeric and native codec domains remain bounded; decoder outcomes are independently checked environment inputs.",
+        "scope": "Portable key/text/frame/envelope/invalidation transformations and generated artifacts. Only validation navigation changed; numeric and native codec domains remain bounded and decoder outcomes are independently checked environment inputs.",
         "contracts": [
           "W01",
           "W02",
@@ -1340,57 +1341,55 @@
     },
     {
       "path": "formal/README.md",
-      "sha256": "1fba57946f24f6bfede39da800089dd0fd7c36be7f49093302d96087fca2149b",
+      "sha256": "9ce879015c1295b975f4cfded6a0dfdedcabb56e2e332e4d1a9e0ec9a09ce4b8",
       "entries": [
         {"line":1,"title":"Executable DialCache specification"},
-        {"line":9,"title":"Start with your task"},
-        {"line":32,"title":"What the suite checks"},
-        {"line":53,"title":"Models and composition profiles"},
-        {"line":92,"title":"One execution inventory"},
-        {"line":116,"title":"Generating and replaying behavior"},
-        {"line":211,"title":"Wire artifacts and native boundaries"},
-        {"line":236,"title":"Go completion and fault challenges"},
-        {"line":264,"title":"Assumptions and maintenance"}
+        {"line":7,"title":"Start with your task"},
+        {"line":23,"title":"How the specification connects to code"},
+        {"line":43,"title":"Models and composition profiles"},
+        {"line":89,"title":"Generating and replaying behavior"},
+        {"line":149,"title":"Evidence and scope"}
       ],
       "review": {
         "kind": "tooling-guide",
-        "scope": "Intent-based entry routes for understanding, changing, debugging and porting DialCache; links to the worked Quint-to-native example, model inventory and full validation workflow. Navigation and finite evidence accounting add no behavioral cases."
+        "scope": "Task-based navigation through shared rules, acquired contracts, five scoped connections, readable models, native replay, symbolic checking and separate alternate-seed exploration. Commands and finite-evidence boundaries replace accumulating historical logs."
       }
     },
     {
       "path": "formal/SEMANTIC-COVERAGE.md",
-      "sha256": "364d1534b5bd3f4c340154eba06a1ac312ecad2bee561d13df57d46d278dd550",
+      "sha256": "bd810a0bd2ce52d1f221114ae2d0cc1cfa9380c8da020e937c3221ea896b37cf",
       "entries": [
         {"line":1,"title":"Measuring semantic coverage"},
         {"line":5,"title":"Evidence inventory"},
-        {"line":49,"title":"Generated boundary evidence"},
-        {"line":57,"title":"Behavioral mutation comparison"},
-        {"line":71,"title":"Latest recorded measurement"},
-        {"line":82,"title":"Historical comparison before generated primitive vectors"},
-        {"line":129,"title":"Reproduction and CI"},
-        {"line":158,"title":"Model properties and cross-language execution"}
+        {"line":47,"title":"Model assurance"},
+        {"line":80,"title":"Generated boundary evidence"},
+        {"line":88,"title":"Behavioral mutation comparison"},
+        {"line":102,"title":"Recorded measurements"},
+        {"line":108,"title":"Reproduction and CI"},
+        {"line":137,"title":"Model properties and cross-language execution"}
       ],
       "review": {
         "kind": "coverage-guide",
-        "scope": "Named-case and mutation methodology, current recorded results via VALIDATION, and explicitly historical earlier cohorts. Mutation execution is manual/weekly or local after valid complete replay, separate from fast PR checks; historical survivor tables retain their original scope."
+        "scope": "Separate accounting of named cases, finite symbolic rules, sampled profile connections, compiling model faults, native replay and implementation mutation detection. Historical measurements remain versioned; current results require fresh input-bound reports."
       }
     },
     {
       "path": "formal/SPEC.md",
-      "sha256": "bf230426f9c9a925fd6f8510b95c7364287de48963d3e1006acda006fda23074",
+      "sha256": "33d5c3074a9b6009e84fddac3ee4c3fb4b64e950b8fe33242a680b6cacefa922",
       "entries": [
         {"line":1,"title":"DialCache behavioral specification"},
-        {"line":15,"title":"Meaning of conformance"},
-        {"line":47,"title":"State and environmental inputs"},
-        {"line":72,"title":"Admission, policy, and traversal"},
-        {"line":121,"title":"Remote acquisition and publication"},
-        {"line":162,"title":"Time, source acceptance, and progress"},
-        {"line":192,"title":"Recovery, shadow work, and invalidation races"},
-        {"line":230,"title":"Assumptions, evidence, and claims"}
+        {"line":15,"title":"Definition ownership and executable connections"},
+        {"line":53,"title":"Meaning of conformance"},
+        {"line":85,"title":"State and environmental inputs"},
+        {"line":110,"title":"Admission, policy, and traversal"},
+        {"line":159,"title":"Remote acquisition and publication"},
+        {"line":200,"title":"Time, source acceptance, and progress"},
+        {"line":230,"title":"Recovery, shadow work, and invalidation races"},
+        {"line":268,"title":"Assumptions, evidence, and claims"}
       ],
       "review": {
         "kind": "contract-guide",
-        "scope": "Portable ownership, admission, traversal, invalidation, recovery, shadow and timing guarantees with explicit environment assumptions. TTL/recovery policy uses safe-integer seconds; bounded replay is evidence rather than universal refinement.",
+        "scope": "Portable ownership, admission, traversal, recovery, shadow and timing contracts with canonical Quint ownership and five executable profile connections. Payload identity and accepted publication timing claims are scoped precisely; no universal refinement or fairness proof is claimed.",
         "contracts": [
           "C01",
           "C02",
@@ -1467,22 +1466,21 @@
     },
     {
       "path": "formal/TEST-AUDIT.md",
-      "sha256": "d23e5ac6b355fe8639e749cdb6752ef80882dcdffdcb3aec96dc112cf9ab6d97",
+      "sha256": "9a3e8a2697f551b08acf7abf9d4bb78e64f9497ae04ed0d6f8a6c28039e43bce",
       "entries": [
         {"line":1,"title":"Docs and test behavior audit"},
-        {"line":13,"title":"Gaps closed by this audit"},
-        {"line":30,"title":"Keeping the audit current"},
-        {"line":49,"title":"Formal and Go guide review"},
-        {"line":72,"title":"Claim boundary"}
+        {"line":13,"title":"Keeping the audit current"},
+        {"line":32,"title":"Formal and Go guide review"},
+        {"line":55,"title":"Claim boundary"}
       ],
       "review": {
         "kind": "coverage-guide",
-        "scope": "Public documentation/test contract mappings and separately reviewed formal/Go guides. Hashes and heading inventories detect source drift; neither file review nor a section tag proves every prose clause. Historical additions remain labeled."
+        "scope": "Public test/documentation applicability and formal/Go guide review, with freshness guards and explicit limits of section-level mapping. Removed historical expansion logs; current evidence and versioned historical records are linked."
       }
     },
     {
       "path": "formal/TEST-MAP.md",
-      "sha256": "ff642024a533e141c8bc5089af7788514ba26a8fa2ce0c09b8db123fe26f9370",
+      "sha256": "5d92707add8aae9151cf584cb0aac33f7af07b14441225b0f436d7f66fb32335",
       "entries": [
         {"line":1,"title":"Formal contract and implementation evidence map"},
         {"line":18,"title":"Behavioral map"},
@@ -1493,53 +1491,44 @@
       ],
       "review": {
         "kind": "coverage-guide",
-        "scope": "Navigation from behaviors to scoped Quint checks, replay observations and native boundaries. Historical line/branch measurements retain their original instrumentation and cannot be treated as current semantic coverage."
+        "scope": "Behavior-to-model/replay/native-boundary navigation. The validation link now names operating procedures rather than describing an old completed snapshot as current evidence."
       }
     },
     {
       "path": "formal/VALIDATION.md",
-      "sha256": "bbc6ff62a3540af3ce5154dcb0a2acd352c7405a690c7f8194e7575a2e114730",
+      "sha256": "7f1e4ae07dd89bbd65775147d6d8032f5d028589278f431d348f6f6e6005607b",
       "entries": [
-        {"line":1,"title":"Validation snapshots"},
-        {"line":3,"title":"Port-readiness milestone"},
-        {"line":12,"title":"Completed local checks"},
-        {"line":31,"title":"Mutation evidence"},
-        {"line":50,"title":"Reproduction and evidence identity"},
-        {"line":86,"title":"Earlier behavioral-authority snapshot"},
-        {"line":100,"title":"Completed scope"},
-        {"line":125,"title":"Mutation challenge"},
-        {"line":149,"title":"Evidence identity and reproduction"},
-        {"line":186,"title":"Limits of this result"}
+        {"line":1,"title":"Validation and evidence"},
+        {"line":7,"title":"Choosing a run"},
+        {"line":28,"title":"Reading a completion report"},
+        {"line":46,"title":"Mutation evidence"},
+        {"line":60,"title":"Exploratory runs"},
+        {"line":90,"title":"A retained sampling regression"},
+        {"line":109,"title":"Historical results"}
       ],
       "review": {
-        "kind": "historical-evidence",
-        "scope": "Completed local snapshots retain their original implementation revisions, corpus/report hashes, counts and failures. Later documentation or audit changes do not relabel those executions as current validation.",
-        "revisions": [
-          "1fc04bc5acabd1206fd120f56aaf1e7ccf33a82a",
-          "b0ed1289968f32b730c2fd75385025833fac1a10",
-          "bf8405a9326a09012db4ed243f3f72f326a38a87",
-          "c4fcb34d21cf19bca534926abdaf11d158674004"
-        ]
+        "kind": "tooling-guide",
+        "scope": "Operating guide for local/hosted validation, exact completion report identity, mutation interpretation, separate alternate-seed diagnostics and versioned historical results. Fast PR checks do not enforce the stated full-validation policy."
       }
     },
     {
       "path": "formal/WALKTHROUGH.md",
-      "sha256": "3e2c97ee30ede542fc79db4657ee351ad851fea2d09abd809992d3a9ab0dd01c",
+      "sha256": "a2e81aaab41c65c8ba02aa0fb80c1cbf6e8ba442d00913a87ac82c5935cee242",
       "entries": [
         {"line":1,"title":"Follow one behavior from Quint to both ports"},
         {"line":14,"title":"Read the named run first"},
-        {"line":51,"title":"Follow input and evidence separately"},
-        {"line":86,"title":"Find the rule's catalog entries"},
-        {"line":113,"title":"Run this example"}
+        {"line":58,"title":"Follow input and evidence separately"},
+        {"line":93,"title":"Find the rule's catalog entries"},
+        {"line":120,"title":"Run this example"}
       ],
       "review": {
         "kind": "tooling-guide",
-        "scope": "A worked reading and reproduction guide for C23.policy-does-not-spend-source-budget. The existing public Quint regression, replay command encodings, independent native observations and catalog roles are explained without adding or broadening a behavioral claim."
+        "scope": "Worked source-budget rule from the existing public Quint regression through the shared profile mapping/assertion to independent TS and Go execution. Includes the source-origin connection and canonical strict-deadline judgment without broadening the example's scope."
       }
     },
     {
       "path": "go/README.md",
-      "sha256": "c5e6b76a080660c4781f1fea9c4a079066137539b44a50837c6ac494dbecc729",
+      "sha256": "754e92d0b7788be4cf1127384a4e0f15b108732fda2a47695b5a2a394ac37d3f",
       "entries": [
         {"line":1,"title":"DialCache for Go"},
         {"line":19,"title":"Use"},
@@ -1549,7 +1538,7 @@
       ],
       "review": {
         "kind": "contract-guide",
-        "scope": "Idiomatic Go API/context/policy and error bindings, interoperable storage, native value/codec domains and observability. Shared Make commands separate fast smoke from full TS-then-Go replay, mutation and real integration; fractional local-clock replay retains its bounded scope.",
+        "scope": "Go API/context/policy/error bindings and native codec domains. Updated test prerequisites and shared coordinator ownership: command mapping/assertions use Node while the cache implementation and environment remain native Go; full evidence differs from smoke.",
         "contracts": [
           "B01",
           "B02",

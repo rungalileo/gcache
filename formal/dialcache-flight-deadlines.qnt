@@ -1,4 +1,5 @@
-module dialcache_coalescing_liveness {
+module dialcache_flight_deadlines {
+  import cache_rules.* from "./cache-rules"
   // Selected rules from C11, C14 and C23-C26. One request/process flight, with followers
   // and older abandoned sources. Policy flags are environment inputs; phase and
   // flightScope are DialCache ownership. fallbackStartedAt records invocation
@@ -175,7 +176,8 @@ module dialcache_coalescing_liveness {
     nondet source = s.independentSources.indices()
       .filter(i => s.independentSources.nth(i).outcome == NoOutcome).oneOf()
     val pending = s.independentSources.nth(source)
-    val expired = pending.budget > 0 and s.now - pending.startedAt >= pending.budget
+    val expired = not(sourceAcceptsAt(pending.startedAt, s.now,
+      if (pending.budget == NO_FALLBACK_TIMEOUT) -1 else pending.budget))
     s' = {
       independentSources: s.independentSources.replaceAt(source, {
         outcome: if (expired) SourceTimeout else SourceSuccess,
@@ -209,7 +211,7 @@ module dialcache_coalescing_liveness {
 
   action sourceSucceedsBeforeDeadline = all {
     s.phase == FallbackRunning,
-    s.now < s.fallbackDeadline,
+    deadlinePendingAt(s.now, s.fallbackDeadline),
     s.activeSourceRunning,
     s' = {
       activeSourceRunning: false,
@@ -223,7 +225,7 @@ module dialcache_coalescing_liveness {
   action sourceRejects = all {
     s.phase == FallbackRunning,
     s.activeSourceRunning,
-    s.now < s.fallbackDeadline,
+    deadlinePendingAt(s.now, s.fallbackDeadline),
     s' = {
       activeSourceRunning: false,
       acceptedSourceResult: false,
@@ -238,7 +240,7 @@ module dialcache_coalescing_liveness {
   action sourceSettlesAfterDeadline = all {
     s.phase == FallbackRunning,
     s.activeSourceRunning,
-    s.now >= s.fallbackDeadline,
+    not(deadlinePendingAt(s.now, s.fallbackDeadline)),
     s' = {
       activeSourceRunning: false,
       acceptedSourceResult: false,
@@ -254,7 +256,7 @@ module dialcache_coalescing_liveness {
   action fallbackTimesOut = all {
     s.phase == FallbackRunning,
     s.fallbackDeadlineStarted,
-    s.now >= s.fallbackDeadline,
+    not(deadlinePendingAt(s.now, s.fallbackDeadline)),
     s.activeSourceRunning,
     s' = {
       activeSourceRunning: false,

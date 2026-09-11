@@ -38,6 +38,13 @@ Read these definitions next, in this order:
 5. `acceptedSourceRespectsItsOwnStart`: independently checks an accepted result's
    recorded settlement time against its source start and budget.
 
+[dialcache-source-connection.qnt](./dialcache-source-connection.qnt) executes
+this same profile and independently reconstructs source starts and owners from
+the preceding external events. `sourceOriginsMatchContract` compares those
+records with the profile's start/budget fields. Both use the canonical acceptance
+judgment in [cache-rules.qnt](./cache-rules.qnt); finite symbolic rule checks
+state the strict deadline inequality independently.
+
 Here, `s` is modeled state and `s'` is the next state. `.then(...)` chains steps;
 `.expect(...)` checks the resulting state. `s.o` is the model's predicted public
 observation. Internal fields such as source ownership and start time explain
@@ -69,14 +76,14 @@ using the published mapping, rather than supplying the predicted call result.
 
 | Follow this part | File and exact symbol |
 | --- | --- |
-| TS command mapping and fixture | [source-budgets-profile.ts](../test/formal/source-budgets-profile.ts), `sourceBudgetsProfile` |
-| Go command mapping and fixture | [source_budgets_profile_test.go](../go/source_budgets_profile_test.go), `sourceBudgetsProfile` |
+| Shared command mapping and fixture | [source-budgets.mjs](./replay/profiles/source-budgets.mjs), `sourceBudgetsProfile` |
 | TS real API execution | [behavior-driver.ts](../test/formal/behavior-driver.ts), `BehaviorDriver.apply` and `snapshot` |
 | Go real API execution | [behavior_driver_test.go](../go/behavior_driver_test.go), `behaviorDriver.apply` and `observation` |
-| TS per-step assertion | [formal-features.test.ts](../test/formal-features.test.ts), `replay` and `projectObservation` |
-| Go per-step assertion | [feature_replay_test.go](../go/feature_replay_test.go), `replayFeature`, `featureObservation` and `TestFeatureConformance` |
+| Shared projection and per-step assertion | [features.mjs](./replay/features.mjs), `projectObservation` and `assertFeatureObservation` |
+| TS replay | [formal-features.test.ts](../test/formal-features.test.ts), `replay` |
+| Go replay transport | [feature_replay_test.go](../go/feature_replay_test.go), `TestFeatureConformance`, and [replay_coordinator_test.go](../go/replay_coordinator_test.go) |
 
-Both fixtures install a real cache with a local TTL and a held runtime-policy
+The shared fixture installs a real cache with a local TTL and a held runtime-policy
 provider. Source loaders, policy replies and time are controlled at their
 external boundaries. The drivers record actual source invocations and caller
 settlements. The assertion layer projects those records into the profile's

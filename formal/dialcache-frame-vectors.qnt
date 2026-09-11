@@ -1,4 +1,5 @@
 module dialcache_frame_vectors {
+  import cache_rules.* from "./cache-rules"
   import wire_text.* from "./wire-text"
 
   // W04/W05: concrete frame bytes, UTF-8 replacement and numeric acceptance.
@@ -58,7 +59,7 @@ module dialcache_frame_vectors {
       val payload = request.bytes.slice(10, request.bytes.length())
       if (request.tracked and timestamp == 0)
         { kind: "miss", reason: "unclassified", fence: fence, ...EMPTY }
-      else if (request.tracked and fence >= 0 and timestamp <= fence)
+      else if (request.tracked and fence >= 0 and not(fenceAllows(timestamp, fence)))
         { kind: "miss", reason: "watermark_fenced", fence: fence, ...EMPTY }
       else if (encoding != 0 and encoding != 1) { kind: "payload_encoding_error", ...EMPTY }
       else { kind: "hit", timestamp: timestamp, payloadType: if (encoding == 1) "binary" else "string",

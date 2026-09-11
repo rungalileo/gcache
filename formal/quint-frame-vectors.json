@@ -3,9 +3,10 @@
   "provenance": {
     "model": "formal/dialcache-frame-vectors.qnt",
     "sourceSha256": {
-      "formal/dialcache-frame-vectors.qnt": "881f930b99107fee24f73cd4f193360223fe8adf8b6be29de771555b56e6cb6b",
+      "formal/dialcache-frame-vectors.qnt": "d7cfaff472fce8888563ce81f62ca3b4bed1a76d51b97b46543a99362548cff8",
       "formal/wire-text.qnt": "c78f8c674f4e1470b0d2b605b209d82e3aab0e35fb4e0efae813247bf093eb27",
-      "formal/generate-frame-vectors.mjs": "9f8a145bc38c3a7aa3efe86b354f3cb13518070ad0e5054622359d0a7329321b"
+      "formal/generate-frame-vectors.mjs": "8375998780cd8985062bb3f8a9d3db5fb3d917f0897880979c6b8cedda6bc1ba",
+      "formal/cache-rules.qnt": "c439080cebd85942a9b7516076d295f18a53bf06be0e66287a35e37ded72ef17"
     }
   },
   "frameVectors": [

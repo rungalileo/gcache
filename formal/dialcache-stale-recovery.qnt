@@ -1,4 +1,5 @@
 module dialcache_stale_recovery {
+  import cache_rules.* from "./cache-rules"
   // Stale-on-error for one Redis frame and one caller/coalesced flight.
   // F is the fresh ceiling; M is the exclusive recovery ceiling. Recovery uses
   // retained bytes from the initial read and deliberately has no second read.
@@ -51,13 +52,12 @@ module dialcache_stale_recovery {
   val initialFrameUsable =
     s.framePresent and s.frameValid and not(s.frameFenced) and s.frameCreatedAt <= s.now
   val freshAtInitialRead =
-    s.readHealthy and initialFrameUsable and s.now - s.frameCreatedAt < FRESH_AGE
+    s.readHealthy and initialFrameUsable and freshAgeAllowed(s.frameCreatedAt, s.now, FRESH_AGE)
   val candidateAtInitialRead =
     s.readHealthy and initialFrameUsable and
-      s.now - s.frameCreatedAt >= FRESH_AGE and
-      s.now - s.frameCreatedAt < MAX_RECOVERY_AGE
+      retainedAgeAllowed(s.frameCreatedAt, s.now, FRESH_AGE, MAX_RECOVERY_AGE)
   val candidateWithinRecoveryAge =
-    s.candidateCreatedAt <= s.now and s.now - s.candidateCreatedAt < MAX_RECOVERY_AGE
+    recoveryAgeAllowed(s.candidateCreatedAt, s.now, MAX_RECOVERY_AGE)
 
   // Initial state
   action init = s' = {
@@ -153,9 +153,9 @@ module dialcache_stale_recovery {
         ReadFailed
       else if (not(initialFrameUsable))
         PlainMiss
-      else if (s.now - s.frameCreatedAt < FRESH_AGE)
+      else if (freshAgeAllowed(s.frameCreatedAt, s.now, FRESH_AGE))
         FreshHit
-      else if (s.now - s.frameCreatedAt < MAX_RECOVERY_AGE)
+      else if (recoveryAgeAllowed(s.frameCreatedAt, s.now, MAX_RECOVERY_AGE))
         RetainedCandidate
       else
         PlainMiss,

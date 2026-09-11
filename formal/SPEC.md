@@ -12,6 +12,44 @@ primitive models compute generated wire expectations; fixed vectors and
 Redis/key documentation provide complementary examples and explanation. [`BEHAVIOR.md`](./BEHAVIOR.md)
 and [`CONFORMANCE.md`](./CONFORMANCE.md) define controlled execution profiles.
 
+## Definition ownership and executable connections
+
+Shared transition judgments live in [cache-rules.qnt](./cache-rules.qnt): fresh
+and recovery age, initial stale classification, insertion expiry and its clock
+grid, source deadlines, and strict watermark acceptance. Profiles supply the
+captured policy and appropriate clock; they import these definitions instead of
+restating the comparison. Wire validity, physical retention and policy validation
+remain separate responsibilities.
+
+[cache-contract.qnt](./cache-contract.qnt) defines acquired recovery snapshots
+and source executions. A snapshot records its owner, modeled payload/value identity,
+timestamp and captured maximum age. A source records its owner, start and budget.
+Later environment changes do not rewrite either acquired record.
+
+The connection models execute the actual conformance profile and project its
+events into these records. They check retained snapshot identity, source timing,
+caller ownership and permitted acceptance for the named scope:
+
+| Profile | Checked connection |
+| --- | --- |
+| recovery-read | [Acquired payload and recovery return](./dialcache-recovery-connection.qnt) |
+| recovery | [Retained flight snapshot and recovery](./dialcache-legacy-recovery-connection.qnt) |
+| independent | [Per-caller snapshots and source deadlines](./dialcache-independent-connection.qnt) |
+| effects | [Source start and accepted publication timing](./dialcache-effects-connection.qnt) |
+| source-budgets | [Captured source origin, budget and follower ownership](./dialcache-source-connection.qnt) |
+
+Properties have different roles. The boundary assertions in
+[dialcache-rule-checks.qnt](./dialcache-rule-checks.qnt) state inequalities
+directly to challenge the shared predicates. Selected receipt invariants, such
+as recovery age and local-hit expiry, also compare independently retained facts.
+Connection and composition properties may reuse canonical predicates through
+`cache-contract.qnt`; they check capture, ownership and history against those
+definitions, rather than independently validating each predicate's meaning.
+Compiling model mutations challenge the particular rule or connection property
+named in the catalog. Connections establish only their listed obligations under
+each profile's bounds; other contracts retain focused models and replay
+evidence. Full-system refinement and fairness are not claimed.
+
 ## Meaning of conformance
 
 An implementation conforms to a declared profile when, for every admissible
@@ -264,5 +302,4 @@ Quint clause and Quint-driven implementation evidence. This is finite case
 accounting; it does not prove every admissible history. Native clock/fault seams,
 codec outcomes and encoded sizes, host numeric formatting, Redis atomicity and
 resource ceilings retain explicit scope notes. [VALIDATION.md](./VALIDATION.md)
-records a completed local expansion snapshot; older passing reports identify
-only their own source revision and corpus. None establishes universal conformance.
+defines current report requirements and reproduction commands.

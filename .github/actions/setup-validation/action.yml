@@ -7,6 +7,9 @@ inputs:
   quint:
     description: Install the pinned Quint CLI and Rust evaluator.
     default: "false"
+  java:
+    description: Install Java 21 for bounded symbolic model checking.
+    default: "false"
 runs:
   using: composite
   steps:
@@ -27,3 +30,8 @@ runs:
         cache-dependency-path: go/go.sum
     - uses: ./.github/actions/setup-quint
       if: inputs.quint == 'true'
+    - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      if: inputs.java == 'true'
+      with:
+        distribution: temurin
+        java-version: "21"

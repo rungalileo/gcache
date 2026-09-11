@@ -19,22 +19,23 @@ Quint definitions and Quint-driven implementation evidence.
 Earlier acceptance records remain **historical**. Their source revisions,
 corpora and report hashes describe the exact runs that passed; changed models,
 regressions, drivers or wire artifacts require fresh reports.
-[VALIDATION.md](VALIDATION.md) records the completed local expansion snapshot
-and the exact scope of its shared and native evidence. Inventory totals are
+[VALIDATION.md](VALIDATION.md) documents current validation commands and
+links the historical acceptance record. Inventory totals are
 accounting, not coverage percentages or proofs.
 
 Each validation record identifies its actual revision/input snapshot, report
-hashes and execution-input manifest. Use `make formal` for full model checks,
-artifact generation and prepared TS/Go replay, then `make mutations` and
-`make integration` for their separate fault and real-server evidence.
+hashes and execution-input manifest. Use `make formal` for Rust model checks,
+artifact generation and prepared TS/Go replay. Run `make model-check` for the
+separate finite symbolic checks, then `make mutations` and `make integration`
+for their fault and real-server evidence.
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs all local lanes in order,
-including the exact Node 22.15.0 package floor; see the [Make target guide](./README.md#generating-and-replaying-behavior)
+including symbolic checks and the exact Node 22.15.0 package floor; see the [Make target guide](./README.md#generating-and-replaying-behavior)
 for pinned prerequisites and individual targets.
 
 Hosted PR checks run native/race tests, committed smoke, audits and real
 integration; model/generator input changes also trigger artifact recomputation.
-The full formal/mutation workflow runs manually and weekly. Fast PR checks do
-not replace the full 7,180-check acceptance requirement: behavior/model changes
+The full formal/symbolic/mutation workflow runs manually and weekly. Fast PR checks do
+not replace the full acceptance inventory: behavior/model changes
 need full validation for their exact inputs before merge, and release/new-port
 acceptance needs the full evidence. Reports under `.formal-traces/` bind their
 source, corpus and witness fingerprints; changed inputs invalidate an old pass.
@@ -61,10 +62,11 @@ covered by generated histories, the ledger must link:
    TypeScript and Go APIs, recording the corpus hash, repository revision,
    checker settings, and both implementation reports.
 
-Named Quint regressions are exported alongside sampled histories. The completion
-gates require every scheduled regression in both ports, so exact boundaries do
-not depend on a random seed reaching them. Fixed scenarios remain useful for a
-known failure or a narrow complementary example.
+Scheduled named Quint regressions are exported alongside sampled histories.
+The completion gates require each of those regressions in both ports, making
+its declared boundary independent of sampling. Remaining mandatory witnesses
+are checked across the combined named and sampled corpus. Fixed scenarios remain
+useful for a known failure or a narrow complementary example.
 Protocol vectors and native integration tests are appropriate evidence for
 byte encodings, host numeric limits, backend registration, and actual Redis
 execution. Acceptance does not require every fixed case to become a generated

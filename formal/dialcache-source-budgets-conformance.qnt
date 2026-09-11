@@ -1,4 +1,5 @@
 module dialcache_source_budgets_conformance {
+  import cache_rules.* from "./cache-rules"
   import conformance_observations.* from "./conformance-observations"
 
   // C01/C23-C27: source deadlines belong to source execution, not policy work
@@ -105,7 +106,7 @@ module dialcache_source_budgets_conformance {
     val admitted = { policyOwners: s.policyOwners.replaceAt(id, -1), ...s }
     s' = if (s.registered >= 0) {
       owners: s.owners.replaceAt(call, s.registered), ...admitted
-    } else if (s.localValue > 0 and s.now < s.localExpires) {
+    } else if (s.localValue > 0 and localEntryLiveAt(s.now, s.localExpires)) {
       o: { calls: s.o.calls.replaceAt(call, s.localValue), ...s.o }, ...admitted
     } else startSource(admitted, call, ENABLED)
   }
@@ -127,7 +128,7 @@ module dialcache_source_budgets_conformance {
     val source = x.sources.nth(id)
     val drained = { sources: x.sources.replaceAt(id, { rawPending: false, ...source }), ...x }
     if (source.result != CALL_PENDING) drained else complete(drained, id,
-      if (source.budget >= 0 and x.now - source.started >= source.budget) DEADLINE_ERROR else outcome)
+      if (not(sourceAcceptsAt(source.started, x.now, source.budget))) DEADLINE_ERROR else outcome)
   }
   action resolved(id: int, value: int): bool = all {
     id < s.sources.length(),
@@ -153,8 +154,8 @@ module dialcache_source_budgets_conformance {
     val advanced = { now: s.now + delta, ...s }
     s' = s.sources.indices().fold(advanced, (current, id) => {
       val source = current.sources.nth(id)
-      if (source.result == CALL_PENDING and source.budget >= 0
-          and current.now - source.started >= source.budget)
+      if (source.result == CALL_PENDING
+          and not(sourceAcceptsAt(source.started, current.now, source.budget)))
         complete(current, id, DEADLINE_ERROR) else current
     })
   }
@@ -168,7 +169,8 @@ module dialcache_source_budgets_conformance {
   val acceptedSourceRespectsItsOwnStart = s.sources.indices().forall(i => {
     val source = s.sources.nth(i)
     not(source.result == VALUE_ONE or source.result == VALUE_TWO)
-      or source.budget < 0 or source.settled < source.started + source.budget
+      or (source.settled >= source.started and
+        (source.budget < 0 or source.settled < source.started + source.budget))
   })
   val registeredWorkIsNotAbandoned = s.registered < 0 or s.sources.nth(s.registered).result == CALL_PENDING
   val localPublicationRequiresAcceptedSource = s.localWriter < 0 or {

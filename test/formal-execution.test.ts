@@ -34,8 +34,8 @@ const validate = (value: unknown) => validateExecution(value);
 
 describe("formal execution schedule", () => {
   it("accounts for all models, selected invariants, regressions, and generated traces without Quint", () => {
-    expect(validate(manifest())).toEqual({ models: 26, libraries: 3, profiles: 15, invariants: 189, regressions: 388,
-      generatedTraces: 5280, exportedRegressionTraces: 165, vectorModels: 4, generatedVectors: 1631 });
+    expect(validate(manifest())).toEqual({ models: 32, libraries: 5, profiles: 15, invariants: 214, regressions: 401,
+      generatedTraces: 5280, exportedRegressionTraces: 234, vectorModels: 4, generatedVectors: 1631 });
   });
 
   it("rejects omitted models and dropped or renamed regressions", () => {
@@ -87,7 +87,7 @@ describe("formal execution schedule", () => {
       (v: NonNullable<Manifest["models"][number]["vectorExport"]>) => { v.generator = "formal/../outside.mjs"; },
       (v: NonNullable<Manifest["models"][number]["vectorExport"]>) => { v.artifact = ".formal-traces/derived.json"; },
       (v: NonNullable<Manifest["models"][number]["vectorExport"]>) => { v.kind = "unknown"; },
-      (v: NonNullable<Manifest["models"][number]["vectorExport"]>) => { v.sources.pop(); },
+      (v: NonNullable<Manifest["models"][number]["vectorExport"]>) => { v.sources = v.sources.filter(path => path !== v.generator); },
       (v: NonNullable<Manifest["models"][number]["vectorExport"]>) => { v.sources.push("src/key.ts"); },
     ]) {
       const invalid = manifest();
@@ -154,7 +154,7 @@ describe("formal execution schedule", () => {
       manifest().models.filter(model => model.regressions.length).map(model => model.path),
     );
     const challenge = check.findIndex(job => job.command === "node");
-    expect(check[challenge - 1]!.args.slice(0, 2)).toEqual(["test", "formal/dialcache-coalescing-liveness.qnt"]);
+    expect(check[challenge - 1]!.args.slice(0, 2)).toEqual(["test", "formal/dialcache-flight-deadlines.qnt"]);
     expect(check[challenge]!.args).toEqual(["formal/check-model-properties.mjs"]);
     for (const job of check.filter(job => job.args[0] === "run")) {
       expect(job.args).toEqual(expect.arrayContaining(["--backend=rust", "--n-threads=1", "--seed=0x1234", "--max-samples=2000", "--max-steps=40"]));

@@ -5,6 +5,7 @@ import { resolve, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { checkSemanticCoverage } from './check-semantic-coverage.mjs';
+import { evaluateSemanticTestReport } from './semantic-reporter.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = resolve(root, '.formal-traces/semantic');
@@ -101,19 +102,11 @@ function run(label, cohort, baseline) {
   if (result.error || result.signal) throw new Error(`${label}/${cohort}: runner failed: ${result.error ?? result.signal}`);
   let data, execution;
   try { data = JSON.parse(readFileSync(json, 'utf8')); execution = JSON.parse(readFileSync(meta, 'utf8')); } catch { throw new Error(`${label}/${cohort}: missing test report`); }
-  const assertions = data.testResults.flatMap(file => file.assertionResults);
-  const failed = assertions.filter(test => test.status === 'failed');
-  const passed = assertions.filter(test => test.status === 'passed').length;
-  const timedOut = failed.some(test => test.failureMessages.some(message => /(?:Test|Hook) timed out in/.test(message)));
-  if (execution.reason !== (failed.length ? 'failed' : 'passed') || execution.collectionErrors.length || execution.unhandledErrors.length || passed + failed === 0 ||
-      timedOut ||
-      (result.status !== 0 && failed.length === 0) || (result.status === 0 && failed.length > 0)) {
-    throw new Error(`${label}/${cohort}: infrastructure/import error, not evidence of detection (exit=${result.status}, passed=${passed}, failed=${failed.length})`);
-  }
-  const state = failed.length ? 'detected' : 'survived';
+  const evaluated = evaluateSemanticTestReport(data, execution, result.status, `${label}/${cohort}`);
+  const { state, passed } = evaluated;
   if (baseline && state !== 'survived') throw new Error(`${cohort}: unmodified baseline must pass`);
   if (!baseline && state === 'survived' && passed !== report.baselines[cohort].passed) throw new Error(`${label}/${cohort}: incomplete surviving run`);
-  return { state, passed, failed: failed.length, failingTests: failed.map(test => test.fullName) };
+  return evaluated;
 }
 function save() {
   report.elapsedSeconds = Math.round((Date.now() - started) / 1000);

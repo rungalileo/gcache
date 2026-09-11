@@ -5,10 +5,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -39,6 +41,10 @@ func witnessHash(path string) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 func checkWitnessEvidence(profile, directory string, paths []string) error {
+	return checkWitnessEvidenceAt("..", profile, directory, paths)
+}
+
+func checkWitnessEvidenceAt(root, profile, directory string, paths []string) error {
 	raw, err := os.ReadFile(filepath.Join(directory, profile+".json"))
 	if err != nil {
 		return err
@@ -53,7 +59,7 @@ func checkWitnessEvidence(profile, directory string, paths []string) error {
 	if evidence.SchemaVersion != 1 || evidence.Profile != profile || evidence.Traces != len(paths) || len(evidence.Corpus) != len(paths) {
 		return fmt.Errorf("unsupported/incomplete %s witness evidence", profile)
 	}
-	registryRaw, err := os.ReadFile("../formal/coverage-witnesses.json")
+	registryRaw, err := os.ReadFile(filepath.Join(root, "formal/coverage-witnesses.json"))
 	if err != nil {
 		return err
 	}
@@ -86,7 +92,7 @@ func checkWitnessEvidence(profile, directory string, paths []string) error {
 	var execution struct {
 		Libraries []string `json:"libraries"`
 	}
-	executionRaw, err := os.ReadFile("../formal/execution.json")
+	executionRaw, err := os.ReadFile(filepath.Join(root, "formal/execution.json"))
 	if err != nil {
 		return err
 	}
@@ -99,14 +105,19 @@ func checkWitnessEvidence(profile, directory string, paths []string) error {
 			Sources []string `json:"witnessSources"`
 		} `json:"profiles"`
 	}
-	definitionsRaw, err := os.ReadFile("../formal/profiles.json")
+	definitionsRaw, err := os.ReadFile(filepath.Join(root, "formal/profiles.json"))
 	if err != nil {
 		return err
 	}
 	if err := json.Unmarshal(definitionsRaw, &definitions); err != nil {
 		return err
 	}
+	sharedSources, err := sharedReplaySources(root)
+	if err != nil {
+		return err
+	}
 	additional := append([]string{}, execution.Libraries...)
+	additional = append(additional, sharedSources...)
 	for _, definition := range definitions.Profiles {
 		if definition.ID == profile {
 			additional = append(additional, definition.Sources...)
@@ -132,7 +143,7 @@ func checkWitnessEvidence(profile, directory string, paths []string) error {
 		if item.Path != path {
 			return fmt.Errorf("unexpected witness input %s", item.Path)
 		}
-		hash, err := witnessHash(filepath.Join("..", filepath.FromSlash(path)))
+		hash, err := witnessHash(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
 			return err
 		}
@@ -180,7 +191,15 @@ func TestGeneratedWitnessEvidence(t *testing.T) {
 			t.Fatal(err)
 		}
 		profiles["local-clock"] = clockPaths
-		for name := range behaviorProfiles() {
+		coordinator := newReplayCoordinator(t)
+		info, err := coordinator.call(obj{"op": "profiles"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name := range bm(info["profiles"]) {
+			if name == "core" || name == "effects" || name == "local-clock" {
+				continue
+			}
 			paths, err := featurePaths(name)
 			if err != nil {
 				t.Fatal(err)
@@ -205,5 +224,108 @@ func TestGeneratedWitnessEvidence(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+// Match the single registry inventory against the executable directory, rather
+// than maintaining another per-profile list of shared mappings in this port.
+func sharedReplaySources(root string) ([]string, error) {
+	raw, err := os.ReadFile(filepath.Join(root, "formal/profiles.json"))
+	if err != nil {
+		return nil, err
+	}
+	var registry struct {
+		ReplaySources []string `json:"replaySources"`
+	}
+	if err := json.Unmarshal(raw, &registry); err != nil {
+		return nil, err
+	}
+	actual := []string{}
+	err = filepath.WalkDir(filepath.Join(root, "formal/replay"), func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if extension := filepath.Ext(path); extension == ".mjs" || extension == ".mts" || extension == ".json" {
+			relative, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			actual = append(actual, filepath.ToSlash(relative))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(actual)
+	if len(actual) == 0 || !reflect.DeepEqual(registry.ReplaySources, actual) {
+		return nil, fmt.Errorf("shared replay source inventory differs from formal/replay")
+	}
+	return actual, nil
+}
+
+func TestWitnessEvidenceBindsSharedReplaySources(t *testing.T) {
+	root := t.TempDir()
+	write := func(path, content string) {
+		t.Helper()
+		path = filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	inputs := []string{"formal/profiles.json", "formal/coverage-witnesses.json", "formal/execution.json", "formal/dialcache-effects-conformance.qnt", "formal/conformance-observations.qnt", "test/formal-effects.test.ts", "test/formal/coverage-evidence.ts", "formal/replay/coordinator.mjs", "formal/replay/mapping.mjs"}
+	for _, path := range inputs {
+		write(path, "reviewed input")
+	}
+	write("formal/profiles.json", `{"profiles":[{"id":"effects"}],"replaySources":["formal/replay/coordinator.mjs","formal/replay/mapping.mjs"]}`)
+	write("formal/coverage-witnesses.json", `{"effects":["observed"]}`)
+	write("formal/execution.json", `{"libraries":[]}`)
+	write("trace.itf.json", "controlled trace")
+	evidence := witnessEvidence{SchemaVersion: 1, Profile: "effects", Traces: 1, Required: []string{"observed"}, Seen: []string{"observed"}}
+	for _, path := range inputs {
+		hash, err := witnessHash(filepath.Join(root, path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		evidence.Inputs = append(evidence.Inputs, witnessDigest{Path: path, SHA256: hash})
+	}
+	trace := filepath.Join(root, "trace.itf.json")
+	hash, err := witnessHash(trace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence.Corpus = []witnessDigest{{Name: "trace.itf.json", SHA256: hash}}
+	raw, err := json.Marshal(evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write("effects.json", string(raw))
+	check := func() error { return checkWitnessEvidenceAt(root, "effects", root, []string{trace}) }
+	if err := check(); err != nil {
+		t.Fatal(err)
+	}
+	write("formal/replay/mapping.mjs", "changed input mapping")
+	if err := check(); err == nil || !strings.Contains(err.Error(), "stale witness definition formal/replay/mapping.mjs") {
+		t.Fatalf("changed shared mapping was not rejected: %v", err)
+	}
+	write("formal/replay/mapping.mjs", "reviewed input")
+	write("formal/replay/new-helper.mjs", "unregistered helper")
+	if err := check(); err == nil || !strings.Contains(err.Error(), "inventory differs") {
+		t.Fatalf("new dependency accepted: %v", err)
+	}
+	if err := os.Remove(filepath.Join(root, "formal/replay/new-helper.mjs")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "formal/replay/mapping.mjs")); err != nil {
+		t.Fatal(err)
+	}
+	if err := check(); err == nil || !strings.Contains(err.Error(), "inventory differs") {
+		t.Fatalf("missing dependency accepted: %v", err)
 	}
 }

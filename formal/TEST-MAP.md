@@ -12,8 +12,8 @@ mean that every assertion in it is modeled.
 [feature-coverage.json](./feature-coverage.json) keeps native adaptations separate.
 All 240 reviewed behavioral cases now have checked Quint references and
 Quint-driven implementation evidence. This accounts for known cases, not every
-input or feature combination. [VALIDATION.md](./VALIDATION.md) records the
-completed local expansion snapshot; earlier reports remain historical.
+input or feature combination. [VALIDATION.md](./VALIDATION.md) describes the
+validation workflow and report requirements.
 
 ## Behavioral map
 

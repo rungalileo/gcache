@@ -31,7 +31,7 @@ Start with the empty observation below. When `fixture.observe` is present, also 
 }
 ```
 
-Every scenario/trace gets a fresh default cache instance and empty Redis environment. Additional named instances share that Redis environment but own separate local storage, request contexts, flights, and shadow capacity. State persists between its steps. The TypeScript implementation is [`test/formal/behavior-driver.ts`](../test/formal/behavior-driver.ts), used by the effects and feature replay tests. No production APIs, private cache maps, or flight mutations are needed.
+Every scenario/trace gets a fresh default cache instance and empty Redis environment. Additional named instances share that Redis environment but own separate local storage, request contexts, flights, and shadow capacity. State persists between its steps. The TypeScript implementation is [`test/formal/behavior-driver.ts`](../test/formal/behavior-driver.ts), used by the effects and feature replay tests. No new production APIs, private cache maps, or flight mutations are needed.
 
 ## Optional observed events
 
@@ -86,14 +86,19 @@ checked properties and replayed regressions are registered in `execution.json`.
 Each records explicit public inputs as described in `AUTHORING.md`; expected
 observations never select a command, effect index or source result.
 
-| Profile | Boundary and distinguishing public observations |
-| --- | --- |
-| `recovery-read` | Request/local/remote traversal, retained snapshots, held reads/decoding, compressed candidates, frame rejection and watermark lifetime. New public requests distinguish retained bytes from current Redis state. |
-| `local-failure` | Local storage exceptions, accepted source outcomes and request-only reuse. A failed local read remains publication-ineligible even after the fault is cleared before source settlement. |
-| `runtime-boundaries` | Exact serving cohort thresholds, leaf inheritance and validation, falsy/absent values, and feature toggles. Results and later layer reuse distinguish policy admission from mere policy input selection. |
-| `shadow-layers` | Dark and served shadow work combined with request/local publication, independent caller sources, per-instance job capacity, captured fill policy and propagated source errors. |
-| `source-budgets` | Default, unbounded and finite source budgets; held policy resolution, outside calls, invalid keys, late followers and late results after retry. |
-| `local-clock` | Fractional native time with whole-millisecond local insertion and expiration, including instances constructed at different process times. |
+| Profile | Boundary and distinguishing public observations | Executable mapping |
+| --- | --- | --- |
+| `recovery-read` | Request/local/remote traversal, retained snapshots, held reads/decoding, compressed candidates, frame rejection and watermark lifetime. New public requests distinguish retained bytes from current Redis state. | [Fixture and actions](./replay/profiles/recovery-read.mjs) |
+| `local-failure` | Local storage exceptions, accepted source outcomes and request-only reuse. A failed local read remains publication-ineligible even after the fault is cleared before source settlement. | [Fixture and actions](./replay/profiles/local-failure.mjs) |
+| `runtime-boundaries` | Exact serving cohort thresholds, leaf inheritance and validation, falsy/absent values, and feature toggles. Results and later layer reuse distinguish policy admission from mere policy input selection. | [Fixture and actions](./replay/profiles/runtime-boundaries.mjs) |
+| `shadow-layers` | Dark and served shadow work combined with request/local publication, independent caller sources, per-instance job capacity, captured fill policy and propagated source errors. | [Fixture and actions](./replay/profiles/shadow-layers.mjs) |
+| `source-budgets` | Default, unbounded and finite source budgets; held policy resolution, outside calls, invalid keys, late followers and late results after retry. | [Fixture and actions](./replay/profiles/source-budgets.mjs) |
+| `local-clock` | Fractional native time with whole-millisecond local insertion and expiration, including instances constructed at different process times. | [Inputs and observations](./replay/local-clock.mjs) |
+
+This table summarizes scope. The linked modules define exact choices and command
+mappings; [bindings.mjs](./replay/bindings.mjs) connects their fixtures, setup and
+assertions to the coordinator. Shared feature projections live in
+[features.mjs](./replay/features.mjs).
 
 The local-failure fixture keeps real storage behind a narrow native failure
 seam: TypeScript throws from the local storage call; Go throws through the
@@ -174,11 +179,18 @@ Initial choices 0..4 use tracked keys; choice 5 checks untracked reply/fence beh
 | 4 | 20 ms | 10 ms | Provider returns null | 10 ms |
 | 5 | 20 ms | 10 ms | Inherit; untracked key | 10 ms |
 
-ITF contains `mbt::actionTaken`, expected state `s`, and `mbt::nondetPicks.choice`. Read/source settlement records an actual effect index; `observerFault` records 0/1; `init` records 0..5, `readBudgetPolicy` records 0..4, and `adapterReply` records 1..16; other actions record `None`. The parser rejects missing, unexpected, or unsafe choices. Failure actions set a fixture fault, release the selected external gate, drain runnable work, and restore the fault. Model-only timestamps, fences, phase, and registration fields never enter execution or implementation projection.
+Each ITF state contains authoritative `input.name` and `input.choice`, plus
+expected state `s`. Choices are ITF integers: read/source settlement records an
+actual effect index; `observerFault` records 0/1; `init` records 0..5,
+`readBudgetPolicy` records 0..4, and `adapterReply` records 1..16. Actions without
+an external choice use `-1`. Optional MBT compatibility annotations must agree
+with the explicit input; raw regression exports need no annotations. See the
+[trace contract](./PORTING.md#trace-and-observation-contract).
+The parser rejects missing, unexpected, or unsafe choices. Failure actions set a fixture fault, release the selected external gate, drain runnable work, and restore the fault. Model-only timestamps, fences, phase, and registration fields never enter execution or implementation projection.
 
 After every step, replay compares actual caller outcomes, loader/read/write/invalidation/serializer/provider counts, physical write TTLs, actual raw-read context budgets/initial cancellation state, and ordered cancellation IDs. Model caller codes are 0 pending, 1 value 1, 2 original source error, 3 timeout. Fixed scenarios additionally compare logical error identity. A read deadline starts a fresh source budget and suppresses refill; successful raw-read completion clears that budget before application-owned decoding. Failed fresh decoding permits refill. Accepted serialization/write outlives the source budget, with the observed fence checked again after preparation.
 
-Full validation exports 512 traces from 4,096 samples, up to 60 transitions, and requires all actions plus 79 witnesses covering abandoned source/read settlement, independent budgets, late settlement guards, application-owned phases, acquired snapshots across invalidation, failure-specific publication, clock rollback at the second fence check, and observer failure isolation. Twenty-two deterministic model regressions anchor those rules. Sampling favors the narrow rollback-during-publication boundary as well as unrestricted clock changes; it does not restrict that behavior to the favored schedule.
+Full validation exports 512 traces from 4,096 samples, up to 60 transitions, and requires all actions plus 79 witnesses covering abandoned source/read settlement, independent budgets, late settlement guards, application-owned phases, acquired snapshots across invalidation, failure-specific publication, clock rollback at the second fence check, and observer failure isolation. Scheduled deterministic regressions anchor their declared boundaries; [execution.json](./execution.json) distinguishes model checks from exported replays. Sampling favors the narrow rollback-during-publication boundary as well as unrestricted clock changes; it does not restrict that behavior to the favored schedule.
 
 Full validation runs all profiles in `execution.json` through TypeScript and Go. PR checks run the committed subset alongside ordinary tests. Committed ITF smokes run without Quint. Failure diagnostics include trace, step, action, and both observations. The effects choice/state schema and scope/policy value choices changed with this specification revision; ports must select a matching revision and reject unsupported actions or choices. Behavioral scenario schema 2 is unchanged.
 
@@ -190,7 +202,7 @@ The profile requires 36 fixture/race witnesses plus 43 adapter/diagnostic witnes
 
 ## Generated feature profiles
 
-Seven additional models share the existing driver and a common [observation record](./conformance-observations.qnt). Their ITF states contain `s.o` as the expected observation, `mbt::actionTaken`, and `mbt::nondetPicks.choice`. State outside `s.o` and the optional diagnostic record `s.d` is model-private prediction, not an implementation observation. The choice is `Some` with a nonnegative ITF integer only on actions with choices below; otherwise it is `None` with the empty tuple. Reject unknown actions, unsupported choices, missing observation fields, and integer precision loss.
+Seven additional models share the existing driver and a common [observation record](./conformance-observations.qnt). Their ITF states contain authoritative `input.name` and `input.choice`, with `s.o` as the expected observation. State outside `s.o` and the optional diagnostic record `s.d` is model-private prediction, not an implementation observation. The explicit choice is a nonnegative ITF integer on actions with choices below, or `-1` otherwise. Optional `mbt::actionTaken` and `mbt::nondetPicks.choice` annotations must agree with it. Reject unknown actions, unsupported choices, missing observation fields, and integer precision loss.
 
 Call observations encode pending as 0, fixture values 1/2 as 1/2, source errors as 3, and deadline errors as 4. Success codes 5..9 represent absent, null, false, zero, and empty string respectively; scope/policy generate these values. Other outcomes fail replay. These profiles compare error categories; the fixed scenarios compare logical error identity. All other observation fields use the scenario vocabulary directly, including zero/empty fields. A driver must use explicit action choices for selected source indices and its actual invocation counts for actions targeting the latest effect. It must never use expected counters, phases, cached values, or fences to select an input or fabricate an observation.
 
@@ -238,6 +250,7 @@ Common actions reuse the scenario inputs: `releaseRead/Load/Dump/Write/Policy` r
 | Shadow `seed` / `reencode` | Store the explicit payload choice below at current wall time; `reencode` chooses the alternate text/binary form of the currently stored bytes during C1 |
 | Shadow `seedUnicode` | Store text/binary multibyte JSON using choice 7/8; this extra environment branch increases representation-boundary sampling while ordinary `seed` retains all payloads |
 | Shadow `advance` | Elapsed time choice 1/10 ms, delivering due timers; blocked-source fixtures 11/12 use only 10 ms windows |
+| Shadow `advanceWall` | Move only the application wall clock forward by choice 1/60000 ms while C1 confirmation is pending; elapsed deadlines and physical Redis TTL do not advance |
 | Shadow `invalidate` | Public invalidation with future buffer choice 0/20 ms |
 
 Shadow payload choices 1/2 are text JSON `1`/`2`; 3/4 are binary hex `31`/`32`; 5 is binary `2031`; 6 is text ` 1`; 7 is text JSON `"café"`; 8 is binary `22636166c3a922`. Thus text and binary may share exact UTF-8 bytes, while different byte spellings may decode to the same value. Comparison uses decoded values; confirmation uses bytes. `reencode` records the replacement payload as an explicit choice, so a driver never consults expected storage. Required witnesses include both Unicode text/binary confirmation directions, equal decoded values superseded by different bytes, binary C0 decoding, and successful/failing comparison exhausting the deadline. Timer delivery is not required for elapsed-time rejection.
@@ -314,15 +327,16 @@ Full validation emits 512 traces from 2,048 samples, up to 60 steps, and require
 
 The initial **input choice**, never expected model state, selects the fresh fixture:
 
-| `init` choice | Tracked Redis | Local capacity per instance |
+| `init` choice | Identity and Redis adapter | Local capacity per instance |
 | --- | --- | --- |
-| 0 | No | 2 |
-| 1 | Yes | 2 |
-| 2 | No | 0 |
-| 3 | Yes | 0 |
-| 4 | Adapter absent | 2 |
+| 0 | Untracked, adapter present | 2 |
+| 1 | Tracked, adapter present | 2 |
+| 2 | Untracked, adapter present | 0 |
+| 3 | Tracked, adapter present | 0 |
+| 4 | Untracked, adapter absent | 2 |
+| 5 | Tracked, adapter absent | 2 |
 
-Mode 4 omits the Redis adapter and requires public local-hit reuse after explicit invalidation reports `missing_remote`; no adapter mutation is dispatched. All modes enable request-local caching and 60-second local/remote TTLs, with no source deadline. Sources are held independently; other external effects settle at their action boundary. Two instances share Redis but own their local capacity and process flights. Persistent contexts 0 and 1 belong to instance 0; context 2 belongs to instance 1. Contexts 3 and 4 mean a fresh invocation scope on instance 0 and 1 respectively. This is an input-level fixture description, not a requirement to reproduce any host context API.
+Modes 4 and 5 omit the Redis adapter and require public local-hit reuse after explicit invalidation reports `missing_remote`; no adapter mutation is dispatched. All modes enable request-local caching and 60-second local/remote TTLs, with no source deadline. Sources are held independently; other external effects settle at their action boundary. Two instances share Redis but own their local capacity and process flights. Persistent contexts 0 and 1 belong to instance 0; context 2 belongs to instance 1. Contexts 3 and 4 mean a fresh invocation scope on instance 0 and 1 respectively. This is an input-level fixture description, not a requirement to reproduce any host context API.
 
 | Action | Input mapping |
 | --- | --- |
@@ -337,7 +351,7 @@ Mode 4 omits the Redis adapter and requires public local-hit reuse after explici
 
 At most twenty calls and eighty steps keep entries fresh throughout this profile; TTL boundaries remain in policy/scenario coverage. There are four logical identities, so a two-slot local cache can demonstrate read promotion and eviction, while request storage can exceed that capacity. Successful source completion publishes only to participating eligible layers. Tracked remote fallback skips direct local publication; an authoritative hit can warm local. Invalidation fences subsequent remote reads while acquired request/local values survive. Policy changes preserve admitted sources' publication decisions.
 
-Full validation exports 512 traces from 2,048 samples. Twenty required witnesses include all five fixtures and local reuse without Redis before and after a surfaced maintenance error, cross-request process sharing, zero-capacity sharing/reload, uncapped request memoization, LRU promotion/eviction with later public probes, per-instance capacity, tracked read warming, local survival across invalidation, both operation variants fenced, and untracked reads ignoring markers. Private model records select reachability witnesses only; storage-related witnesses require actual replayed calls that probe their predictions. They never control the adapter or become implementation observations. Eight deterministic model regressions anchor the same boundaries, and a committed generated smoke runs without Quint.
+Full validation exports 512 traces from 2,048 samples. Required witnesses include all six fixtures and local reuse without Redis before and after a surfaced maintenance error, cross-request process sharing, zero-capacity sharing/reload, uncapped request memoization, LRU promotion/eviction with later public probes, per-instance capacity, tracked read warming, local survival across invalidation, both operation variants fenced, and untracked reads ignoring markers. Private model records select reachability witnesses only; storage-related witnesses require actual replayed calls that probe their predictions. They never control the adapter or become implementation observations. Scheduled deterministic regressions anchor these boundaries, and a committed generated smoke runs without Quint. The current regression and witness inventories are in [execution.json](./execution.json) and [coverage-witnesses.json](./coverage-witnesses.json).
 
 This profile uses the same observations and public/environment inputs as the other feature profiles. It adds initial fixture choices; drivers must reject unsupported choices. Larger capacities, more scopes/instances, mixed deadline/recovery/shadow combinations, and expiry during LRU ordering are outside its generated bounds.
 

@@ -37,9 +37,8 @@ Use these sources for current totals and execution requirements:
 several histories, and one history can support several cases. Those citations
 are not independent proofs, and native tests do not inflate portable counts.
 
-The inventory describes requirements; [VALIDATION.md](./VALIDATION.md) records
-the completed local expansion snapshot. Earlier reports remain historical with
-their actual input fingerprints, and future changes require new execution.
+The inventory describes requirements; [VALIDATION.md](./VALIDATION.md) explains
+how to execute them and interpret current acceptance reports.
 
 ## Feature map
 
@@ -156,7 +155,7 @@ checks source results, later local publication and separate-request probes.
 Recovery-read observes actual marker existence and TTL before and after value
 work, and composes retained bytes with physical expiry and compressed recovery.
 Shadow-layers covers mixed served/dark capacity, request/local publication and
-captured fill policy. Named public-action regressions guarantee these corners
+captured fill policy. Scheduled public-action regressions anchor these corners
 without relying on random selection.
 
 Those additions do not enumerate arbitrary request trees, operation/key/instance

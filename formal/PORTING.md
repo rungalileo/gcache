@@ -13,8 +13,13 @@ Then use this guide to implement the remaining profiles and completion reports.
 
 ## What a port supplies
 
-Supply a native implementation, a controlled test environment, a profile adapter,
-and assertion results in the completion format below. Existing implementations
+Supply a native implementation, a controlled test environment, a driver for the
+shared commands, and assertion results in the completion format below.
+The shared [replay coordinator](./replay/coordinator.mjs) owns profile parsing,
+action mappings and observation assertions. TypeScript imports those same
+modules; Go uses one persistent Node process over JSON lines. A new port can
+reuse that protocol instead of translating every profile's tables.
+Existing implementations
 are examples: [the TypeScript driver](../test/formal/behavior-driver.ts) and
 [the Go driver](../go/behavior_driver_test.go). A port need not copy their public
 API names, threading model, internal storage, or scheduling implementation.
@@ -35,6 +40,39 @@ Input mappings may use previously observed driver-owned invocation IDs and
 counters to select the latest actual operation. They must never use a predicted
 model owner, phase, counter, cache value, or expected result to select an input
 or decide when the implementation has progressed far enough.
+
+## Shared coordinator protocol
+
+Start `node formal/replay/coordinator.mjs` with Node 24. Send one JSON object per
+line on stdin and read one response per line on stdout. Each request includes
+`version: 1`, a positive integer `id`, and `op`. IDs must strictly increase for
+the lifetime of that coordinator process, including across history sessions;
+match each response's version and ID. Responses contain `ok: true` and `result`,
+or `ok: false` and an error. [protocol.schema.json](./replay/protocol.schema.json)
+defines the message and command shapes.
+Malformed input, unknown commands, mismatched IDs, process failure and transport
+timeouts fail the test. The coordinator performs no cache operations.
+
+| Request | Purpose |
+| --- | --- |
+| `profiles` | Discover supported profiles/actions and settlement contract |
+| `prepare` with `profile`, `path`, optional JSON-text `raw` | Validate the entire history; return a session ID, initialization fixture/setup, action names and step count |
+| `observe` with `session`, `index`, `settlement`, `observed`, `environment` | Assert the actual observation for this step; return the next external commands or final completion |
+| `discard` with `session` | Release an unfinished coordinator session after a failed or canceled native run |
+
+After `prepare`, create the native fixture, execute setup and report observation
+index zero. Execute the returned `inputs`, settle authorized work and report the
+next index. The environment currently carries the actual `wallMs` clock used
+for dynamic inputs. Invocation counters and IDs also come from actual native
+observations. The coordinator retains expected state; its command responses do
+not contain predictions. Duplicate or skipped observation indices are errors.
+
+The shared command definitions and per-profile bindings are in
+[replay/bindings.mjs](./replay/bindings.mjs). Their normalization, dynamic input
+selection and assertions are maintained once. The Go transport adapter is
+[replay_coordinator_test.go](../go/replay_coordinator_test.go); native environment
+control remains in the driver. Node is a test-tool dependency, not a dependency
+of the Go cache library.
 
 ## Trace and observation contract
 
@@ -58,24 +96,38 @@ Decode them exactly and reject unsupported ranges. `choice: -1` denotes no
 external choice. An action's integer encoding belongs to its profile; the same
 integer is not a universal operation or result code.
 
-The common normalized envelope also contains `mbt::actionTaken` and
-`mbt::nondetPicks.choice` (`Some` with an integer or `None`). Legacy profiles use
-this envelope directly. Core accepts no nondeterministic argument record.
-[replay-inputs.mjs](./replay-inputs.mjs) translates explicit inputs into that
-envelope without comparing predicted states. Prefer the explicit input when
-the profile declares it, and reject contradictory encodings.
+All current profiles declare explicit inputs. The coordinator reads `input`
+directly, including raw Quint regression exports. Core actions have no external
+arguments and use `choice: -1`. Optional `mbt::actionTaken` and
+`mbt::nondetPicks.choice` annotations (`Some` with an integer or `None`) must agree
+with the input when present. Core also accepts an empty picks record.
+[run-models.mjs](./run-models.mjs) uses
+[replay-inputs.mjs](./replay-inputs.mjs) to add compatibility annotations to
+scheduled exports. A native driver using the coordinator needs no translation
+step and must never infer commands from predicted states.
 
-The controlled fixtures, action mappings and compared fields are documented in
-[CONFORMANCE.md](./CONFORMANCE.md) for core and
-[BEHAVIOR.md](./BEHAVIOR.md) for pending effects, feature profiles and the six
-additional composition profiles. [conformance-observations.qnt](./conformance-observations.qnt)
-names shared outcome encodings. Read a profile's initialization and public
-actions alongside its table; the profile's declared units and choices are part
-of the versioned input contract.
+[CONFORMANCE.md](./CONFORMANCE.md) describes the core fixture, actions and
+observations. [BEHAVIOR.md](./BEHAVIOR.md) describes the common environment,
+pending effects and feature profiles; its composition table summarizes six
+additional profiles and links their executable mappings. Exact fixtures,
+choices and projections are connected by
+[replay/bindings.mjs](./replay/bindings.mjs).
+[conformance-observations.qnt](./conformance-observations.qnt) names shared
+outcome encodings. Read a profile's initialization and public actions alongside
+its binding; the declared units and choices are part of the versioned contract.
 
-For each step, decode the external command, execute it, allow causally ready
-native work to progress, then assert the profile's actual observations. Do not
-release deliberately held work or advance time merely to match an expectation.
+The `causally-ready-v1` settlement contract requires each command's authorized
+native work to finish or reach a declared external gate or timer boundary before
+observation. A driver supplies a controlled executor or equivalent progress
+barrier. Merely waiting a fixed amount of real time is insufficient. Timer
+delivery follows the command's explicit clock policy: a silent clock shift must
+not deliver a timer that the history deliberately holds. Do not release held
+work, advance virtual time, or poll expectations to obtain a matching snapshot.
+
+Exact observations describe the profile's controlled schedule. Preserve required
+causal order and invocation ownership. An unrelated native event order can only
+be normalized when the declared observation contract allows it; sorting every
+event would conceal ordering violations.
 Diagnostic profiles also compare their specified event categories, counts and
 timing. Private prediction fields can support model properties and witness
 classification; they cannot replace observations collected from the port.
@@ -126,23 +178,25 @@ from the repository root:
 
 ```sh
 make check         # Fast native checks and committed smoke; not full acceptance.
-make formal        # Full model/corpus checks, then prepared TS and Go replay.
+make formal        # Rust model/corpus checks, then prepared TS and Go replay.
+make model-check   # Separate finite symbolic checks; requires Java 21 and tar.
 make mutations     # Requires valid completion reports from the full run.
 make integration   # Real-server interoperability; requires Docker.
 ```
 
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs all local lanes in order,
-including the exact Node 22.15.0 package floor. `make formal-corpus` produces the full
-corpus and completed TS evidence; `make formal-go` validates that evidence and
+including symbolic checks and the exact Node 22.15.0 package floor.
+`make formal-corpus` produces the full corpus and completed TS evidence;
+`make formal-go` validates that evidence and
 then prepares Go's run. These are the same entry points used by hosted CI.
-The manual/weekly full workflow performs the complete formal and mutation
+The manual/weekly full workflow performs the complete formal, symbolic and mutation
 checks; PR CI keeps native/race/smoke/audit and real-server integration checks,
 with conditional artifact recomputation. Behavior/model changes require full
 validation before merge, and every release or new-port acceptance requires the
 complete inventory. A green smoke lane supplies no full-parity claim.
 
-The current shared inventory contains 7,180 required checks. Print its exact
-IDs with `node formal/conformance.mjs inventory`. The commands below describe
+Print the current required IDs with `node formal/conformance.mjs inventory`.
+The commands below describe
 the lower-level completion API for implementers of another port; the Make
 targets already orchestrate it for TS and Go.
 

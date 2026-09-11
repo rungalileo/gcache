@@ -1,0 +1,938 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dialcache.dev/formal/replay/protocol-v1.schema.json",
+  "title": "DialCache shared replay protocol v1",
+  "description": "One JSON object per line. Prepare retains all expected state in the coordinator. Native drivers apply setup, then observe index 0. Apply every returned input in order, settling causally ready work after each. Do not advance a future timer or release a held gate to settle. Journals preserve invocation identity and observed order; no expected field controls scheduling. Profile-specific observation projection is defined in adjacent shared modules. Completion acknowledges the entire trace only.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    }
+  ],
+  "$defs": {
+    "request": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "op": {
+              "const": "profiles"
+            }
+          },
+          "required": [
+            "version",
+            "id",
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "op": {
+              "const": "prepare"
+            },
+            "profile": {
+              "enum": [
+                "admission",
+                "core",
+                "effects",
+                "independent",
+                "layers",
+                "local-clock",
+                "local-failure",
+                "policy",
+                "recovery",
+                "recovery-read",
+                "runtime-boundaries",
+                "scope",
+                "shadow",
+                "shadow-layers",
+                "source-budgets"
+              ]
+            },
+            "path": {
+              "type": "string"
+            },
+            "raw": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "id",
+            "op",
+            "profile",
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "op": {
+              "const": "discard"
+            },
+            "session": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          "required": [
+            "version",
+            "id",
+            "op",
+            "session"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "op": {
+              "const": "observe"
+            },
+            "session": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "settlement": {
+              "const": "causally-ready-v1"
+            },
+            "observed": {
+              "type": "object"
+            },
+            "environment": {
+              "type": "object",
+              "properties": {
+                "wallMs": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "wallMs"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "version",
+            "id",
+            "op",
+            "session",
+            "index",
+            "settlement",
+            "observed",
+            "environment"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "settlement": {
+                      "const": "causally-ready-v1"
+                    },
+                    "profiles": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "settlement",
+                    "profiles"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*$"
+                    },
+                    "settlement": {
+                      "const": "causally-ready-v1"
+                    },
+                    "fixture": {
+                      "type": "object"
+                    },
+                    "setup": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/command"
+                      }
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "steps": {
+                      "type": "integer",
+                      "minimum": 2
+                    }
+                  },
+                  "required": [
+                    "session",
+                    "settlement",
+                    "fixture",
+                    "setup",
+                    "actions",
+                    "steps"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "discarded": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "discarded"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "complete": {
+                      "const": false
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "inputs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/command"
+                      },
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "complete",
+                    "index",
+                    "inputs"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "complete": {
+                      "const": true
+                    },
+                    "steps": {
+                      "type": "integer",
+                      "minimum": 2
+                    }
+                  },
+                  "required": [
+                    "complete",
+                    "steps"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": [
+            "version",
+            "id",
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "version",
+            "id",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "command": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/behaviorCommand"
+        },
+        {
+          "$ref": "#/$defs/coreCommand"
+        },
+        {
+          "$ref": "#/$defs/clockCommand"
+        }
+      ]
+    },
+    "behaviorCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "begin"
+            },
+            "key": {
+              "type": "string"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "instance": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "outside": {
+              "type": "boolean"
+            },
+            "disabled": {
+              "type": "boolean"
+            },
+            "recovery": {
+              "enum": [
+                "allow",
+                "deny",
+                "error"
+              ]
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "resolve"
+            },
+            "loader": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "value": {
+              "type": [
+                "number",
+                "string",
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "loader"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "reject"
+            },
+            "loader": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "error": {
+              "const": "timeout"
+            }
+          },
+          "required": [
+            "op",
+            "loader"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "advance"
+            },
+            "ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "deliverTimers": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "op",
+            "ms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "shiftWall"
+            },
+            "ms": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "op",
+            "ms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "seed"
+            },
+            "useCase": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            },
+            "frameHex": {
+              "type": "string"
+            },
+            "payloadText": {
+              "type": "string"
+            },
+            "payloadHex": {
+              "type": "string"
+            },
+            "value": {
+              "type": [
+                "number",
+                "string",
+                "boolean",
+                "null"
+              ]
+            },
+            "ageMs": {
+              "type": "number"
+            },
+            "ttlMs": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "invalidate"
+            },
+            "key": {
+              "type": "string"
+            },
+            "futureBufferMs": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "observeMarker"
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "adapterReply"
+            },
+            "value": {}
+          },
+          "required": [
+            "op",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "policy"
+            },
+            "value": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Explicit runtime configuration input, including deliberately malformed values in boundary profiles. Omitted fields, null, false and zero are distinct."
+            }
+          },
+          "required": [
+            "op",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "faults"
+            },
+            "value": {
+              "type": "object",
+              "properties": {
+                "localStorage": {
+                  "type": "boolean"
+                },
+                "read": {
+                  "type": "boolean"
+                },
+                "write": {
+                  "type": "boolean"
+                },
+                "dump": {
+                  "type": "boolean"
+                },
+                "load": {
+                  "type": "boolean"
+                },
+                "policy": {
+                  "type": "boolean"
+                },
+                "observer": {
+                  "type": "boolean"
+                },
+                "holdReads": {
+                  "type": "boolean"
+                },
+                "holdWrites": {
+                  "type": "boolean"
+                },
+                "holdDumps": {
+                  "type": "boolean"
+                },
+                "holdLoads": {
+                  "type": "boolean"
+                },
+                "holdPolicies": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "op",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "release"
+            },
+            "effect": {
+              "enum": [
+                "read",
+                "write",
+                "dump",
+                "load",
+                "policy"
+              ]
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "fail": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "op",
+            "effect",
+            "index"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "openScope"
+            },
+            "id": {
+              "type": "string"
+            },
+            "parent": {
+              "type": "string"
+            },
+            "disabled": {
+              "type": "boolean"
+            },
+            "instance": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "closeScope"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "coreCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "advanceWall"
+            },
+            "ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "op",
+            "ms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "bumpSource"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "invalidate"
+            },
+            "identity": {
+              "type": "object",
+              "properties": {
+                "keyType": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "useCase": {
+                  "type": "string"
+                },
+                "tracked": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "keyType",
+                "id",
+                "useCase",
+                "tracked"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "op",
+            "identity"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "call"
+            },
+            "identity": {
+              "type": "object",
+              "properties": {
+                "keyType": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "useCase": {
+                  "type": "string"
+                },
+                "tracked": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "keyType",
+                "id",
+                "useCase",
+                "tracked"
+              ],
+              "additionalProperties": false
+            },
+            "policy": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Explicit runtime configuration input, including deliberately malformed values in boundary profiles. Omitted fields, null, false and zero are distinct."
+            },
+            "mode": {
+              "enum": [
+                "outside",
+                "single",
+                "request-pair",
+                "coalesced-pair"
+              ]
+            },
+            "counter": {
+              "enum": [
+                "outsideLoaderCalls",
+                "requestLoaderCalls",
+                "localLoaderCalls",
+                "coalescedLoaderCalls",
+                "remoteLoaderCalls"
+              ]
+            },
+            "readFailure": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "op",
+            "identity",
+            "policy",
+            "mode",
+            "counter",
+            "readFailure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "clockCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "constructInstance"
+            },
+            "instance": {
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "instance"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "advanceTicks"
+            },
+            "ticks": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "op",
+            "ticks"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "call"
+            },
+            "instance": {
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "offered": {
+              "enum": [
+                1,
+                2
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "instance",
+            "offered"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

@@ -18,7 +18,8 @@
       "version": 1,
       "definition": "formal/CONFORMANCE.md",
       "model": "formal/dialcache-conformance.qnt",
-      "smoke": "formal/conformance-smoke.itf.json"
+      "smoke": "formal/conformance-smoke.itf.json",
+      "inputEncoding": "explicit-v1"
     },
     {
       "id": "effects",
@@ -68,7 +69,8 @@
         "formal/replay-inputs.mjs",
         "test/formal/feature-profile.ts",
         "test/formal/behavior-driver.ts"
-      ]
+      ],
+      "inputEncoding": "explicit-v1"
     },
     {
       "id": "policy",
@@ -113,7 +115,8 @@
         "formal/replay-inputs.mjs",
         "test/formal/feature-profile.ts",
         "test/formal/behavior-driver.ts"
-      ]
+      ],
+      "inputEncoding": "explicit-v1"
     },
     {
       "id": "layers",
@@ -297,5 +300,42 @@
       "definition": "go/README.md",
       "limits": "Same generated histories and portable scenarios as TypeScript, all protocol vectors, plus native Redis/Valkey/Cluster and cross-language integration. Claims require current corpus and witness fingerprints; finite evidence does not prove every possible schedule. Native API and value adaptations are documented in the Go README and parity ledger."
     }
+  ],
+  "replaySources": [
+    "formal/replay/bindings.d.mts",
+    "formal/replay/bindings.mjs",
+    "formal/replay/cohort-inputs.d.mts",
+    "formal/replay/cohort-inputs.mjs",
+    "formal/replay/coordinator.d.mts",
+    "formal/replay/coordinator.mjs",
+    "formal/replay/core.d.mts",
+    "formal/replay/core.mjs",
+    "formal/replay/effects.d.mts",
+    "formal/replay/effects.mjs",
+    "formal/replay/features.d.mts",
+    "formal/replay/features.mjs",
+    "formal/replay/itf.d.mts",
+    "formal/replay/itf.mjs",
+    "formal/replay/local-clock.d.mts",
+    "formal/replay/local-clock.mjs",
+    "formal/replay/observation.d.mts",
+    "formal/replay/observation.mjs",
+    "formal/replay/profiles/local-failure.d.mts",
+    "formal/replay/profiles/local-failure.mjs",
+    "formal/replay/profiles/recovery-read.d.mts",
+    "formal/replay/profiles/recovery-read.mjs",
+    "formal/replay/profiles/runtime-boundaries.d.mts",
+    "formal/replay/profiles/runtime-boundaries.mjs",
+    "formal/replay/profiles/shadow-layers.d.mts",
+    "formal/replay/profiles/shadow-layers.mjs",
+    "formal/replay/profiles/source-budgets.d.mts",
+    "formal/replay/profiles/source-budgets.mjs",
+    "formal/replay/protocol.schema.json",
+    "formal/replay/schema.d.mts",
+    "formal/replay/schema.mjs",
+    "formal/replay/sources.d.mts",
+    "formal/replay/sources.mjs",
+    "formal/replay/validation.d.mts",
+    "formal/replay/validation.mjs"
   ]
 }

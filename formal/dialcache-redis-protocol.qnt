@@ -1,4 +1,5 @@
 module dialcache_redis_protocol {
+  import cache_rules.* from "./cache-rules"
   // Abstract public Redis decoder classification. Exact bytes live in portable
   // protocol vectors; this model checks validation/classification precedence.
   // Selected rules from W04 and C33. Reply/frame/watermark/encoding fields are external
@@ -45,7 +46,7 @@ module dialcache_redis_protocol {
     else if (st.tracked and st.frameTimestamp == 0)
       UnclassifiedMiss
     else if (st.tracked and st.watermarkReply == BufferReply and
-      st.watermarkState == ValidWatermark and st.frameTimestamp <= st.watermarkValue)
+      st.watermarkState == ValidWatermark and not(fenceAllows(st.frameTimestamp, st.watermarkValue)))
       WatermarkFenced
     else if (st.encoding == UnsupportedEncoding)
       PayloadEncodingError

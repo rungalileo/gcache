@@ -1,3 +1,5 @@
+import { emptyObservation } from "../../formal/replay/observation.mjs";
+export { emptyObservation } from "../../formal/replay/observation.mjs";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { performance } from "node:perf_hooks";
 
@@ -82,10 +84,6 @@ export interface Observation {
   writeTtls: number[];
   shadow: string[];
   recovery: string[];
-}
-export function emptyObservation(fixture?: Fixture): Observation {
-  return { ...(fixture?.observe === undefined ? {} : { events: [] }), calls: [], loaders: 0, reads: 0, writes: 0, invalidations: 0, maintenance: [],
-    loads: 0, dumps: 0, policyCalls: 0, classifications: 0, comparisons: 0, sourceScopes: [], writeTtls: [], shadow: [], recovery: [] };
 }
 
 function deferred<T>() {

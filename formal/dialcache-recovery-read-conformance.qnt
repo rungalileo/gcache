@@ -1,4 +1,5 @@
 module dialcache_recovery_read_conformance {
+  import cache_rules.* from "./cache-rules"
   import conformance_observations.* from "./conformance-observations"
 
   // One tracked or untracked operation crosses request, local and remote
@@ -121,7 +122,7 @@ module dialcache_recovery_read_conformance {
     else if (payload == CORRUPT_COMPRESSED) x.compression.append("fallback_raw")
     else x.compression
   pure def validCandidate(x: State): bool = x.candidate > 0 and
-    x.candidateCreated <= x.wall and x.wall - x.candidateCreated < x.acceptedMaximum
+    recoveryAgeAllowed(x.candidateCreated, x.wall, x.acceptedMaximum)
   pure def complete(x: State, value: int): State = {
     phase: IDLE,
     memo: if (value != SOURCE_ERROR and x.scope < 2 and not(x.closed.nth(x.scope)))
@@ -147,7 +148,7 @@ module dialcache_recovery_read_conformance {
     context == 2 or not(s.closed.nth(context)),
     input' = { name: "beginCall", choice: context },
     val memoValue = if (context < 2) s.memo.nth(context) else 0
-    val localHit = memoValue == 0 and s.localValue > 0 and s.now < s.localExpires
+    val localHit = memoValue == 0 and s.localValue > 0 and localEntryLiveAt(s.now, s.localExpires)
     val value = if (memoValue > 0) memoValue else if (localHit) s.localValue else CALL_PENDING
     val admitted = {
       scope: context, acceptedFresh: s.freshMs, acceptedMaximum: s.maximumMs,
@@ -174,13 +175,13 @@ module dialcache_recovery_read_conformance {
     s.phase == READING,
     input' = { name: "releaseRead", choice: -1 },
     val present = s.frame > 0 and s.now < s.expires
-    val fenced = s.tracked and s.created <= effectiveMarker(s)
+    val fenced = s.tracked and not(fenceAllows(s.created, effectiveMarker(s)))
     val supportedFrame = s.frame != UNSUPPORTED_VERSION and s.frame != UNSAFE_TIMESTAMP
     val validFrame = present and not(fenced) and supportedFrame and s.frame != UNSUPPORTED_ENCODING
     val encodingError = present and not(fenced) and s.frame == UNSUPPORTED_ENCODING
     val age = s.wall - s.created
-    val freshHit = validFrame and age >= 0 and age < s.acceptedFresh
-    val retained = validFrame and age >= 0 and age < s.acceptedMaximum
+    val freshHit = validFrame and freshAgeAllowed(s.created, s.wall, s.acceptedFresh)
+    val retained = validFrame and recoveryAgeAllowed(s.created, s.wall, s.acceptedMaximum)
     val acquired = {
       candidate: if (retained or freshHit) s.frame else 0, candidateCreated: s.created,
       canRecover: not(encodingError), canWrite: not(encodingError),
@@ -214,7 +215,7 @@ module dialcache_recovery_read_conformance {
     input' = { name: "resolveLoader", choice: -1 },
     val requested = if (s.acceptedMaximum > s.acceptedFresh) s.acceptedMaximum else s.acceptedFresh
     val physicalTtl = if (s.tracked and requested > TRACKED_CAP_MS) TRACKED_CAP_MS else requested
-    val publishRemote = s.canWrite and s.wall > s.observedFence
+    val publishRemote = s.canWrite and fenceAllows(s.wall, s.observedFence)
     val publishLocal = not(s.tracked)
     val published = {
       frame: if (publishRemote and not(s.writeFailed)) RAW_TWO else s.frame,

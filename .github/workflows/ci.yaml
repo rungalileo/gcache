@@ -57,6 +57,15 @@ jobs:
         run: make check-go
       - name: Check real Redis, Valkey, Cluster and TypeScript interoperability with race detection
         run: make integration-go
+      - name: Retain Go integration results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: go-integration-results
+          path: .formal-traces/go-integration.jsonl
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: warn
 
   # The existing required `test` status now requires both native language jobs.
   test:

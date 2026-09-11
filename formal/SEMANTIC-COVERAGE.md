@@ -41,10 +41,41 @@ exact tests, asserted clauses and applicable language adaptations. The source
 audit separately accounts for reviewed test declarations and documentation
 sections; it does not count assertions or prove behavioral equivalence.
 
-[VALIDATION.md](./VALIDATION.md) records the completed expansion snapshot,
-including separate behavioral, primitive-vector and mutation results. Historical
-reports below retain their actual revisions and corpus definitions. Neither
-evidence links nor an older pass validate changed inputs.
+[VALIDATION.md](./VALIDATION.md) explains current commands, report identity and
+where to retain behavioral, primitive-vector and mutation results.
+
+## Model assurance
+
+A model's transition helpers, independent properties and implementation replay
+answer different questions. The shared `cache-rules.qnt` judgments own age,
+expiry, deadline and fence decisions. `cache-contract.qnt` owns acquired recovery
+and source records. Connection models execute real profiles and check selected
+histories against those records.
+
+| Evidence | What it establishes |
+| --- | --- |
+| Finite symbolic rule checks | Every decision in the declared finite domain satisfies the independently stated property |
+| Sampled connection checks | Explored profile histories preserve the selected snapshot, timing and ownership contracts |
+| Compiling model mutations | The named property detects that deliberate semantic change to a transition |
+| Exported boundary regressions | The exact public command sequence is checked in Quint and against both implementations |
+
+`make model-check` runs the symbolic checks declared in `execution.json` through
+checksummed standalone Apalache; see the [tool prerequisites](./README.md#generating-and-replaying-behavior).
+This lane is separate from `make formal` and included in `make ci`.
+The model-property challenge catalog in
+[model-property-challenges.mjs](./model-property-challenges.mjs) runs with the
+scheduled model checks and records its independent baseline and counterexample
+for each fault. Model receipts preserve the timestamp, captured policy and owner
+at acceptance. Boundary properties can challenge an eligibility helper by
+stating the inequality directly. Connection and composition properties may
+reuse that helper while checking independently captured inputs, ownership and
+history; they do not thereby validate the helper itself. Each challenge's named
+property and scope determine what its detection establishes.
+
+Keep structural invariants because they expose broken model state, but report
+semantic obligations and mutation sensitivity separately. Sharing transition
+code reduces drift; it does not replace an independently checked property or
+establish a whole-system refinement theorem.
 
 ## Generated boundary evidence
 
@@ -68,63 +99,11 @@ Execution partitions protocol rows with `DIALCACHE_PROTOCOL_CORPUS=generated` or
 
 Negative harness tests and inventory checks are excluded from detection cohorts: a test that expects a deliberately broken driver to fail must not count as behavioral fault detection. Real-server integration/Lua tests are outside this local mutation comparison; they have their own completion evidence. All unmodified baselines must pass. Compile/import errors, crashes, timeouts, missing reports, empty runs, and incomplete surviving runs fail measurement rather than counting as detections.
 
-### Latest recorded measurement
+### Recorded measurements
 
-[VALIDATION.md](./VALIDATION.md#mutation-evidence) records the latest completed
-measurements and their exact source revisions, corpus fingerprints, cohort
-counts and surviving faults. Both TypeScript and Go detected **13/13 selected
-faults in the generated cohort and 13/13 in the portable union**. The generated
-cohort includes Quint-derived protocol vectors, which now detect M12's reversed
-argument ordering. Ordinary and fixed cohorts retain the survivors listed in
-that validation record. These are recorded runs, not a claim that a subsequent
-documentation or source change has been remeasured.
-
-### Historical comparison before generated primitive vectors
-
-The tables in this section preserve the **earlier Go parity milestone, before
-the current case/witness expansion and generated primitive cohort**. They do
-not describe current detection. Its completed TypeScript measurement passed
-all unmodified baselines: 660 ordinary tests, 4,008 generated replays/witness
-gates, and 372 fixed scenarios/protocol vectors (4,380 positive portable
-tests/gates in their union). Exact source, input, and corpus fingerprints are
-retained in that report. Later changes require fresh reports; the manual/weekly
-full workflow repeats measurement for its checked-out inputs.
-
-| Mutant scope | Ordinary detected | Generated detected | Portable detected |
-| --- | ---: | ---: | ---: |
-| Behavioral faults | 11/11 | 11/11 | 11/11 |
-| Protocol faults | 1/2 | 1/2 | 2/2 |
-| All selected faults | 12/13 | 12/13 | 13/13 |
-
-In that historical snapshot, generated replay and portable tests detected all 12 faults detected by ordinary tests. The generated cohort did not yet include the primitive vectors that distinguish M12. These are detection/parity ratios for this catalog, not percentages of all possible defects. No survivor is automatically labeled equivalent or excluded from the denominator.
-
-Policy and shadow profile version 2 had closed three earlier generated-behavior survivors. The historical fault details were:
-
-| Fault | Ordinary TypeScript | Generated TypeScript | Portable TypeScript | Distinguishing evidence |
-| --- | --- | --- | --- | --- |
-| M08: invalid logging policy enables warnings | Detected | Detected | Detected | A malformed flag reaches a confirmed mismatch without a warning |
-| M11: local reads renew insertion TTL | Detected | Detected | Detected | A hit before expiry is followed by a public probe at the original insertion deadline |
-| M12: argument order is reversed | Survives | Survives | Detected | Exact ordering is checked by protocol vectors |
-| M13: expired dark job starts Redis work | Detected | Detected | Detected | Source work exhausts the job budget before deferred dispatch; no Redis read may start |
-
-The other nine faults were detected by all three cohorts in that snapshot. Mutation IDs identify faults, not proofs of an entire case: shared helper changes can be detected through another affected behavior. The report preserves the actual failing test names and trace diagnostics so detection can be reviewed.
-
-The independent Go measurement from that historical milestone compiled all 13 equivalent faults and completed all unmodified baselines: 93 ordinary native tests, 4,008 generated replays/witness gates, and 372 fixed scenarios/protocol vectors. Its completed report records:
-
-| Go cohort | Selected faults detected |
-| --- | ---: |
-| Ordinary native | 5/13 |
-| Quint-generated | 12/13 |
-| Fixed scenarios/protocol vectors | 12/13 |
-| Portable union | 13/13 |
-
-In that historical Go run, native clock regressions detected M03 (late source acceptance) and M11 (renewed insertion TTL). All 11 behavioral faults were detected by generated tests. M12 was detected only by the fixed protocol vectors; M09 (omitted mismatch-logging flag) was detected by generated tests but survived the fixed cohort. The native TypeScript and Go suites differed in size and scope, so their ordinary detection ratios were not equivalent denominators of implementation quality.
-
-Full validation requires every catalog entry's declared generated and portable
-detections in each language. It runs in the manual/weekly full workflow and via
-`make mutations` locally. Fast PR checks do not run the mutation catalog.
-Quint-driven tests provide the main portable regression suite; native tests
-cover language and integration boundaries.
+Per-run reports retain cohort sizes, assertion failures and survivors. The
+[historical baseline](./VALIDATION.md#historical-results) preserves PR #161's
+results; fresh measurements belong with their exact source and corpus artifacts.
 
 ## Reproduction and CI
 
@@ -157,7 +136,11 @@ To expand assurance, add a test/doc-derived case and precise executable evidence
 
 ## Model properties and cross-language execution
 
-The strengthened C23 invariant records actual model source-start time. `check-model-properties.mjs` requires a compiling deadline-epoch mutation to produce an invariant counterexample, and retains its source hash, tool version, and trace. Compilation/evaluator errors cannot count as detection. This challenges the specification itself in addition to the TypeScript mutation catalog.
+`check-model-properties.mjs` challenges shared boundaries and profile connections
+using the reviewed catalog. It records a passing baseline and invariant
+counterexample for each compiling fault, along with source fingerprints, tools
+and bounds. This measures the specification separately from implementation
+mutation detection.
 
 Every effects replay also runs `assertEffectsHistory` over actual external source starts/settlements and public fallback/write observations. Its C23/C25/C26 checks cover source-relative budget/duration, strict deadline acceptance, and a preceding accepted success before publication. It consumes no expected model phases and permits pending prefixes. An additional causal monitor in both drivers ties writes to their actual invocation/source callback and rejects publication after that source settled too late; negative tests distinguish property failures from malformed monitor inputs. This is a bounded connection for selected properties, not full model refinement or liveness proof.
 

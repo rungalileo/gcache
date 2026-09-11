@@ -1,4 +1,5 @@
 module dialcache_layers_conformance {
+  import cache_rules.* from "./cache-rules"
   import conformance_observations.* from "./conformance-observations"
   // Composition boundary: request -> process flight -> local -> remote -> source.
   // Two entities x two operations; two instances; three persistent request scopes.
@@ -178,7 +179,7 @@ module dialcache_layers_conformance {
     val readsRemote = participating and remoteEnabled(state)
     val remoteValue =
       if (readsRemote and (not(state.tracked)
-        or state.created.nth(key) > state.watermark.nth(key / OPERATIONS_PER_ENTITY)))
+        or fenceAllows(state.created.nth(key), state.watermark.nth(key / OPERATIONS_PER_ENTITY))))
         state.remoteValues.nth(key)
       else NO_CACHED_VALUE
     val withRemoteObservation = if (readsRemote) {
@@ -208,7 +209,7 @@ module dialcache_layers_conformance {
   pure def settle(state: State, index: int, value: int): State = {
     val source = state.sources.nth(index)
     val success = value != SOURCE_ERROR
-    val write = success and source.remote and state.now > source.fence
+    val write = success and source.remote and fenceAllows(state.now, source.fence)
     val withSourceResult = {
       sources: state.sources.replaceAt(index, { result: value, ...source }),
       processFlights: state.processFlights.foldl(List(), (out, owner) =>

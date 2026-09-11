@@ -1,4 +1,5 @@
 module dialcache_local_clock_conformance {
+  import cache_rules.* from "./cache-rules"
   import conformance_observations.* from "./conformance-observations"
 
   // C09/B02: default instances share a whole-millisecond local expiry grid.
@@ -33,9 +34,8 @@ module dialcache_local_clock_conformance {
   var s: State
   var input: { name: str, choice: int }
 
-  pure def wholeMs(ticks: int): int = ticks / TICKS_PER_MS
   pure def entryIsLive(entry: Entry, ticks: int): bool =
-    entry.value != EMPTY_ENTRY and wholeMs(ticks) - wholeMs(entry.insertedTicks) < LOCAL_TTL_MS
+    entry.value != EMPTY_ENTRY and localEntryLiveOnGrid(ticks, entry.insertedTicks, LOCAL_TTL_MS, TICKS_PER_MS)
 
   action init = all {
     s' = {
@@ -93,7 +93,7 @@ module dialcache_local_clock_conformance {
   action step = any { constructInstance, advanceTicks, callCache }
 
   // Deliberately spell out the integer projection here instead of reusing the
-  // transition's entryIsLive or wholeMs helper. A precise-TTL substitution and
+  // transition's localEntryLiveOnGrid helper. A precise-TTL substitution and
   // a renewed insertion timestamp must both violate an independent obligation.
   val localReadsUseCommonWholeMilliseconds = s.probes.indices().forall(index => {
     val probe = s.probes.nth(index)

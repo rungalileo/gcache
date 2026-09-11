@@ -1,3 +1,4 @@
+import { AssertionError } from "node:assert";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -42,7 +43,11 @@ describe("generated local-clock conformance", () => {
     it("compares observations without changing the declared schedule", async () => {
       const trace = structuredClone(traces[0]!);
       trace.steps[1]!.expected.loaders++;
-      await expect(replayLocalClockTrace(trace)).rejects.toThrow(/expected 1, actual 0/);
+      await expect(replayLocalClockTrace(trace)).rejects.toMatchObject({
+        constructor: AssertionError,
+        expected: expect.objectContaining({ loaders: 1 }),
+        actual: expect.objectContaining({ loaders: 0 }),
+      });
     });
     it("ignores private model state as an execution input", async () => {
       const raw = JSON.parse(readFileSync(traces[0]!.path, "utf8"));

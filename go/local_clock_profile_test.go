@@ -11,19 +11,9 @@ import (
 	"time"
 )
 
-// Used only for strict input/observation parsing. Execution below creates real
-// default instances, rather than the ordinary integer-clock BehaviorDriver.
-func localClockProfile() behaviorProfile {
-	return behaviorProfile{name: "local-clock", explicitInputs: true, actions: map[string]behaviorAction{
-		"constructInstance": {choices: []int64{0, 1}},
-		"advanceTicks":      {choices: []int64{1, 100, 300, 400, 700, 999200, 999999, 1000000}},
-		"call":              {choices: []int64{0, 1, 2, 3}},
-	}}
-}
-
-func replayLocalClockTrace(trace behaviorTrace) error {
-	// Normalize only the test environment's phase, before replay begins. No
-	// expected model timestamp or private cache state schedules an operation.
+func replayLocalClockTrace(coordinator *replayCoordinator, prepared obj) error {
+	// Normalize only the test environment's phase. The driver uses real default
+	// instances, so an injected integer clock cannot hide a construction-grid bug.
 	probe := New[int](Options[int]{})
 	elapsed := elapsedNow(probe.options.Clock)
 	if elapsed < 0 {
@@ -34,27 +24,29 @@ func replayLocalClockTrace(trace behaviorTrace) error {
 	var sources atomic.Int64
 	actual := emptyBehaviorObservation(obj{})
 	op := Operation{Identity: Identity{KeyType: "clock", ID: "one", UseCase: "QuintLocalGrid"}, Policy: Policy{LocalTTLMS: 1000}}
-	for index, step := range trace.steps {
-		switch step.action {
+	apply := func(input obj) error {
+		instance := bn(input["instance"])
+		switch input["op"] {
 		case "constructInstance":
-			if caches[step.choice] != nil {
-				return fmt.Errorf("instance already constructed")
+			if instance < 0 || instance >= int64(len(caches)) || caches[instance] != nil {
+				return fmt.Errorf("invalid/duplicate instance")
 			}
-			caches[step.choice] = New[int](Options[int]{})
+			caches[instance] = New[int](Options[int]{})
 		case "advanceTicks":
-			time.Sleep(time.Duration(step.choice) * time.Microsecond)
+			ticks := bn(input["ticks"])
+			if ticks <= 0 {
+				return fmt.Errorf("invalid clock advance")
+			}
+			time.Sleep(time.Duration(ticks) * time.Microsecond)
 		case "call":
-			cache := caches[step.choice/2]
-			if cache == nil {
+			if instance < 0 || instance >= int64(len(caches)) || caches[instance] == nil {
 				return fmt.Errorf("call before instance construction")
 			}
+			cache := caches[instance]
 			var value int
 			err := cache.Enable(context.Background(), func(ctx context.Context) error {
 				var err error
-				value, err = cache.GetOrLoad(ctx, op, func(context.Context) (int, error) {
-					sources.Add(1)
-					return int(step.choice%2 + 1), nil
-				})
+				value, err = cache.GetOrLoad(ctx, op, func(context.Context) (int, error) { sources.Add(1); return int(bn(input["offered"])), nil })
 				return err
 			})
 			if err != nil {
@@ -62,12 +54,12 @@ func replayLocalClockTrace(trace behaviorTrace) error {
 			}
 			actual["calls"] = append(ba(actual["calls"]), value)
 			actual["loaders"] = sources.Load()
+		default:
+			return fmt.Errorf("unknown local-clock command")
 		}
-		if !bequal(step.expected, actual) {
-			return fmt.Errorf("%s step %d %s choice %d\nexpected: %s\nactual: %s", trace.path, index, step.action, step.choice, bjson(step.expected), bjson(actual))
-		}
+		return nil
 	}
-	return nil
+	return coordinator.execute(prepared, apply, func() obj { return actual }, func() int64 { return time.Now().UnixMilli() })
 }
 
 func TestLocalClockConformance(t *testing.T) {
@@ -79,25 +71,21 @@ func TestLocalClockConformance(t *testing.T) {
 		t.Skip("the selected trace belongs to a different profile")
 	}
 	requireBehaviorProfile(t, "local-clock")
+	coordinator := newReplayCoordinator(t)
 	for _, path := range paths {
+		prepared, err := coordinator.prepare("local-clock", path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 		t.Run(filepath.Base(path), func(t *testing.T) {
-			raw, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			trace, err := parseBehaviorTrace(raw, path, localClockProfile())
-			if err != nil {
-				t.Fatal(err)
-			}
 			synctest.Test(t, func(t *testing.T) {
-				if err := replayLocalClockTrace(trace); err != nil {
+				if err := replayLocalClockTrace(coordinator, prepared); err != nil {
 					t.Fatal(err)
 				}
 			})
 		})
 	}
 }
-
 func TestLocalClockReplayIsolation(t *testing.T) {
 	paths, err := featurePaths("local-clock")
 	if err != nil {
@@ -106,18 +94,24 @@ func TestLocalClockReplayIsolation(t *testing.T) {
 	if len(paths) == 0 {
 		t.Skip("the selected trace belongs to a different profile")
 	}
+	coordinator := newReplayCoordinator(t)
 	t.Run("corrupted observation cannot steer replay", func(t *testing.T) {
 		raw, err := os.ReadFile(paths[0])
 		if err != nil {
 			t.Fatal(err)
 		}
-		trace, err := parseBehaviorTrace(raw, paths[0], localClockProfile())
+		trace, err := behaviorJSON(raw)
 		if err != nil {
 			t.Fatal(err)
 		}
-		trace.steps[1].expected["loaders"] = int64(1)
+		state := bm(ba(bm(trace)["states"])[1])
+		bm(bm(state["s"])["o"])["loaders"] = obj{"#bigint": "1"}
+		prepared, err := coordinator.prepare("local-clock", paths[0], []byte(bjson(trace)))
+		if err != nil {
+			t.Fatal(err)
+		}
 		synctest.Test(t, func(t *testing.T) {
-			if err := replayLocalClockTrace(trace); err == nil {
+			if err := replayLocalClockTrace(coordinator, prepared); err == nil {
 				t.Fatal("corrupted source count was accepted")
 			}
 		})

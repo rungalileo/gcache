@@ -11,7 +11,7 @@ const aggregateTargets = {
   formal: ['formal-corpus', 'formal-go'],
   mutations: ['mutations-ts', 'mutations-go'],
   integration: ['integration-ts', 'integration-go'],
-  ci: ['check', 'package-floor', 'formal', 'integration', 'mutations'],
+  ci: ['check', 'package-floor', 'formal', 'model-check', 'integration', 'mutations'],
 };
 export const targetDescriptions = {
   check: 'TypeScript and Go checks, docs build and reviewed inventories; no Quint generation or Docker',
@@ -24,6 +24,8 @@ export const targetDescriptions = {
   'formal-corpus': 'Check models, generate/recompute artifacts and complete TypeScript replay with witnesses',
   'formal-go': 'Require current TypeScript completion, then complete Go replay with race detection',
   'fixtures-check': 'Recompute every committed model-derived artifact with pinned Quint',
+  explore: 'Explore a new recorded seed and replay both ports in an isolated source snapshot',
+  'model-check': 'Symbolically verify the scheduled finite rules with pinned Quint/Apalache (Java 21)',
   mutations: 'Require both current completions, then measure TypeScript and Go semantic mutations',
   'mutations-ts': 'Require current TypeScript completion, then measure its semantic mutations',
   'mutations-go': 'Require both current completions, then measure Go semantic mutations',
@@ -31,7 +33,7 @@ export const targetDescriptions = {
   'integration-ts': 'Run TypeScript real integration checks',
   'integration-go': 'Run Go real integration and interoperability checks with race detection',
   'package-floor': 'Check zstd and the packed package on exact Node 22.15.0 (NODE22_BIN)',
-  ci: 'Run check, package-floor, formal, integration and mutations in dependency order',
+  ci: 'Run check, package-floor, formal, model-check, integration and mutations in dependency order',
 };
 
 export function expandTargets(target) {
@@ -95,6 +97,8 @@ export function validationPlan(target, { directory = root, environment = process
         node('Check conditional fixture regeneration scope', '--test', '.github/scripts/fixture-scope.test.mjs')),
     smoke: [tsReplay(false), nativeGo(false)],
     'fixtures-check': [node('Recompute all committed Quint artifacts', 'formal/generate-artifacts.mjs', '--check')],
+    explore: [node('Explore and replay an isolated alternate-seed corpus', 'formal/explore.mjs')],
+    'model-check': [node('Symbolically verify the scheduled finite rules', 'formal/check-symbolic-models.mjs')],
     'formal-corpus': [invalidate('ts', 'go'), node('Check every scheduled Quint model', 'formal/run-models.mjs', 'check'),
       node('Generate complete corpus and recompute wire artifacts', 'formal/run-models.mjs', 'generate'),
       node('Recompute committed Quint smoke and witness fixtures', 'formal/generated-fixtures.mjs', '--check'),
@@ -129,14 +133,18 @@ export function checkPrerequisites(target, { directory = root, environment = pro
   const requiredPnpm = JSON.parse(readFileSync(resolve(directory, 'package.json'), 'utf8')).packageManager?.replace(/^pnpm@/, '');
   const pnpm = probe('corepack', ['pnpm', '--version'], { directory, environment });
   if (!requiredPnpm || pnpm !== requiredPnpm) throw new Error(`Expected pinned pnpm ${requiredPnpm}; found ${pnpm}. Use corepack pnpm and install the frozen lockfile.`);
-  if (targets.some(name => ['check-go', 'smoke', 'formal-go', 'mutations-go', 'integration-go'].includes(name))) {
+  if (targets.some(name => ['check-go', 'smoke', 'formal-go', 'mutations-go', 'integration-go', 'explore'].includes(name))) {
     const version = probe('go', ['version'], { directory, environment });
     if (!/^go version go1\.27\.1\s/.test(version)) throw new Error(`Validation requires Go 1.27.1; found ${version}. Put the pinned Go toolchain on PATH.`);
   }
-  if (targets.some(name => ['formal-corpus', 'fixtures-check'].includes(name))) {
+  if (targets.some(name => ['formal-corpus', 'fixtures-check', 'explore', 'model-check'].includes(name))) {
     const requiredQuint = JSON.parse(readFileSync(resolve(directory, 'formal/generated-fixtures.lock.json'), 'utf8')).quintVersion;
     const version = probe('quint', ['--version'], { directory, environment });
     if (version !== requiredQuint) throw new Error(`Expected Quint ${requiredQuint}; found ${version}. Install the pinned Quint CLI before recomputing artifacts.`);
+  }
+  if (targets.includes('model-check')) {
+    const version = probe('java', ['--version'], { directory, environment });
+    if (!/^(?:openjdk|java) 21(?:\.|\s)/.test(version)) throw new Error(`Symbolic checking requires Java 21; found ${version.split('\n')[0]}. Put Java 21 on PATH.`);
   }
   if (targets.some(name => name.startsWith('integration-'))) probe('docker', ['info', '--format', '{{.ServerVersion}}'], { directory, environment });
   if (targets.includes('package-floor')) {
@@ -151,6 +159,60 @@ export function checkPrerequisites(target, { directory = root, environment = pro
 // Native JSON reports go directly to files, avoiding enormous CI log streams.
 export async function executeSteps(steps, { directory = root, environment = process.env, log = message => console.log(message) } = {}) {
   const baseEnvironment = cleanEnvironment(environment);
+  const failureExcerpt = async path => {
+    // Scan rather than only tail: a failed subtest can precede many passes.
+    // Bound retained lines and printed text even for malformed/oversized JSONL.
+    const { createReadStream } = await import('node:fs');
+    const selected = [], tail = [], pending = new Map();
+    const lineLimit = 32 * 1024, outputLimit = 12 * 1024;
+    let line = '', truncated = false;
+    const keep = (target, text) => {
+      target.push(text.length > 2048 ? `${text.slice(0, 2048)} … [line truncated]` : text);
+      if (target === tail && tail.length > 20) tail.shift();
+    };
+    const consume = raw => {
+      let event;
+      try { event = JSON.parse(raw); } catch { /* Plain or truncated report line. */ }
+      const text = typeof event?.Output === 'string' ? event.Output.trimEnd() : raw;
+      if (!text.trim()) return;
+      keep(tail, text);
+      const key = event?.Test ?? event?.Package ?? 'native process';
+      if (event?.Action === 'output') {
+        const lines = pending.get(key) ?? [];
+        keep(lines, text);
+        if (lines.length > 12) lines.shift();
+        pending.delete(key); pending.set(key, lines);
+        if (pending.size > 64) pending.delete(pending.keys().next().value);
+      }
+      if (event?.Action === 'fail' || event?.Action === 'build-fail') {
+        if (selected.length < 24) {
+          keep(selected, `Failed: ${key}`);
+          for (const text of pending.get(key) ?? []) if (selected.length < 24) keep(selected, text);
+        }
+        pending.delete(key);
+      } else if (event?.Action === 'pass') pending.delete(key);
+      // Crashes may prevent a final Go fail event; plain/truncated lines still
+      // expose the diagnostic instead of turning the excerpt into a JSON dump.
+      if (selected.length < 24 && /(?:--- FAIL:|panic:|fatal error:|DATA RACE)/.test(text)
+          && event?.Action !== 'output') keep(selected, text);
+    };
+    for await (const chunk of createReadStream(path, { encoding: 'utf8', highWaterMark: 64 * 1024 })) {
+      let start = 0;
+      for (let end = chunk.indexOf('\n', start); end !== -1; end = chunk.indexOf('\n', start)) {
+        const part = chunk.slice(start, end);
+        truncated ||= line.length + part.length > lineLimit;
+        line += part.slice(0, Math.max(0, lineLimit - line.length));
+        consume(line + (truncated ? ' … [line truncated]' : ''));
+        line = ''; truncated = false; start = end + 1;
+      }
+      const part = chunk.slice(start);
+      truncated ||= line.length + part.length > lineLimit;
+      line += part.slice(0, Math.max(0, lineLimit - line.length));
+    }
+    if (line || truncated) consume(line + (truncated ? ' … [line truncated]' : ''));
+    const excerpt = (selected.length ? selected : tail).join('\n');
+    return excerpt.length > outputLimit ? `${excerpt.slice(0, outputLimit)}\n… [diagnostics truncated]` : excerpt;
+  };
   for (const step of steps) {
     log(`→ ${step.label}`);
     if (step.remove) {
@@ -180,6 +242,18 @@ export async function executeSteps(steps, { directory = root, environment = proc
           else resolveRun();
         });
       });
+    } catch (error) {
+      if (step.stdoutFile) {
+        const path = resolve(directory, step.stdoutFile);
+        try {
+          const excerpt = await failureExcerpt(path);
+          log(`Failed command report: ${path}\n${excerpt || '(no stdout captured)'}`);
+        } catch (diagnosticError) {
+          // Diagnostic collection must never replace the original child failure.
+          try { log(`Failed command report: ${path} (unable to read: ${diagnosticError.message})`); } catch {}
+        }
+      }
+      throw error;
     } finally {
       if (output !== undefined) closeSync(output);
     }

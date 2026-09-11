@@ -1,3 +1,5 @@
+import { actions, parseTrace, fixtureFor, inputsFor, project, expectedObservations, type Trace } from "../formal/replay/effects.mjs";
+type Action = string;
 import { effectsAuthorityWitnesses } from "./formal/effects-authority-witnesses.js";
 import { recordWitnesses } from "./formal/coverage-evidence.js";
 
@@ -6,70 +8,8 @@ import { resolve } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BehaviorDriver, type Input, type Fixture, type Observation, type AdapterReply } from "./formal/behavior-driver.js";
-import { itfInteger, itfSignedInteger, record } from "./formal/itf.js";
+import { BehaviorDriver } from "./formal/behavior-driver.js";
 import { assertEffectsHistory } from "./formal/effects-contract.js";
-
-const actions = ["init", "beginCall", "resolveLoader", "rejectLoader", "releaseRead", "failRead", "releaseLoad", "failLoad", "releaseDump", "failDump", "releaseWrite", "failWrite", "seedRemote", "tick", "jumpClock", "rollbackWall", "observerFault", "readBudgetPolicy", "adapterReply", "invalidate", "futureFence"] as const;
-type Action = typeof actions[number];
-const fields = ["now", "wall", "readStarted", "decodeStarted", "tracked", "reply", "replyAt", "readBudget", "baseReadBudget", "phase", "activeLoader", "activeRead", "deadline", "refill", "acceptedAt", "acceptedWall", "observerFailed", "readAborts", "observedFence", "writeTimestamp", "storedTimestamp", "watermark",
-  "loaders", "reads", "writes", "invalidations", "loads", "dumps", "policyCalls"] as const;
-const observedFields = ["loaders", "reads", "writes", "invalidations", "loads", "dumps", "policyCalls"] as const;
-interface Event { event: string; location: string; detail: string; amount: number }
-const eventNames = ["request", "disabled", "miss", "error", "coalesced", "invalidation", "get", "fallback", "serialization", "futureOffset", "size", "storedSize", "writeDispatch"] as const;
-const timedEvents = new Set(["get", "fallback", "serialization", "futureOffset"]);
-type State = Record<typeof fields[number], number> & { calls: number[]; sources: number[]; readStates: number[]; readBudgets: number[]; events: Event[] };
-interface Step { action: Action; choice?: number; state: State }
-interface Trace { path: string; steps: Step[] }
-
-function parseTrace(value: unknown, path: string): Trace {
-  const states = record(value, path).states;
-  if (!Array.isArray(states) || states.length < 2) throw new Error(`${path}: expected a nonempty trace`);
-  const steps = states.map((raw, index): Step => {
-    const context = `${path} step ${index}`;
-    const step = record(raw, context);
-    const input = record(step.input, context);
-    if (Object.keys(input).sort().join() !== "choice,name") throw new Error(`${context}: invalid explicit input`);
-    const action = input.name;
-    if (!actions.some((name) => name === action) || ((index === 0) !== (action === "init"))) {
-      throw new Error(`${context}: unknown or misplaced action ${JSON.stringify(action)}`);
-    }
-    const chosen = action === "init" || action === "adapterReply" || action === "readBudgetPolicy" || action === "observerFault" || action === "resolveLoader" || action === "rejectLoader" || action === "releaseRead" || action === "failRead";
-    const encoded = itfSignedInteger(input.choice, context);
-    let choice: number | undefined;
-    if (chosen) {
-      if (encoded < 0) throw new Error(`${context}: missing effect choice`);
-      choice = encoded;
-      if ((action === "init" && choice > 5) || (action === "readBudgetPolicy" && choice > 4)
-        || (action === "observerFault" && choice > 1)
-        || (action === "adapterReply" && (choice < 1 || choice > 16))) throw new Error(`${context}: unsupported effect choice`);
-    } else if (encoded !== -1) throw new Error(`${context}: unexpected effect choice`);
-    const rawState = record(step.s, context);
-    if (Object.keys(rawState).length !== fields.length + 5) throw new Error(`${context}: unexpected model fields`);
-    const integers = Object.fromEntries(fields.map((field) => [field, itfInteger(rawState[field], `${context} ${field}`)])) as Record<typeof fields[number], number>;
-    const state: State = { ...integers, calls: [], sources: [], readStates: [], readBudgets: [], events: [] };
-    for (const field of ["calls", "sources", "readStates", "readBudgets"] as const) {
-      const values = rawState[field];
-      if (!Array.isArray(values)) throw new Error(`${context}: missing ${field} list`);
-      state[field] = values.map((value) => itfInteger(value, `${context} ${field}`));
-      if (state[field].some((value) => (field === "readBudgets" ? ![10, 20, 30, 50].includes(value) : value > (field === "calls" ? 3 : 2)))) {
-        throw new Error(`${context}: unsupported ${field} code`);
-      }
-    }
-    if (!Array.isArray(rawState.events)) throw new Error(`${context}: missing event observations`);
-    state.events = rawState.events.map(raw => {
-      const value = record(raw, context);
-      if (Object.keys(value).sort().join() !== "amount,detail,event,location" || typeof value.event !== "string" ||
-        !eventNames.some(event => event === value.event) || typeof value.location !== "string" || typeof value.detail !== "string") {
-        throw new Error(`${context}: invalid event observation`);
-      }
-      const amount = itfInteger(value.amount, context);
-      return { event: value.event, location: value.location, detail: value.detail, amount: timedEvents.has(value.event) ? amount / 1000 : amount };
-    });
-    return { action: action as Action, ...(choice === undefined ? {} : { choice }), state };
-  });
-  return { path, steps };
-}
 
 const singleFile = process.env.DIALCACHE_EFFECTS_TRACE_FILE;
 const directory = process.env.DIALCACHE_EFFECTS_TRACE_DIR;
@@ -97,107 +37,23 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
-// Concrete JSON encodings of the model's semantic reply classes. Timestamps
-// come from the controlled external clock, never expected model state.
-function adapterReply(choice: number): AdapterReply {
-  const stamp = Date.now();
-  const replies: AdapterReply[] = [null, 42, { kind: "watermark_miss", observedWatermarkMs: stamp + 20 },
-    { reason: "value_absent" }, { kind: "miss" }, { kind: "miss", reason: "invented" },
-    { kind: "miss", reason: "invented", observedWatermarkMs: stamp + 20 },
-    { kind: "miss", reason: "watermark_fenced" }, { kind: "miss", reason: "watermark_fenced", observedWatermarkMs: -1 },
-    { kind: "miss", reason: "value_absent", observedWatermarkMs: 1.5 },
-    { kind: "miss", reason: "value_absent", observedWatermarkMs: 9007199254740992 },
-    { kind: "miss", reason: "value_absent", observedWatermarkMs: stamp + 20 },
-    { kind: "miss", reason: "expired", observedWatermarkMs: 0 },
-    { kind: "miss", reason: "value_absent", payload: "1", createdAtMs: stamp },
-    { reason: "watermark_fenced", observedWatermarkMs: stamp + 20, payload: "1", createdAtMs: stamp },
-    { kind: "miss", reason: "watermark_fenced", observedWatermarkMs: stamp + 20 }];
-  return replies[choice - 1]!;
-}
-function inputsFor(step: Pick<Step, "action" | "choice">, driver: BehaviorDriver): Input[] {
-  const observed = driver.snapshot();
-  const release = (effect: "read" | "load" | "dump" | "write", index: number, failed = false): Input[] => [
-    { op: "faults", value: { [effect]: failed } }, { op: "release", effect, index },
-    { op: "faults", value: { [effect]: false } },
-  ];
-  switch (step.action) {
-    case "init": return [{ op: "policy", value: step.choice === 3 ? { remoteReadTimeoutMs: 30 } : step.choice === 4 ? null : {} }];
-    case "beginCall": return [{ op: "begin" }];
-    case "resolveLoader": return [{ op: "resolve", loader: step.choice!, value: 1 }];
-    case "rejectLoader": return [{ op: "reject", loader: step.choice! }];
-    case "releaseRead": return release("read", step.choice!);
-    case "failRead": return release("read", step.choice!, true);
-    case "releaseLoad": return release("load", observed.loads - 1);
-    case "failLoad": return release("load", observed.loads - 1, true);
-    case "releaseDump": return release("dump", observed.dumps - 1);
-    case "failDump": return release("dump", observed.dumps - 1, true);
-    case "releaseWrite": return release("write", observed.writes - 1);
-    case "failWrite": return release("write", observed.writes - 1, true);
-    case "seedRemote": return [{ op: "seed", value: 1 }];
-    case "tick": return [{ op: "advance", ms: 10 }];
-    case "jumpClock": return [{ op: "advance", ms: 10, deliverTimers: false }];
-    case "readBudgetPolicy": return [{ op: "policy", value: step.choice === 0 ? {} : { remoteReadTimeoutMs: [0, 10, 20, 30, 50][step.choice!]! } }];
-    case "adapterReply": return [{ op: "adapterReply", value: adapterReply(step.choice!) }];
-    case "observerFault": return [{ op: "faults", value: { observer: step.choice === 1 } }];
-    case "rollbackWall": return [{ op: "shiftWall", ms: -1000 }];
-    case "invalidate": return [{ op: "invalidate" }];
-    case "futureFence": return [{ op: "invalidate", futureBufferMs: 20 }];
-  }
-}
-
-function projectEvents(observed: Observation): Event[] {
-  return observed.events!.filter(event => event.event !== "readContext" && event.event !== "readAbort").map(event => {
-    if (event.event === "writeDispatch") {
-      if (typeof event.index !== "number") throw new Error("Missing actual write index");
-      return { event: event.event, location: "remote", detail: "", amount: event.index };
-    }
-    expect(event).toMatchObject({ cacheNamespace: "urn", keyType: "id" });
-    if (event.event !== "invalidation") expect(event.useCase).toBe("Behavior");
-    if (event.event === "error") expect(event.inFallback).toBe(event.error === "fallback");
-    const location = event.layer ?? event.scope;
-    const detail = event.reason ?? event.error ?? event.operation ?? "";
-    const amount = event.seconds ?? event.bytes ?? 0;
-    if (typeof location !== "string" || typeof detail !== "string" || typeof amount !== "number") throw new Error("Invalid actual diagnostic observation");
-    return { event: event.event, location, detail, amount };
-  });
-}
-function project(driver: BehaviorDriver) {
-  const observed = driver.snapshot();
-  return {
-    ...Object.fromEntries(observedFields.map((field) => [field, observed[field]])),
-    calls: observed.calls.map((call) => call.status === "pending" ? 0
-      : call.status === "value" ? (call.value === 1 ? 1 : 4)
-      : call.error.startsWith("source:") ? 2 : call.error.startsWith("timeout:") ? 3 : 4),
-    writeTtls: observed.writeTtls, events: projectEvents(observed),
-    readContexts: observed.events!.filter(event => event.event === "readContext").map(({ index, timeoutMs, aborted }) => ({ index, timeoutMs, aborted })),
-    readAborts: observed.events!.filter(event => event.event === "readAbort").map(event => event.index),
-  };
-}
-
-function fixtureFor(mode: number): Fixture {
-  return { policy: { ttlSec: { remote: 60 }, ...(mode >= 2 ? { remoteReadTimeoutMs: 10 } : {}) },
-    tracked: mode !== 5, readTimeoutMs: mode === 0 ? "default" : 20, observe: ["readContext", "readAbort", ...eventNames] };
-}
 async function replay(trace: Trace) {
   // Configuration is an explicit initial input, independent of expected state.
   const driver = new BehaviorDriver(fixtureFor(trace.steps[0]!.choice!));
   try {
     await driver.apply({ op: "faults", value: { holdReads: true, holdLoads: true, holdDumps: true, holdWrites: true } });
-    const abortedReads: number[] = [];
+    const expectations = expectedObservations(trace);
     for (const [index, step] of trace.steps.entries()) {
-      const previous = trace.steps[index - 1]?.state;
-      if (previous !== undefined && step.state.readAborts > previous.readAborts) abortedReads.push(previous.activeRead);
       const context = `${trace.path} step ${index} action ${step.action}`;
-      const expected = { ...Object.fromEntries(observedFields.map((field) => [field, step.state[field]])),
-        calls: step.state.calls, events: step.state.events, writeTtls: Array<number>(step.state.writes).fill(60_000), readAborts: abortedReads, readContexts: step.state.readBudgets.map((timeoutMs, index) => ({ index, timeoutMs, aborted: false })) };
+      const expected = expectations[index];
       try {
         // Only the action/choice and independently observed effect index enter execution.
-        const inputs = inputsFor({ action: step.action, ...(step.choice === undefined ? {} : { choice: step.choice }) }, driver);
+        const inputs = inputsFor({ action: step.action, ...(step.choice === undefined ? {} : { choice: step.choice }) }, driver.snapshot(), { wallMs: Date.now() });
         for (const input of inputs) await driver.apply(input);
         // Check C23/C25/C26 directly on observed history, independently of
         // expected Quint phases, timestamps, and outcome predictions.
         assertEffectsHistory(driver.contractHistory());
-        expect(project(driver), context).toEqual(expected);
+        expect(project(driver.snapshot()), context).toEqual(expected);
       } catch (cause) {
         throw new Error(`${context}\nexpected: ${JSON.stringify(expected)}\nactual: ${JSON.stringify(driver.snapshot())}\nreplay: DIALCACHE_EFFECTS_TRACE_FILE=${JSON.stringify(trace.path)} corepack pnpm exec vitest run test/formal-effects.test.ts`, { cause });
       }

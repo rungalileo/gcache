@@ -4,7 +4,7 @@ import type { Fixture, Input, Observation } from "./behavior-driver.js";
 // inputs cannot inspect expected model state or use it to schedule effects.
 export interface Action {
   choices?: readonly number[];
-  input: (choice: number, observed: Observation) => Input;
+  input: (choice: number, observed: Observation, environment: { wallMs: number }) => Input;
 }
 
 export interface Profile {

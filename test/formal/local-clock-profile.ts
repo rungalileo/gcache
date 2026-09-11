@@ -1,3 +1,5 @@
+import { parseLocalClockTrace, localClockInput, assertLocalClockObservation, type Projected, type LocalClockTrace } from "../../formal/replay/local-clock.mjs";
+export { parseLocalClockTrace, type LocalClockTrace } from "../../formal/replay/local-clock.mjs";
 import { performance } from "node:perf_hooks";
 
 import { vi } from "vitest";
@@ -5,46 +7,6 @@ import { vi } from "vitest";
 import { DialCache, DialCacheKeyConfig } from "../../src/index.js";
 import { emptyObservation, type Observation } from "./behavior-driver.js";
 import { itfInteger, itfSignedInteger, record } from "./itf.js";
-
-type Projected = Omit<Observation, "calls"> & { calls: number[] };
-export interface LocalClockStep { action: string; choice: number; expected: Projected }
-export interface LocalClockTrace { path: string; steps: LocalClockStep[] }
-const advances = [1, 100, 300, 400, 700, 999200, 999999, 1000000];
-const choices: Record<string, readonly number[]> = {
-  init: [-1], constructInstance: [0, 1], advanceTicks: advances, call: [0, 1, 2, 3],
-};
-
-export function parseLocalClockTrace(raw: unknown, path: string): LocalClockTrace {
-  const states = record(raw, path).states;
-  if (!Array.isArray(states) || states.length < 2) throw new Error("Clock trace requires initialization and a transition");
-  const shape = emptyObservation();
-  const steps = states.map((value, index): LocalClockStep => {
-    const state = record(value, `${path} state${index}`);
-    const input = record(state.input, "clock input");
-    if (Object.keys(input).sort().join() !== "choice,name" || typeof input.name !== "string"
-      || !Object.hasOwn(choices, input.name) || (index === 0) !== (input.name === "init")) {
-      throw new Error("Unknown or misplaced clock action");
-    }
-    const choice = itfSignedInteger(input.choice, "clock choice");
-    if (!choices[input.name]!.includes(choice)) throw new Error("Invalid clock choice");
-    const rawObservation = record(record(state.s, "clock state").o, "clock observation");
-    if (Object.keys(rawObservation).sort().join() !== Object.keys(shape).sort().join()) throw new Error("Missing clock observation fields");
-    const expected: Record<string, unknown> = {};
-    for (const [key, baseline] of Object.entries(shape)) {
-      const observed = rawObservation[key];
-      if (key === "calls") {
-        if (!Array.isArray(observed)) throw new Error("Invalid clock calls");
-        expected[key] = observed.map(value => itfInteger(value, "clock returned value"));
-      } else if (typeof baseline === "number") expected[key] = itfInteger(observed, `clock ${key}`);
-      else {
-        if (!Array.isArray(observed) || observed.length !== 0) throw new Error(`Unsupported clock ${key}`);
-        expected[key] = [];
-      }
-    }
-    return { action: input.name, choice, expected: expected as Projected };
-  });
-  return { path, steps };
-}
 
 // This binding deliberately creates default DialCache instances. A shared
 // integer fake Clock injected into each cache would hide a construction-grid
@@ -56,28 +18,23 @@ export async function replayLocalClockTrace(trace: LocalClockTrace): Promise<voi
   const caches: Array<{ call: (offered: number) => Promise<number> } | undefined> = [undefined, undefined];
   try {
     for (const [index, step] of trace.steps.entries()) {
-      if (step.action === "constructInstance") {
-        if (caches[step.choice] !== undefined) throw new Error("Instance already constructed");
+      for (const input of localClockInput(step.action, step.choice)) {
+      if (input.op === "constructInstance") {
+        if (caches[input.instance!] !== undefined) throw new Error("Instance already constructed");
         const cache = new DialCache();
         const load = cache.cached(async (offered: number) => { actual.loaders++; return offered; }, {
           keyType: "clock", useCase: "QuintLocalGrid", cacheKey: () => "one",
           defaultConfig: new DialCacheKeyConfig({ ttlSec: { local: 1 } }),
         });
-        caches[step.choice] = { call: offered => cache.enable(() => load(offered)) };
-      } else if (step.action === "advanceTicks") ticks += step.choice;
-      else if (step.action === "call") {
-        const cache = caches[Math.floor(step.choice / 2)];
+        caches[input.instance!] = { call: offered => cache.enable(() => load(offered)) };
+      } else if (input.op === "advanceTicks") ticks += input.ticks!;
+      else if (input.op === "call") {
+        const cache = caches[input.instance!];
         if (cache === undefined) throw new Error("Call before instance construction");
-        actual.calls.push(await cache.call(step.choice % 2 + 1));
+        actual.calls.push(await cache.call(input.offered!));
       }
-      if (JSON.stringify(actual) !== JSON.stringify(step.expected)) {
-        // Object key order is not part of the observation protocol.
-        for (const key of Object.keys(actual) as Array<keyof Projected>) {
-          if (JSON.stringify(actual[key]) !== JSON.stringify(step.expected[key])) {
-            throw new Error(`${trace.path} step ${index} ${step.action} choice ${step.choice} ${key}: expected ${JSON.stringify(step.expected[key])}, actual ${JSON.stringify(actual[key])}`);
-          }
-        }
       }
+      assertLocalClockObservation(step, actual);
     }
   } finally { now.mockRestore(); }
 }

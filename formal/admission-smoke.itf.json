@@ -13,10 +13,10 @@
   "states": [
     {
       "input": {
-        "name": "init",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "init"
       },
       "mbt::actionTaken": "init",
       "mbt::nondetPicks": {
@@ -67,10 +67,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "4"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -125,10 +125,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "4"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -186,10 +186,10 @@
     },
     {
       "input": {
-        "name": "advance",
         "choice": {
           "#bigint": "10"
-        }
+        },
+        "name": "advance"
       },
       "mbt::actionTaken": "advance",
       "mbt::nondetPicks": {
@@ -247,10 +247,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "0"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -311,10 +311,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "1"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -375,10 +375,10 @@
     },
     {
       "input": {
-        "name": "seed",
         "choice": {
           "#bigint": "4"
-        }
+        },
+        "name": "seed"
       },
       "mbt::actionTaken": "seed",
       "mbt::nondetPicks": {
@@ -439,10 +439,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "0"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -503,10 +503,10 @@
     },
     {
       "input": {
-        "name": "advance",
         "choice": {
           "#bigint": "10"
-        }
+        },
+        "name": "advance"
       },
       "mbt::actionTaken": "advance",
       "mbt::nondetPicks": {
@@ -567,10 +567,10 @@
     },
     {
       "input": {
-        "name": "policy",
         "choice": {
           "#bigint": "2"
-        }
+        },
+        "name": "policy"
       },
       "mbt::actionTaken": "policy",
       "mbt::nondetPicks": {
@@ -631,10 +631,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "5"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -698,10 +698,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "4"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -768,10 +768,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "4"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -841,10 +841,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "1"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -916,10 +916,10 @@
     },
     {
       "input": {
-        "name": "rejectLoader",
         "choice": {
           "#bigint": "0"
-        }
+        },
+        "name": "rejectLoader"
       },
       "mbt::actionTaken": "rejectLoader",
       "mbt::nondetPicks": {
@@ -993,10 +993,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "3"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -1073,10 +1073,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "4"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -1156,10 +1156,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "5"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -1239,10 +1239,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "3"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -1322,10 +1322,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "1"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -1408,10 +1408,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "0"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -1495,10 +1495,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "0"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -1585,10 +1585,10 @@
     },
     {
       "input": {
-        "name": "advance",
         "choice": {
           "#bigint": "10"
-        }
+        },
+        "name": "advance"
       },
       "mbt::actionTaken": "advance",
       "mbt::nondetPicks": {
@@ -1676,10 +1676,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "1"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -1770,10 +1770,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "2"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -1865,10 +1865,10 @@
     },
     {
       "input": {
-        "name": "advance",
         "choice": {
           "#bigint": "10"
-        }
+        },
+        "name": "advance"
       },
       "mbt::actionTaken": "advance",
       "mbt::nondetPicks": {
@@ -1961,10 +1961,10 @@
     },
     {
       "input": {
-        "name": "policy",
         "choice": {
           "#bigint": "2"
-        }
+        },
+        "name": "policy"
       },
       "mbt::actionTaken": "policy",
       "mbt::nondetPicks": {
@@ -2057,10 +2057,10 @@
     },
     {
       "input": {
-        "name": "seed",
         "choice": {
           "#bigint": "5"
-        }
+        },
+        "name": "seed"
       },
       "mbt::actionTaken": "seed",
       "mbt::nondetPicks": {
@@ -2153,10 +2153,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "3"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -2252,10 +2252,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "0"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -2354,10 +2354,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "9"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -2456,10 +2456,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "3"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -2559,10 +2559,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "4"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -2663,10 +2663,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "0"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -2770,10 +2770,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "11"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -2877,10 +2877,10 @@
     },
     {
       "input": {
-        "name": "resolveLoader",
         "choice": {
           "#bigint": "3"
-        }
+        },
+        "name": "resolveLoader"
       },
       "mbt::actionTaken": "resolveLoader",
       "mbt::nondetPicks": {
@@ -2984,10 +2984,10 @@
     },
     {
       "input": {
-        "name": "seed",
         "choice": {
           "#bigint": "3"
-        }
+        },
+        "name": "seed"
       },
       "mbt::actionTaken": "seed",
       "mbt::nondetPicks": {
@@ -3091,10 +3091,10 @@
     },
     {
       "input": {
-        "name": "resolveLoader",
         "choice": {
           "#bigint": "10"
-        }
+        },
+        "name": "resolveLoader"
       },
       "mbt::actionTaken": "resolveLoader",
       "mbt::nondetPicks": {
@@ -3198,10 +3198,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "5"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -3306,10 +3306,10 @@
     },
     {
       "input": {
-        "name": "rejectLoader",
         "choice": {
           "#bigint": "2"
-        }
+        },
+        "name": "rejectLoader"
       },
       "mbt::actionTaken": "rejectLoader",
       "mbt::nondetPicks": {
@@ -3414,10 +3414,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "4"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -3522,10 +3522,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "1"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -3633,10 +3633,10 @@
     },
     {
       "input": {
-        "name": "resolveLoader",
         "choice": {
           "#bigint": "11"
-        }
+        },
+        "name": "resolveLoader"
       },
       "mbt::actionTaken": "resolveLoader",
       "mbt::nondetPicks": {
@@ -3744,10 +3744,10 @@
     },
     {
       "input": {
-        "name": "beginCall",
         "choice": {
           "#bigint": "5"
-        }
+        },
+        "name": "beginCall"
       },
       "mbt::actionTaken": "beginCall",
       "mbt::nondetPicks": {
@@ -3858,10 +3858,10 @@
     },
     {
       "input": {
-        "name": "rejectLoader",
         "choice": {
           "#bigint": "3"
-        }
+        },
+        "name": "rejectLoader"
       },
       "mbt::actionTaken": "rejectLoader",
       "mbt::nondetPicks": {
@@ -3973,10 +3973,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "12"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -4088,10 +4088,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "14"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -4203,10 +4203,10 @@
     },
     {
       "input": {
-        "name": "advance",
         "choice": {
           "#bigint": "10"
-        }
+        },
+        "name": "advance"
       },
       "mbt::actionTaken": "advance",
       "mbt::nondetPicks": {
@@ -4320,10 +4320,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "9"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -4438,10 +4438,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "6"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -4556,10 +4556,10 @@
     },
     {
       "input": {
-        "name": "advance",
         "choice": {
           "#bigint": "10"
-        }
+        },
+        "name": "advance"
       },
       "mbt::actionTaken": "advance",
       "mbt::nondetPicks": {
@@ -4674,10 +4674,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "8"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -4792,10 +4792,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "10"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -4910,10 +4910,10 @@
     },
     {
       "input": {
-        "name": "releaseRead",
         "choice": {
           "#bigint": "8"
-        }
+        },
+        "name": "releaseRead"
       },
       "mbt::actionTaken": "releaseRead",
       "mbt::nondetPicks": {
@@ -5028,10 +5028,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "12"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {
@@ -5147,10 +5147,10 @@
     },
     {
       "input": {
-        "name": "rejectLoader",
         "choice": {
           "#bigint": "6"
-        }
+        },
+        "name": "rejectLoader"
       },
       "mbt::actionTaken": "rejectLoader",
       "mbt::nondetPicks": {
@@ -5267,10 +5267,10 @@
     },
     {
       "input": {
-        "name": "releaseLoad",
         "choice": {
           "#bigint": "13"
-        }
+        },
+        "name": "releaseLoad"
       },
       "mbt::actionTaken": "releaseLoad",
       "mbt::nondetPicks": {

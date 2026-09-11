@@ -52,7 +52,7 @@ const inventoryInputs = (): InventoryInputs => ({
 describe("completed Go conformance report", () => {
   it("requires the exact current trace, fixed, protocol, and witness inventories", () => {
     const result = check(completed());
-    expect(result).toMatchObject({ status: "pass", generatedTraces: 5280, quintRegressionTraces: 165, fixedScenarios: 244, protocolVectors: 1477 });
+    expect(result).toMatchObject({ status: "pass", generatedTraces: 5280, quintRegressionTraces: 234, fixedScenarios: 244, protocolVectors: 1477 });
     expect(result.witnessProfiles).toEqual(["admission", "effects", "independent", "layers", "local-clock", "local-failure", "policy",
       "recovery", "recovery-read", "runtime-boundaries", "scope", "shadow", "shadow-layers", "source-budgets"]);
   });

@@ -9,21 +9,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 )
-
-var observationFields = []string{"sourceVersion", "lastResult", "outsideLoaderCalls", "requestLoaderCalls", "localLoaderCalls", "coalescedLoaderCalls", "remoteLoaderCalls", "redisReads", "redisWrites"}
-var coreActions = map[string]bool{"init": true, "bumpSource": true, "outsideCall": true, "requestLocalPair": true, "localCall": true, "coalescedLocalPair": true, "remoteCall": true, "invalidateRemote": true, "remoteReadFailureCall": true}
-
-type coreStep struct {
-	action   string
-	expected map[string]int64
-}
 
 // validateJSON refuses duplicate keys, avoiding encoding/json's last-key-wins
 // behavior at the action/expectation trust boundary.
@@ -76,57 +66,6 @@ func validateJSON(raw []byte) error {
 		return errors.New("trailing JSON content")
 	}
 	return nil
-}
-
-func parseCore(raw []byte) ([]coreStep, error) {
-	if err := validateJSON(raw); err != nil {
-		return nil, err
-	}
-	var trace struct {
-		States []map[string]json.RawMessage `json:"states"`
-	}
-	if err := json.Unmarshal(raw, &trace); err != nil {
-		return nil, err
-	}
-	if len(trace.States) < 2 {
-		return nil, errors.New("trace requires initialization and at least one transition")
-	}
-	steps := make([]coreStep, 0, len(trace.States))
-	for index, state := range trace.States {
-		var action string
-		if err := json.Unmarshal(state["mbt::actionTaken"], &action); err != nil || !coreActions[action] {
-			return nil, fmt.Errorf("step %d: unknown/missing action", index)
-		}
-		if (index == 0) != (action == "init") {
-			return nil, errors.New("missing or misplaced init")
-		}
-		var picks map[string]json.RawMessage
-		if err := json.Unmarshal(state["mbt::nondetPicks"], &picks); err != nil || picks == nil || len(picks) != 0 {
-			return nil, errors.New("core actions have no arguments")
-		}
-		var expected map[string]json.RawMessage
-		if err := json.Unmarshal(state["s"], &expected); err != nil {
-			return nil, err
-		}
-		step := coreStep{action: action, expected: make(map[string]int64)}
-		for _, field := range observationFields {
-			var encoded map[string]string
-			if err := json.Unmarshal(expected[field], &encoded); err != nil || len(encoded) != 1 {
-				return nil, fmt.Errorf("missing/malformed observation %s", field)
-			}
-			text, found := encoded["#bigint"]
-			if !found || text == "" || strings.Trim(text, "0123456789") != "" {
-				return nil, errors.New("invalid ITF integer")
-			}
-			n, err := strconv.ParseUint(text, 10, 64)
-			if err != nil || n > MaxSafeInteger {
-				return nil, errors.New("unsafe ITF integer")
-			}
-			step.expected[field] = int64(n)
-		}
-		steps = append(steps, step)
-	}
-	return steps, nil
 }
 
 type manualClock struct {
@@ -263,13 +202,13 @@ func (d *coreDriver) enabled(op Operation, counter string) (int64, error) {
 // observer callback (or an unexpected second loader) establishes overlap. A
 // warm-cache first call instead establishes its completion through its result.
 // The timeout only detects a deadlocked implementation; it schedules no work.
-func (d *coreDriver) pair(op Operation) (int64, error) {
+func (d *coreDriver) pair(op Operation, counter string) (int64, error) {
 	watchdog := time.NewTimer(5 * time.Second)
 	defer watchdog.Stop()
 	gate := make(chan struct{})
 	started := make(chan struct{}, 2)
 	results := make(chan callResult, 2)
-	load := d.loader("coalescedLoaderCalls", gate, started)
+	load := d.loader(counter, gate, started)
 	call := func() {
 		var value int64
 		err := d.cache.Enable(context.Background(), func(ctx context.Context) error {
@@ -337,99 +276,103 @@ func (d *coreDriver) pair(op Operation) (int64, error) {
 
 // apply has no expected-state parameter. Its only model-derived input is the
 // selected public action; cache publication is tested by later actual calls.
-func (d *coreDriver) apply(action string) error {
-	if action == "init" {
+func (d *coreDriver) apply(input obj) error {
+	switch input["op"] {
+	case "advanceWall":
+		d.clock.mu.Lock()
+		d.clock.wall += bn(input["ms"])
+		d.clock.mu.Unlock()
 		return nil
-	}
-	d.clock.tickWall()
-	var value int64
-	var err error
-	switch action {
 	case "bumpSource":
 		d.mu.Lock()
 		d.source++
 		d.mu.Unlock()
 		return nil
-	case "outsideCall":
-		op := coreOperation("ConformanceOutside")
-		op.Policy.LocalTTLMS = 60000
-		value, err = d.cache.GetOrLoad(context.Background(), op, d.loader("outsideLoaderCalls", nil, nil))
-	case "requestLocalPair":
-		op := coreOperation("ConformanceRequest")
-		op.Policy.RequestLocal = true
-		err = d.cache.Enable(context.Background(), func(ctx context.Context) error {
-			var e error
-			value, e = d.cache.GetOrLoad(ctx, op, d.loader("requestLoaderCalls", nil, nil))
-			if e != nil {
-				return e
-			}
-			second, e := d.cache.GetOrLoad(ctx, op, d.loader("requestLoaderCalls", nil, nil))
-			if e != nil {
-				return e
-			}
-			if second != value {
-				return errors.New("request pair differs")
-			}
-			return nil
-		})
-	case "localCall":
-		op := coreOperation("ConformanceLocal")
-		op.Policy.LocalTTLMS = 60000
-		value, err = d.enabled(op, "localLoaderCalls")
-	case "coalescedLocalPair":
-		op := coreOperation("ConformanceCoalesced")
-		op.Policy.LocalTTLMS = 60000
-		value, err = d.pair(op)
-	case "remoteCall", "remoteReadFailureCall":
-		op := coreOperation("ConformanceRemote")
-		op.Policy.RemoteTTLMS = 60000
-		op.Identity.Tracked = true
-		if action == "remoteReadFailureCall" {
-			d.remote.failReads(true)
-			defer d.remote.failReads(false)
+	case "invalidate":
+		identity := bm(input["identity"])
+		return d.cache.Invalidate(context.Background(), Identity{Namespace: "urn", KeyType: bs(identity["keyType"]), ID: bs(identity["id"])}, 0)
+	case "call":
+		identity := bm(input["identity"])
+		policy, err := ParsePolicy(input["policy"])
+		if err != nil {
+			return err
 		}
-		value, err = d.enabled(op, "remoteLoaderCalls")
-	case "invalidateRemote":
-		return d.cache.Invalidate(context.Background(), coreOperation("ConformanceRemote").Identity, 0)
+		op := Operation{Identity: Identity{Namespace: "urn", KeyType: bs(identity["keyType"]), ID: bs(identity["id"]), UseCase: bs(identity["useCase"]), Tracked: bb(identity["tracked"])}, Policy: policy}
+		counter := bs(input["counter"])
+		d.remote.failReads(bb(input["readFailure"]))
+		defer d.remote.failReads(false)
+		var value int64
+		switch input["mode"] {
+		case "outside":
+			value, err = d.cache.GetOrLoad(context.Background(), op, d.loader(counter, nil, nil))
+		case "single":
+			value, err = d.enabled(op, counter)
+		case "coalesced-pair":
+			value, err = d.pair(op, counter)
+		case "request-pair":
+			err = d.cache.Enable(context.Background(), func(ctx context.Context) error {
+				var err error
+				value, err = d.cache.GetOrLoad(ctx, op, d.loader(counter, nil, nil))
+				if err != nil {
+					return err
+				}
+				second, err := d.cache.GetOrLoad(ctx, op, d.loader(counter, nil, nil))
+				if err != nil {
+					return err
+				}
+				if second != value {
+					return errors.New("request pair differs")
+				}
+				return nil
+			})
+		default:
+			return errors.New("unknown core call mode")
+		}
+		if err == nil {
+			d.mu.Lock()
+			d.last = value
+			d.mu.Unlock()
+		}
+		return err
 	default:
-		return errors.New("unknown driver action")
+		return errors.New("unknown core driver command")
 	}
-	if err == nil {
-		d.mu.Lock()
-		d.last = value
-		d.mu.Unlock()
-	}
-	return err
 }
+
 func (d *coreDriver) observation() map[string]int64 {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.remote.mu.Lock()
 	defer d.remote.mu.Unlock()
 	out := map[string]int64{"sourceVersion": d.source, "lastResult": d.last, "redisReads": d.remote.reads, "redisWrites": d.remote.writes}
-	for _, field := range observationFields {
+	for _, field := range []string{"outsideLoaderCalls", "requestLoaderCalls", "localLoaderCalls", "coalescedLoaderCalls", "remoteLoaderCalls"} {
 		if _, found := out[field]; !found {
 			out[field] = d.loaders[field]
 		}
 	}
 	return out
 }
-func replayCore(steps []coreStep) error {
-	return replayCoreWithDriver(steps, newCoreDriver())
-}
-func replayCoreWithDriver(steps []coreStep, d *coreDriver) error {
-	for index, step := range steps {
-		if err := d.apply(step.action); err != nil {
-			return fmt.Errorf("step %d %s: %w", index, step.action, err)
+func replayCoreWithDriver(coordinator *replayCoordinator, prepared obj, d *coreDriver) error {
+	observe := func() obj {
+		out := obj{}
+		for field, value := range d.observation() {
+			out[field] = value
 		}
-		if actual := d.observation(); !reflect.DeepEqual(actual, step.expected) {
-			return fmt.Errorf("step %d %s\nexpected: %v\nactual:   %v", index, step.action, step.expected, actual)
-		}
+		return out
 	}
-	return nil
+	return coordinator.execute(prepared, d.apply, observe, d.clock.WallMS)
 }
 
 func TestCoreConformance(t *testing.T) {
+	coordinator := newReplayCoordinator(t)
+	info, err := coordinator.call(obj{"op": "profiles"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	coreActions := map[string]bool{"init": true}
+	for _, action := range ba(bm(info["profiles"])["core"]) {
+		coreActions[bs(action)] = true
+	}
 	requireRegistry(t)
 	paths := []string{"../formal/conformance-smoke.itf.json"}
 	file, directory := os.Getenv("DIALCACHE_MBT_TRACE_FILE"), os.Getenv("DIALCACHE_MBT_TRACE_DIR")
@@ -448,6 +391,11 @@ func TestCoreConformance(t *testing.T) {
 		if len(paths) == 0 {
 			t.Fatal("empty trace corpus")
 		}
+		regressions, err := featureRegressionPaths("core", directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, regressions...)
 	}
 	actions := map[string]bool{}
 	for _, path := range paths {
@@ -456,14 +404,14 @@ func TestCoreConformance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			steps, err := parseCore(raw)
+			prepared, err := coordinator.prepare("core", path, raw)
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, step := range steps {
-				actions[step.action] = true
+			for _, action := range ba(prepared["actions"]) {
+				actions[bs(action)] = true
 			}
-			if err := replayCore(steps); err != nil {
+			if err := replayCoreWithDriver(coordinator, prepared, newCoreDriver()); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -479,21 +427,31 @@ func TestCoreConformance(t *testing.T) {
 }
 
 func TestCoreParserAndObservationBoundary(t *testing.T) {
+	coordinator := newReplayCoordinator(t)
 	raw, err := os.ReadFile("../formal/conformance-smoke.itf.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	steps, err := parseCore(raw)
+	prepared, err := coordinator.prepare("core", "../formal/conformance-smoke.itf.json", raw)
 	if err != nil {
 		t.Fatal(err)
 	}
 	broken := newCoreDriver()
 	broken.remote.discardWrites = true
-	if err := replayCoreWithDriver(steps, broken); err == nil {
+	if err := replayCoreWithDriver(coordinator, prepared, broken); err == nil {
 		t.Fatal("acknowledged but lost publication did not diverge on a later public read")
 	}
-	steps[0].expected["redisReads"]++
-	if err := replayCore(steps); err == nil {
+	decoded, err := behaviorJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial := bm(ba(bm(decoded)["states"])[0])
+	bm(initial["s"])["redisReads"] = obj{"#bigint": "1"}
+	prepared, err = coordinator.prepare("core", "corrupt-observation", []byte(bjson(decoded)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := replayCoreWithDriver(coordinator, prepared, newCoreDriver()); err == nil {
 		t.Fatal("corrupted expectation did not fail independently observed replay")
 	}
 	var original struct {
@@ -502,12 +460,37 @@ func TestCoreParserAndObservationBoundary(t *testing.T) {
 	if err := json.Unmarshal(raw, &original); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("explicit inputs without MBT metadata", func(t *testing.T) {
+		var trace struct {
+			States []map[string]json.RawMessage `json:"states"`
+		}
+		if err := json.Unmarshal(raw, &trace); err != nil {
+			t.Fatal(err)
+		}
+		for _, state := range trace.States {
+			delete(state, "mbt::actionTaken")
+			delete(state, "mbt::nondetPicks")
+		}
+		explicit, err := json.Marshal(trace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		prepared, err := coordinator.prepare("core", "explicit-core", explicit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := replayCoreWithDriver(coordinator, prepared, newCoreDriver()); err != nil {
+			t.Fatal(err)
+		}
+	})
 	initOnly, err := json.Marshal(map[string]any{"states": original.States[:1]})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for name, malformed := range map[string][]byte{
 		"empty":               []byte(`{"states":[]}`),
+		"missing input":       bytes.Replace(raw, []byte(`"input": {`), []byte(`"missingInput": {`), 1),
+		"explicit arguments":  bytes.Replace(raw, []byte(`"#bigint": "-1"`), []byte(`"#bigint": "0"`), 1),
 		"init only":           initOnly,
 		"unknown action":      bytes.Replace(raw, []byte(`"mbt::actionTaken": "outsideCall"`), []byte(`"mbt::actionTaken": "inventedAction"`), 1),
 		"missing init":        bytes.Replace(raw, []byte(`"mbt::actionTaken": "init"`), []byte(`"mbt::actionTaken": "localCall"`), 1),
@@ -520,7 +503,7 @@ func TestCoreParserAndObservationBoundary(t *testing.T) {
 			if bytes.Equal(raw, malformed) {
 				t.Fatal("negative control did not change its target field")
 			}
-			if _, err := parseCore(malformed); err == nil {
+			if _, err := coordinator.prepare("core", "malformed-core", malformed); err == nil {
 				t.Fatal("malformed trace accepted")
 			}
 		})

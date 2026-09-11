@@ -124,7 +124,7 @@
     },
     {
       "case": "C11.one-registered-flight",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:oneSourcePerRegisteredFlight",
+      "reference": "formal/dialcache-flight-deadlines.qnt:oneSourcePerRegisteredFlight",
       "kind": "invariant",
       "scope": "At most one source starts for a registered eligible one-key flight; abandoned raw work is separate."
     },
@@ -136,13 +136,13 @@
     },
     {
       "case": "C14.inactive-layers",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:flightsRequireEligibleCaching",
+      "reference": "formal/dialcache-flight-deadlines.qnt:flightsRequireEligibleCaching",
       "kind": "invariant",
       "scope": "A registered flight requires enabled caching, coalescing policy, and an eligible request/shared layer."
     },
     {
       "case": "C14.inactive-layers",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:noFlightWhenCoalescingIneligible",
+      "reference": "formal/dialcache-flight-deadlines.qnt:noFlightWhenCoalescingIneligible",
       "kind": "invariant",
       "scope": "A registered flight requires enabled caching, coalescing policy, and an eligible request/shared layer."
     },
@@ -220,13 +220,13 @@
     },
     {
       "case": "C23.source-start",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:fallbackDeadlineStartsWithFallback",
+      "reference": "formal/dialcache-flight-deadlines.qnt:fallbackDeadlineStartsWithFallback",
       "kind": "invariant",
       "scope": "The deadline equals actual fallback start plus the budget; the delayed lookup regression preserves the entire source budget after cache lookup time."
     },
     {
       "case": "C23.source-start",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:delayedLookupKeepsFullSourceBudgetTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:delayedLookupKeepsFullSourceBudgetTest",
       "kind": "regression",
       "scope": "The deadline equals actual fallback start plus the budget; the delayed lookup regression preserves the entire source budget after cache lookup time."
     },
@@ -250,31 +250,31 @@
     },
     {
       "case": "C25.late-source-rejected",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:timedOutSourceCannotPublish",
+      "reference": "formal/dialcache-flight-deadlines.qnt:timedOutSourceCannotPublish",
       "kind": "invariant",
       "scope": "The abstract late-settlement action represents either success or rejection at elapsed >= budget; timeout prevents acceptance/publication before timer delivery."
     },
     {
       "case": "C25.late-source-rejected",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:lateSettlementBeforeTimerTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:lateSettlementBeforeTimerTest",
       "kind": "regression",
       "scope": "The abstract late-settlement action represents either success or rejection at elapsed >= budget; timeout prevents acceptance/publication before timer delivery."
     },
     {
       "case": "C25.late-rejection",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:timedOutSourceCannotPublish",
+      "reference": "formal/dialcache-flight-deadlines.qnt:timedOutSourceCannotPublish",
       "kind": "invariant",
       "scope": "The abstract late-settlement action represents either success or rejection at elapsed >= budget; timeout prevents acceptance/publication before timer delivery."
     },
     {
       "case": "C25.late-rejection",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:lateSettlementBeforeTimerTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:lateSettlementBeforeTimerTest",
       "kind": "regression",
       "scope": "The abstract late-settlement action represents either success or rejection at elapsed >= budget; timeout prevents acceptance/publication before timer delivery."
     },
     {
       "case": "C25.abandoned-overlap",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:abandonedSourceMayOverlapNewFlightTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:abandonedSourceMayOverlapNewFlightTest",
       "kind": "regression",
       "scope": "After timeout, old raw source may settle while a new registered source remains active."
     },
@@ -286,13 +286,13 @@
     },
     {
       "case": "C26.publication-ownership",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:publicationRequiresAcceptedSource",
+      "reference": "formal/dialcache-flight-deadlines.qnt:publicationRequiresAcceptedSource",
       "kind": "invariant",
       "scope": "Publication requires accepted source and may complete after the former source deadline."
     },
     {
       "case": "C26.publication-ownership",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:acceptedPublicationOutlivesDeadlineTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:acceptedPublicationOutlivesDeadlineTest",
       "kind": "regression",
       "scope": "Publication requires accepted source and may complete after the former source deadline."
     },
@@ -1330,13 +1330,13 @@
     },
     {
       "case": "C01.no-deadline",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:outsideSourceHasNoDeadline",
+      "reference": "formal/dialcache-flight-deadlines.qnt:outsideSourceHasNoDeadline",
       "kind": "invariant",
       "scope": "outside calls have no fallback deadline or sharing. This check covers the bounded model clause: outsideSourceHasNoDeadline. Host representations and other feature combinations retain separate fixed/native evidence."
     },
     {
       "case": "C01.no-deadline",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:outsideCallsIgnoreConfiguredSourceDeadlineTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:outsideCallsIgnoreConfiguredSourceDeadlineTest",
       "kind": "regression",
       "scope": "outside calls have no fallback deadline or sharing. This check covers the bounded model clause: outsideCallsIgnoreConfiguredSourceDeadlineTest. Host representations and other feature combinations retain separate fixed/native evidence."
     },
@@ -1372,7 +1372,7 @@
     },
     {
       "case": "C14.inactive-layers",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:inactiveServingLayersKeepConcurrentCallsIndependentTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:inactiveServingLayersKeepConcurrentCallsIndependentTest",
       "kind": "regression",
       "scope": "inactive serving layers do not coalesce. This check covers the bounded model clause: inactiveServingLayersKeepConcurrentCallsIndependentTest. Host representations and other feature combinations retain separate fixed/native evidence."
     },
@@ -1444,43 +1444,43 @@
     },
     {
       "case": "C23.default-source-budget",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:omittedSourceBudgetUsesSixtySeconds",
+      "reference": "formal/dialcache-flight-deadlines.qnt:omittedSourceBudgetUsesSixtySeconds",
       "kind": "invariant",
       "scope": "The independent-source submodel captures omitted budget as 60000ms; the regression checks rejection at that exact deadline. Generated main-flight samples retain their separately bounded budget."
     },
     {
       "case": "C23.default-source-budget",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:librarySourceDeadlineIsSixtySecondsTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:librarySourceDeadlineIsSixtySecondsTest",
       "kind": "regression",
       "scope": "The independent-source submodel captures omitted budget as 60000ms; the regression checks rejection at that exact deadline. Generated main-flight samples retain their separately bounded budget."
     },
     {
       "case": "C24.follower-source",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:lateFollowerKeepsLeaderSourceDeadlineTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:lateFollowerKeepsLeaderSourceDeadlineTest",
       "kind": "regression",
       "scope": "late follower inherits remaining fallback deadline. This check covers the bounded model clause: lateFollowerKeepsLeaderSourceDeadlineTest. Host representations and other feature combinations retain separate fixed/native evidence."
     },
     {
       "case": "C26.unbounded-source",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:disabledSourceDeadlineNeverTimesOut",
+      "reference": "formal/dialcache-flight-deadlines.qnt:disabledSourceDeadlineNeverTimesOut",
       "kind": "invariant",
       "scope": "disabled fallback deadline accepts later source settlement. This check covers the bounded model clause: disabledSourceDeadlineNeverTimesOut. Host representations and other feature combinations retain separate fixed/native evidence."
     },
     {
       "case": "C26.unbounded-source",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:explicitlyUnboundedEnabledSourceAcceptsLateValueTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:explicitlyUnboundedEnabledSourceAcceptsLateValueTest",
       "kind": "regression",
       "scope": "disabled fallback deadline accepts later source settlement. This check covers the bounded model clause: explicitlyUnboundedEnabledSourceAcceptsLateValueTest. Host representations and other feature combinations retain separate fixed/native evidence."
     },
     {
       "case": "C27.key-failure",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:keyFailureKeepsEnabledSourceDeadlineTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:keyFailureKeepsEnabledSourceDeadlineTest",
       "kind": "regression",
       "scope": "key construction failure runs source with its enabled deadline. This check covers the bounded model clause: keyFailureKeepsEnabledSourceDeadlineTest. Host representations and other feature combinations retain separate fixed/native evidence."
     },
     {
       "case": "C27.key-failure",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:independentAcceptanceChecksCapturedDeadline",
+      "reference": "formal/dialcache-flight-deadlines.qnt:independentAcceptanceChecksCapturedDeadline",
       "kind": "invariant",
       "scope": "key construction failure runs source with its enabled deadline. This check covers the bounded model clause: independentAcceptanceChecksCapturedDeadline. Host representations and other feature combinations retain separate fixed/native evidence."
     },
@@ -1678,13 +1678,13 @@
     },
     {
       "case": "C24.independent-source-budgets",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:independentAcceptanceChecksCapturedDeadline",
+      "reference": "formal/dialcache-flight-deadlines.qnt:independentAcceptanceChecksCapturedDeadline",
       "kind": "invariant",
       "scope": "The independent-source submodel checks each recorded source start and captured budget; the generated independent profile supplies per-call source/read ownership and the fixed scenario isolates different source start times."
     },
     {
       "case": "C23.policy-does-not-spend-source-budget",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:delayedLookupKeepsFullSourceBudgetTest",
+      "reference": "formal/dialcache-flight-deadlines.qnt:delayedLookupKeepsFullSourceBudgetTest",
       "kind": "regression",
       "scope": "The model abstracts pre-source waiting as cache lookup and independently checks a full budget from source start. The fixed policy-delay scenario binds runtime-provider waiting to that rule."
     },
@@ -3289,6 +3289,222 @@
       "reference": "formal/dialcache-runtime-boundaries-conformance.qnt:earlierLocalHitStopsRemoteTraversal",
       "kind": "invariant",
       "scope": "Each admission recorded as an earlier local hit has zero remote reads, no flight join, and a cache result."
+    },
+    {
+      "case": "C01.no-cache-plumbing",
+      "reference": "formal/dialcache-conformance.qnt:disabledAndRequestCallsKeepTheirOwnLifetimesTest",
+      "kind": "regression",
+      "scope": "The introductory profile alternates disabled calls and separate request-local pairs across a source change; results and source/read/write counts establish those lifetimes. This does not separately observe key construction or runtime policy."
+    },
+    {
+      "case": "C05.local-hit-stops-traversal",
+      "reference": "formal/dialcache-conformance.qnt:localValueSurvivesSourceChangeTest",
+      "kind": "regression",
+      "scope": "Two enabled local calls around an external source update return the original value with one local source execution in the introductory profile. No request-memo warming claim."
+    },
+    {
+      "case": "C11.one-registered-flight",
+      "reference": "formal/dialcache-conformance.qnt:coalescedPairPublishesOneReusableValueTest",
+      "kind": "regression",
+      "scope": "Two controlled same-key call pairs, separated by an external source change, share one initial source and reuse its published local value."
+    },
+    {
+      "case": "C32.grouped-invalidation",
+      "reference": "formal/dialcache-conformance.qnt:invalidationRefillsFromCurrentSourceTest",
+      "kind": "regression",
+      "scope": "For one tracked entity/operation, a public invalidation separates a prior cache hit from a refill with the updated source. Multi-operation grouping remains covered by the other case evidence."
+    },
+    {
+      "case": "C28.no-refill-after-read-failure",
+      "reference": "formal/dialcache-conformance.qnt:failedReadPreservesPreviouslyStoredBytesTest",
+      "kind": "regression",
+      "scope": "After a tracked value is stored, an injected read failure returns the changed source without another write; a later healthy read returns the original stored value. This is a read-error example, not a timeout/late-read schedule."
+    },
+    {
+      "case": "C09.fixed-local-ttl",
+      "reference": "formal/dialcache-policy-conformance.qnt:localHitsRespectInsertionExpiry",
+      "kind": "invariant",
+      "scope": "Independent local-hit receipts retain observation time and insertion expiry; each recorded hit occurred strictly before that fixed expiry."
+    },
+    {
+      "case": "C45.maximum-age-exclusive",
+      "reference": "formal/dialcache-recovery-conformance.qnt:recoveredValueWasWithinAcceptedAge",
+      "kind": "invariant",
+      "scope": "Independent recovery receipts check nonnegative returned age strictly below the captured maximum after recovery decode in the recovery profile."
+    },
+    {
+      "case": "C09.fixed-local-ttl",
+      "reference": "formal/dialcache-rule-checks.qnt:localBoundaryIsExclusive",
+      "kind": "invariant",
+      "scope": "Finite symbolic cases compare the canonical local-expiry judgment with the independently stated strict observation-before-expiry inequality."
+    },
+    {
+      "case": "C09.fixed-local-ttl",
+      "reference": "formal/dialcache-rule-checks.qnt:localGridUsesWholeMilliseconds",
+      "kind": "invariant",
+      "scope": "Finite submillisecond examples independently check flooring insertion and observation times before local age comparison; this is the grid decision, not an entire native clock implementation."
+    },
+    {
+      "case": "C22.freshness-boundary",
+      "reference": "formal/dialcache-rule-checks.qnt:freshBoundaryIsExclusive",
+      "kind": "invariant",
+      "scope": "Finite symbolic timestamp and TTL domains independently characterize nonnegative fresh age strictly below the fresh ceiling."
+    },
+    {
+      "case": "C40.first-stale",
+      "reference": "formal/dialcache-rule-checks.qnt:retentionStartsAtFreshBoundary",
+      "kind": "invariant",
+      "scope": "Finite symbolic domains independently characterize initial stale retention as fresh ceiling <= age < maximum; frame/fence validity remains a profile responsibility."
+    },
+    {
+      "case": "C45.maximum-age-exclusive",
+      "reference": "formal/dialcache-rule-checks.qnt:recoveryBoundaryIsExclusive",
+      "kind": "invariant",
+      "scope": "Finite symbolic domains independently characterize recovery age as nonnegative and strictly below the acquired maximum, including equality rejection."
+    },
+    {
+      "case": "C45.rollback-below-fresh",
+      "reference": "formal/dialcache-rule-checks.qnt:rollbackCanRecoverRetainedBytesTest",
+      "kind": "regression",
+      "scope": "Direct canonical-rule example accepts nonnegative recovery age below the fresh ceiling. Actual retention followed by rollback is exercised by the profile evidence."
+    },
+    {
+      "case": "C25.late-source-rejected",
+      "reference": "formal/dialcache-rule-checks.qnt:sourceBoundaryIsExclusive",
+      "kind": "invariant",
+      "scope": "Finite symbolic elapsed-time/budget domains independently characterize finite acceptance strictly before the deadline and the negative unbounded sentinel; monotonic source ordering is checked by connection records."
+    },
+    {
+      "case": "W04.strict-fence",
+      "reference": "formal/dialcache-rule-checks.qnt:fenceBoundaryIsExclusive",
+      "kind": "invariant",
+      "scope": "Finite symbolic timestamp/watermark domains independently characterize strict timestamp-greater-than-fence acceptance; wire numeric validation is separate."
+    },
+    {
+      "case": "C44.retained-invalidation",
+      "reference": "formal/dialcache-recovery-connection.qnt:retainedSnapshotMatchesAcquisition",
+      "kind": "invariant",
+      "scope": "The recovery-read profile captures maximum age from pre-admission policy, then projects read settlement into a retained owner, modeled payload identity and timestamp. Accepted policy and later retained candidates must match those independent records. Raw/compressed encoding identity is abstracted."
+    },
+    {
+      "case": "C45.captured-policy",
+      "reference": "formal/dialcache-recovery-connection.qnt:recoveryReturnMatchesAcquiredContract",
+      "kind": "invariant",
+      "scope": "A served recovery result after releaseLoad must match the acquired snapshot owner and modeled payload and satisfy its captured maximum at the pre-settlement wall clock. Single-active-call profile."
+    },
+    {
+      "case": "C44.retained-invalidation",
+      "reference": "formal/dialcache-legacy-recovery-connection.qnt:flightKeepsAcquiredSnapshot",
+      "kind": "invariant",
+      "scope": "The recovery profile captures pre-read storage and policy into a flight snapshot; nonempty retained candidates preserve its payload, timestamp and maximum through later transitions."
+    },
+    {
+      "case": "C36.independent-invalidation-snapshots",
+      "reference": "formal/dialcache-independent-connection.qnt:independentSnapshotsMatchAcquisition",
+      "kind": "invariant",
+      "scope": "Each independent caller retains its admitted maximum and separately projected read-time payload, timestamp and acquisition wall clock whenever a candidate is retained; callers do not borrow another acquisition."
+    },
+    {
+      "case": "C45.captured-policy",
+      "reference": "formal/dialcache-independent-connection.qnt:independentRecoveryMatchesContract",
+      "kind": "invariant",
+      "scope": "A served independent recovery decode returns the selected caller snapshot payload under its captured maximum and current wall clock, including reversed completion schedules."
+    },
+    {
+      "case": "C23.source-start",
+      "reference": "formal/dialcache-effects-connection.qnt:effectsDeadlineMatchesSourceStart",
+      "kind": "invariant",
+      "scope": "The effects profile projects each observable source start from the preceding environment clock (or end-of-tick read timeout); a running source deadline must equal that start plus its budget."
+    },
+    {
+      "case": "C59.source-excludes-publication",
+      "reference": "formal/dialcache-effects-connection.qnt:effectsPublicationMatchesAcceptedSource",
+      "kind": "invariant",
+      "scope": "Pending serialization/write phases and new dump/write effects require one matching successful source receipt projected from the external settlement input and preceding clock. The modeled accepted timestamp must match that receipt and precede its source-relative deadline; payload provenance and refill fences remain separate."
+    },
+    {
+      "case": "C23.policy-does-not-spend-source-budget",
+      "reference": "formal/dialcache-source-connection.qnt:sourceOriginsMatchContract",
+      "kind": "invariant",
+      "scope": "Each source-budgets source start projects the preceding external clock and captured mode into a separate start/budget record; the executing profile fields must agree."
+    },
+    {
+      "case": "C24.follower-source",
+      "reference": "formal/dialcache-source-connection.qnt:sourceOwnersMatchContract",
+      "kind": "invariant",
+      "scope": "Each source-budgets source is owned by the call selected at beginCall or policy release, as reconstructed from the preceding public event rather than source ownership fields."
+    },
+    {
+      "case": "C24.follower-source",
+      "reference": "formal/dialcache-source-connection.qnt:followerKeepsAcquiredOwner",
+      "kind": "invariant",
+      "scope": "A policy release while a registered source exists maps the released caller to that previously registered owner, preserving the leader execution."
+    },
+    {
+      "case": "C25.late-source-rejected",
+      "reference": "formal/dialcache-source-connection.qnt:acceptedSourcesMatchContract",
+      "kind": "invariant",
+      "scope": "Successful values in the source-budgets profile satisfy the separately captured source owner, start and budget, including the outside-call unbounded sentinel."
+    },
+    {
+      "case": "C24.independent-source-budgets",
+      "reference": "formal/dialcache-independent-connection.qnt:independentSourceOriginsMatchContract",
+      "kind": "invariant",
+      "scope": "The independent profile reconstructs source starts and caller ownership from preceding read/decode events or owned read deadlines during time advance, then compares actual modeled source origins and call-to-source links. Read-deadline correctness remains a profile obligation."
+    },
+    {
+      "case": "C24.independent-source-budgets",
+      "reference": "formal/dialcache-independent-connection.qnt:independentSourceMatchesTimerContract",
+      "kind": "invariant",
+      "scope": "Each modeled source timer equals its separately reconstructed source origin plus budget, and nonpending nontimeout source settlements satisfy that acquired owner/start/budget contract."
+    },
+    {
+      "case": "C43.request-memo",
+      "reference": "formal/dialcache-legacy-recovery-connection.qnt:flightRecoveryMatchesContract",
+      "kind": "invariant",
+      "scope": "After a served recovery decode, every previously pending caller in the acquired flight returns its captured modeled payload within the accepted age bound. This establishes shared caller results; request-memo publication remains covered by the case's other evidence."
+    },
+    {
+      "case": "C55.ignore-untracked-fence",
+      "reference": "formal/dialcache-effects-conformance.qnt:untrackedFencedReplyRefillsAndIsReadableTest",
+      "kind": "regression",
+      "scope": "An untracked watermark-fenced reply is normalized to an unclassified miss with zero fence; one source refill is subsequently readable without a second source."
+    },
+    {
+      "case": "C45.captured-policy",
+      "reference": "formal/dialcache-independent-conformance.qnt:independentRecoveryAtCapturedAgeBoundaryTest",
+      "kind": "regression",
+      "scope": "The shorter captured policy rejects at its exact maximum age while a longer-policy decode remains pending; subsequent decode serves only the longer-policy caller and neither recovery writes shared state."
+    },
+    {
+      "case": "C43.request-memo",
+      "reference": "formal/dialcache-recovery-conformance.qnt:recoveredFlightMemoIsReusedByBothRequestsTest",
+      "kind": "regression",
+      "scope": "Two request scopes sharing recovery each reuse the recovered result in a subsequent public call, with one read/source/decode and no shared writes."
+    },
+    {
+      "case": "C22.freshness-boundary",
+      "reference": "formal/dialcache-policy-conformance.qnt:remoteHitsRespectAcquiredFreshness",
+      "kind": "invariant",
+      "scope": "For each policy-profile read receipt, a remote hit requires eligible physically retained storage and nonnegative acquired wall-clock age strictly below the captured fresh TTL. The assertion states the age inequalities independently of the transition helper; it does not cover tracked frame decoding or shadow admission."
+    },
+    {
+      "case": "C22.freshness-boundary",
+      "reference": "formal/dialcache-policy-conformance.qnt:remoteHitBeforeBoundaryDoesNotRenewFreshnessTest",
+      "kind": "regression",
+      "scope": "A public untracked remote read hits at age 500 ms, then the same retained frame misses at exact age 1000 ms without renewal from the first hit. One source refills with a distinct value and a later read reuses it; local caching is disabled."
+    },
+    {
+      "case": "C52.expired-miss-may-fill",
+      "reference": "formal/dialcache-shadow-conformance.qnt:c0AcquisitionsRespectFreshness",
+      "kind": "invariant",
+      "scope": "Each successful non-abandoned shadow C0 acquisition records its readable snapshot, acquisition wall time, fresh ceiling and acceptance. Acceptance requires nonnegative age strictly below that ceiling; later comparison and C1 confirmation do not reclassify the recorded decision."
+    },
+    {
+      "case": "C52.expired-miss-may-fill",
+      "reference": "formal/dialcache-shadow-conformance.qnt:c0AtExactFreshnessBoundaryRefillsTest",
+      "kind": "regression",
+      "scope": "A public C1 confirmation completes using retained bytes at age 60000 ms. A subsequent job reacquires the same stored bytes as C0 at exact freshness age 60000 ms, does not decode them, and fills once from the accepted caller source. This checks C0 reacquisition rather than changing the prior job's retained decision."
     }
   ],
   "definitions": [
@@ -3912,7 +4128,7 @@
     },
     {
       "case": "C24.follower-source",
-      "reference": "formal/dialcache-coalescing-liveness.qnt:joinFollower",
+      "reference": "formal/dialcache-flight-deadlines.qnt:joinFollower",
       "kind": "transition",
       "scope": "Joining a running flight increments followers without resetting its source deadline; this model has no independent follower-deadline invariant."
     },

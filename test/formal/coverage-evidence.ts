@@ -1,3 +1,4 @@
+import { replaySources } from "../../formal/replay/sources.mjs";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
@@ -20,6 +21,7 @@ export function recordWitnesses(profile: string, seen: Set<string>, required: st
     "test/formal/coverage-evidence.ts",
     ...(profile === "effects" ? [] : ["test/formal/runtime-witnesses.ts", "test/formal/recovery-shadow-witnesses.ts"]),
     ...execution.libraries,
+    ...replaySources(),
     ...(registry.profiles.find(entry => entry.id === profile)?.witnessSources ?? []),
   ])].map(path => ({ path, sha256: hash(path) }));
   const corpus = traces.map(({ path }) => ({ name: basename(path), sha256: hash(path) }))

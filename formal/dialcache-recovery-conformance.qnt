@@ -1,5 +1,6 @@
 module dialcache_recovery_conformance {
   import conformance_observations.* from "./conformance-observations"
+  import cache_rules.* from "./cache-rules"
   // Model boundary -----------------------------------------------------------
   // One registered tracked remote flight, with coalesced callers in two optional
   // request lifetimes. Selected aspects of C40-C46 cover retained recovery;
@@ -41,14 +42,17 @@ module dialcache_recovery_conformance {
     classifier: int, instanceClassifier: int, readFailed: bool, loadFailed: bool,
     canRecover: bool, canWrite: bool, observedFence: int,
     request: bool, memo: List[int], closed: List[bool], attached: List[bool],
-    sources: List[int], activeLoader: int, deadline: int, sourceError: int
+    sources: List[int], activeLoader: int, deadline: int, sourceError: int,
+    recoveryReceipts: List[{ created: int, accepted: int, maximum: int }]
   }
   var s: State
+  // Public commands, separate from the state that predicts their consequences.
+  var input: { name: str, choice: int }
 
   // Initial fixture ----------------------------------------------------------
-  action init = {
-    // Choices 0..3 select the instance classifier; 4..7 also enable request memo.
-    nondet choice = 0.to(7).oneOf()
+  action initialize(choice: int): bool = all {
+    (0.to(7)).contains(choice),
+    input' = { name: "init", choice: choice },
     s' = {
       o: empty, d: noDiagnostics,
       now: 10000, wall: 100000, phase: IDLE,
@@ -62,16 +66,21 @@ module dialcache_recovery_conformance {
       canRecover: false, canWrite: false, observedFence: 0,
       request: choice >= 4, memo: List(0, 0),
       closed: List(false, false), attached: List(false, false),
-      sources: List(), activeLoader: 0, deadline: 0, sourceError: SOURCE_ERROR
+      sources: List(), activeLoader: 0, deadline: 0, sourceError: SOURCE_ERROR,
+      recoveryReceipts: List()
     }
+  }
+  action init = {
+    nondet choice = 0.to(7).oneOf()
+    initialize(choice)
   }
 
   // Read classification and request admission --------------------------------
-  val readable = not(s.readFailed) and s.frame > 0 and s.now < s.expires and s.created > s.watermark
-  val eligible = readable and s.created <= s.wall and s.wall - s.created < s.maxAge
-  val fresh = eligible and s.wall - s.created < FRESH_AGE_MS
-  pure def candidateValid(x: State): bool = x.candidate > 0 and x.candidateCreated <= x.wall and
-    x.wall - x.candidateCreated < x.acceptedMaxAge
+  val readable = not(s.readFailed) and s.frame > 0 and s.now < s.expires and fenceAllows(s.created, s.watermark)
+  val eligible = readable and recoveryAgeAllowed(s.created, s.wall, s.maxAge)
+  val fresh = eligible and freshAgeAllowed(s.created, s.wall, FRESH_AGE_MS)
+  pure def candidateValid(x: State): bool = x.candidate > 0 and
+    recoveryAgeAllowed(x.candidateCreated, x.wall, x.acceptedMaxAge)
 
   pure def memoized(x: State, value: int): State = {
     memo: if (x.request and (value == VALUE_ONE or value == VALUE_TWO))
@@ -104,13 +113,15 @@ module dialcache_recovery_conformance {
       deadline: s.now + SOURCE_BUDGET_MS, sourceError: SOURCE_ERROR,
       ...s
     }
+  action beginWith(choice: int): bool = all {
+    (0.to(7).filter(code => not(s.closed.nth(code / 4)))).contains(choice),
+    input' = { name: "beginCall", choice: choice },
+    s.phase == IDLE, s.o.calls.length() < MAX_CALLS,
+    s' = admitted(choice / 4, choice % 4)
+  }
   action beginCall = {
-    // The input encodes context 0/1 and operation classifier 0..3.
     nondet choice = 0.to(7).filter(code => not(s.closed.nth(code / 4))).oneOf()
-    all {
-      s.phase == IDLE, s.o.calls.length() < MAX_CALLS,
-      s' = admitted(choice / 4, choice % 4)
-    }
+    beginWith(choice)
   }
   def joined(scope: int): State = {
     val memo = if (s.request) s.memo.nth(scope) else 0
@@ -122,20 +133,28 @@ module dialcache_recovery_conformance {
       ...s
     }
   }
+  action joinWith(choice: int): bool = all {
+    (0.to(1).filter(scope => not(s.closed.nth(scope)))).contains(choice),
+    input' = { name: "joinCall", choice: choice },
+    all { s.phase != IDLE, s.o.calls.length() < MAX_CALLS, s' = joined(choice) }
+  }
   action joinCall = {
     nondet choice = 0.to(1).filter(scope => not(s.closed.nth(scope))).oneOf()
-    all { s.phase != IDLE, s.o.calls.length() < MAX_CALLS, s' = joined(choice) }
+    joinWith(choice)
+  }
+  action closeWith(choice: int): bool = all {
+    (0.to(1).filter(scope => not(s.closed.nth(scope)))).contains(choice),
+    input' = { name: "closeScope", choice: choice },
+    s.request, s.o.calls.length() > 0,
+    s' = {
+      closed: s.closed.replaceAt(choice, true), memo: s.memo.replaceAt(choice, 0),
+      attached: s.attached.replaceAt(choice, false),
+      ...s
+    }
   }
   action closeScope = {
     nondet choice = 0.to(1).filter(scope => not(s.closed.nth(scope))).oneOf()
-    all {
-      s.request, s.o.calls.length() > 0,
-      s' = {
-        closed: s.closed.replaceAt(choice, true), memo: s.memo.replaceAt(choice, 0),
-        attached: s.attached.replaceAt(choice, false),
-        ...s
-      }
-    }
+    closeWith(choice)
   }
 
   // Source settlement and retained recovery ----------------------------------
@@ -158,7 +177,7 @@ module dialcache_recovery_conformance {
   }
   def settled(index: int, failure: int): State = {
     val sourceSettled = { sources: s.sources.replaceAt(index, SOURCE_SETTLED), ...s }
-    val mayWrite = s.canWrite and s.wall > s.observedFence
+    val mayWrite = s.canWrite and fenceAllows(s.wall, s.observedFence)
     if (s.sources.nth(index) == SOURCE_ABANDONED) sourceSettled
     else if (failure > SETTLEMENT_SUCCESS)
       rejected(sourceSettled, SOURCE_ERROR, failure == SETTLEMENT_PROPAGATED_TIMEOUT)
@@ -175,24 +194,43 @@ module dialcache_recovery_conformance {
       ...memoized(sourceSettled, VALUE_TWO)
     }
   }
+  action resolveWith(choice: int): bool = all {
+    (s.sources.indices().filter(i => s.sources.nth(i) != SOURCE_SETTLED)).contains(choice),
+    input' = { name: "resolveLoader", choice: choice },
+    s' = settled(choice, SETTLEMENT_SUCCESS)
+  }
   action resolveLoader = {
     nondet choice = s.sources.indices().filter(i => s.sources.nth(i) != SOURCE_SETTLED).oneOf()
-    s' = settled(choice, SETTLEMENT_SUCCESS)
+    resolveWith(choice)
+  }
+  action rejectWith(choice: int): bool = all {
+    (s.sources.indices().filter(i => s.sources.nth(i) != SOURCE_SETTLED)).contains(choice),
+    input' = { name: "rejectLoader", choice: choice },
+    s' = settled(choice, SETTLEMENT_FAILURE)
   }
   action rejectLoader = {
     nondet choice = s.sources.indices().filter(i => s.sources.nth(i) != SOURCE_SETTLED).oneOf()
-    s' = settled(choice, SETTLEMENT_FAILURE)
+    rejectWith(choice)
+  }
+  action rejectTimeoutWith(choice: int): bool = all {
+    (s.sources.indices().filter(i => s.sources.nth(i) != SOURCE_SETTLED)).contains(choice),
+    input' = { name: "rejectTimeout", choice: choice },
+    s' = settled(choice, SETTLEMENT_PROPAGATED_TIMEOUT)
   }
   action rejectTimeout = {
     nondet choice = s.sources.indices().filter(i => s.sources.nth(i) != SOURCE_SETTLED).oneOf()
-    s' = settled(choice, SETTLEMENT_PROPAGATED_TIMEOUT)
+    rejectTimeoutWith(choice)
   }
   action releaseLoad = all {
+    input' = { name: "releaseLoad", choice: -1 },
     s.phase == FRESH_DECODE or s.phase == RECOVERY_DECODE,
     val recovered = not(s.loadFailed) and candidateValid(s)
     val retry = s.phase == FRESH_DECODE and s.loadFailed
     val result = if (retry) CALL_PENDING else if (s.phase == FRESH_DECODE or recovered) s.candidate else s.sourceError
     s' = {
+      recoveryReceipts: if (s.phase == RECOVERY_DECODE and recovered)
+        s.recoveryReceipts.append({ created: s.candidateCreated, accepted: s.wall, maximum: s.acceptedMaxAge })
+        else s.recoveryReceipts,
       memo: memoized(s, result).memo,
       d: if (s.phase == RECOVERY_DECODE and recovered)
         { ages: s.d.ages.append(s.wall - s.candidateCreated), ...s.d }
@@ -212,8 +250,9 @@ module dialcache_recovery_conformance {
   }
 
   // Environmental storage, clocks, policy, and faults -------------------------
-  action seed = {
-    nondet choice = 0.to(6).oneOf()
+  action seedWith(choice: int): bool = all {
+    (0.to(6)).contains(choice),
+    input' = { name: "seed", choice: choice },
     val age = List(0, 999, 1000, 4999, 5000, -1, 1000).nth(choice)
     s' = {
       frame: if (choice == 6) VALUE_TWO else VALUE_ONE,
@@ -221,9 +260,14 @@ module dialcache_recovery_conformance {
       ...s
     }
   }
-  action advance = {
-    nondet choice = Set(1, 10, 1000, 4000).oneOf()
-    val timedOut = if (s.phase == SOURCE_RUNNING and s.now + choice >= s.deadline)
+  action seed = {
+    nondet choice = 0.to(6).oneOf()
+    seedWith(choice)
+  }
+  action advanceBy(choice: int): bool = all {
+    (Set(1, 10, 1000, 4000)).contains(choice),
+    input' = { name: "advance", choice: choice },
+    val timedOut = if (s.phase == SOURCE_RUNNING and not(deadlinePendingAt(s.now + choice, s.deadline)))
       rejected({
         now: s.deadline, wall: s.wall + s.deadline - s.now,
         sources: s.sources.replaceAt(s.activeLoader, SOURCE_ABANDONED),
@@ -232,23 +276,48 @@ module dialcache_recovery_conformance {
       else s
     s' = { now: s.now + choice, wall: s.wall + choice, ...timedOut }
   }
-  action invalidate = s' = {
-    watermark: if (s.wall > s.watermark) s.wall else s.watermark,
-    o: { invalidations: s.o.invalidations + 1, maintenance: s.o.maintenance.append("ok"), ...s.o },
-    ...s
+  action advance = {
+    nondet choice = Set(1, 10, 1000, 4000).oneOf()
+    advanceBy(choice)
   }
-  action rollbackWall = s' = { wall: s.wall - WALL_ROLLBACK_MS, ...s }
+  action invalidate = all {
+    input' = { name: "invalidate", choice: -1 },
+    s' = {
+      watermark: if (s.wall > s.watermark) s.wall else s.watermark,
+      o: { invalidations: s.o.invalidations + 1, maintenance: s.o.maintenance.append("ok"), ...s.o },
+      ...s
+    }
+  }
+  action rollbackWall = all {
+    input' = { name: "rollbackWall", choice: -1 },
+    s' = { wall: s.wall - WALL_ROLLBACK_MS, ...s }
+  }
+  action policyWith(choice: int): bool = all {
+    (Set(2000, 5000)).contains(choice),
+    input' = { name: "policy", choice: choice },
+    s' = { maxAge: choice, ...s }
+  }
   action policy = {
     nondet choice = Set(2000, 5000).oneOf()
-    s' = { maxAge: choice, ...s }
+    policyWith(choice)
+  }
+  action readFaultWith(choice: int): bool = all {
+    (Set(0, 1)).contains(choice),
+    input' = { name: "readFault", choice: choice },
+    s' = { readFailed: choice == 1, ...s }
   }
   action readFault = {
     nondet choice = Set(0, 1).oneOf()
-    s' = { readFailed: choice == 1, ...s }
+    readFaultWith(choice)
+  }
+  action loadFaultWith(choice: int): bool = all {
+    (Set(0, 1)).contains(choice),
+    input' = { name: "loadFault", choice: choice },
+    s' = { loadFailed: choice == 1, ...s }
   }
   action loadFault = {
     nondet choice = Set(0, 1).oneOf()
-    s' = { loadFailed: choice == 1, ...s }
+    loadFaultWith(choice)
   }
 
   // Exploration schedule: preserve grouping and order for seeded sampling.
@@ -267,148 +336,130 @@ module dialcache_recovery_conformance {
   val sourcesMatchEffects = s.sources.length() == s.o.loaders
   val onlyRegisteredSourceOwnsDeadline = s.phase != SOURCE_RUNNING or s.sources.nth(s.activeLoader) == SOURCE_REGISTERED
 
-  // Deterministic model regressions ------------------------------------------
-  // A codec hit rejected for future age is a logical miss without a refill fence.
-  action seedFutureFixture = s' = { frame: VALUE_ONE, created: s.wall + 1, expires: s.now + 60000, ...s }
-  run futureFrameDoesNotCarryMissFenceTest = init.then(invalidate).then(seedFutureFixture)
-    .then(beginCall).then(resolveLoader).expect(s.o.writes == 1)
+  // Check accepted history, not the current age of a value returned earlier.
+  // Keep these inequalities independent of the transition eligibility helper.
+  val recoveredValueWasWithinAcceptedAge = s.recoveryReceipts.indices().forall(i => {
+    val receipt = s.recoveryReceipts.nth(i)
+    receipt.created <= receipt.accepted and receipt.accepted - receipt.created < receipt.maximum
+  })
 
-  action defaultFixture = init.then(s' = { instanceClassifier: CLASSIFIER_TIMEOUT_ONLY, request: false, ...s })
-  action beginInheritedFixture = beginCall.then(s' = { classifier: s.instanceClassifier, ...s })
-  action timeoutFixture = s' = rejected({
-    now: s.deadline, wall: s.wall + s.deadline - s.now,
-    sources: s.sources.replaceAt(s.activeLoader, SOURCE_ABANDONED),
-    ...s
-  }, DEADLINE_ERROR, true)
-  action beginDefaultFixture = beginCall.then(s' = { classifier: CLASSIFIER_TIMEOUT_ONLY, ...s })
-  action beginDenyFixture = beginCall.then(s' = { classifier: CLASSIFIER_DENY, ...s })
-  run defaultRecoversOwnTimeoutTest = defaultFixture.then(beginDefaultFixture).then(timeoutFixture).then(releaseLoad)
+  // Deterministic public histories ------------------------------------------
+  // The same commands drive exploration and implementation replay. Initialization
+  // 0 is the timeout-only default, 1 permits ordinary errors, 2 denies recovery;
+  // adding 4 enables request memoization. beginWith encodes 4 * scope + classifier.
+  // No regression patches private cache state or invents an environment command.
+
+  run futureFrameDoesNotCarryMissFenceTest = initialize(0).then(invalidate).then(seedWith(5))
+    .then(beginWith(3)).then(resolveWith(0)).expect(s.o.writes == 1)
+
+  run defaultRecoversOwnTimeoutTest = initialize(0).then(beginWith(3)).then(advanceBy(10)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.o.classifications == 0 and s.o.recovery == List("served"))
-  run explicitDenialReplacesDefaultTest = init.then(beginDenyFixture).then(timeoutFixture)
+  run explicitDenialReplacesDefaultTest = initialize(0).then(beginWith(1)).then(advanceBy(10))
     .expect(s.o.calls == List(DEADLINE_ERROR) and s.o.classifications == 1 and s.o.loads == 0)
-  run defaultRejectsOrdinaryFailureTest = defaultFixture.then(beginDefaultFixture).then(rejectLoader)
+  run defaultRejectsOrdinaryFailureTest = initialize(0).then(beginWith(3)).then(rejectWith(0))
     .expect(s.o.calls == List(SOURCE_ERROR) and s.o.classifications == 0 and s.o.loads == 0)
-  run defaultRecoversPropagatedTimeoutTest = defaultFixture.then(beginDefaultFixture).then(rejectTimeout).then(releaseLoad)
+  run defaultRecoversPropagatedTimeoutTest = initialize(0).then(beginWith(3)).then(rejectTimeoutWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.o.classifications == 0)
-  run lateSuccessCannotReplaceRecoveredValueTest = defaultFixture.then(beginDefaultFixture).then(timeoutFixture)
-    .then(resolveLoader).then(releaseLoad)
+  run lateSuccessCannotReplaceRecoveredValueTest = initialize(0).then(beginWith(3)).then(advanceBy(10))
+    .then(resolveWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.o.writes == 0 and s.o.dumps == 0)
-  run failedRecoveryPreservesDeadlineErrorTest = defaultFixture.then(beginDefaultFixture).then(timeoutFixture)
-    .then(s' = { loadFailed: true, ...s }).then(releaseLoad)
+  run failedRecoveryPreservesDeadlineErrorTest = initialize(0).then(beginWith(3)).then(advanceBy(10))
+    .then(loadFaultWith(1)).then(releaseLoad)
     .expect(s.o.calls == List(DEADLINE_ERROR) and s.o.recovery == List("deserialization_error"))
-  action requestFixture = init.then(s' = { request: true, instanceClassifier: CLASSIFIER_ALLOW, ...s })
-  run recoveredValueMemoizesOnlyInAttachedRequestTest = requestFixture.then(s' = admitted(0, CLASSIFIER_INHERIT))
-    .then(rejectLoader).then(releaseLoad).expect(s.memo == List(1, 0) and s.o.writes == 0)
-    .then(s' = admitted(0, CLASSIFIER_INHERIT)).expect(s.o.calls == List(VALUE_ONE, VALUE_ONE) and s.o.reads == 1)
-    .then(s' = admitted(1, CLASSIFIER_INHERIT)).expect(s.o.calls == List(VALUE_ONE, VALUE_ONE, CALL_PENDING) and s.o.reads == 2)
-  run crossRequestRecoveryMemoizesBothScopesTest = requestFixture.then(s' = admitted(0, CLASSIFIER_INHERIT))
-    .then(s' = joined(1)).then(s' = joined(0)).then(rejectLoader).then(releaseLoad)
+  run recoveredValueMemoizesOnlyInAttachedRequestTest = initialize(5).then(beginWith(3))
+    .then(rejectWith(0)).then(releaseLoad).expect(s.memo == List(1, 0) and s.o.writes == 0)
+    .then(beginWith(3)).expect(s.o.calls == List(VALUE_ONE, VALUE_ONE) and s.o.reads == 1)
+    .then(beginWith(7)).expect(s.o.calls == List(VALUE_ONE, VALUE_ONE, CALL_PENDING) and s.o.reads == 2)
+  run crossRequestRecoveryMemoizesBothScopesTest = initialize(5).then(beginWith(3))
+    .then(joinWith(1)).then(joinWith(0)).then(rejectWith(0)).then(releaseLoad)
     .expect(s.memo == List(1, 1) and s.o.calls == List(VALUE_ONE, VALUE_ONE, VALUE_ONE) and
       s.d.coalesced == List("process", "request_local") and s.o.loads == 1)
-  run closedRequestCannotReceiveLateRecoveryMemoTest = requestFixture.then(s' = admitted(0, CLASSIFIER_INHERIT)).then(rejectLoader)
-    .then(s' = { closed: List(true, false), attached: List(false, false), ...s }).then(releaseLoad)
-    .expect(s.memo == List(0, 0) and s.o.calls == List(VALUE_ONE)).then(s' = admitted(1, CLASSIFIER_INHERIT))
+  // Both request scopes join one flight, then independently reuse its recovered
+  // value. These calls make request publication observable without shared writes.
+  run recoveredFlightMemoIsReusedByBothRequestsTest = initialize(4)
+    .then(beginWith(4)).then(joinWith(0)).then(advanceBy(1000)).then(releaseLoad)
+    .expect(s.o.calls == List(VALUE_ONE, VALUE_ONE) and s.o.recovery == List("served"))
+    .then(beginWith(4)).then(beginWith(0))
+    .expect(s.o.calls == List(VALUE_ONE, VALUE_ONE, VALUE_ONE, VALUE_ONE)
+      and s.o.reads == 1 and s.o.loaders == 1 and s.o.loads == 1
+      and s.o.classifications == 1 and s.o.dumps == 0 and s.o.writes == 0)
+  run closedRequestCannotReceiveLateRecoveryMemoTest = initialize(5).then(beginWith(3)).then(rejectWith(0))
+    .then(closeWith(0)).then(releaseLoad)
+    .expect(s.memo == List(0, 0) and s.o.calls == List(VALUE_ONE)).then(beginWith(7))
     .expect(s.o.reads == 2 and s.o.calls == List(VALUE_ONE, CALL_PENDING))
-  run rollbackCannotLowerInvalidationWatermarkTest = defaultFixture.then(invalidate).then(rollbackWall).then(invalidate)
+  run rollbackCannotLowerInvalidationWatermarkTest = initialize(0).then(invalidate).then(rollbackWall).then(invalidate)
     .expect(s.watermark == 100000)
-  run rollbackDuringRetainedDecodeRejectsFutureSnapshotTest = defaultFixture.then(beginDefaultFixture)
-    .then(timeoutFixture).then(rollbackWall).then(rollbackWall).then(releaseLoad)
+    // Probe the retained fence through a real source result and suppressed refill.
+    .then(beginWith(3)).then(resolveWith(0))
+    .expect(s.o.calls == List(VALUE_TWO) and s.o.writes == 0 and s.o.dumps == 0)
+  run rollbackDuringRetainedDecodeRejectsFutureSnapshotTest = initialize(0).then(beginWith(3))
+    .then(advanceBy(10)).then(rollbackWall).then(rollbackWall).then(releaseLoad)
     .expect(s.o.calls == List(DEADLINE_ERROR) and s.o.recovery == List("miss") and s.d.ages == List())
-  run instanceAllowReplacesTimeoutOnlyDefaultTest = init.then(s' = { instanceClassifier: CLASSIFIER_ALLOW, ...s })
-    .then(beginInheritedFixture).then(rejectLoader).then(releaseLoad)
+  run instanceAllowReplacesTimeoutOnlyDefaultTest = initialize(1)
+    .then(beginWith(3)).then(rejectWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.o.classifications == 1)
-  run instanceDenialReplacesTimeoutOnlyDefaultTest = init.then(s' = { instanceClassifier: CLASSIFIER_DENY, ...s })
-    .then(beginInheritedFixture).then(timeoutFixture).expect(s.o.calls == List(DEADLINE_ERROR) and s.o.loads == 0)
-  run operationDenialReplacesInstanceAllowTest = init.then(s' = { instanceClassifier: CLASSIFIER_ALLOW, ...s })
-    .then(beginDenyFixture).then(rejectLoader).expect(s.o.calls == List(SOURCE_ERROR) and s.o.loads == 0)
+  run instanceDenialReplacesTimeoutOnlyDefaultTest = initialize(2)
+    .then(beginWith(3)).then(advanceBy(10)).expect(s.o.calls == List(DEADLINE_ERROR) and s.o.loads == 0)
+  run operationDenialReplacesInstanceAllowTest = initialize(1)
+    .then(beginWith(1)).then(rejectWith(0)).expect(s.o.calls == List(SOURCE_ERROR) and s.o.loads == 0)
 
-
-  // Narrow boundary histories use the same public actions and projections as
-  // generated replay. Fixture updates supply external bytes, clocks or faults.
-  action allowRecoveryFixture = init.then(s' = {
-    instanceClassifier: CLASSIFIER_ALLOW, request: false, ...s
-  })
-  action beginAllowedRecovery = s' = admitted(0, CLASSIFIER_ALLOW)
-
-  run lastFreshReadDoesNotInvokeSourceTest = allowRecoveryFixture
-    .then(s' = { created: s.wall - FRESH_AGE_MS + 1, ...s })
-    .then(beginAllowedRecovery).then(releaseLoad)
+  run lastFreshReadDoesNotInvokeSourceTest = initialize(1).then(seedWith(1))
+    .then(beginWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.o.loaders == 0
       and s.o.loads == 1 and s.o.recovery == List() and s.o.writes == 0)
-
-  run lastRecoveryMillisecondIsServedTest = allowRecoveryFixture
-    .then(s' = { created: s.wall - s.maxAge + 1, ...s })
-    .then(beginAllowedRecovery).then(rejectLoader).then(releaseLoad)
+  run lastRecoveryMillisecondIsServedTest = initialize(1).then(seedWith(3))
+    .then(beginWith(0)).then(rejectWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.d.ages == List(4999)
       and s.o.recovery == List("served") and s.o.dumps == 0 and s.o.writes == 0)
-
-  run maximumAgeAtReadDoesNotDecodeTest = allowRecoveryFixture
-    .then(s' = { created: s.wall - s.maxAge, ...s })
-    .then(beginAllowedRecovery).then(rejectLoader)
+  run maximumAgeAtReadDoesNotDecodeTest = initialize(1).then(seedWith(4))
+    .then(beginWith(0)).then(rejectWith(0))
     .expect(s.o.calls == List(SOURCE_ERROR) and s.o.loads == 0
       and s.o.reads == 1 and s.o.recovery == List("miss"))
-
-  run fencedInitialBytesNeverRecoverTest = allowRecoveryFixture.then(invalidate)
-    .then(beginAllowedRecovery).then(rejectLoader)
+  run fencedInitialBytesNeverRecoverTest = initialize(1).then(invalidate)
+    .then(beginWith(0)).then(rejectWith(0))
     .expect(s.o.calls == List(SOURCE_ERROR) and s.o.loads == 0
       and s.o.reads == 1 and s.o.recovery == List("miss"))
-
-  run classifierErrorPreservesSourceWithoutDecodeTest = allowRecoveryFixture
-    .then(s' = admitted(0, CLASSIFIER_ERROR)).then(rejectLoader)
+  run classifierErrorPreservesSourceWithoutDecodeTest = initialize(1)
+    .then(beginWith(2)).then(rejectWith(0))
     .expect(s.o.calls == List(SOURCE_ERROR) and s.o.classifications == 1
       and s.o.loads == 0 and s.o.recovery == List() and s.o.writes == 0)
-
-  run freshDecodeFailureCannotBeRetriedAsRecoveryTest = allowRecoveryFixture
-    .then(s' = { created: s.wall, loadFailed: true, ...s })
-    .then(beginAllowedRecovery).then(releaseLoad).then(rejectLoader)
+  run freshDecodeFailureCannotBeRetriedAsRecoveryTest = initialize(1)
+    .then(seedWith(0)).then(loadFaultWith(1))
+    .then(beginWith(0)).then(releaseLoad).then(rejectWith(0))
     .expect(s.o.calls == List(SOURCE_ERROR) and s.o.loads == 1
       and s.o.classifications == 0 and s.o.recovery == List() and s.o.reads == 1)
-
-  run initialReadFailureSkipsRecoveryClassificationTest = allowRecoveryFixture
-    .then(s' = { readFailed: true, ...s }).then(beginAllowedRecovery).then(rejectLoader)
+  run initialReadFailureSkipsRecoveryClassificationTest = initialize(1)
+    .then(readFaultWith(1)).then(beginWith(0)).then(rejectWith(0))
     .expect(s.o.calls == List(SOURCE_ERROR) and s.o.loads == 0
       and s.o.classifications == 0 and s.o.recovery == List() and s.o.reads == 1)
-
-  run rollbackBelowFreshCeilingStillRecoversTest = allowRecoveryFixture
-    .then(beginAllowedRecovery).then(rejectLoader).then(rollbackWall).then(releaseLoad)
+  run rollbackBelowFreshCeilingStillRecoversTest = initialize(1)
+    .then(beginWith(0)).then(rejectWith(0)).then(rollbackWall).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.d.ages == List(0)
       and s.o.recovery == List("served") and s.o.writes == 0)
-
-  run replacementDoesNotChangeRetainedRecoveryTest = allowRecoveryFixture
-    .then(beginAllowedRecovery).then(s' = { frame: VALUE_TWO, created: s.wall, ...s })
-    .then(rejectLoader).then(releaseLoad)
+  run replacementDoesNotChangeRetainedRecoveryTest = initialize(1)
+    .then(beginWith(0)).then(seedWith(6)).then(rejectWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.frame == VALUE_TWO
       and s.o.reads == 1 and s.o.loads == 1 and s.o.writes == 0)
-
-  run maximumAgeBeforeDecodePreservesSourceTest = allowRecoveryFixture
-    .then(s' = { created: s.wall - s.maxAge + 1, ...s }).then(beginAllowedRecovery)
-    .then(s' = { now: s.now + 1, wall: s.wall + 1, ...s }).then(rejectLoader)
+  run maximumAgeBeforeDecodePreservesSourceTest = initialize(1)
+    .then(seedWith(3)).then(beginWith(0)).then(advanceBy(1)).then(rejectWith(0))
     .expect(s.o.calls == List(SOURCE_ERROR) and s.o.loads == 0
       and s.o.reads == 1 and s.o.recovery == List("miss"))
-
-  run maximumAgeAfterDecodePreservesSourceTest = allowRecoveryFixture
-    .then(beginAllowedRecovery).then(rejectLoader)
-    .then(s' = { wall: s.candidateCreated + s.acceptedMaxAge, ...s }).then(releaseLoad)
+  run maximumAgeAfterDecodePreservesSourceTest = initialize(1)
+    .then(beginWith(0)).then(rejectWith(0)).then(advanceBy(4000)).then(releaseLoad)
     .expect(s.o.calls == List(SOURCE_ERROR) and s.o.loads == 1
       and s.o.recovery == List("miss") and s.d.ages == List() and s.o.writes == 0)
-
-  // An operation classifier is the captured decision even when its instance
-  // would deny recovery. An ordinary failure distinguishes allow from default.
-  run operationAllowReplacesInstanceDenialTest = init
-    .then(s' = { instanceClassifier: CLASSIFIER_DENY, request: false, ...s })
-    .then(s' = admitted(0, CLASSIFIER_ALLOW)).then(rejectLoader).then(releaseLoad)
+  run operationAllowReplacesInstanceDenialTest = initialize(2)
+    .then(beginWith(0)).then(rejectWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.o.classifications == 1
       and s.o.loads == 1 and s.o.recovery == List("served") and s.o.writes == 0)
-
-  run coalescedRecoveryClassifiesAndDecodesOnceTest = requestFixture
-    .then(s' = admitted(0, CLASSIFIER_INHERIT)).then(s' = joined(1)).then(s' = joined(0))
-    .then(rejectLoader).then(releaseLoad)
+  run coalescedRecoveryClassifiesAndDecodesOnceTest = initialize(5)
+    .then(beginWith(3)).then(joinWith(1)).then(joinWith(0))
+    .then(rejectWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE, VALUE_ONE, VALUE_ONE)
       and s.o.reads == 1 and s.o.loaders == 1 and s.o.classifications == 1
       and s.o.loads == 1 and s.o.recovery == List("served") and s.o.writes == 0)
-
-  run recoveredValueKeepsOriginalFallbackDiagnosticTest = allowRecoveryFixture
-    .then(beginAllowedRecovery).then(rejectLoader).then(releaseLoad)
+  run recoveredValueKeepsOriginalFallbackDiagnosticTest = initialize(1)
+    .then(beginWith(0)).then(rejectWith(0)).then(releaseLoad)
     .expect(s.o.calls == List(VALUE_ONE) and s.o.recovery == List("served")
       and s.d.fallbackErrors == List("remote") and s.o.classifications == 1
       and s.o.loads == 1 and s.o.dumps == 0 and s.o.writes == 0)

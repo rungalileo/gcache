@@ -2,6 +2,11 @@ name: Full formal verification
 
 on:
   workflow_dispatch:
+    inputs:
+      exploration:
+        description: Explore a fresh seed in both ports in addition to pinned acceptance.
+        type: boolean
+        default: false
   schedule:
     - cron: "11 5 * * 1"
 
@@ -13,6 +18,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  exploration:
+    if: (github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.exploration)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+        with:
+          quint: "true"
+          go: "true"
+      - name: Explore a fresh recorded seed and replay both ports
+        run: make explore
+      - name: Preserve exploratory sources, seed and counterexamples
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-exploration
+          path: .formal-traces/exploration/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
   corpus:
     # Scheduled workflows run the default branch; keep the intended main scope explicit.
     if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
@@ -31,6 +58,27 @@ jobs:
         with:
           name: formal-traces
           path: .formal-traces/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  symbolic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+        with:
+          quint: "true"
+          java: "true"
+      - name: Verify finite symbolic properties using approved solver bytes
+        run: make model-check
+      - name: Preserve symbolic verification results and solver identity
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-symbolic
+          path: .formal-traces/symbolic/
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
@@ -118,7 +166,7 @@ jobs:
 
   # A failed or skipped dependency cannot turn smoke evidence into full acceptance.
   formal-full:
-    needs: [corpus, typescript-mutations, go-parity, go-mutations]
+    needs: [corpus, symbolic, typescript-mutations, go-parity, go-mutations, exploration]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -129,8 +177,17 @@ jobs:
           TYPESCRIPT_RESULT: ${{ needs.typescript-mutations.result }}
           GO_RESULT: ${{ needs.go-parity.result }}
           GO_MUTATIONS_RESULT: ${{ needs.go-mutations.result }}
+          SYMBOLIC_RESULT: ${{ needs.symbolic.result }}
+          EXPLORATION_RESULT: ${{ needs.exploration.result }}
+          EXPLORATION_REQUIRED: ${{ github.event_name == 'schedule' || inputs.exploration == true }}
         run: |
           test "$CORPUS_RESULT" = success
           test "$TYPESCRIPT_RESULT" = success
           test "$GO_RESULT" = success
           test "$GO_MUTATIONS_RESULT" = success
+          test "$SYMBOLIC_RESULT" = success
+          if [ "$EXPLORATION_REQUIRED" = true ]; then
+            test "$EXPLORATION_RESULT" = success
+          else
+            test "$EXPLORATION_RESULT" = skipped
+          fi

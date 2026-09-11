@@ -1,4 +1,5 @@
 module dialcache_policy_conformance {
+  import cache_rules.* from "./cache-rules"
   import conformance_observations.* from "./conformance-observations"
   // Two logical keys, one process-local slot, untracked Redis. At most one
   // provider reply is held at a time, but accepted sources can overlap and
@@ -52,10 +53,14 @@ module dialcache_policy_conformance {
     shared: bool,
     result: int
   }
+  type LocalReadReceipt = { eligible: bool, observed: int, expires: int, hit: bool }
+  type RemoteReadReceipt = { eligible: bool, created: int, observed: int, fresh: int, hit: bool }
   type State = {
     o: Observation,
     policyErrors: List[{ layer: str, errorType: str }],
     policyReplies: List[{ providerFailed: bool, invalidBudget: bool }],
+    localReadReceipts: List[LocalReadReceipt],
+    remoteReadReceipts: List[RemoteReadReceipt],
     now: int,
     wall: int,
     policyCall: int,
@@ -83,7 +88,7 @@ module dialcache_policy_conformance {
     s' = {
       o: empty,
       policyErrors: List(),
-      policyReplies: List(),
+      policyReplies: List(), localReadReceipts: List(), remoteReadReceipts: List(),
       now: 0,
       wall: 100000,
       policyCall: NO_OWNER,
@@ -163,17 +168,24 @@ module dialcache_policy_conformance {
       and (localTtl > 0 or remoteTtl > 0)
     val joinsFlight = shared and s.registered.nth(s.key) >= 0
     // Flight admission precedes reading the first participating cache layer.
-    val localHit = not(joinsFlight) and localTtl > 0 and s.localKey == s.key and s.localValue > 0
-      and s.now < s.localExpires
+    val localEligible = not(joinsFlight) and localTtl > 0 and s.localKey == s.key and s.localValue > 0
+    val localHit = localEligible and localEntryLiveAt(s.now, s.localExpires)
     val readsRemote = not(joinsFlight) and not(localHit) and remoteTtl > 0
-    val remoteHit = readsRemote and not(s.readFailed) and s.remoteValues.nth(s.key) > 0
-      and s.now < s.remoteExpires.nth(s.key) and s.wall >= s.remoteCreated.nth(s.key)
-      and s.wall - s.remoteCreated.nth(s.key) < remoteTtl
+    val remoteEligible = readsRemote and not(s.readFailed) and s.remoteValues.nth(s.key) > 0
+      and s.now < s.remoteExpires.nth(s.key)
+    val remoteHit = remoteEligible and freshAgeAllowed(s.remoteCreated.nth(s.key), s.wall, remoteTtl)
     val hitValue = if (localHit) s.localValue else if (remoteHit) s.remoteValues.nth(s.key) else NO_CACHED_VALUE
     val startsSource = not(joinsFlight) and hitValue == NO_CACHED_VALUE
     val owner = if (joinsFlight) s.registered.nth(s.key) else if (startsSource) s.sources.length() else NO_OWNER
     s' = {
       policyCall: NO_OWNER,
+      localReadReceipts: s.localReadReceipts.append({
+        eligible: localEligible, observed: s.now, expires: s.localExpires, hit: localHit
+      }),
+      remoteReadReceipts: s.remoteReadReceipts.append({
+        eligible: remoteEligible, created: s.remoteCreated.nth(s.key),
+        observed: s.wall, fresh: remoteTtl, hit: remoteHit
+      }),
       policyReplies: s.policyReplies.append({
         providerFailed: s.providerFailed, invalidBudget: s.overlay == POLICY_INVALID_READ_BUDGET
       }),
@@ -337,6 +349,20 @@ module dialcache_policy_conformance {
   }
 
   // -- Independently stated safety properties --------------------------------
+
+  // The decision is checked against the entry and elapsed time acquired before
+  // this read. Do not call the transition helper from this independent check.
+  val localHitsRespectInsertionExpiry = s.localReadReceipts.indices().forall(index => {
+    val receipt = s.localReadReceipts.nth(index)
+    receipt.hit == (receipt.eligible and receipt.observed < receipt.expires)
+  })
+  // Recheck the acquired wall time and policy, not later storage or policy.
+  // Physical retention and layer eligibility are distinct from logical age.
+  val remoteHitsRespectAcquiredFreshness = s.remoteReadReceipts.indices().forall(index => {
+    val receipt = s.remoteReadReceipts.nth(index)
+    receipt.hit == (receipt.eligible and receipt.created <= receipt.observed
+      and receipt.observed - receipt.created < receipt.fresh)
+  })
 
   val writesHaveRetention = s.o.writes == s.o.writeTtls.length()
   val hitsSkipSource = s.o.loaders <= s.o.calls.length()
@@ -544,6 +570,18 @@ module dialcache_policy_conformance {
     .then(startCall(0)).then(releasePolicy)
     .expect(s.o.calls == List(VALUE_ONE, CALL_PENDING)
       and s.o.loaders == 2 and s.o.loads == 0 and s.remoteExpires.nth(0) == DEFAULT_RETENTION_MS)
+
+  // The first read proves the retained frame is usable; its hit cannot renew
+  // logical freshness. Equality then refills and a later read reuses that fill.
+  run remoteHitBeforeBoundaryDoesNotRenewFreshnessTest = init
+    .then(changePolicy(POLICY_NO_LOCAL)).then(seedRemote(0, VALUE_ONE))
+    .then(elapse(HALF_SECOND_MS)).then(startCall(0)).then(releasePolicy)
+    .expect(s.o.calls == List(VALUE_ONE) and s.o.loaders == 0 and s.o.loads == 1)
+    .then(elapse(HALF_SECOND_MS)).then(startCall(0)).then(releasePolicy)
+    .expect(s.o.calls == List(VALUE_ONE, CALL_PENDING) and s.o.loaders == 1 and s.o.loads == 1)
+    .then(finishSource(0, VALUE_TWO)).then(startCall(0)).then(releasePolicy)
+    .expect(s.o.calls == List(VALUE_ONE, VALUE_TWO, VALUE_TWO)
+      and s.o.loaders == 1 and s.o.loads == 2 and s.o.writes == 1)
 
   run increasedFreshTtlCannotResurrectExpiredStorageTest = init
     .then(changePolicy(POLICY_RECOVERY_TWO_SECONDS))

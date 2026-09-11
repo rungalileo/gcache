@@ -1,4 +1,5 @@
 module dialcache_shadow_layers_conformance {
+  import cache_rules.* from "./cache-rules"
   import conformance_observations.* from "./conformance-observations"
   import cohort_boundaries.* from "./cohort-boundaries"
   // Composition: request/local reuse, independent caller sources, and one
@@ -96,10 +97,10 @@ module dialcache_shadow_layers_conformance {
   pure def frame(state: State, key: int): int =
     if (state.now < state.remoteExpires.nth(key)) state.remoteValues.nth(key) else NO_VALUE
   pure def fresh(state: State, key: int): int =
-    if (state.now - state.remoteCreated.nth(key) < state.policy.freshMs) frame(state, key) else NO_VALUE
+    if (freshAgeAllowed(state.remoteCreated.nth(key), state.now, state.policy.freshMs)) frame(state, key) else NO_VALUE
   pure def ordinaryStaleCandidate(state: State, key: int): bool =
     frame(state, key) > NO_VALUE and fresh(state, key) == NO_VALUE
-      and state.now - state.remoteCreated.nth(key) < state.policy.retainedMs
+      and recoveryAgeAllowed(state.remoteCreated.nth(key), state.now, state.policy.retainedMs)
 
   action init = all {
     input' = { name: "init", choice: -1 },
@@ -242,7 +243,7 @@ module dialcache_shadow_layers_conformance {
     val slot = if (context < SCOPES and state.policy.request) context * KEYS + key else NO_OWNER
     val localSlot = inst * KEYS + key
     val requestHit = if (slot >= 0) state.memo.nth(slot) else NO_VALUE
-    val localHit = if (state.policy.local and state.now < state.localExpires.nth(localSlot))
+    val localHit = if (state.policy.local and localEntryLiveAt(state.now, state.localExpires.nth(localSlot)))
       state.localValues.nth(localSlot) else NO_VALUE
     val remoteHit = if (state.policy.serving) fresh(state, key) else NO_VALUE
     val hit = if (requestHit > NO_VALUE) requestHit else if (localHit > NO_VALUE) localHit else remoteHit
@@ -381,7 +382,7 @@ module dialcache_shadow_layers_conformance {
     val advanced = { now: state.now + elapsed, ...state }
     state.jobs.indices().fold(advanced, (updated, index) => {
       val job = updated.jobs.nth(index)
-      if (job.phase == FINISHED or job.timedOut or updated.now < job.admittedAt + JOB_BUDGET_MS) updated
+      if (job.phase == FINISHED or job.timedOut or deadlinePendingAt(updated.now, job.admittedAt + JOB_BUDGET_MS)) updated
       else {
         jobs: updated.jobs.replaceAt(index, {
           timedOut: true,

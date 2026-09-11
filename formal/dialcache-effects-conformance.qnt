@@ -1,4 +1,5 @@
 module dialcache_effects_conformance {
+  import cache_rules.* from "./cache-rules"
   // Model boundary -----------------------------------------------------------
   // One registered remote-only execution, plus up to eight callers and late
   // external sources/reads. Selected aspects of C23-C28 cover budgets and
@@ -105,7 +106,7 @@ module dialcache_effects_conformance {
       "serialization", "dump", x.now - x.acceptedAt)
     if (failed) measured else metric(metric(measured, "size", "", 1), "storedSize", "", 1)
   }
-  val unfenced = s.storedTimestamp > 0 and (s.tracked == UNTRACKED or s.storedTimestamp > s.watermark)
+  val unfenced = s.storedTimestamp > 0 and (s.tracked == UNTRACKED or fenceAllows(s.storedTimestamp, s.watermark))
   val readable = unfenced and s.wall >= s.storedTimestamp
 
   // Initial fixture ----------------------------------------------------------
@@ -158,7 +159,7 @@ module dialcache_effects_conformance {
       ...s
     }
     if (s.readStates.nth(index) == EFFECT_ABANDONED) settled
-    else if (s.now >= s.deadline) {
+    else if (not(deadlinePendingAt(s.now, s.deadline))) {
       val cancelled = { readAborts: s.readAborts + 1, ...settled }
       val measured = readDone(metric(cancelled, "error", "cache_read_timeout", 0))
       startSource(measured, REFILL_DENIED, 0)
@@ -236,15 +237,15 @@ module dialcache_effects_conformance {
   def settledSource(index: int, failed: bool): State = {
     val settled = { sources: s.sources.replaceAt(index, EFFECT_SETTLED), ...s }
     val measured = if (s.sources.nth(index) == EFFECT_ABANDONED) settled
-      else sourceDone(settled, failed or s.now >= s.deadline)
+      else sourceDone(settled, failed or not(deadlinePendingAt(s.now, s.deadline)))
     if (s.sources.nth(index) == EFFECT_ABANDONED) measured
-    else if (s.now >= s.deadline) {
+    else if (not(deadlinePendingAt(s.now, s.deadline))) {
       phase: IDLE, calls: finishPendingCalls(s.calls, CALL_TIMEOUT), ...measured
     }
     else if (failed) {
       phase: IDLE, calls: finishPendingCalls(s.calls, CALL_SOURCE_ERROR), ...measured
     }
-    else if (s.refill == REFILL_DENIED or s.wall <= s.observedFence) {
+    else if (s.refill == REFILL_DENIED or not(fenceAllows(s.wall, s.observedFence))) {
       phase: IDLE, calls: finishPendingCalls(s.calls, CALL_VALUE), ...measured
     }
     else {
@@ -274,7 +275,7 @@ module dialcache_effects_conformance {
     s.phase == SERIALIZE_PENDING,
     // The native write is stamped after serialization, not at source acceptance.
     val prepared = serialized(s, false)
-    s' = if (s.wall <= s.observedFence) {
+    s' = if (not(fenceAllows(s.wall, s.observedFence))) {
       phase: IDLE, calls: finishPendingCalls(s.calls, CALL_VALUE), ...prepared
     } else {
       phase: WRITE_PENDING, writes: s.writes + 1, writeTimestamp: s.wall,
@@ -308,7 +309,7 @@ module dialcache_effects_conformance {
     val advanced = { now: s.now + CLOCK_STEP_MS, wall: s.wall + CLOCK_STEP_MS, ...s }
     all {
       input' = { name: "tick", choice: -1 },
-      s' = if (s.phase == READ_PENDING and s.now + CLOCK_STEP_MS >= s.deadline) {
+      s' = if (s.phase == READ_PENDING and not(deadlinePendingAt(s.now + CLOCK_STEP_MS, s.deadline))) {
         val cancelled = {
           readStates: s.readStates.replaceAt(s.activeRead, EFFECT_ABANDONED),
           readAborts: s.readAborts + 1,
@@ -642,4 +643,15 @@ module dialcache_effects_conformance {
     .expect(s.calls == List(CALL_VALUE, CALL_VALUE) and s.loads == 1 and s.loaders == 1
       and s.reads == 2 and s.dumps == 1 and s.writes == 1)
     .expect(s.events.select(e => e.event == "miss").foldl(List(), (out, e) => out.append(e.detail)) == List("value_absent"))
+
+  // Untracked reads demote a fenced-miss reply to an ordinary miss. Observe the
+  // consequence through publication and a later hit, using only public inputs.
+  run untrackedFencedReplyRefillsAndIsReadableTest = initialized(FIXTURE_UNTRACKED)
+    .then(replyWith(REPLY_FENCED_WITH_VALID_FENCE)).then(beginCall).then(releaseRead)
+    .then(resolveLoader).then(releaseDump).then(releaseWrite)
+    .then(beginCall).then(releaseRead).then(releaseLoad)
+    .expect(s.calls == List(CALL_VALUE, CALL_VALUE) and s.observedFence == 0
+      and s.loads == 1 and s.loaders == 1 and s.reads == 2 and s.dumps == 1 and s.writes == 1)
+    .expect(s.events.select(e => e.event == "miss").foldl(List(), (out, e) => out.append(e.detail)) == List("unclassified"))
+
 }

@@ -1,4 +1,5 @@
 module dialcache_independent_conformance {
+  import cache_rules.* from "./cache-rules"
   import conformance_observations.* from "./conformance-observations"
   // Model boundary -----------------------------------------------------------
   // Six same-key callers with coalescing disabled exercise selected aspects of
@@ -93,7 +94,7 @@ module dialcache_independent_conformance {
   }
   pure def validCandidate(x: State, caller: int): bool = {
     val call = x.calls.nth(caller)
-    call.candidate > NO_CANDIDATE and call.created <= x.wall and x.wall - call.created < call.maxAge
+    call.candidate > NO_CANDIDATE and recoveryAgeAllowed(call.created, x.wall, call.maxAge)
   }
   pure def rejected(x: State, caller: int, error: int): State = {
     val call = x.calls.nth(caller)
@@ -159,10 +160,10 @@ module dialcache_independent_conformance {
       ...x
     }
     val call = x.calls.nth(read.caller)
-    val readable = x.frame > 0 and x.now < x.expires and x.created > x.watermark
-    val fresh = readable and x.created <= x.wall and x.wall - x.created < FRESH_AGE_MS
+    val readable = x.frame > 0 and x.now < x.expires and fenceAllows(x.created, x.watermark)
+    val fresh = readable and freshAgeAllowed(x.created, x.wall, FRESH_AGE_MS)
     val stale = readable and x.created <= x.wall and
-      x.wall - x.created >= FRESH_AGE_MS and x.wall - x.created < call.maxAge
+      retainedAgeAllowed(x.created, x.wall, FRESH_AGE_MS, call.maxAge)
     val observed = {
       calls: settled.calls.replaceAt(read.caller, {
         canWrite: not(failed), canRecover: not(failed) and not(fresh),
@@ -200,7 +201,7 @@ module dialcache_independent_conformance {
         outcome: if (source.active) value else source.outcome, ...source }),
       ...x
     }
-    val mayWrite = call.canWrite and x.wall > call.fence
+    val mayWrite = call.canWrite and fenceAllows(x.wall, call.fence)
     if (not(source.active)) settled
     else if (value == SOURCE_ERROR) rejected(settled, source.caller, SOURCE_ERROR)
     else finished({
@@ -322,17 +323,19 @@ module dialcache_independent_conformance {
     }
   }
 
-  action policy = {
-    // Wire choices 0/1 use long retention; parity chooses the read budget.
-    nondet choice = 0.to(3).oneOf()
-    all {
-      input' = { name: "policy", choice: choice },
-      s' = {
-        readBudget: if (choice % 2 == 0) SHORT_READ_BUDGET_MS else LONG_READ_BUDGET_MS,
-        maxAge: if (choice < 2) LONG_RETENTION_MS else SHORT_RETENTION_MS,
-        ...s
-      }
+  // Wire choices 0/1 use long retention; parity chooses the read budget.
+  action policyWith(choice: int): bool = all {
+    (0.to(3)).contains(choice),
+    input' = { name: "policy", choice: choice },
+    s' = {
+      readBudget: if (choice % 2 == 0) SHORT_READ_BUDGET_MS else LONG_READ_BUDGET_MS,
+      maxAge: if (choice < 2) LONG_RETENTION_MS else SHORT_RETENTION_MS,
+      ...s
     }
+  }
+  action policy = {
+    nondet choice = 0.to(3).oneOf()
+    policyWith(choice)
   }
 
 
@@ -375,7 +378,8 @@ module dialcache_independent_conformance {
 
   // Deterministic model regressions ------------------------------------------
   run independentReadDeadlinesStartSeparateSourcesTest = init.then(beginCall).then(advanceBy(1)).then(beginCall)
-    .then(advanceBy(4)).expect(s.io.aborted == List(0) and s.o.loaders == 1)
+    .then(advanceBy(1)).then(advanceBy(1)).then(advanceBy(1)).then(advanceBy(1))
+    .expect(s.io.aborted == List(0) and s.o.loaders == 1)
     .then(advanceBy(1)).expect(s.io.aborted == List(0, 1) and s.o.loaders == 2)
   run independentRecoveryKeepsDistinctSnapshotsTest = init.then(beginCall).then(readAt(0))
     .then(all { input' = input, s' = { frame: VALUE_TWO, ...s } }).then(beginCall).then(readAt(1))
@@ -397,6 +401,20 @@ module dialcache_independent_conformance {
     .then(rejectAt(0)).then(rejectAt(1)).then(advanceBy(1000))
     .then(loadAt(0)).then(loadAt(1))
     .expect(s.o.calls == List(VALUE_ONE, SOURCE_ERROR) and s.io.sourceErrors == List(0, 2) and s.o.recovery == List("served", "miss"))
+
+  // Release the shorter-policy decode first, while the longer-policy caller
+  // still waits. At exactly its captured maximum it preserves its own error;
+  // the other caller can still recover the same acquired bytes.
+  run independentRecoveryAtCapturedAgeBoundaryTest = init
+    .then(beginCall).then(readAt(0)).then(policyWith(2))
+    .then(beginCall).then(readAt(1)).then(rejectAt(0)).then(rejectAt(1))
+    .then(advanceBy(1000)).then(loadAt(1))
+    .expect(s.o.calls == List(CALL_PENDING, SOURCE_ERROR)
+      and s.o.recovery == List("miss") and s.io.sourceErrors == List(0, 2))
+    .then(loadAt(0))
+    .expect(s.o.calls == List(VALUE_ONE, SOURCE_ERROR)
+      and s.o.recovery == List("miss", "served") and s.o.reads == 2
+      and s.o.loaders == 2 and s.o.loads == 2 and s.o.dumps == 0 and s.o.writes == 0)
 
   // Fenced storage removes recovery as a competing explanation. The later
   // source succeeds after the earlier caller's deadline, within its own budget.

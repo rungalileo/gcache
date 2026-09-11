@@ -6,11 +6,16 @@ This document specifies the bounded `core` profile implemented by the TypeScript
 
 Inputs use Quint 0.32.0's ITF JSON format. Each entry in `states` has:
 
-- `mbt::actionTaken`: the action that reached this state; the first is `init`.
-- `mbt::nondetPicks`: an empty record for this profile, whose actions have no parameters.
+- `input`: the authoritative public action, encoded as `{"name":"init","choice":{"#bigint":"-1"}}`. The first action is `init`; every core action uses `choice: -1` because it has no external arguments.
 - `s`: the expected model state after that action. Integers are encoded as `{"#bigint":"123"}`; booleans are JSON booleans.
 
-The committed smoke scenario uses the same format. Drivers reject unknown actions, unsupported arguments, missing/misplaced initialization, missing observations, and empty traces/corpora. This profile uses nonnegative safe integers; the TypeScript parser rejects out-of-range ITF integers instead of rounding them. General ITF sets/maps/variants are not needed by this profile.
+Optional `mbt::actionTaken` and `mbt::nondetPicks` annotations must agree with
+`input` when present. For core, the picks may be an empty record or an explicit
+`None` choice. Scheduled exports add compatibility annotations; raw Quint
+regression exports may omit them. The shared parser accepts either form without
+inferring commands from expected state.
+
+The committed smoke scenario uses the same input contract. Drivers reject unknown actions, unsupported arguments, missing/misplaced initialization, missing observations, and empty traces/corpora. Model observations use nonnegative safe integers; the TypeScript parser rejects out-of-range ITF integers instead of rounding them. General ITF sets/maps/variants are not needed by this profile.
 
 Create a fresh implementation instance and independently controlled environment per trace, preserving both across its actions. Await its defined completion boundary, record real outputs/effects, then compare the observation projection with `s`. Only action names enter the TypeScript driver's execution method. Expected state is consumed by the assertion layer.
 

@@ -16,8 +16,13 @@ behavior.
 ## Reading a model
 
 Start with the file's scope and assumptions. Each model deliberately covers a
-bounded part of DialCache. The verification models emphasize rules; conformance
-profiles describe external actions that a language driver can replay. The
+bounded part of DialCache. Begin with [cache-rules.qnt](./cache-rules.qnt) for
+shared age, expiry, deadline and fence judgments, and
+[cache-contract.qnt](./cache-contract.qnt) for acquired recovery and source
+ownership records. Verification models and conformance profiles consume these
+definitions. Connection models check selected profile histories against the
+acquired contracts. Conformance profiles also expose external actions that a
+language driver can replay. The
 [model inventory](./README.md#models-and-composition-profiles) and [profile registry](./profiles.json)
 identify the relevant starting point.
 
@@ -74,7 +79,22 @@ and use named constants, so a readability edit does not silently change the
 portable trace interface. An integer can have a different meaning in another
 profile; do not share a constant merely because its numeric value matches.
 
-Keep repeated definitions DRY when they express the same operation. Small
+Keep repeated definitions DRY when they express the same operation. Shared
+acceptance judgments belong in `cache-rules.qnt`; acquired snapshot and source
+ownership contracts belong in `cache-contract.qnt`. A profile supplies its
+normalized policy, clocks and environment; it must not restate those decisions.
+Where representations differ, add an executable projection/connection check
+that compares profile history with the contract. Give the projection an explicit
+scope and challenge mistakes in policy capture, event timing or ownership.
+
+Connection models advance the imported profile and save its preceding context
+in the same `all` action. Views such as `acquired` and `observedSources` combine
+that context with the latest recorded input to reconstruct the current contract
+record. Invariants check this view immediately; the next step persists it.
+Quint assignments in `all` are simultaneous, so changing their textual order
+does not change which state they read.
+
+Small
 representation helpers such as completing callers owned by one source belong
 in [conformance-observations.qnt](./conformance-observations.qnt). Name repeated
 transition conditions locally, including the time or snapshot they inspect.
@@ -88,6 +108,9 @@ predicate. For example, the transition can use a named recovery-age predicate,
 while its invariant independently compares the retained timestamp with the
 recorded acceptance time and exclusive maximum age. This intentional repetition
 provides evidence; it is not duplicate behavior to remove mechanically.
+Connection and composition checks can reuse a canonical predicate to check
+capture, ownership or history. State that dependency explicitly and keep a
+separate boundary property for faults in the predicate itself.
 
 ## Codifying the next behavior
 
@@ -99,9 +122,12 @@ For each new rule or interaction:
 2. **Model the smallest relevant boundary.** Extend the appropriate model with
    readable state, inputs, and transitions. Add another profile only when an
    existing one cannot express the necessary ownership or scheduling boundary.
-3. **Challenge the rule.** Add an independently stated invariant or regression,
-   and a representative fault when it adds useful evidence. Merely declaring a
-   property is insufficient: schedule it in `execution.json`.
+3. **Challenge the rule.** Add an independently stated semantic invariant and
+   deterministic boundary histories. Add a compiling model mutation for a
+   plausible wrong implementation of the rule; require an invariant violation,
+   not merely a compiler error or failed bookkeeping check. Use symbolic checking
+   for tractable finite modules and sample larger compositions. Schedule every
+   property and regression in `execution.json`.
 4. **Exercise both implementations.** Require a generated witness or exported
    Quint regression that exposes the rule's consequence, and replay the same
    history in TypeScript and Go. Fixed scenarios preserve narrow regressions;
@@ -136,8 +162,9 @@ follow recorded external inputs and actual effect ownership.
 
 ## Exporting a deterministic regression
 
-Sampled histories explore combinations. Named Quint regressions guarantee that
-a reviewed boundary is exercised even when a random seed does not reach it.
+Sampled histories explore combinations. Exported and scheduled named Quint
+regressions guarantee that their reviewed boundary is exercised in both ports
+even when a random seed does not reach it.
 Keep the expected result in Quint; do not copy it into a hand-maintained JSON
 scenario and call that Quint-driven evidence.
 
@@ -155,9 +182,11 @@ assignment to private model state is not an executable input.
 
 List exportable runs in the model's `replayRegressions` in `execution.json`.
 Generation exports them under `regressions/<profile>/` alongside the sampled
-corpus. Quint's deterministic test export omits MBT action metadata, so
-`replay-inputs.mjs` normalizes only the explicit input record into the common
-envelope. It never infers commands from differences in expected state.
+corpus. Quint's deterministic test export omits MBT action metadata.
+`replay-inputs.mjs` adds compatibility annotations derived only from the explicit
+input record to scheduled exports; it never infers commands from expected state.
+The coordinator also accepts raw regression exports directly. `input` remains
+authoritative, and any optional MBT annotations must agree with it.
 
 Each implementation validates the input domain, performs the real public
 operation, and compares its own observations after every step. Both completion

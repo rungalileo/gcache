@@ -11,7 +11,7 @@ export const artifact = 'formal/quint-frame-vectors.json';
 export const expectedCases = 589;
 export const invariants = ['encodedFrameKeepsHeaderAndPayload', 'decodedTextContainsOnlyScalars',
   'trackedHitsStrictlyClearValidFence', 'absentValueKeepsItsOwnClassification', 'acceptedDurationWithinCeiling', 'writerRejectsInvalidNumericDomain'];
-const sources = [model, 'formal/wire-text.qnt', generator];
+const sources = [model, 'formal/wire-text.qnt', generator, 'formal/cache-rules.qnt'];
 const sourceHashes = () => Object.fromEntries(sources.map(path => [path,
   createHash('sha256').update(readFileSync(resolve(root, path))).digest('hex')]));
 const object = (value, label) => {

@@ -1,224 +1,106 @@
+import {
+  coreCommands, parseItfTrace, expectedCoreObservation, assertCoreObservation,
+  type CoreCommand, type Counter, type ActionName, type Observation, type Trace,
+} from "../formal/replay/core.mjs";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CacheLayer, DialCache, DialCacheKeyConfig, type DialCacheConfig } from "../src/index.js";
-import { record, itfInteger } from "./formal/itf.js";
+import { DialCache, DialCacheKeyConfig, type DialCacheConfig } from "../src/index.js";
+import { record } from "./formal/itf.js";
 import { FakeRedis } from "./fake-redis.js";
-
-const actionNames = [
-  "init", "bumpSource", "outsideCall", "requestLocalPair", "localCall",
-  "coalescedLocalPair", "remoteCall", "invalidateRemote", "remoteReadFailureCall",
-] as const;
-type ActionName = typeof actionNames[number];
-
-// Only these model fields are observable through the public API/environment.
-// Cache-presence/value fields stay in Quint to predict future observations;
-// a loader invocation alone is not evidence that a local value was published.
-const observationFields = [
-  "sourceVersion", "lastResult", "outsideLoaderCalls", "requestLoaderCalls",
-  "localLoaderCalls", "coalescedLoaderCalls", "remoteLoaderCalls", "redisReads", "redisWrites",
-] as const;
-type Observation = Pick<Snapshot, typeof observationFields[number]>;
-
-interface Snapshot {
-  sourceVersion: number;
-  lastResult: number;
-  outsideLoaderCalls: number;
-  requestLoaderCalls: number;
-  localLoaderCalls: number;
-  coalescedLoaderCalls: number;
-  remoteLoaderCalls: number;
-  localCached: boolean;
-  localValue: number;
-  coalescedCached: boolean;
-  coalescedValue: number;
-  remoteReadable: boolean;
-  remoteValue: number;
-  redisReads: number;
-  redisWrites: number;
-}
-
-interface TraceState {
-  action: ActionName;
-  state: Snapshot;
-}
-
-interface Trace {
-  path: string;
-  states: TraceState[];
-}
-
-const localOnly = () =>
-  new DialCacheKeyConfig({
-    ttlSec: { [CacheLayer.LOCAL]: 60 },
-    ramp: { [CacheLayer.LOCAL]: 100 },
-  });
-
-const remoteOnly = () =>
-  new DialCacheKeyConfig({
-    ttlSec: { [CacheLayer.REMOTE]: 60 },
-    ramp: { [CacheLayer.REMOTE]: 100 },
-  });
-
-const requestOnly = () => new DialCacheKeyConfig({ requestLocal: true });
 
 class ConformanceDriver {
   readonly redis = new FakeRedis();
   readonly dialcache: DialCache;
+  private sourceVersion = 1;
+  private lastResult = 0;
+  private readonly counters: Record<Counter, number> = {
+    outsideLoaderCalls: 0,
+    requestLoaderCalls: 0,
+    localLoaderCalls: 0,
+    coalescedLoaderCalls: 0,
+    remoteLoaderCalls: 0,
+  };
+  private wallClockMs = Date.parse("2026-09-08T12:00:00.000Z");
 
   constructor(config: DialCacheConfig = {}) {
     this.dialcache = new DialCache({ ...config, redis: { client: this.redis } });
   }
 
-  sourceVersion = 1;
-  lastResult = 0;
-  outsideLoaderCalls = 0;
-  requestLoaderCalls = 0;
-  localLoaderCalls = 0;
-  coalescedLoaderCalls = 0;
-  remoteLoaderCalls = 0;
-
-  private wallClockMs = Date.parse("2026-09-08T12:00:00.000Z");
-
   async apply(action: ActionName): Promise<void> {
-    if (action === "init") return;
+    for (const input of coreCommands(action)) await this.applyInput(input);
+  }
 
-    // Give sequential protocol actions distinct wall-clock timestamps. This is
-    // an environment scheduling choice, not a DialCache semantic guarantee.
-    this.wallClockMs += 1;
-    vi.setSystemTime(this.wallClockMs);
-
-    switch (action) {
-      case "bumpSource":
-        this.sourceVersion += 1;
-        return;
-      case "outsideCall":
-        this.lastResult = await this.dialcache.getOrLoad(
-          async () => {
-            this.outsideLoaderCalls += 1;
-            return this.sourceVersion;
-          },
-          {
-            keyType: "user_id",
-            useCase: "ConformanceOutside",
-            key: "123",
-            defaultConfig: localOnly(),
-          },
-        );
-        return;
-      case "requestLocalPair": {
-        const options = {
-          keyType: "user_id",
-          useCase: "ConformanceRequest",
-          key: "123",
-          defaultConfig: requestOnly(),
-        } as const;
-        const values = await this.dialcache.enable(async () => {
-          const first = await this.dialcache.getOrLoad(async () => {
-            this.requestLoaderCalls += 1;
-            return this.sourceVersion;
-          }, options);
-          const second = await this.dialcache.getOrLoad(async () => {
-            this.requestLoaderCalls += 1;
-            return this.sourceVersion;
-          }, options);
-          return [first, second] as const;
-        });
-        expect(values[1]).toBe(values[0]);
-        this.lastResult = values[1];
-        return;
-      }
-      case "localCall":
-        this.lastResult = await this.dialcache.enable(async () =>
-          await this.dialcache.getOrLoad(async () => {
-            this.localLoaderCalls += 1;
-            return this.sourceVersion;
-          }, {
-            keyType: "user_id",
-            useCase: "ConformanceLocal",
-            key: "123",
-            defaultConfig: localOnly(),
-          }),
-        );
-        return;
-      case "coalescedLocalPair": {
-        const gate = deferred<void>();
-        const options = {
-          keyType: "user_id",
-          useCase: "ConformanceCoalesced",
-          key: "123",
-          defaultConfig: localOnly(),
-        } as const;
-        const values = await this.dialcache.enable(async () => {
-          const leader = this.dialcache.getOrLoad(async () => {
-            this.coalescedLoaderCalls += 1;
-            await gate.promise;
-            return this.sourceVersion;
-          }, options);
-          const follower = this.dialcache.getOrLoad(async () => {
-            this.coalescedLoaderCalls += 1;
-            return this.sourceVersion;
-          }, options);
-          // Drain ready work while the loader remains blocked. This does not
-          // advance deadlines and does not encode a count of Promise turns in
-          // the portable action. Ports drain their own executor here.
-          await vi.advanceTimersByTimeAsync(0);
-          gate.resolve();
-          return await Promise.all([leader, follower]);
-        });
-        expect(values[1]).toBe(values[0]);
-        this.lastResult = values[1];
-        return;
-      }
-      case "remoteCall":
-        this.lastResult = await this.remoteCall();
-        return;
-      case "invalidateRemote":
-        await this.dialcache.invalidateRemote("user_id", "123");
-        return;
-      case "remoteReadFailureCall":
-        this.redis.failGet = true;
-        try {
-          this.lastResult = await this.remoteCall();
-        } finally {
-          this.redis.failGet = false;
-        }
-        return;
+  private async applyInput(input: CoreCommand): Promise<void> {
+    if (input.op === "advanceWall") {
+      this.wallClockMs += input.ms;
+      vi.setSystemTime(this.wallClockMs);
+      return;
     }
-    const unsupported: never = action;
-    throw new Error(`Unsupported conformance action: ${unsupported}`);
+    if (input.op === "bumpSource") {
+      this.sourceVersion++;
+      return;
+    }
+    if (input.op === "invalidate") {
+      await this.dialcache.invalidateRemote(input.identity.keyType, input.identity.id);
+      return;
+    }
+
+    const options = {
+      keyType: input.identity.keyType,
+      key: input.identity.id,
+      useCase: input.identity.useCase,
+      trackForInvalidation: input.identity.tracked,
+      defaultConfig: new DialCacheKeyConfig(input.policy),
+    };
+    const call = (wait?: Promise<void>) => this.dialcache.getOrLoad(async () => {
+      this.counters[input.counter]++;
+      if (wait !== undefined) await wait;
+      return this.sourceVersion;
+    }, options);
+    const pair = async (concurrent: boolean) => {
+      if (!concurrent) {
+        const first = await call();
+        const second = await call();
+        expect(second).toBe(first);
+        return second;
+      }
+      const gate = deferred<void>();
+      const leader = call(gate.promise);
+      const follower = call();
+      // Drain only causally ready work while the actual source remains held.
+      await vi.advanceTimersByTimeAsync(0);
+      gate.resolve();
+      const values = await Promise.all([leader, follower]);
+      expect(values[1]).toBe(values[0]);
+      return values[1]!;
+    };
+
+    this.redis.failGet = input.readFailure;
+    try {
+      if (input.mode === "outside") {
+        this.lastResult = await call();
+      } else {
+        this.lastResult = await this.dialcache.enable(() => input.mode === "single"
+          ? call()
+          : pair(input.mode === "coalesced-pair"));
+      }
+    } finally {
+      this.redis.failGet = false;
+    }
   }
 
   snapshot(): Observation {
     return {
       sourceVersion: this.sourceVersion,
       lastResult: this.lastResult,
-      outsideLoaderCalls: this.outsideLoaderCalls,
-      requestLoaderCalls: this.requestLoaderCalls,
-      localLoaderCalls: this.localLoaderCalls,
-      coalescedLoaderCalls: this.coalescedLoaderCalls,
-      remoteLoaderCalls: this.remoteLoaderCalls,
+      ...this.counters,
       redisReads: this.redis.getCalls + this.redis.mGetCalls,
       redisWrites: this.redis.setCalls,
     };
-  }
-
-  private async remoteCall(): Promise<number> {
-    return await this.dialcache.enable(async () =>
-      await this.dialcache.getOrLoad(async () => {
-        this.remoteLoaderCalls += 1;
-        return this.sourceVersion;
-      }, {
-        keyType: "user_id",
-        useCase: "ConformanceRemote",
-        key: "123",
-        trackForInvalidation: true,
-        defaultConfig: remoteOnly(),
-      }),
-    );
   }
 }
 
@@ -235,42 +117,6 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve };
 }
 
-function parseItfTrace(value: unknown, path: string): Trace {
-  const parsed = record(value, path);
-  if (!Array.isArray(parsed.states) || parsed.states.length < 2) {
-    throw new Error(`${path}: expected init and at least one action`);
-  }
-  const states = parsed.states.map((value, index): TraceState => {
-    const context = `${path} step ${index}`;
-    const state = record(value, context);
-    const action = state["mbt::actionTaken"];
-    if (!actionNames.some((name) => name === action) || ((index === 0) !== (action === "init"))) {
-      throw new Error(`${context}: unknown or misplaced action ${JSON.stringify(action)}`);
-    }
-    if (Object.keys(record(state["mbt::nondetPicks"], context)).length !== 0) {
-      throw new Error(`${context}: this profile does not accept nondeterministic action arguments`);
-    }
-    const raw = record(state.s, context);
-    const integerFields = [
-      ...observationFields, "localValue", "coalescedValue", "remoteValue",
-    ] as const;
-    const booleanFields = ["localCached", "coalescedCached", "remoteReadable"] as const;
-    if (Object.keys(raw).length !== integerFields.length + booleanFields.length) {
-      throw new Error(`${context}: unexpected model state fields`);
-    }
-    const decoded: Record<string, number | boolean> = {};
-    for (const field of integerFields) {
-      decoded[field] = itfInteger(raw[field], `${context} ${field}`);
-    }
-    for (const field of booleanFields) {
-      if (typeof raw[field] !== "boolean") throw new Error(`${context}: expected boolean ${field}`);
-      decoded[field] = raw[field];
-    }
-    return { action: action as ActionName, state: decoded as unknown as Snapshot };
-  });
-  return { path, states };
-}
-
 function readItfTrace(path: string): Trace {
   return parseItfTrace(JSON.parse(readFileSync(path, "utf8")), path);
 }
@@ -280,17 +126,24 @@ function loadTraces(generatedDir: string | undefined): Trace[] {
   const root = resolve(generatedDir);
   const paths = readdirSync(root).filter((name) => name.endsWith(".itf.json")).sort();
   if (paths.length === 0) throw new Error(`${root}: no .itf.json conformance traces found`);
-  return paths.map((name) => readItfTrace(resolve(root, name)));
+  const execution = JSON.parse(readFileSync(resolve("formal/execution.json"), "utf8")) as {
+    models: Array<{ profile?: string; replayRegressions?: string[] }>;
+  };
+  const regressions = execution.models.find(model => model.profile === "core")?.replayRegressions ?? [];
+  return [
+    ...paths.map((name) => readItfTrace(resolve(root, name))),
+    ...regressions.map(name => readItfTrace(resolve(root, "..", "regressions", "core", `${name}.itf.json`))),
+  ];
 }
 
 async function replay(trace: Trace, driver = new ConformanceDriver()): Promise<void> {
   for (const [index, step] of trace.states.entries()) {
     const context = `trace ${trace.path} step ${index} action ${step.action}`;
     // Expected state is used only for comparison. It never enters the driver.
-    const expected = Object.fromEntries(observationFields.map((field) => [field, step.state[field]]));
+    const expected = expectedCoreObservation(step.state);
     try {
       await driver.apply(step.action);
-      expect(driver.snapshot(), context).toEqual(expected);
+      assertCoreObservation(step.state, driver.snapshot());
     } catch (cause) {
       throw new Error([
         context,
@@ -329,6 +182,15 @@ describe("conformance harness trust boundary", () => {
   const smokePath = resolve("formal/conformance-smoke.itf.json");
   const smoke = readItfTrace(smokePath);
 
+  it("accepts explicit commands without MBT metadata", async () => {
+    const trace = JSON.parse(readFileSync(smokePath, "utf8")) as { states: Record<string, unknown>[] };
+    for (const state of trace.states) {
+      delete state["mbt::actionTaken"];
+      delete state["mbt::nondetPicks"];
+    }
+    await replay(parseItfTrace(trace, "explicit-core.itf.json"));
+  });
+
   it("detects lost local caching through a later public call", async () => {
     const driver = new ConformanceDriver({
       cacheConfigProvider: () => new DialCacheKeyConfig({ ramp: { local: 0 } }),
@@ -357,6 +219,12 @@ describe("conformance harness trust boundary", () => {
 
   it.each([
     ["empty trace", (trace: { states: unknown[] }) => { trace.states = []; }],
+    ["missing explicit input", (trace: { states: unknown[] }) => {
+      delete record(trace.states[1], "test").input;
+    }],
+    ["unexpected explicit choice", (trace: { states: unknown[] }) => {
+      record(record(trace.states[1], "test").input, "test").choice = { "#bigint": "0" };
+    }],
     ["unknown action", (trace: { states: unknown[] }) => {
       record(trace.states[1], "test")["mbt::actionTaken"] = "unsupportedAction";
     }],

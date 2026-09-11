@@ -13,10 +13,10 @@
   "states": [
     {
       "input": {
-        "name": "init",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "init"
       },
       "mbt::actionTaken": "init",
       "mbt::nondetPicks": {},
@@ -64,10 +64,10 @@
     },
     {
       "input": {
-        "name": "outsideCall",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "outsideCall"
       },
       "mbt::actionTaken": "outsideCall",
       "mbt::nondetPicks": {},
@@ -115,10 +115,10 @@
     },
     {
       "input": {
-        "name": "requestLocalPair",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "requestLocalPair"
       },
       "mbt::actionTaken": "requestLocalPair",
       "mbt::nondetPicks": {},
@@ -166,10 +166,10 @@
     },
     {
       "input": {
-        "name": "localCall",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "localCall"
       },
       "mbt::actionTaken": "localCall",
       "mbt::nondetPicks": {},
@@ -217,10 +217,10 @@
     },
     {
       "input": {
-        "name": "bumpSource",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "bumpSource"
       },
       "mbt::actionTaken": "bumpSource",
       "mbt::nondetPicks": {},
@@ -268,10 +268,10 @@
     },
     {
       "input": {
-        "name": "localCall",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "localCall"
       },
       "mbt::actionTaken": "localCall",
       "mbt::nondetPicks": {},
@@ -319,10 +319,10 @@
     },
     {
       "input": {
-        "name": "coalescedLocalPair",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "coalescedLocalPair"
       },
       "mbt::actionTaken": "coalescedLocalPair",
       "mbt::nondetPicks": {},
@@ -370,10 +370,10 @@
     },
     {
       "input": {
-        "name": "remoteCall",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "remoteCall"
       },
       "mbt::actionTaken": "remoteCall",
       "mbt::nondetPicks": {},
@@ -421,10 +421,10 @@
     },
     {
       "input": {
-        "name": "bumpSource",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "bumpSource"
       },
       "mbt::actionTaken": "bumpSource",
       "mbt::nondetPicks": {},
@@ -472,10 +472,10 @@
     },
     {
       "input": {
-        "name": "remoteCall",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "remoteCall"
       },
       "mbt::actionTaken": "remoteCall",
       "mbt::nondetPicks": {},
@@ -523,10 +523,10 @@
     },
     {
       "input": {
-        "name": "invalidateRemote",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "invalidateRemote"
       },
       "mbt::actionTaken": "invalidateRemote",
       "mbt::nondetPicks": {},
@@ -574,10 +574,10 @@
     },
     {
       "input": {
-        "name": "remoteCall",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "remoteCall"
       },
       "mbt::actionTaken": "remoteCall",
       "mbt::nondetPicks": {},
@@ -625,10 +625,10 @@
     },
     {
       "input": {
-        "name": "bumpSource",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "bumpSource"
       },
       "mbt::actionTaken": "bumpSource",
       "mbt::nondetPicks": {},
@@ -676,10 +676,10 @@
     },
     {
       "input": {
-        "name": "remoteReadFailureCall",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "remoteReadFailureCall"
       },
       "mbt::actionTaken": "remoteReadFailureCall",
       "mbt::nondetPicks": {},
@@ -727,10 +727,10 @@
     },
     {
       "input": {
-        "name": "requestLocalPair",
         "choice": {
           "#bigint": "-1"
-        }
+        },
+        "name": "requestLocalPair"
       },
       "mbt::actionTaken": "requestLocalPair",
       "mbt::nondetPicks": {},

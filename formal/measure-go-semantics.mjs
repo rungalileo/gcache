@@ -11,7 +11,7 @@ const json = file => JSON.parse(readFileSync(file, 'utf8'));
 const protocolNames = ['TestProtocolKeys', 'TestProtocolFrames', 'TestProtocolDecoders', 'TestProtocolCohorts', 'TestProtocolRemainingVectors'];
 const generatedNames = ['TestCoreConformance', 'TestEffectsConformance', 'TestFeatureConformance', 'TestLocalClockConformance', 'TestGeneratedWitnessEvidence', ...protocolNames];
 const fixedNames = ['TestBehaviorConformance', ...protocolNames];
-const infrastructureTestFile = /(?:replay|driver|protocol|profile|registry|witness_evidence|integration)_test\.go$/;
+const infrastructureTestFile = /(?:replay|driver|coordinator|protocol|profile|registry|witness_evidence|integration)_test\.go$/;
 
 // The monitor emits this discriminator only after validating its journal.
 // Match explicit rule/event schemas; generic monitor errors remain failures of

@@ -1,4 +1,5 @@
 module dialcache_tracked_invalidation {
+  import cache_rules.* from "./cache-rules"
   // One invalidation entity and one tracked Redis value. Reads atomically
   // snapshot value + watermark; later invalidation cannot revoke that snapshot.
   // Selected rules from C33 and C35-C36. Mutation/invalidation share a model step.
@@ -123,7 +124,7 @@ module dialcache_tracked_invalidation {
   action finishTrackedRead = all {
     s.readPhase == ReadAcquired,
     s' = {
-      readPhase: if (s.snapshotPresent and s.snapshotCreatedAt > s.snapshotWatermark)
+      readPhase: if (s.snapshotPresent and fenceAllows(s.snapshotCreatedAt, s.snapshotWatermark))
         ReadServed
       else
         ReadMissed,
@@ -144,11 +145,11 @@ module dialcache_tracked_invalidation {
     s.readPhase == ReadMissed,
     not(s.loadInFlight),
     s' = {
-      valuePresent: if (s.now + MAX_WRITER_CLOCK_LEAD_MS <= s.snapshotWatermark)
+      valuePresent: if (not(fenceAllows(s.now + MAX_WRITER_CLOCK_LEAD_MS, s.snapshotWatermark)))
         s.valuePresent else true,
-      valueCreatedAt: if (s.now + MAX_WRITER_CLOCK_LEAD_MS <= s.snapshotWatermark)
+      valueCreatedAt: if (not(fenceAllows(s.now + MAX_WRITER_CLOCK_LEAD_MS, s.snapshotWatermark)))
         s.valueCreatedAt else s.now + MAX_WRITER_CLOCK_LEAD_MS,
-      valueSourceVersion: if (s.now + MAX_WRITER_CLOCK_LEAD_MS <= s.snapshotWatermark)
+      valueSourceVersion: if (not(fenceAllows(s.now + MAX_WRITER_CLOCK_LEAD_MS, s.snapshotWatermark)))
         s.valueSourceVersion else s.sourceVersion,
       readPhase: ReadIdle,
       ...s

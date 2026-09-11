@@ -397,3 +397,30 @@ async def test_a_key_built_before_gcache_is_rejected(gcache: GCache, enabled_uc:
             await gcache.aget(stale, load)
         with pytest.raises(GCacheKeyPrefixMismatch):
             await gcache.aput(stale, {"session_id": "abc"})
+
+
+@pytest.mark.asyncio
+async def test_resetting_the_registry_the_way_consumers_do_still_works(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # orbit's services/api/tests/conftest.py does `gcache._use_case_registry = set()` between
+    # tests. Making that attribute a dict broke every gcache test in that repo with
+    # "'set' object does not support item assignment" -- a cross-repo break from renaming a
+    # private type. It stays a set; the envelope map is separate and keyed off it.
+    cache_config_provider.configs["reset_uc"] = GCacheKeyConfig.enabled(60)
+    gcache._use_case_registry = set()
+
+    @gcache.cached(key_type="session_id", id_arg="sid", use_case="reset_uc")
+    async def decorated(sid: str) -> dict:
+        return {"session_id": sid}
+
+    with gcache.enable():
+        assert await decorated(sid="abc") == {"session_id": "abc"}
+
+    # And the envelope rule is inert for a name the reset removed, rather than stale.
+    async def load() -> dict:
+        return {"session_id": "abc"}
+
+    gcache._use_case_registry = set()
+    with gcache.enable():
+        assert await gcache.aget(_key(use_case="reset_uc"), load) == {"session_id": "abc"}

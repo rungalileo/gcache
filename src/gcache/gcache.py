@@ -106,10 +106,16 @@ class GCache:
 
         self._cache = CacheChain(config.cache_config_provider, local_cache, redis_cache)
 
-        # use_case -> the Envelope the decorator declared for it. A set would do for the
-        # duplicate-name check, but aget/aput take a hand-built key whose envelope has to
-        # be checked against the decorator's -- see _check_direct_key.
-        self._use_case_registry: dict[str, Envelope] = {}
+        # Deliberately still a set. Consumers reach into this private attribute to reset it
+        # between tests (orbit's services/api/tests/conftest.py does `gcache
+        # ._use_case_registry = set()`), so changing its type breaks them at a distance --
+        # which is exactly what happened when this was a dict for one commit. The declared
+        # envelope lives alongside it instead.
+        self._use_case_registry: set[str] = set()
+        # use_case -> the Envelope the decorator declared for it, for _check_direct_key.
+        # Consulted only for names still in _use_case_registry, so a consumer that resets
+        # the registry makes this inert too rather than leaving a stale rule behind.
+        self._use_case_envelopes: dict[str, Envelope] = {}
 
         # Use a thread pool to run non async cached functions in.
         # This is because all of the GCache implementation is async, but we still want to support caching
@@ -247,7 +253,8 @@ class GCache:
             if use_case == "watermark":
                 raise UseCaseNameIsReserved()
 
-            self._use_case_registry[use_case] = envelope
+            self._use_case_registry.add(use_case)
+            self._use_case_envelopes[use_case] = envelope
 
             if arg_adapters is None:
                 arg_adapters = {}
@@ -410,7 +417,7 @@ class GCache:
         compare with, which is why ``envelope`` and ``serializer`` still have to agree by
         convention across languages.
         """
-        declared = self._use_case_registry.get(key.use_case)
+        declared = self._use_case_envelopes.get(key.use_case) if key.use_case in self._use_case_registry else None
         if declared is not None and declared != key.envelope:
             raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
 

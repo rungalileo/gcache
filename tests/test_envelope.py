@@ -905,9 +905,11 @@ async def test_invalidate_writes_a_watermark_in_the_value_key_s_slot() -> None:
         (b"abc", 2**63 - 1),  # unreadable -> suppress EVERYTHING (the max, not the min)
         (b"", 2**63 - 1),
         (b"nan", 2**63 - 1),
-        (b"inf", 2**63 - 1),  # clamps, matching Go's clampToInt64
-        (b"1e400", 2**63 - 1),
-        (b"-inf", -(2**63)),
+        (b"inf", 2**63 - 1),  # non-finite -> suppress
+        (b"1e400", 2**63 - 1),  # float() gives inf, so also non-finite
+        (b"1e300", 2**63 - 1),  # FINITE but out of range -> clamps high
+        (b"-1e300", -(2**63)),  # FINITE out of range low -> clamps, meaning "very old"
+        (b"-inf", 2**63 - 1),  # non-finite -> suppress, like nan and inf
     ],
 )
 def test_parse_watermark_never_raises_and_fails_closed(raw: bytes | None, expected: int | None) -> None:
@@ -995,3 +997,37 @@ async def test_get_does_not_raise_on_a_malformed_watermark() -> None:
             result = await RedisCache.get(cache, key, fallback)
 
         assert result is not None, f"watermark {bad!r} produced no answer"
+
+
+def test_every_non_finite_watermark_suppresses_in_both_languages() -> None:
+    # The agreement matrix, asserted rather than described. Guarding on isnan alone treated
+    # the three non-finite inputs three ways -- nan and inf suppressed, -inf SERVED -- which
+    # was also the single input where the two clients disagreed, since Go rejects -inf.
+    #
+    # The line is finite-vs-not, not sign: -1e300 is a real instruction ("an extremely old
+    # watermark, nothing is stale") and clamps in both clients, while -inf is not a
+    # timestamp at all. Go reaches the same split from the other direction -- it rejects
+    # non-finite and clamps finite out-of-range.
+    import logging
+
+    from gcache._internal.redis_cache import _parse_watermark
+    from gcache.config import GCacheKey
+
+    key = GCacheKey(key_type="kt", id="i", use_case="u", invalidation_tracking=True)
+    created_at_ms = 1757308800123
+    logging.disable(logging.WARNING)
+    try:
+        for raw in (b"nan", b"inf", b"-inf", b"1e400", b"abc", b""):
+            parsed = _parse_watermark(raw, key)
+            # None is a distinct outcome meaning "no watermark stored", and none of these
+            # may produce it -- that would SERVE the entry, same as the minimum would.
+            assert parsed is not None, f"{raw!r} must not read as 'no watermark'"
+            assert parsed >= created_at_ms, f"{raw!r} must suppress"
+
+        # Finite out-of-range keeps its meaning rather than being treated as garbage.
+        old_watermark = _parse_watermark(b"-1e300", key)
+        assert old_watermark is not None and old_watermark < created_at_ms, "a very old watermark stays old"
+        high = _parse_watermark(b"1e300", key)
+        assert high is not None and high >= created_at_ms
+    finally:
+        logging.disable(logging.NOTSET)

@@ -101,8 +101,16 @@ def _parse_watermark(raw: bytes | str | None, key: GCacheKey) -> int | None:
     except (TypeError, ValueError):
         _GLOBAL_GCACHE_STATE.logger.warning("Unreadable watermark for %s; suppressing the entry", key.urn)
         return _WATERMARK_SUPPRESS_ALL
-    if math.isnan(as_float):
-        _GLOBAL_GCACHE_STATE.logger.warning("NaN watermark for %s; suppressing the entry", key.urn)
+    # EVERY non-finite value, not just NaN. Guarding on isnan alone treated the three
+    # non-finite inputs three ways: nan and inf suppressed, but -inf clamped to the int64
+    # minimum and SERVED the entry. None of them is a timestamp, so all three are
+    # unreadable and all three must suppress.
+    #
+    # That also closes the one input where the two clients disagreed: Go rejects -inf
+    # (a miss), and Python was serving it. Finite out-of-range values still clamp in both
+    # -- -1e300 means "an extremely old watermark", which is a real instruction, not garbage.
+    if not math.isfinite(as_float):
+        _GLOBAL_GCACHE_STATE.logger.warning("Non-finite watermark %r for %s; suppressing the entry", as_float, key.urn)
         return _WATERMARK_SUPPRESS_ALL
     if as_float >= _INT64_MAX:
         return _INT64_MAX

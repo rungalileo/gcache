@@ -894,3 +894,104 @@ async def test_invalidate_writes_a_watermark_in_the_value_key_s_slot() -> None:
             assert written == expected + "#watermark", f"diverged at urn_prefix={prefix!r}: {written}"
     finally:
         _GLOBAL_GCACHE_STATE.urn_prefix = original
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (b"1757308800123", 1757308800123),
+        (b"1757308800123.9", 1757308800123),  # Python writes an int but reads via float()
+        (None, None),
+        (b"abc", 2**63 - 1),  # unreadable -> suppress EVERYTHING (the max, not the min)
+        (b"", 2**63 - 1),
+        (b"nan", 2**63 - 1),
+        (b"inf", 2**63 - 1),  # clamps, matching Go's clampToInt64
+        (b"1e400", 2**63 - 1),
+        (b"-inf", -(2**63)),
+    ],
+)
+def test_parse_watermark_never_raises_and_fails_closed(raw: bytes | None, expected: int | None) -> None:
+    # Every one of these used to raise out of RedisCache.get -- float() on a non-numeric
+    # value, int(nan) with ValueError, int(inf) with OverflowError -- which is the one thing
+    # this class promises cannot happen: a cache must not be able to fail a request. The
+    # int() sat outside the guarded block, so nothing caught it.
+    #
+    # Unreadable suppresses rather than returning None. None means "no invalidation has
+    # happened", which would SERVE an entry someone tried to invalidate -- the one answer a
+    # broken watermark must never produce. NaN is the sharpest case: had int(nan) not
+    # raised, every comparison against it is False, so the entry would be neither stale nor
+    # written back -- served forever and never repopulated.
+    #
+    # Reachable because of this work: before the shared envelope, only Python wrote these
+    # keys. Go's parseWatermark has handled all three deliberately.
+    from gcache._internal.redis_cache import _parse_watermark
+    from gcache.config import GCacheKey
+
+    key = GCacheKey(key_type="kt", id="i", use_case="u", invalidation_tracking=True)
+    assert _parse_watermark(raw, key) == expected
+
+
+def test_an_unreadable_watermark_suppresses_rather_than_serving() -> None:
+    # The direction is the whole point, and I got it wrong first: staleness is
+    # `watermark_ms >= created_at_ms`, so suppressing needs the MAXIMUM. The minimum marks
+    # nothing stale and serves the very entry the broken watermark should have hidden --
+    # which is also what None does, so both wrong answers are the same wrong answer.
+    from gcache._internal.redis_cache import _WATERMARK_SUPPRESS_ALL
+
+    created_at_ms = 1757308800123
+    assert _WATERMARK_SUPPRESS_ALL >= created_at_ms, "must mark every entry stale"
+    assert not (-(2**63) >= created_at_ms), "the minimum would serve it -- the bug I wrote"
+
+    # And it must not trigger write-back: _exec_fallback re-puts only when
+    # watermark_ms < now, so the maximum leaves the stored value alone until the watermark
+    # key expires on its own TTL.
+    import time
+
+    assert not (_WATERMARK_SUPPRESS_ALL < time.time() * 1e3)
+
+
+@pytest.mark.asyncio
+async def test_get_does_not_raise_on_a_malformed_watermark() -> None:
+    # Drives RedisCache.get, because testing _parse_watermark alone proved the parser
+    # correct without proving it was WIRED IN -- reverting get() to the bare float()/int()
+    # pair left every parser test passing. The mutation check is what exposed that.
+    #
+    # Each of these raised out of get() before: float("abc") -> ValueError, int(nan) ->
+    # ValueError, int(inf) -> OverflowError, none of them inside the guarded block. A cache
+    # must not be able to fail a request.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.envelope import encode_json
+    from gcache._internal.metrics import GCacheMetrics
+    from gcache._internal.redis_cache import RedisCache
+    from gcache.config import GCacheKey, JsonSerializer
+
+    key = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        invalidation_tracking=True,
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    stored = encode_json(created_at_ms=1757308800123, ttl_sec=3600, payload='{"v":1}')
+
+    for bad in (b"abc", b"", b"nan", b"inf", b"-inf", b"1e400"):
+        fake = MagicMock(mget=AsyncMock(return_value=[stored, bad]), setex=AsyncMock(), set=AsyncMock())
+        cache = object.__new__(RedisCache)
+
+        async def fallback() -> dict:
+            return {"v": "fresh"}
+
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", MagicMock()),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            # The assertion is that this RETURNS rather than raising.
+            result = await RedisCache.get(cache, key, fallback)
+
+        assert result is not None, f"watermark {bad!r} produced no answer"

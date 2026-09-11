@@ -1,4 +1,5 @@
 import asyncio
+import math
 import pickle
 import threading
 import time
@@ -12,7 +13,7 @@ from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
-from gcache._internal.envelope import DecodedValue, EnvelopeDecodeError, decode, encode_json
+from gcache._internal.envelope import _INT64_MAX, _INT64_MIN, DecodedValue, EnvelopeDecodeError, decode, encode_json
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.config import CacheConfigProvider, CacheLayer, Envelope, GCacheKey, RedisConfig, render_prefix
@@ -53,6 +54,61 @@ def create_default_redis_client_factory(
             return Redis.from_url(config.url, **options)  # type: ignore[arg-type]
 
     return factory
+
+
+_WATERMARK_SUPPRESS_ALL = _INT64_MAX
+"""Stand-in for a watermark that exists but cannot be read: suppresses every entry.
+
+The MAXIMUM, deliberately. Staleness is ``watermark_ms >= created_at_ms``, so the maximum
+marks every entry stale and the minimum marks none -- I first wrote the minimum here and it
+did the exact opposite of this docstring, serving the entry it was meant to suppress.
+
+Not None either. None means "no invalidation has happened", which also SERVES an entry
+someone tried to invalidate. Both wrong answers are the same wrong answer.
+
+It also stops write-back: _exec_fallback only re-puts when ``watermark_ms < now``, which
+the maximum never is. So an unreadable watermark yields a miss AND leaves the stored value
+alone until the watermark key expires on its own TTL, rather than overwriting a value whose
+suppression state we cannot read.
+"""
+
+
+def _parse_watermark(raw: bytes | str | None, key: GCacheKey) -> int | None:
+    """Convert a stored watermark to an int, failing CLOSED.
+
+    Three things used to go wrong here, all of them raising out of RedisCache.get, which is
+    the one thing this class promises cannot happen -- a cache must not be able to fail a
+    request:
+
+    * a non-numeric value (a foreign writer, a corrupt key) raised ValueError from float();
+    * ``nan`` reached ``int(nan)`` and raised ValueError. Worse if it had not: every
+      comparison against NaN is False, so the entry was neither stale nor written back --
+      served forever and never repopulated;
+    * ``inf`` (directly, or from a literal past ~1.8e308) reached ``int(inf)`` and raised
+      OverflowError.
+
+    The shared key space is what makes those reachable: before this envelope work only
+    Python wrote these keys. Go's parseWatermark has handled all three deliberately.
+
+    Unreadable fails closed -- see _WATERMARK_SUPPRESS_ALL. Out-of-range clamps, matching
+    Go's clampToInt64: a watermark is a suppression instruction rather than data about the
+    entry, so saturating gives the same answer the exact value would.
+    """
+    if raw is None:
+        return None
+    try:
+        as_float = float(raw)
+    except (TypeError, ValueError):
+        _GLOBAL_GCACHE_STATE.logger.warning("Unreadable watermark for %s; suppressing the entry", key.urn)
+        return _WATERMARK_SUPPRESS_ALL
+    if math.isnan(as_float):
+        _GLOBAL_GCACHE_STATE.logger.warning("NaN watermark for %s; suppressing the entry", key.urn)
+        return _WATERMARK_SUPPRESS_ALL
+    if as_float >= _INT64_MAX:
+        return _INT64_MAX
+    if as_float <= _INT64_MIN:
+        return _INT64_MIN
+    return int(as_float)
 
 
 class RedisCache(CacheInterface):
@@ -143,9 +199,7 @@ class RedisCache(CacheInterface):
         if key.invalidation_tracking:
             vals = await self.client.mget(key.urn, key.prefix + "#watermark")
             raw = vals[0]
-            watermark_ms = vals[1]
-            if watermark_ms is not None:
-                watermark_ms = float(watermark_ms)
+            watermark_ms = _parse_watermark(vals[1], key)
         else:
             raw = await self.client.get(key.urn)
         if raw is not None:
@@ -230,9 +284,9 @@ class RedisCache(CacheInterface):
                 )
             )
 
-            # Check if cache val is expired.
+            # Check if cache val is expired. watermark_ms is already an int or None --
+            # _parse_watermark did the conversion, so there is no int() here to raise.
             if watermark_ms is not None:
-                watermark_ms = int(watermark_ms)
                 if watermark_ms >= deserialized_value.created_at_ms:
                     return await self._exec_fallback(key, watermark_ms, fallback)
             return payload

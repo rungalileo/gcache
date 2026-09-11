@@ -313,7 +313,7 @@ def identity_key(project_id: str, session_id: str) -> GCacheKey:
     return GCacheKey(
         key_type="session_id",
         id=f"{project_id}:{session_id}",
-        use_case="SessionService::identity",
+        use_case="session-identity",
         envelope=Envelope.JSON,
         serializer=JsonSerializer(),
         invalidation_tracking=True,
@@ -352,10 +352,13 @@ Three things to know:
 - **`aput` raises on a cache-layer failure**, unlike a read. That matches `adelete` and
   `ainvalidate`. "Prime" reads as best-effort, so a caller on a request path should decide
   what to do with a Redis timeout rather than let it propagate.
-- **A prime inside an active invalidation window is lost silently.** The entry is written
-  with `createdAtMs` below the watermark, so reads find it stale until the window closes and
-  a read rewrites it. That is the invalidation doing its job, but `aput` still returns
-  normally. Go behaves the same way; the TypeScript client returns `false` here.
+- **A prime inside an active invalidation window is lost silently — on the Redis layer.**
+  The entry is written with `createdAtMs` below the watermark, so remote reads find it stale
+  until the window closes and a read rewrites it. That is the invalidation doing its job, but
+  `aput` still returns normally. Go behaves the same way; the TypeScript client returns
+  `false` here. The **local** layer never reads watermarks, so a later `aget` in the same
+  process returns the primed value regardless — keep the local ramp at 0 for a shared use
+  case, as above.
 
 #### Prefer a protobuf payload over a hand-written dict
 

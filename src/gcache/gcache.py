@@ -25,10 +25,12 @@ from gcache.config import (
 from gcache.exceptions import (
     EnvelopeMismatchWithRegisteredUseCase,
     GCacheAlreadyInstantiated,
+    GCacheError,
     GCacheKeyPrefixMismatch,
     KeyArgDoesNotExist,
     RedisConfigConflict,
     ReentrantSyncFunctionDetected,
+    SerializerMismatchWithRegisteredUseCase,
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )
@@ -112,10 +114,11 @@ class GCache:
         # which is exactly what happened when this was a dict for one commit. The declared
         # envelope lives alongside it instead.
         self._use_case_registry: set[str] = set()
-        # use_case -> the Envelope the decorator declared for it, for _check_direct_key.
+        # use_case -> what the decorator declared for it, for _check_direct_key.
         # Consulted only for names still in _use_case_registry, so a consumer that resets
         # the registry makes this inert too rather than leaving a stale rule behind.
         self._use_case_envelopes: dict[str, Envelope] = {}
+        self._use_case_serializers: dict[str, Serializer | None] = {}
 
         # Use a thread pool to run non async cached functions in.
         # This is because all of the GCache implementation is async, but we still want to support caching
@@ -255,6 +258,7 @@ class GCache:
 
             self._use_case_registry.add(use_case)
             self._use_case_envelopes[use_case] = envelope
+            self._use_case_serializers[use_case] = serializer
 
             if arg_adapters is None:
                 arg_adapters = {}
@@ -405,21 +409,33 @@ class GCache:
         self._run_coroutine_in_thread(self.aflushall)
 
     def _check_direct_key(self, key: GCacheKey) -> None:
-        """Reject a direct key whose envelope contradicts a decorator on the same use case.
+        """Raise when a direct key can never share entries with what declared its use case.
 
-        Both render the same urn, so they are one entry. With different framing they
-        overwrite each other forever inside ONE process: the decorator writes pickle, the
-        direct key refuses that pickle and writes JSON, the decorator treats the JSON as a
-        miss and writes pickle again. Nothing raises and nothing logs -- the same failure
-        the class docstring warns about across languages, except here it is detectable.
+        Both render the same urn, so they are ONE entry, and the two halves of the framing
+        contract have to agree:
 
-        Only checked against a REGISTERED use case; a direct-only use case has nothing to
-        compare with, which is why ``envelope`` and ``serializer`` still have to agree by
-        convention across languages.
+        * ``envelope`` -- the decorator writes pickle, the direct key refuses that pickle
+          and writes JSON, the decorator calls the JSON a miss and writes pickle again.
+          They overwrite each other forever inside one process.
+        * ``serializer`` -- subtler and worse, because nothing even degrades. A decorator
+          with no serializer plus a direct key carrying JsonSerializer share one entry, and
+          the decorated function gets handed the raw payload ``'{"a": 1}'`` where it
+          expected a ``dict``. No exception, no log line, no metric.
+
+        Only checked against a REGISTERED use case. A direct-only use case has nothing to
+        compare against, which is why both still have to agree by convention across
+        languages -- there the library cannot see the other side at all.
         """
-        declared = self._use_case_envelopes.get(key.use_case) if key.use_case in self._use_case_registry else None
-        if declared is not None and declared != key.envelope:
-            raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
+        if key.use_case in self._use_case_registry:
+            declared = self._use_case_envelopes.get(key.use_case)
+            if declared is not None and declared != key.envelope:
+                raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
+
+            # Compared by TYPE: serializers are instances and two JsonSerializer()s are
+            # never ==, so identity or equality would reject every legitimate caller.
+            declared_ser = self._use_case_serializers.get(key.use_case)
+            if type(declared_ser) is not type(key.serializer):
+                raise SerializerMismatchWithRegisteredUseCase(key.use_case, declared_ser, key.serializer)
 
         # A key built BEFORE GCache() ran captured the default urn_prefix, while
         # ainvalidate uses the configured one -- so the value and its watermark land in
@@ -461,7 +477,23 @@ class GCache:
         :param fallback: Async callable invoked on a miss to produce the value.
         :return: The cached value, or whatever ``fallback`` returned.
         """
-        self._check_direct_key(key)
+        # Fails OPEN, unlike aput. A misconfigured key is a programming error, but the
+        # README's Error Handling contract is that a read never breaks the caller's
+        # request, and the decorator path already honours it: it catches key-construction
+        # failures, logs, counts gcache_error_counter and runs the function uncached. A
+        # direct read that raised where a decorated one degraded would be the same
+        # misconfiguration failing two different ways.
+        #
+        # The counter is what makes it visible -- silently uncached forever is how this
+        # reaches production otherwise.
+        try:
+            self._check_direct_key(key)
+        except GCacheError as e:
+            _GLOBAL_GCACHE_STATE.logger.error("Direct key is unusable; reading uncached", exc_info=True)
+            GCacheMetrics.ERROR_COUNTER.labels(
+                key.use_case, key.key_type, "direct key check", type(e).__name__, False
+            ).inc()
+            return await fallback()
         return await self._cache.get(key, fallback)
 
     def get(self, key: GCacheKey, fallback: Fallback) -> Any:
@@ -481,12 +513,17 @@ class GCache:
         a silent failure here means the entry another process is waiting for never appears.
         A caller priming off a request path should not let that propagate.
 
-        A prime landing inside an active invalidation window is LOST, silently. The entry is
-        written with ``createdAtMs`` below the watermark, so every read then finds it stale
-        and it heals only once the window closes and a read rewrites it. That is correct --
-        the invalidation is meant to suppress it -- but this call still returns normally.
-        Go's ``Put`` behaves the same way; the TypeScript client is the outlier there and
-        returns ``false``. Checking here would cost an extra round trip on every prime.
+        A prime landing inside an active invalidation window is lost **on the Redis layer**,
+        silently: the entry is written with ``createdAtMs`` below the watermark, so remote
+        reads find it stale until the window closes and a read rewrites it. That is the
+        invalidation doing its job, but this call still returns normally. Go's ``Put``
+        behaves the same way; the TypeScript client is the outlier and returns ``false``.
+        Checking here would cost an extra round trip on every prime.
+
+        The LOCAL layer does NOT honour that -- it never reads watermarks -- so a later
+        ``aget`` in the same process takes a local hit and returns the primed value as if
+        nothing had been invalidated. Keep the local ramp at 0 for any use case shared
+        across processes or languages, which is what the README already advises.
         """
         self._check_direct_key(key)
         await self._cache.put(key, value)
@@ -499,9 +536,15 @@ class GCache:
         """
         Delete a specific cache entry (async version).
 
+        Raises on an unusable key, like :meth:`aput` and unlike :meth:`aget`. Returning
+        ``False`` would be a lie a caller cannot detect: a key carrying a stale
+        ``urn_prefix`` deletes a urn in the wrong namespace, reports "no entry existed",
+        and leaves the real entry in place.
+
         :param key: The cache key to delete.
         :return: True if the key was deleted, False otherwise.
         """
+        self._check_direct_key(key)
         return await self._cache.delete(key)
 
     def delete(self, key: GCacheKey) -> bool:

@@ -159,14 +159,23 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
             for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
                 if isinstance(value, bool) or not isinstance(value, int | float):
                     raise EnvelopeDecodeError(f"{field} must be a number, got {type(value).__name__}")
-                # json.loads maps 1e999 to inf, which is an instance of float, and int(inf)
-                # then raises OverflowError -- past this function's contract of raising only
-                # EnvelopeDecodeError, so the entry would stay poisoned for its whole TTL.
-                # parseEnvelope requires Number.isFinite for the same reason.
+                # Must be representable as a double, which is what the other two clients
+                # can hold. JSON.parse maps an out-of-range integer LITERAL to Infinity, so
+                # parseEnvelope's Number.isFinite check rejects it; Python's int is
+                # arbitrary-precision and accepted a 401-digit value happily. That entry
+                # then never looks expired and `watermark_ms >= created_at_ms` can never be
+                # true, so no invalidation can ever reach it -- while TypeScript calls the
+                # same bytes a miss.
                 #
-                # Guarded on float only: math.isfinite raises OverflowError on a very large
-                # int, which would reintroduce the escape it is here to prevent.
-                if isinstance(value, float) and not math.isfinite(value):
+                # float() rather than math.isfinite: isfinite raises OverflowError on a
+                # very large int, escaping this function's contract of raising only
+                # EnvelopeDecodeError. float() fails on exactly the values JSON.parse
+                # cannot represent, which is the line we need to match.
+                try:
+                    as_double = float(value)
+                except OverflowError as exc:
+                    raise EnvelopeDecodeError(f"{field} exceeds a double, got {value!r}") from exc
+                if not math.isfinite(as_double):
                     raise EnvelopeDecodeError(f"{field} must be finite, got {value!r}")
             encoding = envelope.get("encoding")
             if encoding == "base64":

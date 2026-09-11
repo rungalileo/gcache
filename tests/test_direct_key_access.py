@@ -325,10 +325,15 @@ async def test_a_direct_key_cannot_contradict_a_decorated_use_case(
         return {"session_id": "abc"}
 
     with gcache.enable():
-        with pytest.raises(EnvelopeMismatchWithRegisteredUseCase):
-            await gcache.aget(_key(use_case="clash_uc"), load)
+        # aget fails OPEN -- the README's contract is that a read never breaks the
+        # request, and the decorator degrades the same way on a bad key.
+        assert await gcache.aget(_key(use_case="clash_uc"), load) == {"session_id": "abc"}
+        # aput and adelete raise: a silent no-op write, or a delete reporting "no entry",
+        # is a lie the caller cannot detect.
         with pytest.raises(EnvelopeMismatchWithRegisteredUseCase):
             await gcache.aput(_key(use_case="clash_uc"), {"session_id": "abc"})
+        with pytest.raises(EnvelopeMismatchWithRegisteredUseCase):
+            await gcache.adelete(_key(use_case="clash_uc"))
 
 
 @pytest.mark.asyncio
@@ -393,10 +398,14 @@ async def test_a_key_built_before_gcache_is_rejected(gcache: GCache, enabled_uc:
         return {"session_id": "abc"}
 
     with gcache.enable():
-        with pytest.raises(GCacheKeyPrefixMismatch):
-            await gcache.aget(stale, load)
+        # Fails open on read, raises on write -- see the clash test above.
+        assert await gcache.aget(stale, load) == {"session_id": "abc"}
         with pytest.raises(GCacheKeyPrefixMismatch):
             await gcache.aput(stale, {"session_id": "abc"})
+        # adelete would otherwise delete a urn in the WRONG namespace and return False,
+        # which the caller reads as "no entry existed" while the real entry survives.
+        with pytest.raises(GCacheKeyPrefixMismatch):
+            await gcache.adelete(stale)
 
 
 @pytest.mark.asyncio
@@ -424,3 +433,120 @@ async def test_resetting_the_registry_the_way_consumers_do_still_works(
     gcache._use_case_registry = set()
     with gcache.enable():
         assert await gcache.aget(_key(use_case="reset_uc"), load) == {"session_id": "abc"}
+
+
+@pytest.mark.asyncio
+async def test_a_direct_key_cannot_contradict_a_decorated_serializer(
+    gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Subtler than the envelope clash and worse, because nothing degrades: the two keys
+    # render one urn and share one entry, so the decorated function is handed the raw
+    # payload string '{"a": 1}' where it expected a dict. No exception, no log, no metric.
+    from gcache.exceptions import SerializerMismatchWithRegisteredUseCase
+
+    cache_config_provider.configs["ser_uc"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="session_id", id_arg="sid", use_case="ser_uc")
+    async def decorated(sid: str) -> dict:
+        return {"a": 1}
+
+    # Same use case, same PICKLE envelope, but carrying a serializer the decorator has not.
+    clashing = GCacheKey(key_type="session_id", id="p:r:s", use_case="ser_uc", serializer=JsonSerializer())
+
+    with gcache.enable():
+        with pytest.raises(SerializerMismatchWithRegisteredUseCase):
+            await gcache.aput(clashing, {"a": 1})
+        with pytest.raises(SerializerMismatchWithRegisteredUseCase):
+            await gcache.adelete(clashing)
+
+    # The mirror -- two DIFFERENT serializer types on one JSON use case, which this change
+    # makes likely by shipping a second one. (Decorator-with, direct-without is already
+    # impossible: GCacheKey rejects Envelope.JSON with no serializer at construction.)
+    from google.protobuf import descriptor_pb2
+
+    from gcache import ProtoJsonSerializer
+
+    cache_config_provider.configs["ser_uc2"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(
+        key_type="session_id",
+        id_arg="sid",
+        use_case="ser_uc2",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    async def decorated2(sid: str) -> dict:
+        return {"a": 1}
+
+    proto_keyed = GCacheKey(
+        key_type="session_id",
+        id="p:r:s",
+        use_case="ser_uc2",
+        envelope=Envelope.JSON,
+        serializer=ProtoJsonSerializer(descriptor_pb2.FileOptions),
+    )
+    with gcache.enable():
+        with pytest.raises(SerializerMismatchWithRegisteredUseCase):
+            await gcache.aput(proto_keyed, {"a": 1})
+
+
+@pytest.mark.asyncio
+async def test_a_matching_serializer_instance_is_accepted(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Compared by TYPE, not identity or equality: two JsonSerializer() instances are never
+    # ==, so a stricter check would reject every legitimate caller -- which is the whole
+    # point of the direct-key API.
+    cache_config_provider.configs["ok_uc"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(
+        key_type="session_id",
+        id_arg="sid",
+        use_case="ok_uc",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    async def decorated(sid: str) -> dict:
+        return {"a": 1}
+
+    matching = _key(use_case="ok_uc")  # a DIFFERENT JsonSerializer() instance
+    assert matching.serializer is not None
+
+    with gcache.enable():
+        await gcache.aput(matching, {"a": 1})
+
+        async def must_not_run() -> dict:
+            raise AssertionError("the entry aput wrote should have been served")
+
+        assert await gcache.aget(matching, must_not_run) == {"a": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_failed_direct_key_check_is_counted_on_read(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # aget fails open, so the counter is the only thing standing between "misconfigured"
+    # and "silently uncached forever". Same series the decorator uses for a bad key.
+    from prometheus_client import REGISTRY
+
+    def error_count() -> float:
+        total = 0.0
+        for fam in REGISTRY.collect():
+            for s in fam.samples:
+                if s.name.endswith("gcache_error_counter_total") and s.labels.get("layer") == "direct key check":
+                    total += s.value
+        return total
+
+    cache_config_provider.configs["counted_uc"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="session_id", id_arg="sid", use_case="counted_uc")
+    async def decorated(sid: str) -> dict:
+        return {"a": 1}
+
+    async def load() -> dict:
+        return {"a": 1}
+
+    before = error_count()
+    with gcache.enable():
+        assert await gcache.aget(_key(use_case="counted_uc"), load) == {"a": 1}
+    assert error_count() > before, "a fail-open read must still be counted"

@@ -64,6 +64,21 @@ class GCacheKeyPrefixMismatch(GCacheError):
         )
 
 
+class SerializerMismatchWithRegisteredUseCase(GCacheError):
+    """A direct key's serializer contradicts the one a @cached decorator declared."""
+
+    def __init__(self, use_case: str, declared: object, given: object) -> None:
+        def name(v: object) -> str:
+            return "no serializer" if v is None else type(v).__name__
+
+        super().__init__(
+            f"use case {use_case!r} is registered with {name(declared)}, but this key "
+            f"declares {name(given)}. They render the same Redis key, so one side would "
+            "hand the other a raw payload string where it expected its own type -- with "
+            "nothing raised, logged or counted."
+        )
+
+
 class EnvelopeMismatchWithRegisteredUseCase(GCacheError):
     """A direct key contradicts the envelope a @cached decorator declared for the same use case."""
 

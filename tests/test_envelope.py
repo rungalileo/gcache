@@ -556,14 +556,29 @@ def test_decode_rejects_a_non_finite_timestamp(field: str) -> None:
         decode(raw)
 
 
-def test_decode_accepts_a_very_large_integer_timestamp() -> None:
-    # The finiteness guard must not be applied to ints: math.isfinite raises OverflowError
-    # on a large one, which would reintroduce exactly the escape it exists to prevent.
+def test_decode_accepts_a_large_but_representable_integer_timestamp() -> None:
+    # Large is fine as long as a double can hold it -- that is the line the other two
+    # clients can read. math.isfinite must still not be called on the int directly: it
+    # raises OverflowError, escaping decode's contract of raising only EnvelopeDecodeError.
     big = 10**30
     raw = json.dumps(
         {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}
     ).encode()
     assert decode(raw).created_at_ms == big
+
+
+def test_decode_rejects_an_integer_timestamp_past_a_double() -> None:
+    # JSON.parse maps an out-of-range integer literal to Infinity, so the TypeScript
+    # reader's Number.isFinite check rejects it. Python's arbitrary-precision int accepted
+    # it, and the entry then never looked expired AND could never be invalidated --
+    # `watermark_ms >= created_at_ms` is false for every real watermark. One key, two
+    # answers.
+    big = int("9" * 401)
+    raw = json.dumps(
+        {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}
+    ).encode()
+    with pytest.raises(EnvelopeDecodeError):
+        decode(raw)
 
 
 def test_decode_wraps_a_recursion_error_from_deeply_nested_json() -> None:

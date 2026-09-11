@@ -823,3 +823,42 @@ def test_json_serializer_parses_inline_even_when_large() -> None:
 
     src = inspect.getsource(JsonSerializer.load)
     assert "run_in_executor" not in src
+
+
+@pytest.mark.asyncio
+async def test_invalidate_writes_a_watermark_in_the_value_key_s_slot() -> None:
+    # Drives RedisCache.invalidate and captures the key it actually SETEXes -- comparing
+    # two calls to render_prefix would pass with the bug restored, since both sides would
+    # use the same helper.
+    #
+    # invalidate used to build this key by hand, and the two constructions disagreed when
+    # urn_prefix was empty: a GCacheKey renders "{kt:i}" while the hand-rolled form
+    # rendered "{:kt:i}". The braces ARE the cluster hash tag, so the watermark stopped
+    # sharing a slot with the value it was meant to suppress -- the paired MGET is not even
+    # legal across slots -- and the invalidation silently never matched. Go's WatermarkKey
+    # guards the empty case, so Python was also the odd one out across languages.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.metrics import GCacheMetrics
+    from gcache._internal.redis_cache import RedisCache
+    from gcache._internal.state import _GLOBAL_GCACHE_STATE
+    from gcache.config import GCacheKey
+
+    original = _GLOBAL_GCACHE_STATE.urn_prefix
+    try:
+        for prefix in ("urn", "urn:galileo:acme", ""):
+            _GLOBAL_GCACHE_STATE.urn_prefix = prefix
+
+            fake_client = MagicMock(setex=AsyncMock())
+            cache = object.__new__(RedisCache)
+            with (
+                patch.object(RedisCache, "client", property(lambda _self: fake_client)),
+                patch.object(GCacheMetrics, "INVALIDATION_COUNTER", MagicMock(), create=True),
+            ):
+                await RedisCache.invalidate(cache, "kt", "i", 0)
+
+            written = fake_client.setex.await_args.args[0]
+            expected = GCacheKey(key_type="kt", id="i", use_case="u", invalidation_tracking=True).prefix
+            assert written == expected + "#watermark", f"diverged at urn_prefix={prefix!r}: {written}"
+    finally:
+        _GLOBAL_GCACHE_STATE.urn_prefix = original

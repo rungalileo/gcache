@@ -15,7 +15,7 @@ from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES, WATERMARK_T
 from gcache._internal.envelope import DecodedValue, EnvelopeDecodeError, decode, encode_json
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache.config import CacheConfigProvider, CacheLayer, Envelope, GCacheKey, RedisConfig
+from gcache.config import CacheConfigProvider, CacheLayer, Envelope, GCacheKey, RedisConfig, render_prefix
 from gcache.exceptions import MissingKeyConfig
 
 
@@ -121,7 +121,13 @@ class RedisCache(CacheInterface):
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
         GCacheMetrics.INVALIDATION_COUNTER.labels(key_type, self.layer().name).inc()
 
-        key = "{" + _GLOBAL_GCACHE_STATE.urn_prefix + ":" + key_type + ":" + id + "}#watermark"
+        # render_prefix, not a hand-rolled concatenation. The two disagreed when
+        # urn_prefix was empty -- this produced "{:kt:id}" where a GCacheKey produces
+        # "{kt:id}" -- which is a different cluster hash slot, so the watermark stopped
+        # sharing a slot with the value it was meant to suppress and the invalidation
+        # silently never matched. Go's WatermarkKey guards that case, so Python was also
+        # the odd one out across languages.
+        key = render_prefix(key_type, id, tracked=True) + "#watermark"
         exp_ms = int(time.time() * 1000 + future_buffer_ms)
         await self.client.setex(key, WATERMARK_TTL_SECONDS, exp_ms)
 

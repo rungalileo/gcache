@@ -202,6 +202,22 @@ class JsonSerializer(Serializer):
         return json.loads(data)
 
 
+def render_prefix(key_type: str, id: str, *, tracked: bool) -> str:
+    """Render ``[{]<urn_prefix>:<key_type>:<id>[}]``, the key's namespaced identity.
+
+    Shared with RedisCache.invalidate, which needs the same string to build the watermark
+    key. It used to build it by hand, and the two disagreed when urn_prefix was empty:
+    this yields ``{kt:id}`` while the hand-rolled form yielded ``{:kt:id}``. That is a
+    different cluster hash slot, so the value and its watermark stop sharing one and an
+    invalidation silently never matches -- and Go's WatermarkKey guards the empty case, so
+    Python was also the odd one out across languages.
+    """
+    rendered = f"{key_type}:{id}"
+    if _GLOBAL_GCACHE_STATE.urn_prefix:
+        rendered = f"{_GLOBAL_GCACHE_STATE.urn_prefix}:{rendered}"
+    return "{" + rendered + "}" if tracked else rendered
+
+
 @dataclass(frozen=True, slots=True)
 class GCacheKey:
     key_type: str
@@ -257,12 +273,7 @@ class GCacheKey:
 
         object.__setattr__(self, "args", tuple(self.args))
 
-        # Compute prefix
-        prefix = f"{self.key_type}:{self.id}"
-        if _GLOBAL_GCACHE_STATE.urn_prefix:
-            prefix = f"{_GLOBAL_GCACHE_STATE.urn_prefix}:{prefix}"
-        if self.invalidation_tracking:
-            prefix = "{" + prefix + "}"
+        prefix = render_prefix(self.key_type, self.id, tracked=self.invalidation_tracking)
         object.__setattr__(self, "prefix", prefix)
 
         # Compute urn

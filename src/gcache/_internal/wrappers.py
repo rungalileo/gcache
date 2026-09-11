@@ -216,22 +216,29 @@ class CacheChain(CacheWrapper):
         from its own miss path inside ``get`` -- but GCache.aput exists to prime an entry
         for another PROCESS, which a local-only write cannot do.
 
-        Both layers are attempted even if one fails; the first error is re-raised.
+        The SHARED layer is written first and its failure skips the local write, so a
+        failed prime leaves nothing cached anywhere rather than a local-only copy. A local
+        failure still surfaces, after the shared write has already succeeded.
 
-        "Fails" means Exception. asyncio.CancelledError is a BaseException and deliberately
-        propagates on the spot, leaving the remote write undone -- prompt cancellation is
-        the correct behaviour when the caller is already gone, and suppressing it to finish
-        a best-effort write would delay it. The layers are then in the same state a remote
-        failure leaves them in.
+        asyncio.CancelledError is a BaseException and propagates on the spot from whichever
+        write is in flight -- prompt cancellation is correct when the caller is gone, and
+        suppressing it to finish a best-effort write would delay it.
         """
-        first_error: Exception | None = None
-        for cache in (self.wrapped, self.fallback_cache):
-            try:
-                await cache.put(key, value)
-            except Exception as e:  # noqa: PERF203 - both layers must be attempted
-                first_error = first_error or e
-        if first_error is not None:
-            raise first_error
+        # SHARED layer first, and the local write is skipped when it fails.
+        #
+        # aput exists to prime an entry another PROCESS will read. With the local write
+        # first, a failed Redis write left this process holding a local copy: aput raised,
+        # so the caller believed the prime failed, but a later aget in the same process took
+        # a local hit and returned the value -- a cache that looks healthy to the one
+        # participant that does not matter and is empty for every other. That is the default
+        # shape, not an edge case, since GCacheKeyConfig.enabled() ramps the local layer to
+        # 100.
+        #
+        # This refines "both layers are always attempted" to "both unless the shared layer
+        # failed", deliberately. Attempting both still matters in the other direction: a
+        # local failure must not stop the remote write, which is the whole point of aput.
+        await self.fallback_cache.put(key, value)
+        await self.wrapped.put(key, value)
 
     async def delete(self, key: GCacheKey) -> bool:
         ret = await self.wrapped.delete(key)

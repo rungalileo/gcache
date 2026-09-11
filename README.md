@@ -278,11 +278,21 @@ Four constraints:
   caller instead of the value, with nothing logged. The JSON case *is* caught — the reader
   knows it needs a serializer and treats the entry as a miss — but the pickle one cannot be.
   New `use_case` for that too.
-- **TypeScript interop needs URL-safe key components and a matching prefix.** `gcache-ts`
-  percent-encodes every key component and Python interpolates raw, so a `use_case` like
-  `SessionService::identity` renders as `SessionService%3A%3Aidentity` there and the two
-  compute different keys — zero sharing, no error. Until the encoding is unified, keep key
-  components URL-safe. Go and Python agree today.
+- **TypeScript interop is broken today, and the prefix is why.** `gcache-ts` percent-encodes
+  *every* component — `joinUrnComponents` maps all of them through `encodeURIComponent`
+  (`packages/gcache-ts/src/key.ts:73`) — while Python interpolates raw. A `use_case` like
+  `SessionService::identity` renders as `SessionService%3A%3Aidentity` there, and the same
+  applies to `urn_prefix`, which is the part that makes this unavoidable rather than
+  avoidable: a namespaced prefix is the normal case and contains colons. This repo's own
+  fixture uses `urn:galileo:test`, and orbit uses `urn:galileo:<customer>`.
+
+      Python      urn:galileo:test:kt:id
+      TypeScript  urn%3Agalileo%3Atest:kt:id
+
+  So there is no configuration of key components that makes the two share a key space —
+  zero sharing, no error, for every key. Keeping a `use_case` URL-safe is not sufficient;
+  the prefix would have to be too, and a colon-free prefix defeats the namespacing it
+  exists for. Unifying the encoding is the only real fix. Go and Python agree today.
 - **Never flip this on a live use case.** A rolling deploy runs both pod generations at
   once: an old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle
   over it, and a new pod refuses that pickle and writes JSON again. Each destroys the

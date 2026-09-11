@@ -216,11 +216,19 @@ async def test_aput_writes_redis_even_when_the_local_layer_raises(
         "the remote layer must be written even when the local layer raises"
     )
 
-    # And when BOTH fail, the FIRST error is the one the caller sees.
-    with patch.object(local, "put", local_boom), patch.object(remote, "put", remote_boom):
+    # When the SHARED layer fails, that error surfaces and the local write is SKIPPED --
+    # a failed prime must leave nothing cached anywhere. Writing local anyway gave this
+    # process a hit for an entry no other process could read, while aput had raised.
+    local_calls: list = []
+
+    async def local_record(key: GCacheKey, value: Any) -> None:
+        local_calls.append(key)
+
+    with patch.object(local, "put", local_record), patch.object(remote, "put", remote_boom):
         with gcache.enable():
-            with pytest.raises(RuntimeError, match="local layer down"):
+            with pytest.raises(RuntimeError, match="remote layer down"):
                 await gcache.aput(_key(use_case="both_uc"), {"session_id": "abc"})
+    assert local_calls == [], "a failed shared write must not leave a local-only copy"
 
 
 @pytest.mark.asyncio

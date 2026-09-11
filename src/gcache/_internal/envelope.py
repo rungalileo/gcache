@@ -105,7 +105,7 @@ def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes
     ).encode("utf-8")
 
 
-def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
+def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
     """Decode a stored value, sniffing the framing rather than trusting the key's config.
 
     Sniffing is what lets a key move between envelopes with no flag day: a reader handles
@@ -123,6 +123,22 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
     """
     if not data:
         raise EnvelopeDecodeError("empty value")
+
+    # A client built with decode_responses=True hands back str, not bytes. Both sniff
+    # tests below then fail silently -- `data[0] == 0x80` is False for a one-char str and
+    # `data[0:1] == b"{"` is False too -- and control reached the unrecognized-leading-byte
+    # error, whose f"{data[0]:#04x}" raised ValueError. That escaped this function's
+    # one-exception contract, so CacheController logged an error and never wrote back: the
+    # entry stayed unreadable for its whole TTL, gcache_degraded_read_counter never moved,
+    # and every read re-ran the fallback.
+    #
+    # Encoded rather than rejected, because a str is a legitimate transport form of the
+    # same JSON text and decode_responses=True is an established pattern in the consuming
+    # repo (services/api's AssistantService builds its client that way). The pickle branch
+    # is unreachable from a str by construction -- a pickle blob is not valid UTF-8, so
+    # redis-py could not have handed one back as str in the first place.
+    if isinstance(data, str):
+        data = data.encode("utf-8")
 
     if data[0] == _PICKLE_PROTO_OPCODE:
         if not allow_pickle:

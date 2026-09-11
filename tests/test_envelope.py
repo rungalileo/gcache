@@ -1031,3 +1031,25 @@ def test_every_non_finite_watermark_suppresses_in_both_languages() -> None:
         assert high is not None and high >= created_at_ms
     finally:
         logging.disable(logging.NOTSET)
+
+
+@pytest.mark.parametrize("as_str", [False, True])
+def test_decode_handles_a_str_from_decode_responses(as_str: bool) -> None:
+    # A client built with decode_responses=True hands back str. Both sniff tests then fail
+    # silently and control reached the unrecognized-leading-byte error, whose
+    # f"{data[0]:#04x}" raised ValueError -- escaping decode's one-exception contract. The
+    # consequence was worse than a crash: CacheController logged and never wrote back, so
+    # the entry stayed unreadable for its whole TTL, every read re-ran the fallback, and
+    # gcache_degraded_read_counter never moved, so nothing observable pointed at it.
+    #
+    # decode_responses=True is an established pattern in the consuming repo
+    # (services/api's AssistantService builds its client that way through the same
+    # RedisConfig helper gcache's factory uses), so this is a reachable trap rather than a
+    # hypothetical one.
+    raw = encode_json(created_at_ms=1757308800123, ttl_sec=3600, payload='{"v":1}')
+    data = raw.decode() if as_str else raw
+
+    decoded = decode(data, allow_pickle=False)
+
+    assert decoded.payload == '{"v":1}'
+    assert decoded.created_at_ms == 1757308800123

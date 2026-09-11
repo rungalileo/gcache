@@ -1,13 +1,12 @@
-import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command,
-  type PublicPrefixWitnessRule } from "./public-prefix-witnesses.js";
+import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command } from "./public-prefix.mjs";
 
 const init = command("init");
-const begin = (scope: number) => command("beginCall", scope);
-const resolve = (value: number) => command("resolveLoader", value);
-const fault = (enabled: number) => command("localFault", enabled);
+const begin = scope => command("beginCall", scope);
+const resolve = value => command("resolveLoader", value);
+const fault = enabled => command("localFault", enabled);
 const remoteOff = command("policy", 0);
 
-export const localFailureWitnessRules: readonly PublicPrefixWitnessRule[] = [
+export const localFailureWitnessRules = [
   rule("failed-local-read-preserves-old-value-and-memoizes-remote", "localReadFailureFallsThroughAndPreservesOldLocalTest",
     [init, begin(2), resolve(1), command("seed", 2), fault(1), begin(0), fault(0), begin(2), begin(0)],
     check(2, { calls: [1], loaders: 1, reads: 1, writes: 1 }),
@@ -32,6 +31,6 @@ export const localFailureWitnessRules: readonly PublicPrefixWitnessRule[] = [
     check(8, { calls: [1, 3, 1], loaders: 2, reads: 1, writes: 1 })),
 ];
 
-export function localFailureWitnesses(paths: readonly string[]): Set<string> {
+export function localFailureWitnesses(paths) {
   return publicPrefixWitnesses(paths, localFailureWitnessRules);
 }

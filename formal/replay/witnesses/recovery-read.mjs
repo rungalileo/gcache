@@ -1,35 +1,21 @@
-import { readFileSync } from "node:fs";
-import { record } from "./itf.js";
+import { record } from "../itf.mjs";
+import { decodeIntegers, explicitInput, readTrace, traceStates, witnessCommand as command } from "./trace.mjs";
 
 // These boundary histories are intentionally narrow. Inputs identify the
 // controlled schedule; the independently written public checks establish its
 // consequence. Private model cache state, phase and eligibility never count.
-interface PublicState {
-  o: Record<string, unknown>;
-  io: Record<string, unknown>;
-  markers: unknown[];
-  compression: unknown[];
-}
-interface Rule {
-  name: string;
-  regression: string;
-  commands: string[];
-  outcome: Partial<PublicState>;
-}
-const command = (name: string, choice = -1) => `${name}:${choice}`;
 const init = (mode = 1) => command("init", mode);
-const seed = (choice: number) => command("seed", choice);
-const begin = (scope: number) => command("beginCall", scope);
-const advance = (ms: number) => command("advance", ms);
-const policy = (choice: number) => command("policy", choice);
+const seed = choice => command("seed", choice);
+const begin = scope => command("beginCall", scope);
+const advance = ms => command("advance", ms);
+const policy = choice => command("policy", choice);
 const read = command("releaseRead"), load = command("releaseLoad");
 const reject = command("rejectLoader"), resolve = command("resolveLoader");
 const invalidate = command("invalidate"), marker = command("observeMarker");
 const noSharedWrites = { dumps: 0, writes: 0 };
-const rule = (name: string, regression: string, commands: string[], outcome: Partial<PublicState>): Rule =>
-  ({ name, regression, commands, outcome });
+const rule = (name, regression, commands, outcome) => ({ name, regression, commands, outcome });
 
-export const recoveryReadWitnessRules: readonly Rule[] = [
+export const recoveryReadWitnessRules = [
   rule("read-settlement-crosses-freshness-and-recovers", "freshnessAfterHeldReadTest",
     [init(), seed(0), begin(2), advance(1000), read, reject, load],
     { o: { calls: [1], reads: 1, loaders: 1, loads: 1, classifications: 1, recovery: ["served"], ...noSharedWrites } }),
@@ -112,44 +98,28 @@ export const recoveryReadWitnessRules: readonly Rule[] = [
     [init(), begin(0), read, invalidate, resolve, begin(1), read, reject],
     { o: { calls: [2, 3], reads: 2, loaders: 2, loads: 0, dumps: 1, writes: 1, recovery: ["miss"] },
       io: { sourceErrors: [0, 2] } }),
-
 ];
 
-function decoded(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(decoded);
-  if (value === null || typeof value !== "object") return value;
-  const object = record(value, "recovery-read witness");
-  if (Object.hasOwn(object, "#bigint")) {
-    const text = object["#bigint"];
-    if (Object.keys(object).length !== 1 || typeof text !== "string" || !/^-?\d+$/.test(text)
-        || !Number.isSafeInteger(Number(text))) throw new Error("Invalid witness integer");
-    return Number(text);
-  }
-  return Object.fromEntries(Object.entries(object).map(([key, item]) => [key, decoded(item)]));
-}
-function contains(actual: unknown, expected: unknown): boolean {
+function contains(actual, expected) {
   if (expected === null || typeof expected !== "object" || Array.isArray(expected)) {
     return JSON.stringify(actual) === JSON.stringify(expected);
   }
   if (actual === null || typeof actual !== "object" || Array.isArray(actual)) return false;
-  return Object.entries(expected).every(([key, value]) => contains((actual as Record<string, unknown>)[key], value));
+  return Object.entries(expected).every(([key, value]) => contains(actual[key], value));
 }
 
-export function recoveryReadWitnesses(paths: readonly string[]): Set<string> {
-  const seen = new Set<string>();
+export function recoveryReadWitnesses(paths) {
+  const seen = new Set();
   for (const path of paths) {
-    const raw = record(JSON.parse(readFileSync(path, "utf8")), path);
-    if (!Array.isArray(raw.states)) throw new Error("Missing recovery-read witness states");
-    const commands: string[] = [];
-    const observations = raw.states.map(rawState => {
+    const commands = [];
+    const observations = traceStates(readTrace(path), path).map(rawState => {
       const state = record(rawState, path);
-      const input = record(decoded(state.input), path);
-      if (typeof input.name !== "string" || typeof input.choice !== "number") throw new Error("Missing explicit witness input");
+      const input = explicitInput(state, path);
       commands.push(command(input.name, input.choice));
       const value = record(state.s, path);
       // Read only public observations. Private model predictions are irrelevant
       // to a schedule's claim, and cannot make an absent consequence count.
-      return decoded({ o: value.o, io: value.io, markers: value.markers, compression: value.compression });
+      return decodeIntegers({ o: value.o, io: value.io, markers: value.markers, compression: value.compression }, path);
     });
     for (const rule of recoveryReadWitnessRules) {
       if (commands.length < rule.commands.length) continue;

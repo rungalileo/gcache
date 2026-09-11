@@ -1,14 +1,13 @@
-import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command,
-  type PublicPrefixWitnessRule } from "./public-prefix-witnesses.js";
+import { publicPrefixWitnesses, publicPrefixRule as rule, publicCheckpoint as check, witnessCommand as command } from "./public-prefix.mjs";
 
-const init = (fixture: number) => command("init", fixture);
+const init = fixture => command("init", fixture);
 const seed = command("seed", 1), begin = command("beginCall"), read = command("releaseRead");
 const resolve = command("resolveLoader", 2), load = command("releaseLoad");
 const rollback = command("rollbackWall");
 const mismatch = { calls: [2], reads: 2, loads: 1, writes: 0, comparisons: 1, shadow: ["mismatch"] };
 const futureShadow = [{ layer: "remote_shadow", offsetMs: 1000 }];
 
-export const shadowDiagnosticsWitnessRules: readonly PublicPrefixWitnessRule[] = [
+export const shadowDiagnosticsWitnessRules = [
   rule("omitted-shadow-logging-keeps-mismatch-metrics-only", "omittedLoggingKeepsMismatchMetricsOnlyTest",
     [init(2), seed, begin, read, resolve, load, read],
     check(6, mismatch, { warnings: 0, configErrors: 0, ages: [0], futureOffsets: [] })),
@@ -35,6 +34,6 @@ export const shadowDiagnosticsWitnessRules: readonly PublicPrefixWitnessRule[] =
       { futureOffsets: [{ layer: "remote_shadow", offsetMs: 990 }] })),
 ];
 
-export function shadowDiagnosticsWitnesses(paths: readonly string[]): Set<string> {
+export function shadowDiagnosticsWitnesses(paths) {
   return publicPrefixWitnesses(paths, shadowDiagnosticsWitnessRules);
 }

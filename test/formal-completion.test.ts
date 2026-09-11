@@ -28,8 +28,7 @@ describe("portable completion contract", () => {
     const inputs = new Set(defaultSources("go") as string[]);
     const profiles = JSON.parse(readFileSync("formal/profiles.json", "utf8")) as { profiles: Array<{ id: string; witnessSources?: string[] }> };
     const lock = JSON.parse(readFileSync("formal/generated-fixtures.lock.json", "utf8")) as { artifacts: Record<string, string> };
-    const shared = ["src/prometheus.ts", "test/formal/coverage-evidence.ts", "test/formal/runtime-witnesses.ts", "test/formal/recovery-shadow-witnesses.ts",
-      ...profiles.profiles.flatMap(profile => profile.witnessSources ?? []), ...Object.keys(lock.artifacts)];
+    const shared = ["src/prometheus.ts", ...profiles.profiles.flatMap(profile => profile.witnessSources ?? []), ...Object.keys(lock.artifacts)];
     for (const path of shared.filter(path => !path.startsWith("formal/"))) expect(inputs.has(path), path).toBe(true);
     for (const profile of profiles.profiles.filter(profile => profile.id !== "core")) {
       expect(inputs.has(`.formal-traces/go-parity-witnesses/${profile.id}.json`), profile.id).toBe(true);

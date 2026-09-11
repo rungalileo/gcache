@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { recoveryShadowWitnesses } from "./formal/recovery-shadow-witnesses.js";
+import { recoveryShadowWitnesses } from "../formal/replay/witnesses/recovery-shadow.mjs";
 
 type RecordValue = Record<string, unknown>;
 type Fixture = {
@@ -12,7 +12,7 @@ type Fixture = {
   initialState: RecordValue;
   steps: Array<{ action: string; statePatch: RecordValue }>;
 };
-type State = { "mbt::actionTaken": string; s: RecordValue };
+type State = { input: { name: string; choice: { "#bigint": string } }; s: RecordValue };
 const fixtures = JSON.parse(readFileSync(new URL("./fixtures/formal-witness-attribution.json", import.meta.url), "utf8")) as Fixture[];
 const directories: string[] = [];
 
@@ -36,10 +36,13 @@ function fixtureFor(witness: string): Fixture {
   if (fixture === undefined) throw new Error(`Missing attribution fixture for ${witness}`);
   return fixture;
 }
+// These excerpts use native integers for private state; the shared classifiers
+// key on the explicit input record, so each step declares one without a choice.
+const noChoice = () => ({ name: "", choice: { "#bigint": "-1" } });
 function statesFor(fixture: Fixture): State[] {
-  const states: State[] = [{ "mbt::actionTaken": "excerpt", s: structuredClone(fixture.initialState) }];
+  const states: State[] = [{ input: { ...noChoice(), name: "excerpt" }, s: structuredClone(fixture.initialState) }];
   for (const step of fixture.steps) {
-    states.push({ "mbt::actionTaken": step.action, s: merge(states.at(-1)!.s, step.statePatch) });
+    states.push({ input: { ...noChoice(), name: step.action }, s: merge(states.at(-1)!.s, step.statePatch) });
   }
   return states;
 }

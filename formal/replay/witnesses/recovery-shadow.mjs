@@ -1,60 +1,27 @@
-import { readFileSync } from "node:fs";
+import { explicitInput, integer, privateStates, readTrace, traceStates } from "./trace.mjs";
 
-// Classify schedules only after both drivers have independently replayed their
+// Classify schedules only after every driver has independently replayed its
 // public observations. Private Quint state identifies the external boundary;
 // each witness also requires its visible consequence, never merely an input.
 // The committed smoke traces omit private state and are not coverage evidence.
-type State = Record<string, unknown>;
-type Observation = {
-  calls: number[];
-  reads: number;
-  loads: number;
-  loaders: number;
-  classifications: number;
-  dumps: number;
-  writes: number;
-  recovery: string[];
-  shadow: string[];
-};
-type TraceState = { "mbt::actionTaken": string; s: State & { o: Observation } };
-
-function decode(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(decode);
-  if (value !== null && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    if (Object.hasOwn(record, "#bigint")) {
-      const integer = Number(record["#bigint"]);
-      if (!Number.isSafeInteger(integer)) throw new Error("Unsafe witness ITF integer");
-      return integer;
-    }
-    return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, decode(item)]));
-  }
-  return value;
-}
-function number(state: State, name: string): number {
-  const value = state[name];
-  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
-    throw new Error(`Missing witness state integer: ${name}`);
-  }
-  return value;
-}
-function settled(before: Observation, after: Observation, value: number): boolean {
+const number = (state, name) => integer(state[name], name);
+function settled(before, after, value) {
   return after.calls.some((result, index) => before.calls[index] === 0 && result === value);
 }
-function unchangedWork(before: Observation, after: Observation): boolean {
+function unchangedWork(before, after) {
   return after.reads === before.reads && after.loads === before.loads
     && after.dumps === before.dumps && after.writes === before.writes;
 }
 
-function recoveryWitnesses(states: TraceState[], seen: Set<string>): void {
+function recoveryWitnesses(steps, seen) {
   const FRESH_DECODE = 1, SOURCE_RUNNING = 2, RECOVERY_DECODE = 3;
-  let acquired: State | undefined;
-  let acquisitionObservations: Observation | undefined;
+  let acquired;
+  let acquisitionObservations;
   let failedFreshDecode = false;
-  let decodeStartedAge: number | undefined;
-  for (let index = 1; index < states.length; index++) {
-    const before = states[index - 1]!.s, after = states[index]!.s;
-    const previous = before.o, actual = after.o, action = states[index]!["mbt::actionTaken"];
+  let decodeStartedAge;
+  for (let index = 1; index < steps.length; index++) {
+    const before = steps[index - 1].s, after = steps[index].s;
+    const previous = before.o, actual = after.o, action = steps[index].input.name;
     if (action === "beginCall" && actual.reads === previous.reads + 1) {
       acquired = before;
       acquisitionObservations = actual;
@@ -131,7 +98,7 @@ function recoveryWitnesses(states: TraceState[], seen: Set<string>): void {
         if (ageNow === number(before, "acceptedMaxAge") - 1) seen.add("last-recovery-age-serves");
         if (ageNow >= 0 && ageNow < 1000 && ageAtRead >= 1000) seen.add("rollback-below-fresh-age-still-recovers");
         if (number(before, "frame") !== number(before, "candidate")) seen.add("replacement-cannot-change-recovered-value");
-        const ages = (after.d as { ages: number[] }).ages;
+        const ages = after.d.ages;
         if (decodeStartedAge !== undefined && ageNow !== decodeStartedAge && ages.at(-1) === ageNow) {
           seen.add("recovery-age-sampled-at-successful-decode");
         }
@@ -144,18 +111,18 @@ function recoveryWitnesses(states: TraceState[], seen: Set<string>): void {
 
 // Normalize the published text/binary fixture encodings to byte identities.
 // Whitespace-distinct JSON remains distinct even when decoded values agree.
-function payloadBytes(payload: number): number {
-  return ({ 3: 1, 4: 2, 6: 5, 8: 7 } as Record<number, number>)[payload] ?? payload;
+function payloadBytes(payload) {
+  return ({ 3: 1, 4: 2, 6: 5, 8: 7 })[payload] ?? payload;
 }
 
-function shadowWitnesses(states: TraceState[], seen: Set<string>): void {
+function shadowWitnesses(steps, seen) {
   const C0_READ = 1, SNAPSHOT_DECODE = 3, CONFIRMATION_READ = 4;
   const FILL_SERIALIZE = 5, FILL_WRITE = 6;
   let c0Future = false, c0Fenced = false, failedReadWhileCallerPending = false;
-  let callStart: Observation | undefined;
-  for (let index = 1; index < states.length; index++) {
-    const before = states[index - 1]!.s, after = states[index]!.s;
-    const previous = before.o, actual = after.o, action = states[index]!["mbt::actionTaken"];
+  let callStart;
+  for (let index = 1; index < steps.length; index++) {
+    const before = steps[index - 1].s, after = steps[index].s;
+    const previous = before.o, actual = after.o, action = steps[index].input.name;
     const phase = number(before, "phase");
     const appended = actual.shadow.slice(previous.shadow.length);
     if (action === "beginCall") {
@@ -223,14 +190,16 @@ function shadowWitnesses(states: TraceState[], seen: Set<string>): void {
   }
 }
 
-export function recoveryShadowWitnesses(profile: string, paths: readonly string[]): Set<string> {
-  const seen = new Set<string>();
+export function recoveryShadowWitnesses(profile, paths) {
+  const seen = new Set();
   if (profile !== "recovery" && profile !== "shadow") return seen;
   for (const path of paths) {
-    const trace = decode(JSON.parse(readFileSync(path, "utf8"))) as { states: TraceState[] };
-    if (trace.states[0]?.s.phase === undefined) continue;
-    if (profile === "recovery") recoveryWitnesses(trace.states, seen);
-    else shadowWitnesses(trace.states, seen);
+    const raw = readTrace(path);
+    const states = traceStates(raw, path);
+    if (states[0]?.s?.phase === undefined) continue;
+    const steps = privateStates(raw, path).map((s, index) => ({ s, input: index === 0 ? undefined : explicitInput(states[index], `${path} step ${index}`) }));
+    if (profile === "recovery") recoveryWitnesses(steps, seen);
+    else shadowWitnesses(steps, seen);
   }
   return seen;
 }

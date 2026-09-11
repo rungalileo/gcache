@@ -2,8 +2,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { recoveryShadowWitnesses } from "./formal/recovery-shadow-witnesses.js";
-import { runtimeWitnesses } from "./formal/runtime-witnesses.js";
+import { recoveryShadowWitnesses } from "../formal/replay/witnesses/recovery-shadow.mjs";
+import { runtimeWitnesses } from "../formal/replay/witnesses/runtime.mjs";
 
 type RecordValue = Record<string, unknown>;
 type Fixture = {
@@ -12,7 +12,8 @@ type Fixture = {
   initialState: RecordValue;
   steps: Array<{ action: string; choice?: unknown; statePatch: RecordValue }>;
 };
-type State = { "mbt::actionTaken": string; "mbt::nondetPicks"?: { choice: unknown }; s: RecordValue };
+type Choice = { tag: string; value: unknown };
+type State = { input: { name: string; choice: unknown }; s: RecordValue };
 const fixtures = JSON.parse(readFileSync(new URL("./fixtures/formal-witness-boundaries.json", import.meta.url), "utf8")) as Fixture[];
 const directories: string[] = [];
 
@@ -30,14 +31,13 @@ function merge(before: RecordValue, patch: RecordValue): RecordValue {
   }
   return result;
 }
+// Excerpts start mid-history; the first state carries a placeholder input.
+// Steps declare the explicit input record that every shared classifier keys on.
+const explicitInput = (name: string, choice?: unknown) => ({ name, choice: choice === undefined ? integer(-1) : (choice as Choice).value });
 function statesFor(fixture: Fixture): State[] {
-  const states: State[] = [{ "mbt::actionTaken": "excerpt", s: structuredClone(fixture.initialState) }];
+  const states: State[] = [{ input: explicitInput("excerpt"), s: structuredClone(fixture.initialState) }];
   for (const step of fixture.steps) {
-    states.push({
-      "mbt::actionTaken": step.action,
-      ...(step.choice === undefined ? {} : { "mbt::nondetPicks": { choice: step.choice } }),
-      s: merge(states.at(-1)!.s, step.statePatch),
-    });
+    states.push({ input: explicitInput(step.action, step.choice), s: merge(states.at(-1)!.s, step.statePatch) });
   }
   return states;
 }
@@ -109,7 +109,7 @@ describe("Quint recovery and shadow witness consequences", () => {
   it("requires the exact F boundary, not merely a served stale value", () => {
     const fixture = fixtureFor("first-stale-age-recovers-without-publication");
     const states = statesFor(fixture);
-    const acquisition = states.findIndex(state => state["mbt::actionTaken"] === "beginCall") - 1;
+    const acquisition = states.findIndex(state => state.input.name === "beginCall") - 1;
     const before = states[acquisition]!.s;
     before.created = integer(Number((before.created as RecordValue)["#bigint"]) - 1);
     expect(collect(fixture, states).has(fixture.witness)).toBe(false);
@@ -134,7 +134,7 @@ describe("Quint invalidation memo witness provenance", () => {
   it("does not credit a same-value replacement after invalidation as the original memo", () => {
     const fixture = examples.find(item => item.title === "preexisting-memo-survives")!;
     const states = statesFor(fixture);
-    const invalidation = states.findIndex(state => state["mbt::actionTaken"] === "invalidate");
+    const invalidation = states.findIndex(state => state.input.name === "invalidate");
     const replacement = structuredClone(states[invalidation]!);
     const beforeProbe = states.at(-2)!.s;
     const memo = beforeProbe.memo as RecordValue[];
@@ -146,8 +146,7 @@ describe("Quint invalidation memo witness provenance", () => {
     const value = Number(memo[retainedSlot]!["#bigint"]);
     // Challenge provenance with an observed publication of the same bytes.
     // Public replay remains a separate gate; this test isolates classification.
-    replacement["mbt::actionTaken"] = "resolveLoader";
-    replacement["mbt::nondetPicks"] = { choice: { tag: "Some", value: integer(loader * 2 + value) } };
+    replacement.input = { name: "resolveLoader", choice: integer(loader * 2 + value) };
     states.splice(invalidation + 1, 0, replacement);
     expect(collect(fixture, states).has(fixture.witness)).toBe(false);
   });

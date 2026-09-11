@@ -34,6 +34,10 @@ export function explorationPlan(directory, seed, options = {}) {
     }
     if (script === 'formal/run-models.mjs') return [{ ...step, env: { ...step.env, QUINT_SEED: normalized } }];
     if (step.env?.DIALCACHE_MBT_TRACE_DIR) return [{ ...step, nativeReport: step.command === 'go' ? 'go' : 'typescript' }];
+    // A seed's missing witness is classified by both native reports. The shared
+    // evaluator still writes evidence for complete profiles; its exit status
+    // must not stop Go from executing that seed's histories.
+    if (script === 'formal/witnesses.mjs') return [{ ...step, tolerateFailure: true }];
     return [step];
   });
 }
@@ -165,6 +169,11 @@ export async function runExplorationSteps(plan, { directory, environment = proce
   const results = [];
   for (const step of plan) {
     if (step.explorationContext) { await prepareExplorationContext(step.explorationContext, directory); continue; }
+    if (step.tolerateFailure) {
+      try { await execute([step], { directory, environment }); }
+      catch (error) { console.warn(`${step.label ?? 'Tolerated step'} failed; both native witness leaves record the shortfall: ${error}`); }
+      continue;
+    }
     if (!step.nativeReport) { await execute([step], { directory, environment }); continue; }
     const language = step.nativeReport, path = resolve(directory, reportPaths[language]);
     const contextPath = resolve(directory, contextPaths[language]);

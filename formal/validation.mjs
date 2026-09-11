@@ -21,7 +21,7 @@ export const targetDescriptions = {
   audit: 'Check source, behavior, feature, Go and generated-fixture freshness inventories',
   smoke: 'Replay committed Quint-derived fixtures in TypeScript and Go; no full completion claim',
   formal: 'Complete Quint checks and corpus, then prepared TypeScript and Go replay',
-  'formal-corpus': 'Check models, generate/recompute artifacts and complete TypeScript replay with witnesses',
+  'formal-corpus': 'Check models, generate/recompute artifacts, complete TypeScript replay and evaluate shared witness evidence',
   'formal-go': 'Require current TypeScript completion, then complete Go replay with race detection',
   'fixtures-check': 'Recompute every committed model-derived artifact with pinned Quint',
   explore: 'Explore a new recorded seed and replay both ports in an isolated source snapshot',
@@ -81,7 +81,10 @@ export function validationPlan(target, { directory = root, environment = process
   const tsReplay = full => ({ ...pnpm(full ? 'Replay complete TypeScript corpus' : 'Replay committed TypeScript fixtures',
     'exec', 'vitest', 'run', ...replayTests, '--coverage.enabled=false',
     ...(full ? ['--reporter=default', '--reporter=json', '--outputFile=.formal-traces/ts-replay.json'] : [])),
-    ...(full ? { env: { ...replayEnv, DIALCACHE_COVERAGE_EVIDENCE_DIR: witnessDirectory } } : {}) });
+    ...(full ? { env: replayEnv } : {}) });
+  // The language-neutral evaluator is the sole producer of the reusable witness
+  // evidence; TypeScript replay only checks the same gate inside its suite.
+  const witnesses = node('Evaluate shared witness evidence over the complete corpus', 'formal/witnesses.mjs', 'evaluate', '--profile', 'all');
   const nativeGo = full => ({ ...go(full ? 'Replay complete Go corpus with race detection' : 'Run Go default tests with race detection',
     'test', '-race', '-count=1', ...(full ? ['-json'] : []), './...'),
     ...(full ? { env: { ...replayEnv, DIALCACHE_WITNESS_EVIDENCE_DIR: witnessDirectory }, stdoutFile: '.formal-traces/go-replay.jsonl' } : {}) });
@@ -103,7 +106,7 @@ export function validationPlan(target, { directory = root, environment = process
       node('Generate complete corpus and recompute wire artifacts', 'formal/run-models.mjs', 'generate'),
       node('Recompute committed Quint smoke and witness fixtures', 'formal/generated-fixtures.mjs', '--check'),
       node('Prepare TypeScript execution context', 'formal/conformance.mjs', 'prepare', 'typescript', reportPath('ts', 'context')),
-      tsReplay(true), { ...node('Adapt TypeScript native assertion report', 'formal/conformance-adapters.mjs', 'typescript', reportPath('ts', 'replay'), reportPath('ts', 'context')), stdoutFile: reportPath('ts', 'completion') },
+      tsReplay(true), witnesses, { ...node('Adapt TypeScript native assertion report', 'formal/conformance-adapters.mjs', 'typescript', reportPath('ts', 'replay'), reportPath('ts', 'context')), stdoutFile: reportPath('ts', 'completion') },
       completion('ts')],
     'formal-go': [completion('ts'), invalidate('go'), node('Check Go parity inventory', 'formal/check-go-parity.mjs'),
       node('Prepare Go execution context', 'formal/conformance.mjs', 'prepare', 'go', reportPath('go', 'context')), nativeGo(true),

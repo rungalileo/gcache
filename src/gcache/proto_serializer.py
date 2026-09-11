@@ -9,8 +9,10 @@ uses this class or not.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
+from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
 from gcache.config import Serializer
 
 if TYPE_CHECKING:
@@ -59,7 +61,15 @@ class ProtoJsonSerializer(Serializer):
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, bytes):
             data = data.decode("utf-8")
-        # Tolerate a field a newer writer added; the default raises, which would make
-        # each pod generation reject the other's entries for a whole rolling deploy.
-        # Matches Go's protojson.UnmarshalOptions{DiscardUnknown: true}.
-        return self._parse(data, self._message_type(), ignore_unknown_fields=True)
+
+        def parse() -> Any:
+            # Tolerate a field a newer writer added; the default raises, which would make
+            # each pod generation reject the other's entries for a whole rolling deploy.
+            # Matches Go's protojson.UnmarshalOptions{DiscardUnknown: true}.
+            return self._parse(data, self._message_type(), ignore_unknown_fields=True)
+
+        # Offloaded above the same threshold RedisCache uses for the envelope; see
+        # JsonSerializer.load for why the envelope offload does not already cover this.
+        if len(data) < ASYNC_DECODE_THRESHOLD_BYTES:
+            return parse()
+        return await asyncio.get_running_loop().run_in_executor(None, parse)

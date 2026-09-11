@@ -1,8 +1,10 @@
+import asyncio
 import base64
 import json
 import pickle
 import time
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 import redislite
@@ -777,3 +779,46 @@ async def test_json_serializer_refuses_nan_and_infinity() -> None:
 
     # A finite float still round-trips.
     assert await JsonSerializer().dump({"score": 1.5}) == '{"score":1.5}'
+
+
+def test_envelope_rejects_a_boolean_version() -> None:
+    # isinstance(True, int) and True == 1, so `"version": true` satisfied
+    # `!= ENVELOPE_VERSION` and was accepted. The TypeScript reader's `!== 1` rejects it
+    # and Go's *int unmarshal fails on it, so Python was the only client calling it a hit.
+    from gcache._internal.envelope import EnvelopeDecodeError, decode
+
+    raw = b'{"version":true,"createdAtMs":1,"expiresAtMs":2,"encoding":"utf8","payload":"{}"}'
+    with pytest.raises(EnvelopeDecodeError):
+        decode(raw, allow_pickle=False)
+
+
+@pytest.mark.asyncio
+async def test_json_serializer_offloads_a_large_payload() -> None:
+    # RedisCache offloads decode() above ASYNC_DECODE_THRESHOLD_BYTES, but decode returns
+    # the payload as ONE string; this parse turns it into the real structure and allocates
+    # more. So a multi-megabyte entry blocked the loop right after the envelope offload had
+    # avoided exactly that.
+    from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
+
+    big = {"k": "x" * (ASYNC_DECODE_THRESHOLD_BYTES + 1000)}
+    payload = await JsonSerializer().dump(big)
+    assert len(payload) > ASYNC_DECODE_THRESHOLD_BYTES
+
+    ran_on: list[str] = []
+    loop = asyncio.get_running_loop()
+    original = loop.run_in_executor
+
+    def spy(executor: Any, func: Any, *args: Any) -> Any:
+        ran_on.append("executor")
+        return original(executor, func, *args)
+
+    with patch.object(loop, "run_in_executor", spy):
+        assert await JsonSerializer().load(payload) == big
+    assert ran_on == ["executor"], "a payload past the threshold must not parse on the loop"
+
+    # Below the threshold it stays inline -- an executor hop would cost more than the parse.
+    ran_on.clear()
+    small = await JsonSerializer().dump({"k": "x"})
+    with patch.object(loop, "run_in_executor", spy):
+        assert await JsonSerializer().load(small) == {"k": "x"}
+    assert ran_on == []

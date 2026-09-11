@@ -1,3 +1,4 @@
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
@@ -9,13 +10,18 @@ from typing import Any, Union
 from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
 
+from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.exceptions import UseCaseNameIsReserved
 
 #: Async callable that fetches the actual value on a cache miss.
 #: Public because GCache.aget/get take one: annotating a fallback should not mean
 #: importing from gcache._internal.
-Fallback = Callable[..., Awaitable[Any]]
+#:
+#: Zero-argument: every caller invokes it as ``fallback()``. ``Callable[..., ...]`` accepted
+#: a function with required parameters and deferred the TypeError to the first cache miss,
+#: which is the worst moment to find out. Bind arguments with functools.partial or a closure.
+Fallback = Callable[[], Awaitable[Any]]
 
 
 class CacheLayer(Enum):
@@ -184,7 +190,15 @@ class JsonSerializer(Serializer):
             data = data.decode("utf-8")
         if data == _TS_UNDEFINED_SENTINEL:
             return None
-        return json.loads(data)
+        # Offloaded above the same threshold RedisCache uses for the envelope. That offload
+        # covers decode() only, which parses the envelope and hands back the payload as ONE
+        # string; this parse turns that string into the real structure and allocates more.
+        # So a multi-megabyte JSON entry blocked the loop here, immediately after the
+        # envelope offload had avoided exactly that. A pickle key has no serializer and does
+        # all of its work inside decode, which is why only Envelope.JSON has this shape.
+        if len(data) < ASYNC_DECODE_THRESHOLD_BYTES:
+            return json.loads(data)
+        return await asyncio.get_running_loop().run_in_executor(None, json.loads, data)
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,20 +263,22 @@ class GCacheKey:
             args_str = "?" + "&".join([f"{arg[0]}={arg[1]}" for arg in self.args])
         object.__setattr__(self, "urn", f"{prefix}{args_str}#{self.use_case}")
 
+    # Identity IS the rendered urn, which is the Redis key. urn is precomputed in
+    # __post_init__, so this allocates nothing.
+    #
+    # The previous tuple of (key_type, id, use_case, args) omitted invalidation_tracking,
+    # which DOES change the urn -- a tracked key braces its prefix for the cluster hash tag.
+    # So two keys addressing different Redis keys compared equal, and LocalCache (a dict
+    # keyed on GCacheKey) served one for the other, bypassing the watermark entirely. A
+    # decorator declares track_for_invalidation once per use case, so it stayed unreachable
+    # until direct keys let two call sites build the same use case both ways.
     def __hash__(self) -> int:
-        # Tuple hashing is fast (C implementation) and avoids string allocation
-        return hash((self.key_type, self.id, self.use_case, tuple(self.args)))
+        return hash(self.urn)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, GCacheKey):
             return False
-        # Direct field comparison - short-circuits on first mismatch
-        return (
-            self.key_type == other.key_type
-            and self.id == other.id
-            and self.use_case == other.use_case
-            and self.args == other.args
-        )
+        return self.urn == other.urn
 
     def __str__(self) -> str:
         return self.urn

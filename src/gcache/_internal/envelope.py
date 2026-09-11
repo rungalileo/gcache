@@ -142,7 +142,11 @@ def decode(data: bytes, *, allow_pickle: bool = True) -> DecodedValue:
             # makes the two readers disagree about the same bytes -- the version field in
             # particular exists precisely to turn a future writer's data into a miss.
             version = envelope.get("version")
-            if version != ENVELOPE_VERSION:
+            # isinstance(True, int) and True == 1, so a bare `"version": true` satisfied
+            # `!= ENVELOPE_VERSION` and was ACCEPTED here, while the TypeScript reader's
+            # `parsed.version !== 1` rejects it and Go's *int unmarshal fails on it. Python
+            # was the only client answering hit for those bytes.
+            if isinstance(version, bool) or version != ENVELOPE_VERSION:
                 raise EnvelopeDecodeError(f"unsupported envelope version {version!r}")
             payload = envelope["payload"]
             if not isinstance(payload, str):

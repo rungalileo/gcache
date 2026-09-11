@@ -289,3 +289,64 @@ async def test_sync_get_warns_when_called_from_an_async_context(
             assert gcache.get(_key(), load) == {"session_id": "abc"}
 
     assert any("called from async context" in r.message for r in caplog.records)
+
+
+def test_tracked_and_untracked_keys_are_not_the_same_key() -> None:
+    # They render DIFFERENT Redis keys -- a tracked key braces its prefix for the cluster
+    # hash tag -- but __hash__/__eq__ omitted invalidation_tracking, so LocalCache (a dict
+    # keyed on GCacheKey) served one for the other and the watermark was never consulted.
+    # A decorator declares track_for_invalidation once per use case, which is why this only
+    # became reachable when two call sites could build the same use case both ways.
+    tracked = _key(invalidation_tracking=True)
+    untracked = _key(invalidation_tracking=False)
+
+    assert tracked.urn != untracked.urn
+    assert tracked != untracked
+    assert hash(tracked) != hash(untracked)
+    assert {tracked: "tracked"}.get(untracked) is None
+
+
+@pytest.mark.asyncio
+async def test_a_direct_key_cannot_contradict_a_decorated_use_case(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider
+) -> None:
+    # Same urn, different framing: the decorator writes pickle, the direct key refuses that
+    # pickle and writes JSON, the decorator calls the JSON a miss and writes pickle again.
+    # They overwrite each other forever inside one process, with nothing raised or logged.
+    from gcache.exceptions import EnvelopeMismatchWithRegisteredUseCase
+
+    cache_config_provider.configs["clash_uc"] = GCacheKeyConfig.enabled(60)
+
+    @gcache.cached(key_type="session_id", id_arg="sid", use_case="clash_uc")
+    async def decorated(sid: str) -> dict:
+        return {"session_id": sid}
+
+    async def load() -> dict:
+        return {"session_id": "abc"}
+
+    with gcache.enable():
+        with pytest.raises(EnvelopeMismatchWithRegisteredUseCase):
+            await gcache.aget(_key(use_case="clash_uc"), load)
+        with pytest.raises(EnvelopeMismatchWithRegisteredUseCase):
+            await gcache.aput(_key(use_case="clash_uc"), {"session_id": "abc"})
+
+
+@pytest.mark.asyncio
+async def test_a_disabled_context_is_counted_not_silent(gcache: GCache, enabled_uc: None) -> None:
+    # The three other skip reasons increment DISABLED_COUNTER; a disabled context did not.
+    # The decorator counts it itself and returns before reaching the cache, so aget/aput
+    # were the fully silent path: no exception, no log, no metric, and a caller believing
+    # another process could now read the entry.
+    from prometheus_client import REGISTRY
+
+    def disabled_count() -> float:
+        total = 0.0
+        for fam in REGISTRY.collect():
+            for s in fam.samples:
+                if s.name.endswith("gcache_disabled_counter_total") and s.labels.get("reason") == "context":
+                    total += s.value
+        return total
+
+    before = disabled_count()
+    await gcache.aput(_key(), {"session_id": "abc"})  # no enable() block
+    assert disabled_count() > before, "a disabled context must be counted, not silently skipped"

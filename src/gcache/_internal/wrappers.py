@@ -141,6 +141,14 @@ class CacheController(CacheWrapper):
     async def _should_cache(self, key: GCacheKey) -> bool:
         try:
             if not GCacheContext.enabled.get():
+                # Counted here, not only in the decorator. The decorator returns before it
+                # ever reaches the cache, so it cannot double-count -- and aget/aput come
+                # straight here, which made a disabled context the one skip reason with no
+                # exception, no log and no metric. A caller that primes outside enable()
+                # otherwise believes another process can read the entry.
+                GCacheMetrics.DISABLED_COUNTER.labels(
+                    key.use_case, key.key_type, self.layer().name, DisabledReasons.context.name
+                ).inc()
                 return False
             config = await self._resolve_config(key)
             if config is None:

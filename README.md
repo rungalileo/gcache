@@ -300,6 +300,63 @@ consult watermarks, so an invalidation from another language does not clear a Py
 in-process copy until its local TTL expires — keep the local TTL short (or the local ramp at
 0) for a use case shared across languages.
 
+#### Reading and writing one key directly
+
+`@cached` fits whenever the value is a pure function of a call's arguments. A shared cache
+often is not: the key comes from data that is nobody's parameter, and the value is something
+the caller already fetched. `aget`/`aput` (and their sync `get`/`put`) take a key you build:
+
+```python
+from gcache import Envelope, GCacheKey, JsonSerializer
+
+def identity_key(project_id: str, session_id: str) -> GCacheKey:
+    return GCacheKey(
+        key_type="session_id",
+        id=f"{project_id}:{session_id}",
+        use_case="SessionService::identity",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+        invalidation_tracking=True,
+    )
+
+# Read. The fallback runs only on a miss, so the caller can reuse whatever it fetched --
+# a plain get would make it read its source of truth twice.
+async def resolve(project_id: str, session_id: str) -> dict:
+    fetched: dict | None = None
+
+    async def load() -> dict:
+        nonlocal fetched
+        fetched = await db.fetch_session(project_id, session_id)
+        return fetched
+
+    with gcache.enable():
+        return await gcache.aget(identity_key(project_id, session_id), load)
+
+# Write. For priming an entry ANOTHER process will read, when this one already has the
+# value and does not want the read that would otherwise populate it.
+with gcache.enable():
+    await gcache.aput(identity_key(project_id, session_id), {"session_id": session_id})
+```
+
+Both honour `enable()` and the use case's ramp, exactly as the decorator does — a write
+outside an `enable()` block, or for a use case ramped to 0, does nothing.
+
+Three things to know:
+
+- **`envelope` and `serializer` are not part of the key.** `key_type`, `id`, `args` and
+  `use_case` are, so getting one of those wrong just means the two participants never see
+  each other's entries. Getting the envelope wrong is worse: both then share one key with
+  incompatible framing, each overwrites the other, and neither can read what it finds. Within
+  one process the library now catches it — a direct key whose envelope contradicts a
+  `@cached` declaration on the same `use_case` raises — but across languages it cannot.
+- **`aput` raises on a cache-layer failure**, unlike a read. That matches `adelete` and
+  `ainvalidate`. "Prime" reads as best-effort, so a caller on a request path should decide
+  what to do with a Redis timeout rather than let it propagate.
+- **A prime inside an active invalidation window is lost silently.** The entry is written
+  with `createdAtMs` below the watermark, so reads find it stale until the window closes and
+  a read rewrites it. That is the invalidation doing its job, but `aput` still returns
+  normally. Go behaves the same way; the TypeScript client returns `false` here.
+
 #### Prefer a protobuf payload over a hand-written dict
 
 `JsonSerializer` leaves the payload *schema* as something each language writes by hand, and

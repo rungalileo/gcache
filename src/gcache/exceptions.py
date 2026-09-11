@@ -50,3 +50,13 @@ class MissingKeyConfig(GCacheError):
 class UseCaseNameIsReserved(GCacheError):
     def __init__(self) -> None:
         super().__init__("Use case name is reserved.")
+
+
+class EnvelopeMismatchWithRegisteredUseCase(GCacheError):
+    """A direct key contradicts the envelope a @cached decorator declared for the same use case."""
+
+    def __init__(self, use_case: str, declared: object, given: object) -> None:
+        super().__init__(
+            f"use case {use_case!r} is registered with {declared}, but this key declares {given}. "
+            "They render the same Redis key, so the two framings would overwrite each other."
+        )

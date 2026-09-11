@@ -23,6 +23,7 @@ from gcache.config import (
     Serializer,
 )
 from gcache.exceptions import (
+    EnvelopeMismatchWithRegisteredUseCase,
     GCacheAlreadyInstantiated,
     KeyArgDoesNotExist,
     RedisConfigConflict,
@@ -104,7 +105,10 @@ class GCache:
 
         self._cache = CacheChain(config.cache_config_provider, local_cache, redis_cache)
 
-        self._use_case_registry: set = set()
+        # use_case -> the Envelope the decorator declared for it. A set would do for the
+        # duplicate-name check, but aget/aput take a hand-built key whose envelope has to
+        # be checked against the decorator's -- see _check_direct_key.
+        self._use_case_registry: dict[str, Envelope] = {}
 
         # Use a thread pool to run non async cached functions in.
         # This is because all of the GCache implementation is async, but we still want to support caching
@@ -242,7 +246,7 @@ class GCache:
             if use_case == "watermark":
                 raise UseCaseNameIsReserved()
 
-            self._use_case_registry.add(use_case)
+            self._use_case_registry[use_case] = envelope
 
             if arg_adapters is None:
                 arg_adapters = {}
@@ -392,6 +396,23 @@ class GCache:
         """Remove all local and remote cache entries (sync version)."""
         self._run_coroutine_in_thread(self.aflushall)
 
+    def _check_direct_key(self, key: GCacheKey) -> None:
+        """Reject a direct key whose envelope contradicts a decorator on the same use case.
+
+        Both render the same urn, so they are one entry. With different framing they
+        overwrite each other forever inside ONE process: the decorator writes pickle, the
+        direct key refuses that pickle and writes JSON, the decorator treats the JSON as a
+        miss and writes pickle again. Nothing raises and nothing logs -- the same failure
+        the class docstring warns about across languages, except here it is detectable.
+
+        Only checked against a REGISTERED use case; a direct-only use case has nothing to
+        compare with, which is why ``envelope`` and ``serializer`` still have to agree by
+        convention across languages.
+        """
+        declared = self._use_case_registry.get(key.use_case)
+        if declared is not None and declared != key.envelope:
+            raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
+
     async def aget(self, key: GCacheKey, fallback: Fallback) -> Any:
         """
         Read one key, computing and caching the value on a miss (async version).
@@ -422,6 +443,7 @@ class GCache:
         :param fallback: Async callable invoked on a miss to produce the value.
         :return: The cached value, or whatever ``fallback`` returned.
         """
+        self._check_direct_key(key)
         return await self._cache.get(key, fallback)
 
     def get(self, key: GCacheKey, fallback: Fallback) -> Any:
@@ -440,7 +462,15 @@ class GCache:
         caller. That matches :meth:`adelete` and :meth:`ainvalidate`, and it is deliberate:
         a silent failure here means the entry another process is waiting for never appears.
         A caller priming off a request path should not let that propagate.
+
+        A prime landing inside an active invalidation window is LOST, silently. The entry is
+        written with ``createdAtMs`` below the watermark, so every read then finds it stale
+        and it heals only once the window closes and a read rewrites it. That is correct --
+        the invalidation is meant to suppress it -- but this call still returns normally.
+        Go's ``Put`` behaves the same way; the TypeScript client is the outlier there and
+        returns ``false``. Checking here would cost an extra round trip on every prime.
         """
+        self._check_direct_key(key)
         await self._cache.put(key, value)
 
     def put(self, key: GCacheKey, value: Any) -> None:

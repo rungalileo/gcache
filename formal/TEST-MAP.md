@@ -26,9 +26,9 @@ sampled trace counts and exported regressions live in
 | --- | --- | --- | --- |
 | Enablement and scopes | Core verification; core/scope/layers profiles | `dialcache-local`, `dialcache-request-local`: disabled pass-through, nested scopes, memo ownership, closure/replacement and later public reuse | Bounded context trees, calls and instances |
 | Traversal, local TTL and LRU | Core/policy verification; policy/layers/local-clock profiles | `dialcache-local`, `dialcache-config-ramp`: first hit, value/absence reuse, promotion without renewal, zero capacity and common native millisecond grid | Selected capacities/keys; custom-clock resolution remains native |
-| Coalescing and independent calls | Coalescing verification; effects/policy/layers/independent profiles | `dialcache-coalescing`, `dialcache-liveness`: leader/follower results, remaining budget, independent source/error/read identities and publication order | Bounded overlap and operation identities; no fairness proof |
+| Coalescing and independent calls | Flight-deadlines verification; effects/policy/layers/independent profiles | `dialcache-coalescing`, `dialcache-liveness`: leader/follower results, remaining budget, independent source/error/read identities and publication order | Bounded overlap and operation identities; no fairness proof |
 | Runtime policy | Runtime-policy verification; policy/runtime-boundaries/scope profiles | `dialcache-config-ramp`: sparse leaves, null versus omission, defaults, invalid policy, cohort equality and captured snapshots | Native malformed host objects and static API validation remain separate |
-| Source/read budgets | Coalescing verification; effects/source-budgets/independent profiles | `dialcache-liveness`, `dialcache-redis-read-deadline`: time begins at actual work, separate budgets, exact deadlines, cancellation and late settlement | Selected integer budgets; precise native timer boundaries have binding tests |
+| Source/read budgets | Flight-deadlines verification; effects/source-budgets/independent profiles | `dialcache-liveness`, `dialcache-redis-read-deadline`: time begins at actual work, separate budgets, exact deadlines, cancellation and late settlement | Selected integer budgets; precise native timer boundaries have binding tests |
 | Cache failures | Core/recovery verification; effects/local-failure/recovery-read profiles | `dialcache-redis`, `dialcache-local`: original source outcomes, failure-specific refill/publication authority and independent probes | Native storage/clock seams inject local faults; not arbitrary heap corruption |
 | Tracked invalidation | Tracked verification; effects/layers/recovery-read profiles | `dialcache-invalidation`, `redis-payload`, real/cluster tests: acquired snapshots, both observed-fence checks, marker existence/TTL and delayed writes | Atomic primary snapshots and watermark durability are assumptions |
 | Stale recovery | Stale-recovery verification; recovery/recovery-read/independent profiles | `dialcache-stale-on-error`, `dialcache-stale-recovery-policy`: F/M boundaries, original errors, lazy decode, retained bytes, closed scopes and no shared publication | Recovery-read selected-shadow mode admits only stale seeds and failed sources |
@@ -111,25 +111,12 @@ exclusion and unchanged 95% line/function/statement and 90% branch thresholds.
 Every shipped implementation module remains in scope. Imported formal tooling
 has separate parser, provenance, model, replay and mutation checks; importing a
 checker directly must not silently change the library coverage denominator.
-The full unit and production-coverage gate passed with this explicit scope.
 
-Earlier Vitest/V8 code-coverage measurements predate this expansion. They remain
-historical observations of their recorded source/instrumentation snapshot:
-
-| Historical cohort | Library lines | Library branches | Main engine lines | Main engine branches |
-| --- | --- | --- | --- | --- |
-| 660 ordinary unit tests | 97.96% | 97.06% | 96.16% | 95.35% |
-| 4,000 configured generated traces | 70.71% | 71.62% | 83.94% | 84.59% |
-| 229 scenarios, 102 protocol cases and four audit checks | 72.54% | 72.50% | 82.72% | 79.21% |
-| Generated plus portable, 4,335 positive tests | 75.00% | 77.49% | 85.34% | 85.33% |
-
-These percentages are not current-suite coverage, assertion strength or a
-percentage of behavior formalized. A new schedule can strengthen ownership
-checks while revisiting the same branch. Recompute with identical source and
-instrumentation maps before comparing another run. Keep positive behavioral
-execution separate from parser, classifier and deliberately broken-driver
-controls. [SEMANTIC-COVERAGE.md](./SEMANTIC-COVERAGE.md) explains the independent
-mutation measurements and their retained historical reports.
+Code-coverage percentages are not current-suite coverage, assertion strength or a
+percentage of behavior formalized. Keep positive behavioral execution separate
+from parser, classifier and deliberately broken-driver controls.
+[SEMANTIC-COVERAGE.md](./SEMANTIC-COVERAGE.md) explains the independent mutation
+measurements; historical run results live in PR summaries and workflow artifacts.
 
 When behavior disagrees, review the intended contract, change Quint with an
 independent regression, replay it in both ports, and update explanatory docs and

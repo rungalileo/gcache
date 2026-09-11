@@ -26,6 +26,8 @@ both language bindings.
 
 `make formal` checks the scheduled Quint models, generates the complete corpus,
 and requires full TypeScript and Go replay with matching evidence fingerprints.
+`make model-check` runs the separate finite symbolic checks; it needs Java 21 and
+a checksummed Apalache release and is the only lane that does.
 `make mutations` then challenges the tests with the catalogued implementation
 faults; it requires current full replay reports.
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs the complete pipeline,

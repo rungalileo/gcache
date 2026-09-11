@@ -101,15 +101,17 @@ regressions now anchor the missing schedules:
 | recovery / `recovery-memoizes-both-requests` | [recoveredFlightMemoIsReusedByBothRequestsTest](./dialcache-recovery-conformance.qnt) |
 
 The same seed passed both ports and all mandatory witnesses on snapshot
-`97f77529d693c4d39baa124a2bde2142c8856bc1`. That exploration was not rerun on
-`87c5e6e25784f188125403db4c46295d6e5bea95`, whose later changes include assertion
-diagnostics. This records the discovery and its regression anchors; it does not
-claim that named regressions alone cover every required witness.
+`97f77529d693c4d39baa124a2bde2142c8856bc1`. A second fresh seed,
+`0xfe678a03def8b0f2`, passed both ports and all 435 required labels on the
+merged revision `61d55cfec0f5f124ce4cbe46ad9386b310bfaf75` in hosted run
+[34646653122](https://github.com/lan17/DialCache/actions/runs/34646653122).
+This records discoveries and their regression anchors; it does not claim that
+named regressions alone cover every required witness.
 
 ## Historical results
 
 The merged baseline's detailed run logs remain in
-[the versioned record from PR #161](https://github.com/lan17/DialCache/blob/7729c3f461c1d6f631b528ea06a81edca3ae787c/formal/VALIDATION.md).
+[the versioned record from PR #161](https://github.com/lan17/DialCache/blob/fa4ef77489fd124213b5877479f69e2086c1aa90/formal/VALIDATION.md).
 Current results belong in PR summaries and uploaded artifacts. This guide
 explains how to produce and interpret evidence; it is not an accumulating log
 of previous executions or machine-specific temporary paths.

@@ -60,6 +60,7 @@ process.exit(Number(process.argv[3] ?? 0));\n`);
     fakeTool("go", 'console.log("go version go1.27.1 test/test")');
     fakeTool("quint", 'console.log("0.32.0")');
     fakeTool("java", 'console.log("openjdk 21.0.11")');
+    fakeTool("tar", 'console.log("bsdtar 3.5.3")');
     fakeTool("docker", 'console.log("running")');
     environment.PATH = `${join(directory, "bin")}${delimiter}${process.env.PATH ?? ""}`;
   });
@@ -149,6 +150,14 @@ process.exit(Number(process.argv[3] ?? 0));\n`);
     expect(validationPlan("ci", { directory }).filter(step => step.args?.[0] === "formal/check-symbolic-models.mjs")).toHaveLength(1);
     fakeTool("java", 'console.log("openjdk 21.0.11 2026-04-21 LTS")');
     expect(() => checkPrerequisites("model-check", { directory, environment, nodeVersion: "v24.20.0" })).not.toThrow();
+    // The pinned Apalache archive is unpacked with tar; only the symbolic lane needs it.
+    fakeTool("tar", 'console.error("tar: not available"); process.exit(1)');
+    for (const target of ["model-check", "ci"]) {
+      expect(() => checkPrerequisites(target, { directory, environment, nodeVersion: "v24.20.0" })).toThrow(/requires tar to unpack the pinned Apalache archive/);
+    }
+    for (const target of ["check-ts", "formal", "formal-corpus", "explore"]) {
+      expect(() => checkPrerequisites(target, { directory, environment, nodeVersion: "v24.20.0" })).not.toThrow();
+    }
   });
 
   it("allows the standalone floor target on Node 22.15 and propagates its PATH without reintroducing selectors", async () => {

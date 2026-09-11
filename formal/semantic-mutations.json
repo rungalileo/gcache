@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "mutations": [
+    {
+      "id": "M01",
+      "case": "C45.maximum-age-exclusive",
+      "description": "Accept a retained candidate at the exact maximum age after decoding",
+      "path": "src/internal/redis-cache.ts",
+      "before": "servingAge.ageMs >= maximumAgeMs",
+      "after": "servingAge.ageMs > maximumAgeMs",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M02",
+      "case": "C45.recheck-after-decode",
+      "description": "Reuse the pre-decode age instead of observing age after asynchronous decoding",
+      "path": "src/internal/redis-cache.ts",
+      "before": "const servingAge = this.frameAge(key, frame, CacheLayer.REMOTE);",
+      "after": "const servingAge = initialAge;",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M03",
+      "case": "C25.late-source-rejected",
+      "description": "Accept an externally settled result after its elapsed deadline when the timer has not run",
+      "path": "src/internal/deadline.ts",
+      "before": "if (elapsedMs() >= timeoutMs) {",
+      "after": "if (false) {",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M04",
+      "case": "C34.second-fence",
+      "description": "Skip the tracked fence recheck after serialization",
+      "path": "src/internal/redis-cache.ts",
+      "before": "if (createdAtMs <= observedWatermarkMs) {",
+      "after": "if (false) {",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M05",
+      "case": "C03.detached-bypass",
+      "description": "Treat a detached context whose outer scope closed as still enabled",
+      "path": "src/context.ts",
+      "before": "return store?.enabled === true && store.holder?.closed === false;",
+      "after": "return store?.enabled === true;",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M06",
+      "case": "W04.strict-fence",
+      "description": "Accept a tracked frame timestamp equal to its watermark",
+      "path": "src/internal/redis-payload.ts",
+      "before": "observedWatermarkMs !== undefined && createdAtMs <= observedWatermarkMs",
+      "after": "observedWatermarkMs !== undefined && createdAtMs < observedWatermarkMs",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M07",
+      "case": "C51.changed-confirmation",
+      "description": "Confirm an unequal shadow result even when C1 contains different payload bytes",
+      "path": "src/dialcache.ts",
+      "before": "confirmationFrame === null || !redisPayloadsEqual(originalFrame.payload, confirmationFrame.payload)",
+      "after": "confirmationFrame === null",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M08",
+      "case": "C60.invalid-logging-policy",
+      "description": "Enable mismatch logging after a malformed runtime logging flag",
+      "path": "src/dialcache.ts",
+      "before": "this.recordError(key, CacheLayer.REMOTE, \"config_resolution\");\n      return false;\n    }\n    return configuredLogMismatches;",
+      "after": "this.recordError(key, CacheLayer.REMOTE, \"config_resolution\");\n      return true;\n    }\n    return configuredLogMismatches;",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M09",
+      "case": "C60.logging-default-off",
+      "description": "Enable mismatch logging when its flag is omitted",
+      "path": "src/dialcache.ts",
+      "before": "if (configuredLogMismatches === undefined) {\n      return false;",
+      "after": "if (configuredLogMismatches === undefined) {\n      return true;",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M10",
+      "case": "C31.tracked-no-local-fill",
+      "description": "Publish an unvalidated tracked source value directly into local storage",
+      "path": "src/dialcache.ts",
+      "before": "const suppressLocalWrite = (remote.status === \"disabled\" && remote.skipCacheWrite === true)\n      || (remoteWriteConfig !== undefined && key.trackForInvalidation);",
+      "after": "const suppressLocalWrite = remote.status === \"disabled\" && remote.skipCacheWrite === true;",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M11",
+      "case": "C09.fixed-local-ttl",
+      "description": "Renew the local insertion TTL on every cache hit",
+      "path": "src/internal/local-cache.ts",
+      "before": "ttlResolution: 0,",
+      "after": "ttlResolution: 0,\n            updateAgeOnGet: true,",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M12",
+      "case": "W02.sorted-arguments",
+      "description": "Reverse the prescribed argument-name ordering",
+      "path": "src/key.ts",
+      "before": ".sort(([left], [right]) => compareCodePoints(left, right));",
+      "after": ".sort(([left], [right]) => -compareCodePoints(left, right));",
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M13",
+      "case": "C54.expired-before-start",
+      "description": "Dispatch dark shadow reads after the job deadline already elapsed before deferred work starts",
+      "path": "src/dialcache.ts",
+      "before": "        try {\n          if (abandonIfExpired()) {\n            return \"timeout\";\n          }\n\n          let shadowFillConfig:",
+      "after": "        try {\n          let shadowFillConfig:",
+      "requiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    }
+  ]
+}

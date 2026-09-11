@@ -1,0 +1,610 @@
+[
+  {
+    "witness": "recovery-age-sampled-at-successful-decode",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-attribution.json/recovery-age-sampled-at-successful-decode"
+    },
+    "initialState": {
+      "acceptedMaxAge": 5000,
+      "candidate": 0,
+      "candidateCreated": 0,
+      "classifier": 0,
+      "created": 99000,
+      "deadline": 0,
+      "expires": 70000,
+      "frame": 1,
+      "loadFailed": false,
+      "maxAge": 5000,
+      "now": 10000,
+      "phase": 0,
+      "readFailed": false,
+      "wall": 100000,
+      "watermark": 0,
+      "o": {
+        "calls": [],
+        "reads": 0,
+        "loads": 0,
+        "loaders": 0,
+        "classifications": 0,
+        "dumps": 0,
+        "writes": 0,
+        "recovery": [],
+        "shadow": []
+      },
+      "d": {
+        "ages": []
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "candidate": 1,
+          "candidateCreated": 99000,
+          "deadline": 10010,
+          "phase": 2,
+          "o": {
+            "calls": [
+              0
+            ],
+            "reads": 1,
+            "loaders": 1
+          }
+        }
+      },
+      {
+        "action": "invalidate",
+        "statePatch": {
+          "watermark": 100000
+        }
+      },
+      {
+        "action": "invalidate",
+        "statePatch": {}
+      },
+      {
+        "action": "advance",
+        "statePatch": {
+          "now": 10001,
+          "wall": 100001
+        }
+      },
+      {
+        "action": "rejectTimeout",
+        "statePatch": {
+          "phase": 3,
+          "o": {
+            "loads": 1,
+            "classifications": 1
+          }
+        }
+      },
+      {
+        "action": "seed",
+        "statePatch": {
+          "created": 99001,
+          "expires": 70001
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "o": {
+            "calls": [
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "o": {
+            "calls": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "action": "seed",
+        "statePatch": {
+          "created": 99002
+        }
+      },
+      {
+        "action": "readFault",
+        "statePatch": {
+          "readFailed": true
+        }
+      },
+      {
+        "action": "readFault",
+        "statePatch": {
+          "readFailed": false
+        }
+      },
+      {
+        "action": "loadFault",
+        "statePatch": {}
+      },
+      {
+        "action": "policy",
+        "statePatch": {}
+      },
+      {
+        "action": "rollbackWall",
+        "statePatch": {
+          "wall": 99001
+        }
+      },
+      {
+        "action": "releaseLoad",
+        "statePatch": {
+          "phase": 0,
+          "o": {
+            "calls": [
+              1,
+              1,
+              1
+            ],
+            "recovery": [
+              "served"
+            ]
+          },
+          "d": {
+            "ages": [
+              1
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "fenced-read-does-not-retain",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-attribution.json/fenced-read-does-not-retain"
+    },
+    "initialState": {
+      "acceptedMaxAge": 5000,
+      "candidate": 0,
+      "candidateCreated": 99000,
+      "classifier": 1,
+      "created": 99000,
+      "deadline": 10010,
+      "expires": 70000,
+      "frame": 1,
+      "loadFailed": false,
+      "maxAge": 5000,
+      "now": 10000,
+      "phase": 0,
+      "readFailed": false,
+      "wall": 100000,
+      "watermark": 100000,
+      "o": {
+        "calls": [
+          3
+        ],
+        "reads": 1,
+        "loads": 0,
+        "loaders": 1,
+        "classifications": 1,
+        "dumps": 0,
+        "writes": 0,
+        "recovery": [],
+        "shadow": []
+      },
+      "d": {
+        "ages": []
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "classifier": 0,
+          "phase": 2,
+          "o": {
+            "calls": [
+              3,
+              0
+            ],
+            "reads": 2,
+            "loaders": 2
+          }
+        }
+      },
+      {
+        "action": "rejectLoader",
+        "statePatch": {
+          "phase": 0,
+          "o": {
+            "calls": [
+              3,
+              3
+            ],
+            "classifications": 2,
+            "recovery": [
+              "miss"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "future-read-preserves-source-error",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-attribution.json/future-read-preserves-source-error"
+    },
+    "initialState": {
+      "acceptedMaxAge": 5000,
+      "candidate": 0,
+      "candidateCreated": 0,
+      "classifier": 0,
+      "created": 100001,
+      "deadline": 0,
+      "expires": 70000,
+      "frame": 1,
+      "loadFailed": false,
+      "maxAge": 2000,
+      "now": 10000,
+      "phase": 0,
+      "readFailed": false,
+      "wall": 100000,
+      "watermark": 0,
+      "o": {
+        "calls": [],
+        "reads": 0,
+        "loads": 0,
+        "loaders": 0,
+        "classifications": 0,
+        "dumps": 0,
+        "writes": 0,
+        "recovery": [],
+        "shadow": []
+      },
+      "d": {
+        "ages": []
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "acceptedMaxAge": 2000,
+          "candidateCreated": 100001,
+          "deadline": 10010,
+          "phase": 2,
+          "o": {
+            "calls": [
+              0
+            ],
+            "reads": 1,
+            "loaders": 1
+          }
+        }
+      },
+      {
+        "action": "advance",
+        "statePatch": {
+          "now": 14000,
+          "phase": 0,
+          "wall": 104000,
+          "o": {
+            "calls": [
+              4
+            ],
+            "classifications": 1,
+            "recovery": [
+              "miss"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "classifier-error-keeps-error-without-decode",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-attribution.json/classifier-error-keeps-error-without-decode"
+    },
+    "initialState": {
+      "acceptedMaxAge": 5000,
+      "candidate": 0,
+      "candidateCreated": 0,
+      "classifier": 0,
+      "created": 99000,
+      "deadline": 0,
+      "expires": 70000,
+      "frame": 1,
+      "loadFailed": false,
+      "maxAge": 5000,
+      "now": 10000,
+      "phase": 0,
+      "readFailed": false,
+      "wall": 100000,
+      "watermark": 0,
+      "o": {
+        "calls": [],
+        "reads": 0,
+        "loads": 0,
+        "loaders": 0,
+        "classifications": 0,
+        "dumps": 0,
+        "writes": 0,
+        "recovery": [],
+        "shadow": []
+      },
+      "d": {
+        "ages": []
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "candidate": 1,
+          "candidateCreated": 99000,
+          "classifier": 2,
+          "deadline": 10010,
+          "phase": 2,
+          "o": {
+            "calls": [
+              0
+            ],
+            "reads": 1,
+            "loaders": 1
+          }
+        }
+      },
+      {
+        "action": "rejectLoader",
+        "statePatch": {
+          "phase": 0,
+          "o": {
+            "calls": [
+              3
+            ],
+            "classifications": 1
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "maximum-age-read-preserves-source-error",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-attribution.json/maximum-age-read-preserves-source-error"
+    },
+    "initialState": {
+      "acceptedMaxAge": 5000,
+      "candidate": 1,
+      "candidateCreated": 99000,
+      "classifier": 2,
+      "created": 97000,
+      "deadline": 14010,
+      "expires": 74000,
+      "frame": 1,
+      "loadFailed": false,
+      "maxAge": 5000,
+      "now": 14000,
+      "phase": 0,
+      "readFailed": false,
+      "wall": 102000,
+      "watermark": 0,
+      "o": {
+        "calls": [
+          1,
+          1,
+          1,
+          3,
+          3,
+          3
+        ],
+        "reads": 3,
+        "loads": 1,
+        "loaders": 3,
+        "classifications": 3,
+        "dumps": 0,
+        "writes": 0,
+        "recovery": [
+          "served"
+        ],
+        "shadow": []
+      },
+      "d": {
+        "ages": [
+          4000
+        ]
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "candidate": 0,
+          "candidateCreated": 97000,
+          "classifier": 0,
+          "phase": 2,
+          "o": {
+            "calls": [
+              1,
+              1,
+              1,
+              3,
+              3,
+              3,
+              0
+            ],
+            "reads": 4,
+            "loaders": 4
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "o": {
+            "calls": [
+              1,
+              1,
+              1,
+              3,
+              3,
+              3,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "action": "rejectLoader",
+        "statePatch": {
+          "phase": 0,
+          "o": {
+            "calls": [
+              1,
+              1,
+              1,
+              3,
+              3,
+              3,
+              3,
+              3
+            ],
+            "classifications": 4,
+            "recovery": [
+              "served",
+              "miss"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "fenced-c1-supersedes-without-repair",
+    "profile": "shadow",
+    "provenance": {
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-attribution.json/fenced-c1-supersedes-without-repair"
+    },
+    "initialState": {
+      "abandoned": true,
+      "c0": 0,
+      "created": 100000,
+      "deadline": 10010,
+      "frame": 3,
+      "loadFailed": false,
+      "now": 10010,
+      "phase": 7,
+      "readFailed": false,
+      "wall": 100010,
+      "watermark": 0,
+      "writeFailed": false,
+      "o": {
+        "calls": [
+          1
+        ],
+        "reads": 1,
+        "loads": 0,
+        "loaders": 1,
+        "classifications": 0,
+        "dumps": 0,
+        "writes": 0,
+        "recovery": [],
+        "shadow": [
+          "timeout"
+        ]
+      },
+      "d": {
+        "ages": []
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "abandoned": false,
+          "deadline": 10020,
+          "phase": 1,
+          "o": {
+            "calls": [
+              1,
+              0
+            ],
+            "reads": 2,
+            "loaders": 2
+          }
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "c0": 3,
+          "phase": 2
+        }
+      },
+      {
+        "action": "invalidate",
+        "statePatch": {
+          "watermark": 100010
+        }
+      },
+      {
+        "action": "dumpFault",
+        "statePatch": {}
+      },
+      {
+        "action": "resolveLoader",
+        "statePatch": {
+          "phase": 3,
+          "o": {
+            "calls": [
+              1,
+              1
+            ],
+            "loads": 1
+          }
+        }
+      },
+      {
+        "action": "releaseLoad",
+        "statePatch": {
+          "phase": 4,
+          "o": {
+            "reads": 3
+          }
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "phase": 7,
+          "o": {
+            "shadow": [
+              "timeout",
+              "superseded"
+            ]
+          }
+        }
+      }
+    ]
+  }
+]

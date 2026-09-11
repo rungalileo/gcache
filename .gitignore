@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+.formal-traces/
 docs/.vitepress/cache/
 *.tgz
 .env

@@ -1,0 +1,2136 @@
+{
+  "schemaVersion": 1,
+  "scope": "Reviewed feature inventory and known corner cases. Every portable scenario, protocol vector and named native feature has an explicit disposition. Evidence scope is checked separately from execution; no claim covers every possible value, scheduler interleaving, backend failure or feature product.",
+  "features": [
+    {
+      "id": "api",
+      "title": "Public API and configuration binding",
+      "scope": "Wrapper registration, inline loading, validation timing, typed arguments and policy snapshots are explicit native API obligations.",
+      "contracts": [
+        "B01"
+      ],
+      "cases": [],
+      "nativeCases": [
+        "B01.registration-and-policy-snapshot",
+        "B01.inline-operation-binding",
+        "B01.reserved-computed-identity",
+        "B01.static-policy-validation",
+        "B01.policy-leaf-omission",
+        "B01.capacity-validation",
+        "B01.renamed-and-removed-options"
+      ],
+      "assumptions": []
+    },
+    {
+      "id": "scope",
+      "title": "Request enablement and ownership",
+      "scope": "Outside, nested, disabled, detached, closed and replacement contexts distinguish request lifetime from unfinished external work.",
+      "contracts": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C07",
+        "B02"
+      ],
+      "cases": [
+        "C01.no-cache-plumbing",
+        "C01.no-deadline",
+        "C02.nested-memo",
+        "C02.reenabled-memo",
+        "C03.late-publication",
+        "C03.detached-bypass",
+        "C04.pending-policy",
+        "C07.scope-isolation",
+        "C07.no-capacity-limit",
+        "C03.late-recovery-publication"
+      ],
+      "nativeCases": [
+        "B02.native-context-propagation"
+      ],
+      "assumptions": [
+        "E03"
+      ]
+    },
+    {
+      "id": "layers",
+      "title": "Cache layers and value reuse",
+      "scope": "Request/local/remote traversal, falsy values, per-instance LRU capacity, insertion TTL, logical freshness and physical expiry have named boundary cases.",
+      "contracts": [
+        "C05",
+        "C06",
+        "C08",
+        "C09",
+        "C10",
+        "C22"
+      ],
+      "cases": [
+        "C05.participating-publication",
+        "C05.first-hit",
+        "C06.null-request",
+        "C06.null-local",
+        "C06.null-remote",
+        "C06.false-request",
+        "C06.false-local",
+        "C06.false-remote",
+        "C06.zero-request",
+        "C06.zero-local",
+        "C06.zero-remote",
+        "C06.empty-string-request",
+        "C06.empty-string-local",
+        "C06.empty-string-remote",
+        "C06.absent-request",
+        "C06.absent-local",
+        "C06.absent-remote",
+        "C08.shared-capacity",
+        "C08.instance-capacity",
+        "C08.read-promotes",
+        "C09.fixed-local-ttl",
+        "C09.wall-rollback",
+        "C09.insertion-age",
+        "C10.zero-capacity",
+        "C22.freshness-boundary",
+        "C22.physical-vs-logical",
+        "C06.absent-distinct-from-text",
+        "C22.freshness-after-read",
+        "C05.request-hit-stops-traversal",
+        "C05.local-hit-stops-traversal",
+        "C09.fractional-clock-grid"
+      ],
+      "nativeCases": [
+        "B01.capacity-validation",
+        "B02.precise-elapsed-deadlines"
+      ],
+      "assumptions": [
+        "E04"
+      ]
+    },
+    {
+      "id": "coalescing",
+      "title": "Shared and independent callers",
+      "scope": "Same-key leaders and followers, independent operations, policy changes, failure cleanup and last-completion publication retain separate ownership.",
+      "contracts": [
+        "C11",
+        "C12",
+        "C13",
+        "C14",
+        "C15",
+        "C24"
+      ],
+      "cases": [
+        "C11.distinct-keys",
+        "C11.one-registered-flight",
+        "C12.separate-request-memos",
+        "C13.uncoalesced-caching",
+        "C13.local-last-writer",
+        "C13.remote-last-writer",
+        "C14.inactive-layers",
+        "C15.shared-error-retry",
+        "C24.follower-read",
+        "C24.follower-source",
+        "C24.independent-reads",
+        "C24.independent-source-budgets",
+        "C13.request-last-writer",
+        "C27.source-error-no-publication"
+      ],
+      "nativeCases": [
+        "X01.coalescing-inspection"
+      ],
+      "assumptions": [
+        "E03",
+        "E04"
+      ]
+    },
+    {
+      "id": "policy",
+      "title": "Runtime policy and rollout",
+      "scope": "Sparse inheritance, explicit values, invalid-leaf consequences, kill switches, deterministic cohort boundaries and captured policy are reviewed separately.",
+      "contracts": [
+        "C16",
+        "C17",
+        "C18",
+        "C19",
+        "C20",
+        "C21"
+      ],
+      "cases": [
+        "C16.null-inherits",
+        "C16.sparse-leaves",
+        "C16.ttl-implies-ramp",
+        "C17.library-defaults",
+        "C17.disable-keeps-entry",
+        "C18.captured-insertion",
+        "C18.captured-shadow-fill",
+        "C18.existing-leader",
+        "C19.memo-bypass",
+        "C20.provider-failure",
+        "C20.invalid-invocation-policy",
+        "C21.invalid-layer",
+        "C21.invalid-recovery",
+        "C21.invalid-shadow",
+        "C21.invalid-dark-shadow",
+        "C16.explicit-null-leaf",
+        "C20.invalid-coalesce",
+        "C20.invalid-request-local",
+        "C16.runtime-enables-coalescing",
+        "C18.captured-shadow-admission",
+        "C19.exact-serving-cohort",
+        "C16.reenable-default-coalescing",
+        "C17.explicit-feature-kill-switch",
+        "C21.invalid-remote-ttl",
+        "C21.invalid-local-ramp",
+        "C21.invalid-remote-ramp"
+      ],
+      "nativeCases": [
+        "B01.registration-and-policy-snapshot",
+        "B01.static-policy-validation",
+        "B01.policy-leaf-omission"
+      ],
+      "assumptions": [
+        "E04"
+      ]
+    },
+    {
+      "id": "deadlines",
+      "title": "Read and source budgets",
+      "scope": "Budget precedence, start time, full elapsed duration, exact boundaries, late settlement, unbounded source work and cancellation requests are distinct cases.",
+      "contracts": [
+        "C23",
+        "C24",
+        "C25",
+        "C26",
+        "C56"
+      ],
+      "cases": [
+        "C23.library-read-budget",
+        "C23.instance-read-budget",
+        "C23.operation-read-budget",
+        "C23.runtime-read-budget",
+        "C23.source-start",
+        "C23.default-source-budget",
+        "C24.follower-read",
+        "C24.follower-source",
+        "C24.independent-reads",
+        "C25.late-source-rejected",
+        "C25.late-rejection",
+        "C25.abandoned-overlap",
+        "C26.unbounded-source",
+        "C26.publication-ownership",
+        "C26.decode-ownership",
+        "C56.cooperative-cancel",
+        "C56.late-read",
+        "C56.clear-read-timer",
+        "C24.independent-source-budgets",
+        "C23.policy-does-not-spend-source-budget"
+      ],
+      "nativeCases": [
+        "B02.precise-elapsed-deadlines"
+      ],
+      "assumptions": [
+        "E03"
+      ]
+    },
+    {
+      "id": "failures",
+      "title": "Failure isolation and adapter normalization",
+      "scope": "Key/provider/cache/codec/observer failures preserve the specified source outcome; explicit maintenance failures surface and adapter metadata is normalized.",
+      "contracts": [
+        "C27",
+        "C28",
+        "C29",
+        "C30",
+        "C55"
+      ],
+      "cases": [
+        "C27.key-failure",
+        "C27.dump-failure",
+        "C27.write-failure",
+        "C27.local-read-failure",
+        "C27.local-write-failure",
+        "C28.no-refill-after-read-failure",
+        "C28.untracked-local-publication",
+        "C29.missing-redis-local",
+        "C29.missing-redis-maintenance",
+        "C29.maintenance-failure",
+        "C30.observer-isolation",
+        "C55.miss-discriminator",
+        "C55.unknown-reason",
+        "C55.ignore-untracked-fence",
+        "C27.decode-failure-refill",
+        "C30.original-source-error",
+        "C55.legacy-reply-normalization",
+        "C55.invalid-fence-discarded",
+        "C55.valid-fence-independent-of-cause",
+        "C55.frame-ignores-miss-metadata",
+        "C28.encoding-error-suppresses-refill",
+        "C27.source-error-no-publication"
+      ],
+      "nativeCases": [
+        "B02.raw-reply-shapes",
+        "B02.logger-failure-adaptation"
+      ],
+      "assumptions": [
+        "E01"
+      ]
+    },
+    {
+      "id": "invalidation",
+      "title": "Tracked invalidation and publication fences",
+      "scope": "Entity grouping, strict fences, acquired snapshots, delayed writes, two fence checks, retention bounds and atomic invalidation rejection are covered.",
+      "contracts": [
+        "C31",
+        "C32",
+        "C33",
+        "C34",
+        "C35",
+        "C36",
+        "C37",
+        "C38",
+        "C39",
+        "W09"
+      ],
+      "cases": [
+        "C31.tracked-no-local-fill",
+        "C32.grouped-invalidation",
+        "C32.untracked-unaffected",
+        "C34.first-fence",
+        "C34.second-fence",
+        "C34.write-timestamp",
+        "C35.delayed-old-write",
+        "C36.acquired-fresh",
+        "C36.acquired-local",
+        "C36.acquired-request",
+        "C37.physical-cap",
+        "C37.logical-age-unclamped",
+        "C38.marker-transition",
+        "C39.reject-before-mutation",
+        "W04.strict-fence",
+        "C38.retention",
+        "C38.marker-repair",
+        "C39.numeric-limits",
+        "C38.buffer-cutoff",
+        "C39.decimal-normalization",
+        "C31.local-only-publication",
+        "C31.ramped-down-publication",
+        "C33.reject-future-before-decode",
+        "C33.reject-unsafe-before-decode",
+        "C33.reject-version-before-decode",
+        "C36.independent-invalidation-snapshots",
+        "C34.observed-fence-snapshot",
+        "C38.value-work-does-not-extend-marker"
+      ],
+      "nativeCases": [],
+      "assumptions": [
+        "E01",
+        "E02",
+        "E03",
+        "E05"
+      ]
+    },
+    {
+      "id": "recovery",
+      "title": "Stale recovery",
+      "scope": "Candidate eligibility at fresh/maximum/future boundaries, classifier precedence, original errors, captured bytes and late or independent sources are explicit.",
+      "contracts": [
+        "C40",
+        "C41",
+        "C42",
+        "C43",
+        "C44",
+        "C45",
+        "C46"
+      ],
+      "cases": [
+        "C40.first-stale",
+        "C40.last-stale",
+        "C40.maximum-age",
+        "C40.future-rejected",
+        "C41.success-skips-decode",
+        "C41.denial-keeps-error",
+        "C41.classifier-failure",
+        "C42.allow-override",
+        "C42.timeout-only-default",
+        "C42.propagated-timeout",
+        "C42.explicit-denial",
+        "C43.coalesced-once",
+        "C43.request-memo",
+        "C43.independent-values",
+        "C44.retained-invalidation",
+        "C44.retained-expiry",
+        "C44.no-reread",
+        "C45.maximum-age-exclusive",
+        "C45.recheck-after-decode",
+        "C45.captured-policy",
+        "C45.preserve-source-error",
+        "C45.rollback-future",
+        "C45.failed-fresh-not-stale",
+        "C46.ignore-late-source",
+        "C45.recheck-before-decode",
+        "C42.operation-denial",
+        "C45.compressed-candidate",
+        "C40.fenced-candidate",
+        "C45.rollback-below-fresh"
+      ],
+      "nativeCases": [],
+      "assumptions": [
+        "E01",
+        "E03",
+        "E04"
+      ]
+    },
+    {
+      "id": "shadow",
+      "title": "Shadow admission, validation and fills",
+      "scope": "Served and dark paths distinguish caller/source ownership, C0/C1 confirmation, diagnostic outcomes, fill authority and capacity retained by unfinished work.",
+      "contracts": [
+        "C47",
+        "C48",
+        "C49",
+        "C50",
+        "C51",
+        "C52",
+        "C53",
+        "C54"
+      ],
+      "cases": [
+        "C47.requires-hook",
+        "C47.requires-capacity",
+        "C47.requires-cohort",
+        "C48.source-disabled",
+        "C48.ordinary-miss",
+        "C49.dark-source-reuse",
+        "C49.dark-no-delay",
+        "C50.custom-equal",
+        "C50.custom-unequal",
+        "C50.comparator-error",
+        "C51.changed-confirmation",
+        "C51.confirmation-age",
+        "C51.confirmation-rollback",
+        "C51.payload-representation",
+        "C51.bytes-not-decoded-value",
+        "C52.present-not-repaired",
+        "C52.undecodable-not-repaired",
+        "C53.fill-fenced",
+        "C53.confirmation-fails-open",
+        "C54.deduplication",
+        "C54.source-ownership",
+        "C54.decode-ownership",
+        "C54.read-ownership",
+        "C54.comparison-budget",
+        "C54.expired-before-start",
+        "C50.served-match-diagnostic",
+        "C50.served-mismatch-diagnostic",
+        "C53.source-error-keeps-caller",
+        "C54.dump-ownership",
+        "C54.write-ownership",
+        "C54.dark-read-ownership",
+        "C54.unbounded-source-bounded-shadow",
+        "C54.unowned-caller-releases-slot",
+        "C53.dark-propagated-timeout",
+        "C53.served-propagated-timeout",
+        "C49.local-publication",
+        "C49.request-publication",
+        "C49.job-dedup-keeps-independent-sources",
+        "C49.no-stale-recovery",
+        "C47.recovery-skips-shadow",
+        "C47.coalesced-hit-one-job",
+        "C52.future-miss-may-fill",
+        "C52.expired-miss-may-fill",
+        "C53.acquired-miss-no-reread",
+        "C51.retained-candidate-not-reclassified",
+        "C54.instance-isolation",
+        "C53.dark-read-error-keeps-caller",
+        "C53.dark-source-error",
+        "C52.fenced-miss-may-fill",
+        "C51.fenced-confirmation",
+        "C51.future-confirmation",
+        "C50.equal-skips-confirmation",
+        "C53.fill-serialization-error",
+        "C53.fill-write-error",
+        "C51.identical-payload-confirmation"
+      ],
+      "nativeCases": [
+        "B01.capacity-validation"
+      ],
+      "assumptions": [
+        "E01",
+        "E03",
+        "E04"
+      ]
+    },
+    {
+      "id": "wire",
+      "title": "Keys, codecs, compression and Redis integration",
+      "scope": "Exact key/frame/envelope compatibility and supported value domains are paired with real Redis dispatch, primary reads and cross-language integration.",
+      "contracts": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "B03",
+        "X02"
+      ],
+      "cases": [
+        "W01.key-identity",
+        "W01.invalid-identity",
+        "W02.sorted-arguments",
+        "W03.cohort-assignment",
+        "W04.frame-encoding",
+        "W04.tracked-decoder",
+        "W04.untracked-decoder",
+        "W04.invalid-timestamps",
+        "W05.duration-bounds",
+        "W06.envelope-markers",
+        "W06.compressed-decode",
+        "W07.compression-selection",
+        "W08.legacy-reading",
+        "W04.strict-fence",
+        "W04.malformed-text"
+      ],
+      "nativeCases": [
+        "B03.borrowed-value-references",
+        "B03.json-absence-sentinel",
+        "B03.json-lossy-values",
+        "B03.json-unicode-domain",
+        "B03.default-semantic-comparison",
+        "X02.compression-resource-cap",
+        "X02.compression-config-runtime",
+        "X02.malformed-compression-retains-raw",
+        "X02.retained-payload-ownership",
+        "X02.redis-complete-write-dispatch",
+        "X02.redis-primary-atomic-read",
+        "X02.redis-invalidation-retry",
+        "X02.redis-cancellation-binding",
+        "X02.redis-real-interop",
+        "X02.glide-client-identity"
+      ],
+      "assumptions": [
+        "E01",
+        "E04",
+        "E05"
+      ]
+    },
+    {
+      "id": "observability",
+      "title": "Diagnostics and exporters",
+      "scope": "Error categories, phase durations, ages, sizes, coalescing inspection, warning eligibility, exporter schemas and collector ownership remain distinct obligations.",
+      "contracts": [
+        "C57",
+        "C58",
+        "C59",
+        "C60",
+        "X01"
+      ],
+      "cases": [
+        "C57.recovery-age",
+        "C57.shadow-age",
+        "C57.clamp-age",
+        "C57.future-offset",
+        "C58.shared-trail",
+        "C58.recovered-failure",
+        "C59.remote-includes-decode",
+        "C59.source-excludes-publication",
+        "C60.logging-default-off",
+        "C60.logging-enabled",
+        "C60.no-warning-on-match",
+        "C60.no-warning-on-superseded",
+        "C60.invalid-logging-policy",
+        "C58.failure-categories",
+        "C58.request-follower-trail",
+        "C58.late-rejection-not-recounted",
+        "C59.compression-read-telemetry",
+        "C60.logging-explicit-off"
+      ],
+      "nativeCases": [
+        "X01.prometheus-schema",
+        "X01.prometheus-registry-ownership",
+        "X01.prometheus-conflict-atomicity",
+        "X01.datadog-schema-mode",
+        "X01.datadog-validation-privacy",
+        "X01.shadow-log-resource-bounds",
+        "X01.coalescing-inspection"
+      ],
+      "assumptions": [
+        "E03"
+      ]
+    }
+  ],
+  "nativeCases": [
+    {
+      "id": "B01.registration-and-policy-snapshot",
+      "rule": "Registering a cached wrapper rejects duplicate/reserved names and captures a policy snapshot before later caller mutation.",
+      "contracts": [
+        "B01"
+      ],
+      "relatedContracts": [
+        "C01",
+        "C18"
+      ],
+      "typescript": [
+        {
+          "test": "rejects duplicate and reserved use cases",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects duplicate and reserved use cases.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "captures an immutable default policy snapshot when the use case is registered",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Asserts that the TypeScript binding captures an immutable default policy snapshot when the use case is registered.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestCachedRegistrationAndCapturedDefaults",
+          "path": "go/bindings_test.go",
+          "scope": "Duplicate Cached registration rejects; mutated caller-owned ramp does not alter the captured default; disabled calls skip the key selector and dynamic key failure fails open.",
+          "sha256": "2bd84fa77e7de519ba4f2e9aeb78970e5195911ed525045d84a931c7acab17a3"
+        },
+        {
+          "test": "TestReservedIdentityValidationBoundary",
+          "path": "go/identity_boundary_test.go",
+          "scope": "Static reserved use cases reject before callbacks; computed invalid identity skips policy/cache work and preserves source success/error in enabled and disabled calls.",
+          "sha256": "2fcf3c57bc71a582123285b5ca5311c4fb49436f6dda2d1d4fd8bd46e90924fd"
+        }
+      ],
+      "adaptation": "Registration and validation timing are externally visible binding contracts, distinct from per-invocation policy semantics.",
+      "gaps": []
+    },
+    {
+      "id": "B01.inline-operation-binding",
+      "rule": "Inline operations reuse a use case without registering it, capture each invocation policy and key dimensions, and use the invocation codec.",
+      "contracts": [
+        "B01"
+      ],
+      "relatedContracts": [
+        "C01",
+        "C18",
+        "W01"
+      ],
+      "typescript": [
+        {
+          "test": "reuses a stable use case without registering it and still rejects the reserved name",
+          "path": "test/dialcache-get-or-load.test.ts",
+          "scope": "Asserts that the TypeScript binding reuses a stable use case without registering it and still rejects the reserved name.",
+          "sha256": "48608eca552ac6d6a01b3c9b314be7e922919e6357c56349a2addc06dc2c043d"
+        },
+        {
+          "test": "validates and snapshots defaultConfig independently for each invocation",
+          "path": "test/dialcache-get-or-load.test.ts",
+          "scope": "Asserts that the TypeScript binding validates and snapshots defaultConfig independently for each invocation.",
+          "sha256": "48608eca552ac6d6a01b3c9b314be7e922919e6357c56349a2addc06dc2c043d"
+        },
+        {
+          "test": "reads and writes Redis values with the per-invocation serializer",
+          "path": "test/dialcache-get-or-load.test.ts",
+          "scope": "Asserts that the TypeScript binding reads and writes Redis values with the per-invocation serializer.",
+          "sha256": "48608eca552ac6d6a01b3c9b314be7e922919e6357c56349a2addc06dc2c043d"
+        },
+        {
+          "test": "uses captured values from each invocation and requires them in the direct key",
+          "path": "test/dialcache-get-or-load.test.ts",
+          "scope": "Inline operations use each invocation value and explicit key arguments; distinct captured inputs stay separated by their direct cache keys.",
+          "sha256": "48608eca552ac6d6a01b3c9b314be7e922919e6357c56349a2addc06dc2c043d"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestInlineFallbackDeadlineSnapshot",
+          "path": "go/api_boundary_test.go",
+          "scope": "Per-invocation fallback deadline remains captured while the policy provider or initial remote read is pending.",
+          "sha256": "1028fb26afe921ca730435829213546870fb5a48e49251a3914a924506ec5903"
+        },
+        {
+          "test": "TestInvalidOperationCodecFailsOpenWithoutDefaultSubstitution",
+          "path": "go/api_boundary_test.go",
+          "scope": "Malformed operation codec fails open without substituting the instance/default codec or writing invalid data.",
+          "sha256": "1028fb26afe921ca730435829213546870fb5a48e49251a3914a924506ec5903"
+        },
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestCachedRegistrationAfterInlineUseCase",
+          "scope": "Inline calls do not reserve registration; a later compatible Cached wrapper sees the same entry, duplicate wrapper registration rejects, and inline reuse continues.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        },
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestInlineOperationCodecOverridesDefaultOnReadAndWrite",
+          "scope": "Public inline calls select a valid operation codec over the instance default for both Encode and Decode; exact stored text/binary bytes, source/read/write counts and unused-codec counters distinguish override from fallback.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        },
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestInlinePolicySnapshotsMutableRampPerInvocation",
+          "scope": "While the first GetOrLoad waits at a provider barrier, mutating the caller-owned default ramp cannot revoke its captured policy; later calls see rampdown and reenablement reuses the first value without an extra source.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        }
+      ],
+      "adaptation": "A global registration rule accidentally applied to inline calls would reject valid API usage.",
+      "gaps": []
+    },
+    {
+      "id": "B01.reserved-computed-identity",
+      "rule": "Invalid static operation identity rejects at the API boundary; computed identity failure inside an enabled invocation fails open without cache work and preserves source error.",
+      "contracts": [
+        "B01"
+      ],
+      "relatedContracts": [
+        "C01",
+        "C27",
+        "W01"
+      ],
+      "typescript": [
+        {
+          "test": "reuses a stable use case without registering it and still rejects the reserved name",
+          "path": "test/dialcache-get-or-load.test.ts",
+          "scope": "Asserts that the TypeScript binding reuses a stable use case without registering it and still rejects the reserved name.",
+          "sha256": "48608eca552ac6d6a01b3c9b314be7e922919e6357c56349a2addc06dc2c043d"
+        },
+        {
+          "test": "fails open when an explicit cacheKey selector throws",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding fails open when an explicit cacheKey selector throws.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestReservedIdentityValidationBoundary",
+          "path": "go/identity_boundary_test.go",
+          "scope": "Static reserved use cases reject before callbacks; computed invalid identity skips policy/cache work and preserves source success/error in enabled and disabled calls.",
+          "sha256": "2fcf3c57bc71a582123285b5ca5311c4fb49436f6dda2d1d4fd8bd46e90924fd"
+        }
+      ],
+      "adaptation": "Static misuse and invocation-time plumbing failure have different validation and fallback obligations.",
+      "gaps": []
+    },
+    {
+      "id": "B01.static-policy-validation",
+      "rule": "Public static policy rejects malformed shapes, unsupported TTLs/budgets and option combinations before runtime traversal; runtime invalidity retains its documented narrower failure scope.",
+      "contracts": [
+        "B01"
+      ],
+      "relatedContracts": [
+        "C16",
+        "C17",
+        "C20",
+        "C21"
+      ],
+      "typescript": [
+        {
+          "test": "accepts disabled and exact-maximum static stale-on-error policy",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Asserts that the TypeScript binding accepts disabled and exact-maximum static stale-on-error policy.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "rejects unsupported runtime TTLs before cache or serialization work",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects unsupported runtime TTLs before cache or serialization work.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "rejects $0 in the public config constructor",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Malformed policy objects, layer maps, boolean leaves, and shadow shapes reject at public configuration construction.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "rejects a malformed static defaultConfig with $0 at registration",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Invalid static TTLs, ramps, recovery limits, and policy shapes reject before reserving the use case; a corrected policy may reuse the same name.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "rejects invalid fallbackTimeoutMs value %s without reserving the use case",
+          "path": "test/dialcache-liveness.test.ts",
+          "scope": "Zero, negative, fractional, non-finite, and over-maximum source deadlines reject before registration; a valid replacement can reuse the use case.",
+          "sha256": "2d51e3a6123f4b056fdfbaabb3847ddcfdc8493d73a0f93c3d00c7ba425a809f"
+        },
+        {
+          "test": "rejects nonnumeric fallbackTimeoutMs from untyped callers",
+          "path": "test/dialcache-liveness.test.ts",
+          "scope": "A string-valued source deadline rejects at the public API boundary rather than being coerced into a budget.",
+          "sha256": "2d51e3a6123f4b056fdfbaabb3847ddcfdc8493d73a0f93c3d00c7ba425a809f"
+        },
+        {
+          "test": "accepts an omitted instance default and rejects invalid explicit values",
+          "path": "test/dialcache-redis-read-deadline.test.ts",
+          "scope": "An omitted instance read budget is accepted; null, nonnumeric, zero, fractional, unsafe, and over-maximum values reject while the exact maximum is accepted.",
+          "sha256": "177808835689a92414d37b6aaf0c03dd63d771854e6a182869fe0ad193da62a6"
+        },
+        {
+          "test": "rejects invalid static use-case overrides before reserving the use-case name",
+          "path": "test/dialcache-redis-read-deadline.test.ts",
+          "scope": "Malformed and out-of-range static operation read budgets reject before registration; the exact supported maximum remains accepted.",
+          "sha256": "177808835689a92414d37b6aaf0c03dd63d771854e6a182869fe0ad193da62a6"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestPolicyStaticValidation",
+          "path": "go/policy_test.go",
+          "scope": "Malformed option types and combinations reject; the maximum supported remote TTL/read budget is accepted and fractional-second static TTL is rejected.",
+          "sha256": "8f1d96879b606726d836ec8fb7475a1ddddfcbcdd69f625dc4589e8497fff61d"
+        },
+        {
+          "test": "TestRuntimePolicyFailureScopes",
+          "path": "go/policy_test.go",
+          "scope": "Malformed invocation-wide leaves fail resolution; invalid layer/recovery leaves retain the other active layers and their failure categories.",
+          "sha256": "8f1d96879b606726d836ec8fb7475a1ddddfcbcdd69f625dc4589e8497fff61d"
+        }
+      ],
+      "adaptation": "Native number and optional-value encodings differ; each binding must distinguish absent, explicitly disabled, malformed, and boundary values.",
+      "gaps": []
+    },
+    {
+      "id": "B01.policy-leaf-omission",
+      "rule": "Omitted request-local/coalescing/shadow/recovery leaves survive construction until baseline and runtime policy merge; mutable nested defaults are copied.",
+      "contracts": [
+        "B01"
+      ],
+      "relatedContracts": [
+        "C16",
+        "C17",
+        "C18"
+      ],
+      "typescript": [
+        {
+          "test": "preserves requestLocal omission until baseline and runtime config are merged",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Asserts that the TypeScript binding preserves requestLocal omission until baseline and runtime config are merged.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "preserves coalesce omission until baseline and runtime config are merged",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Asserts that the TypeScript binding preserves coalesce omission until baseline and runtime config are merged.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "clones the supplied shadow policy",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Asserts that the TypeScript binding clones the supplied shadow policy.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "preserves stale-on-error omission and explicit disable values",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Absent stale recovery remains absent while explicit zero and positive maximum age retain their distinct construction values.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "preserves shadow omission and explicit kill-switch values",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Absent shadow remains absent; an empty shadow overlay and explicit zero ramp/false logging remain distinct sparse construction values.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestPolicySparseResolutionAndSnapshots",
+          "path": "go/policy_test.go",
+          "scope": "Nested runtime leaves merge independently, omitted leaves inherit, and captured nested pointer-valued defaults survive caller mutation.",
+          "sha256": "8f1d96879b606726d836ec8fb7475a1ddddfcbcdd69f625dc4589e8497fff61d"
+        }
+      ],
+      "adaptation": "Eager defaulting can erase inherited leaves even when ordinary effective-policy examples pass.",
+      "gaps": []
+    },
+    {
+      "id": "B01.capacity-validation",
+      "rule": "Local and shadow capacities honor their zero/positive rules and safe-integer domain without eager allocation proportional to configured size.",
+      "contracts": [
+        "B01"
+      ],
+      "relatedContracts": [
+        "C08",
+        "C10",
+        "C54"
+      ],
+      "typescript": [
+        {
+          "test": "constructs large local entry caps without eager allocation",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding constructs large local entry caps without eager allocation.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "accepts a positive shadowMaxInFlight",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Asserts that the TypeScript binding accepts a positive shadowMaxInFlight.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "allows localMaxSize zero to disable local storage",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Zero local capacity accepts construction and forces settled calls to reload without retaining local values.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "rejects invalid localMaxSize value %s",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Negative, fractional, non-finite, and unsafe local capacities reject at construction with the nonnegative safe-integer constraint.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "rejects invalid shadowMaxInFlight value %s",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Null, zero, negative, fractional, non-finite, and unsafe shadow capacities reject under the positive safe-integer constraint.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestInstanceCapacitySafeIntegerBounds",
+          "path": "go/api_boundary_test.go",
+          "scope": "On 64-bit Go, local and shadow capacity construction rejects values above the safe-integer maximum and accepts the exact maximum without proportional allocation.",
+          "sha256": "1028fb26afe921ca730435829213546870fb5a48e49251a3914a924506ec5903"
+        },
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestCapacityConstructionOmissionAndBounds",
+          "scope": "Go zero-valued capacity options resolve to local 10000 and shadow 1; explicit LocalCapacitySet zero retains no settled values, whereas omitted local zero reuses entries; negative capacities panic at construction.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        }
+      ],
+      "adaptation": "TypeScript explicit zero shadow capacity rejects. In Go, zero ShadowMaxInFlight denotes omission and selects the default capacity of one; LocalCapacitySet distinguishes explicit zero local storage from an omitted default.",
+      "gaps": []
+    },
+    {
+      "id": "B02.native-context-propagation",
+      "rule": "Enable/disable nesting restores the prior scope after return and failure, and concurrent native flows do not leak enablement.",
+      "contracts": [
+        "B02"
+      ],
+      "relatedContracts": [
+        "C01",
+        "C02",
+        "C03",
+        "C07"
+      ],
+      "typescript": [
+        {
+          "test": "restores async context after scope failures",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding restores async context after scope failures.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "does not leak enabled context across parallel async flows",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding does not leak enabled context across parallel async flows.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "preserves enabled context through Promise.all within a scope",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding preserves enabled context through Promise.all within a scope.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestNestedDisablePreservesMemoAndOutsideDoesNotShare",
+          "path": "go/cache_test.go",
+          "scope": "Nested reenablement reuses the outer request memo while disabled/outside calls load independently.",
+          "sha256": "5992ae0b963227eede25fcf25bb99082a0b42abcb4df0bf0302e067b61a6917a"
+        },
+        {
+          "test": "TestClosedScopeCannotPublishIntoReplacement",
+          "path": "go/cache_test.go",
+          "scope": "Late closed-scope source completion cannot overwrite replacement-scope memo; reusing the closed context bypasses caching.",
+          "sha256": "5992ae0b963227eede25fcf25bb99082a0b42abcb4df0bf0302e067b61a6917a"
+        }
+      ],
+      "adaptation": "TS AsyncLocalStorage and explicit Go context are different language mechanisms implementing the same scope rules.",
+      "gaps": []
+    },
+    {
+      "id": "B02.raw-reply-shapes",
+      "rule": "Native Redis adapters reject non-bulk read elements, wrong MGET arity, and mutation replies outside their exact domains.",
+      "contracts": [
+        "B02"
+      ],
+      "relatedContracts": [
+        "W04",
+        "W09",
+        "C55"
+      ],
+      "typescript": [
+        {
+          "test": "rejects malformed native read reply shapes",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects malformed native read reply shapes.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "rejects every out-of-domain reply returned by a node-redis client",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects every out-of-domain reply returned by a node-redis client.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "rejects malformed native read and mutation script replies",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects malformed native read and mutation script replies.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestRedisAdapterReadsAndBoundaries",
+          "path": "go/redis_adapter_test.go",
+          "scope": "Tracked native MGET validates pair length and element types; mutation validators reject non-OK and non-integer-one reply domains.",
+          "sha256": "205e25513e3edfb0ccbe5b477a8a69b19b4f3b235be63e7c22eb7de2eb42585b"
+        }
+      ],
+      "adaptation": "Redis drivers expose bulk strings and integer replies through different host representations; arbitrary truthiness is not a protocol.",
+      "gaps": []
+    },
+    {
+      "id": "B02.logger-failure-adaptation",
+      "rule": "Logging failures are consumed without replacing source success, source failure, or explicit maintenance failure; asynchronous TS thenable rejection and Go panic/error handling are native adaptations.",
+      "contracts": [
+        "B02"
+      ],
+      "relatedContracts": [
+        "C27",
+        "C29",
+        "C30"
+      ],
+      "typescript": [
+        {
+          "test": "consumes rejecting thenables returned by every logger method without awaiting them",
+          "path": "test/dialcache-logger.test.ts",
+          "scope": "Asserts that the TypeScript binding consumes rejecting thenables returned by every logger method without awaiting them.",
+          "sha256": "ce801ec2f2dd8b028092ed240fef5b7db4a50d245e28a04fe24cb08873c4c502"
+        },
+        {
+          "test": "preserves the original invalidation error when logging also fails",
+          "path": "test/dialcache-logger.test.ts",
+          "scope": "Asserts that the TypeScript binding preserves the original invalidation error when logging also fails.",
+          "sha256": "ce801ec2f2dd8b028092ed240fef5b7db4a50d245e28a04fe24cb08873c4c502"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestLoggerFailuresPreserveSourceAndMaintenanceResults",
+          "path": "go/api_boundary_test.go",
+          "scope": "Failing native loggers preserve original source values/errors and explicit invalidation errors.",
+          "sha256": "1028fb26afe921ca730435829213546870fb5a48e49251a3914a924506ec5903"
+        },
+        {
+          "test": "TestObserverIsolationAndBoundedNativeJSONLogs",
+          "path": "go/metrics_test.go",
+          "scope": "Native observer panic/error and logger panics are isolated; JSON/key previews obey UTF-8 byte caps and unsupported/cyclic values have null previews.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        }
+      ],
+      "adaptation": "Observability must remain diagnostic even when both the primary operation and logger fail.",
+      "gaps": []
+    },
+    {
+      "id": "B02.precise-elapsed-deadlines",
+      "rule": "Native source/read/shadow clocks preserve full elapsed budgets across fractional starts and early timer delivery rechecks the boundary; local insertion expiry compares whole monotonic milliseconds, matching the TypeScript local cache.",
+      "contracts": [
+        "B02"
+      ],
+      "relatedContracts": [
+        "C09",
+        "C23",
+        "C25",
+        "C54",
+        "C59"
+      ],
+      "typescript": [
+        {
+          "test": "rechecks the monotonic deadline when a timer fires early",
+          "path": "test/dialcache-liveness.test.ts",
+          "scope": "Asserts that the TypeScript binding rechecks the monotonic deadline when a timer fires early.",
+          "sha256": "2d51e3a6123f4b056fdfbaabb3847ddcfdc8493d73a0f93c3d00c7ba425a809f"
+        },
+        {
+          "test": "checks local ttl from an epoch-zero monotonic clock before the timers phase",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding checks local ttl from an epoch-zero monotonic clock before the timers phase.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "local insertion expiry uses whole monotonic milliseconds at fractional starts",
+          "path": "test/formal-local-clock-boundary.test.ts",
+          "scope": "A local entry inserted at 0.7ms is hit at 999.9ms and missed at 1000ms, exercising the existing TypeScript whole-millisecond insertion-age contract through public calls.",
+          "sha256": "1145e2f7b8b724d9ce4f01b9c97b379e3ff076f0a7acd02f934b25a8e8fbfbfb"
+        },
+        {
+          "path": "test/formal-deadline-clock-boundary.test.ts",
+          "test": "source settled $label its full elapsed deadline",
+          "scope": "A source starting at a fractional clock origin succeeds and is cached before its full elapsed budget, while exact-boundary settlement rejects and publishes no reusable value.",
+          "sha256": "be8daa09ac525d238c533e43e1c9c3fb57de617758deba0c160222435f87db0e"
+        },
+        {
+          "path": "test/formal-deadline-clock-boundary.test.ts",
+          "test": "remote read settled $label its full elapsed deadline",
+          "scope": "A bounded remote read starting at a fractional clock origin serves a pre-deadline hit, but exact-boundary settlement falls through to source and suppresses Redis refill.",
+          "sha256": "be8daa09ac525d238c533e43e1c9c3fb57de617758deba0c160222435f87db0e"
+        },
+        {
+          "path": "test/formal-deadline-clock-boundary.test.ts",
+          "test": "shadow $mode settled $label its full elapsed deadline",
+          "scope": "Served and dark shadow work from a fractional clock origin accepts pre-deadline completion and times out at the exact elapsed boundary, preserving caller ownership and conditional write authority.",
+          "sha256": "be8daa09ac525d238c533e43e1c9c3fb57de617758deba0c160222435f87db0e"
+        },
+        {
+          "path": "test/formal-local-clock-boundary.test.ts",
+          "test": "default instances share the local millisecond expiry grid",
+          "scope": "Two default instances constructed at different fractional times fill at the same instant and both expire at the common whole-millisecond boundary.",
+          "sha256": "1145e2f7b8b724d9ce4f01b9c97b379e3ff076f0a7acd02f934b25a8e8fbfbfb"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestPreciseSourceDeadline",
+          "path": "go/clock_precision_test.go",
+          "scope": "Fractional native elapsed starts preserve source budget just before its boundary and reject settlement at the boundary.",
+          "sha256": "2fb513f60bf67d84ec036fcaf8e4e09ef7e8f0092f6488ccd6c63086234604ce"
+        },
+        {
+          "test": "TestPreciseRemoteReadDeadline",
+          "path": "go/clock_precision_test.go",
+          "scope": "Fractional native elapsed starts preserve the remote-read budget and cancel at the effective boundary.",
+          "sha256": "2fb513f60bf67d84ec036fcaf8e4e09ef7e8f0092f6488ccd6c63086234604ce"
+        },
+        {
+          "test": "TestPreciseShadowDeadline",
+          "path": "go/clock_precision_test.go",
+          "scope": "Served and dark shadow budgets preserve fractional elapsed time and suppress publication after the boundary.",
+          "sha256": "2fb513f60bf67d84ec036fcaf8e4e09ef7e8f0092f6488ccd6c63086234604ce"
+        },
+        {
+          "test": "TestLocalInsertionExpiryUsesWholeMilliseconds",
+          "path": "go/clock_precision_test.go",
+          "scope": "A local entry inserted at 0.7ms is hit at 999.9ms and missed at 1000ms, matching the TypeScript whole-millisecond monotonic expiry boundary.",
+          "sha256": "2fb513f60bf67d84ec036fcaf8e4e09ef7e8f0092f6488ccd6c63086234604ce"
+        },
+        {
+          "test": "TestPreciseDeadlineRechecksEarlyTimer",
+          "path": "go/clock_precision_test.go",
+          "scope": "An early native timer callback rechecks elapsed deadline and schedules remaining time.",
+          "sha256": "2fb513f60bf67d84ec036fcaf8e4e09ef7e8f0092f6488ccd6c63086234604ce"
+        },
+        {
+          "test": "TestPreciseLocalTTLAcceptsLargeIntegerClockOrigin",
+          "path": "go/clock_precision_test.go",
+          "scope": "Large supported integer elapsed origins preserve local TTL without duration overflow.",
+          "sha256": "2fb513f60bf67d84ec036fcaf8e4e09ef7e8f0092f6488ccd6c63086234604ce"
+        },
+        {
+          "path": "go/clock_precision_test.go",
+          "test": "TestDefaultInstancesShareLocalMillisecondGrid",
+          "scope": "Default instances constructed 0.4ms apart use the same monotonic millisecond grid: same-time insertion hits just before the common boundary and reloads in both instances at equality; default elapsed time remains nonnegative.",
+          "sha256": "2fb513f60bf67d84ec036fcaf8e4e09ef7e8f0092f6488ccd6c63086234604ce"
+        }
+      ],
+      "adaptation": "Quint integer time matches the local-cache clock contract. Native source/read/shadow elapsed budgets retain separate fractional precision. Default instances share a whole-millisecond grid; custom clocks may supply their own consistent origins.",
+      "gaps": []
+    },
+    {
+      "id": "B03.borrowed-value-references",
+      "rule": "Request/local cache and coalesced callers reuse stored native object references rather than cloning; callers own the no-mutation assumption.",
+      "contracts": [
+        "B03"
+      ],
+      "relatedContracts": [
+        "C06",
+        "C11"
+      ],
+      "typescript": [
+        {
+          "test": "shares process-local value references across request scopes without cloning",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding shares process-local value references across request scopes without cloning.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "coalesces request-local-only work within one request and shares the resolved reference",
+          "path": "test/dialcache-coalescing.test.ts",
+          "scope": "Asserts that the TypeScript binding coalesces request-local-only work within one request and shares the resolved reference.",
+          "sha256": "f782ce3db6051a6b46dc3403311e247f7752eddbafbd20fdbbcd54c0fa7f0fdb"
+        }
+      ],
+      "go": [
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestBorrowedReferencesSurviveFollowersAndCacheHits",
+          "scope": "Map and pointer identities survive leader/follower returns and request/local cache hits; local reuse also crosses enabled request scopes without another source call.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        }
+      ],
+      "adaptation": "Object identity is observable in TS and pointer/slice/map aliasing is observable in Go, but JSON trace projection does not measure it.",
+      "gaps": []
+    },
+    {
+      "id": "B03.json-absence-sentinel",
+      "rule": "The default JSON codec distinguishes absent, null and the literal sentinel string, including binary input; typed Go destinations reject unrepresentable absence/null.",
+      "contracts": [
+        "B03"
+      ],
+      "relatedContracts": [
+        "C06",
+        "W04"
+      ],
+      "typescript": [
+        {
+          "test": "round-trips undefined through the JSON serializer",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding round-trips undefined through the JSON serializer.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "round-trips values through the JSON serializer",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding round-trips values through the JSON serializer.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "path": "test/formal-native-boundary.test.ts",
+          "test": "default JSON codec distinguishes absent null and the literal sentinel string",
+          "scope": "Exact dump bytes and text/binary load results distinguish absent, null and a literal string equal to the reserved absence sentinel.",
+          "sha256": "7eb2bdf4d94ecf81a38839ca79c1c60feb4d08fcd0fb21b7bc62c61bd4d58b88"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestJSONCodecNativeSemantics",
+          "path": "go/codec_test.go",
+          "scope": "Default codec asserts explicit absent/null/sentinel, native JSON lossy values and ordering, invalid/cyclic values, and typed-destination representation boundaries.",
+          "sha256": "c50ea59c78bfe50e1182c347bd2918d99e0598a52d463b116e6ab33f671e2e0a"
+        }
+      ],
+      "adaptation": "Default codec absence is a binding convention beyond the abstract cache presence bit.",
+      "gaps": []
+    },
+    {
+      "id": "B03.json-lossy-values",
+      "rule": "The default JSON codec preserves its documented lossy value rules and rejects unsupported top-level/cyclic values instead of silently changing the contract.",
+      "contracts": [
+        "B03"
+      ],
+      "relatedContracts": [
+        "C06",
+        "C27"
+      ],
+      "typescript": [
+        {
+          "test": "keeps native lossy JSON semantics without an extra validation pass",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding keeps native lossy JSON semantics without an extra validation pass.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "rejects unsupported top-level values in the JSON serializer",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects unsupported top-level values in the JSON serializer.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestJSONCodecNativeSemantics",
+          "path": "go/codec_test.go",
+          "scope": "Default codec asserts explicit absent/null/sentinel, native JSON lossy values and ordering, invalid/cyclic values, and typed-destination representation boundaries.",
+          "sha256": "c50ea59c78bfe50e1182c347bd2918d99e0598a52d463b116e6ab33f671e2e0a"
+        }
+      ],
+      "adaptation": "NaN, infinities, absent array/object members, byte-buffer conversion and unsupported types must have a declared cross-language domain.",
+      "gaps": []
+    },
+    {
+      "id": "B03.json-unicode-domain",
+      "rule": "JSON within the portable Unicode scalar domain preserves valid surrogate pairs and literal backslash escapes; Go rejects lone escaped UTF-16 surrogates rather than substituting another value.",
+      "contracts": [
+        "B03"
+      ],
+      "relatedContracts": [
+        "W04"
+      ],
+      "typescript": [
+        {
+          "path": "test/formal-native-boundary.test.ts",
+          "test": "default JSON codec preserves scalar pairs and literal surrogate escapes",
+          "scope": "Valid paired UTF-16 escapes decode to scalars in text and binary JSON; literal backslash-surrogate text is not interpreted as a surrogate.",
+          "sha256": "7eb2bdf4d94ecf81a38839ca79c1c60feb4d08fcd0fb21b7bc62c61bd4d58b88"
+        },
+        {
+          "path": "test/formal-native-boundary.test.ts",
+          "test": "native JSON accepts lone escaped surrogates outside the shared scalar domain",
+          "scope": "TS accepts lone escaped UTF-16 code units in JSON as a documented language difference; this test does not assert Go accepts them.",
+          "sha256": "7eb2bdf4d94ecf81a38839ca79c1c60feb4d08fcd0fb21b7bc62c61bd4d58b88"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestJSONCodecUnicodeScalarDomain",
+          "path": "go/codec_test.go",
+          "scope": "Valid JSON surrogate pairs and literal escapes decode; lone escaped surrogates in values or keys reject for generic and typed Go destinations.",
+          "sha256": "c50ea59c78bfe50e1182c347bd2918d99e0598a52d463b116e6ab33f671e2e0a"
+        }
+      ],
+      "adaptation": "Direct frame text replacement is a wire rule; JSON escaped lone-surrogate support differs by language and is explicitly outside the shared value domain.",
+      "gaps": []
+    },
+    {
+      "id": "B03.default-semantic-comparison",
+      "rule": "Default comparison distinguishes absent/null, numeric zero sign, bytes/arrays and missing/object members while comparing supported nested values structurally.",
+      "contracts": [
+        "B03"
+      ],
+      "relatedContracts": [
+        "C50"
+      ],
+      "typescript": [
+        {
+          "path": "test/formal-native-boundary.test.ts",
+          "test": "default shadow comparator preserves $name",
+          "scope": "Ten public shadow verdicts assert absent/null, NaN, signed zero, nested property order, missing/absent properties and binary/array distinctions; mismatches require confirmation and never write.",
+          "sha256": "7eb2bdf4d94ecf81a38839ca79c1c60feb4d08fcd0fb21b7bc62c61bd4d58b88"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestSemanticEqualPortableDomain",
+          "path": "go/codec_test.go",
+          "scope": "Direct native comparator table distinguishes absent/null, signed zero, NaN, nested maps, missing fields and binary/array values.",
+          "sha256": "c50ea59c78bfe50e1182c347bd2918d99e0598a52d463b116e6ab33f671e2e0a"
+        },
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestDefaultShadowComparatorNativeValueBoundaries",
+          "scope": "The same ten native value corners execute through public cache shadow validation with the default comparator; exact source/decode/read/write and terminal outcome counts are asserted.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        }
+      ],
+      "adaptation": "Native default deep equality includes value-domain conventions; custom comparator result/error semantics remain portable C50.",
+      "gaps": []
+    },
+    {
+      "id": "X01.prometheus-schema",
+      "rule": "Prometheus names, help text, labels, counter/histogram types and bucket bounds match the documented schema without exporting cache IDs, arguments or raw errors.",
+      "contracts": [
+        "X01"
+      ],
+      "relatedContracts": [
+        "C57",
+        "C58",
+        "C59"
+      ],
+      "typescript": [
+        {
+          "test": "preserves the public collector schema",
+          "path": "test/prometheus.test.ts",
+          "scope": "Asserts that the TypeScript binding preserves the public collector schema.",
+          "sha256": "1c081c00ca8642c8ed5e7a3fd5a5faa2d5d06d333f99c2fb0832ead0057c1602"
+        },
+        {
+          "test": "exports every bounded error category without rewriting labels",
+          "path": "test/prometheus.test.ts",
+          "scope": "Asserts that the TypeScript binding exports every bounded error category without rewriting labels.",
+          "sha256": "1c081c00ca8642c8ed5e7a3fd5a5faa2d5d06d333f99c2fb0832ead0057c1602"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestPrometheusWireSchemaMatchesTypeScriptBinding",
+          "path": "go/metrics_test.go",
+          "scope": "All nineteen Go collector names, help text, label order, kinds and bucket boundaries are checked against the TS binding schema.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        }
+      ],
+      "adaptation": "Exporter schema changes break dashboards even when portable event semantics still pass; current Go schema check derives its expectation from TS source, not Quint.",
+      "gaps": []
+    },
+    {
+      "id": "X01.prometheus-registry-ownership",
+      "rule": "Default construction does not register global metrics; adapters register only in caller-owned registries and reuse compatible collectors.",
+      "contracts": [
+        "X01"
+      ],
+      "relatedContracts": [
+        "C30"
+      ],
+      "typescript": [
+        {
+          "test": "keeps default DialCache construction detached from Prometheus",
+          "path": "test/prometheus.test.ts",
+          "scope": "Asserts that the TypeScript binding keeps default DialCache construction detached from Prometheus.",
+          "sha256": "1c081c00ca8642c8ed5e7a3fd5a5faa2d5d06d333f99c2fb0832ead0057c1602"
+        },
+        {
+          "test": "registers collectors only in the caller-owned registry",
+          "path": "test/prometheus.test.ts",
+          "scope": "Asserts that the TypeScript binding registers collectors only in the caller-owned registry.",
+          "sha256": "1c081c00ca8642c8ed5e7a3fd5a5faa2d5d06d333f99c2fb0832ead0057c1602"
+        },
+        {
+          "test": "reuses existing collectors when multiple adapters share a registry",
+          "path": "test/prometheus.test.ts",
+          "scope": "Asserts that the TypeScript binding reuses existing collectors when multiple adapters share a registry.",
+          "sha256": "1c081c00ca8642c8ed5e7a3fd5a5faa2d5d06d333f99c2fb0832ead0057c1602"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestPrometheusReuseAndConflictIsolation",
+          "path": "go/metrics_test.go",
+          "scope": "Compatible adapters reuse counters and histograms in one caller registry; incompatible pre-existing metrics cause no partial collector registration.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        }
+      ],
+      "adaptation": "Registry ownership and collector reuse avoid global pollution and duplicate collectors in multi-instance deployments.",
+      "gaps": []
+    },
+    {
+      "id": "X01.prometheus-conflict-atomicity",
+      "rule": "Incompatible pre-registered collectors reject before new collector registration; existing observations survive compatible reuse.",
+      "contracts": [
+        "X01"
+      ],
+      "relatedContracts": [
+        "C30"
+      ],
+      "typescript": [
+        {
+          "test": "rejects a pre-registered legacy miss collector before registering anything",
+          "path": "test/prometheus.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects a pre-registered legacy miss collector before registering anything.",
+          "sha256": "1c081c00ca8642c8ed5e7a3fd5a5faa2d5d06d333f99c2fb0832ead0057c1602"
+        },
+        {
+          "test": "rejects exemplar-enabled collectors before registering anything",
+          "path": "test/prometheus.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects exemplar-enabled collectors before registering anything.",
+          "sha256": "1c081c00ca8642c8ed5e7a3fd5a5faa2d5d06d333f99c2fb0832ead0057c1602"
+        },
+        {
+          "test": "reuses a pre-registered current-schema miss collector",
+          "path": "test/prometheus.test.ts",
+          "scope": "Asserts that the TypeScript binding reuses a pre-registered current-schema miss collector.",
+          "sha256": "1c081c00ca8642c8ed5e7a3fd5a5faa2d5d06d333f99c2fb0832ead0057c1602"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestPrometheusReuseAndConflictIsolation",
+          "path": "go/metrics_test.go",
+          "scope": "Compatible adapters reuse counters and histograms in one caller registry; incompatible pre-existing metrics cause no partial collector registration.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        },
+        {
+          "test": "TestPrometheusExplicitBindingsPreserveExistingObservations",
+          "path": "go/metrics_test.go",
+          "scope": "Explicit compatible externally created collectors preserve pre-existing counter and histogram observations when bound by an adapter.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        },
+        {
+          "test": "TestPrometheusBindingsRejectIncompatibleOrUnregisteredCollectors",
+          "path": "go/metrics_test.go",
+          "scope": "Explicit collector bindings reject malformed schema, conflicting registry state or unregistered collector identities.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        }
+      ],
+      "adaptation": "Go requires explicit collector bindings/schema because client_golang cannot expose empty histogram bucket schema; no destructive compatibility probing is permitted.",
+      "gaps": []
+    },
+    {
+      "id": "X01.datadog-schema-mode",
+      "rule": "DogStatsD emits exact metric names, seconds/bytes/count units and bounded tags using the explicitly selected histogram or distribution observation mode.",
+      "contracts": [
+        "X01"
+      ],
+      "relatedContracts": [
+        "C57",
+        "C58",
+        "C59"
+      ],
+      "typescript": [
+        {
+          "test": "maps every DialCache metric to the default metric namespace with exact names, values, and tags",
+          "path": "test/datadog.test.ts",
+          "scope": "Asserts that the TypeScript binding maps every DialCache metric to the default metric namespace with exact names, values, and tags.",
+          "sha256": "8b50a81e6baa8d3d1eb4854cb9d84d83cc48493bca4efc0b656e0f0714f66d65"
+        },
+        {
+          "test": "emits hot-shots histogram datagrams when explicitly selected",
+          "path": "test/datadog.test.ts",
+          "scope": "Asserts that the TypeScript binding emits hot-shots histogram datagrams when explicitly selected.",
+          "sha256": "8b50a81e6baa8d3d1eb4854cb9d84d83cc48493bca4efc0b656e0f0714f66d65"
+        },
+        {
+          "test": "requires an explicit observation metric type",
+          "path": "test/datadog.test.ts",
+          "scope": "Asserts that the TypeScript binding requires an explicit observation metric type.",
+          "sha256": "8b50a81e6baa8d3d1eb4854cb9d84d83cc48493bca4efc0b656e0f0714f66d65"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestDatadogMetricNamesUnitsAndLabels",
+          "path": "go/metrics_test.go",
+          "scope": "Native DogStatsD method/name/unit tables, representative bounded labels, histogram mode, namespace restrictions and nil-client validation are checked.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        }
+      ],
+      "adaptation": "Different observation modes have different backend semantics and require a namespace migration; current schema source remains native integration code.",
+      "gaps": []
+    },
+    {
+      "id": "X01.datadog-validation-privacy",
+      "rule": "DogStatsD validates client/options/namespace and final metric-name length before emission, and never sends cache identity, arguments, Redis keys or raw errors as tags.",
+      "contracts": [
+        "X01"
+      ],
+      "relatedContracts": [
+        "C30",
+        "C58"
+      ],
+      "typescript": [
+        {
+          "test": "never emits cache ids, arguments, Redis keys, or raw errors as Datadog tags",
+          "path": "test/datadog.test.ts",
+          "scope": "Asserts that the TypeScript binding never emits cache ids, arguments, Redis keys, or raw errors as Datadog tags.",
+          "sha256": "8b50a81e6baa8d3d1eb4854cb9d84d83cc48493bca4efc0b656e0f0714f66d65"
+        },
+        {
+          "test": "enforces Datadog's 200-character final metric-name limit",
+          "path": "test/datadog.test.ts",
+          "scope": "Asserts that the TypeScript binding enforces Datadog's 200-character final metric-name limit.",
+          "sha256": "8b50a81e6baa8d3d1eb4854cb9d84d83cc48493bca4efc0b656e0f0714f66d65"
+        },
+        {
+          "test": "validates every required DogStatsD method before emitting metrics",
+          "path": "test/datadog.test.ts",
+          "scope": "Asserts that the TypeScript binding validates every required DogStatsD method before emitting metrics.",
+          "sha256": "8b50a81e6baa8d3d1eb4854cb9d84d83cc48493bca4efc0b656e0f0714f66d65"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestDatadogMetricNamesUnitsAndLabels",
+          "path": "go/metrics_test.go",
+          "scope": "Native DogStatsD method/name/unit tables, representative bounded labels, histogram mode, namespace restrictions and nil-client validation are checked.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        }
+      ],
+      "adaptation": "Typed Go methods replace TS duck-typed method validation, but namespace and cardinality constraints remain observable integration contracts.",
+      "gaps": []
+    },
+    {
+      "id": "X01.shadow-log-resource-bounds",
+      "rule": "Mismatch key and JSON previews are byte-bounded without splitting UTF-8; unsupported values or JSON hook failure yield independent null previews.",
+      "contracts": [
+        "X01"
+      ],
+      "relatedContracts": [
+        "C60"
+      ],
+      "typescript": [
+        {
+          "test": "byte-clamps keys and JSON without splitting UTF-8 sequences",
+          "path": "test/shadow-log-json.test.ts",
+          "scope": "Asserts that the TypeScript binding byte-clamps keys and JSON without splitting UTF-8 sequences.",
+          "sha256": "97d2a80d23bbe76574f97b0f569307a203279de4fa770a253603648325801467"
+        },
+        {
+          "test": "catches user JSON hook failures",
+          "path": "test/shadow-log-json.test.ts",
+          "scope": "Asserts that the TypeScript binding catches user JSON hook failures.",
+          "sha256": "97d2a80d23bbe76574f97b0f569307a203279de4fa770a253603648325801467"
+        },
+        {
+          "test": "returns null independently for values that native JSON cannot serialize",
+          "path": "test/shadow-log-json.test.ts",
+          "scope": "Asserts that the TypeScript binding returns null independently for values that native JSON cannot serialize.",
+          "sha256": "97d2a80d23bbe76574f97b0f569307a203279de4fa770a253603648325801467"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestObserverIsolationAndBoundedNativeJSONLogs",
+          "path": "go/metrics_test.go",
+          "scope": "Native observer panic/error and logger panics are isolated; JSON/key previews obey UTF-8 byte caps and unsupported/cyclic values have null previews.",
+          "sha256": "01ef26fd58908f12a5134ae0125bb43bb80098ed4030f091929a9bf34eccaa76"
+        }
+      ],
+      "adaptation": "C60 covers whether a warning happens; bounded formatting and native JSON failures are separate observability behavior.",
+      "gaps": []
+    },
+    {
+      "id": "X01.coalescing-inspection",
+      "rule": "Process coalescing snapshots count registered leaders/followers, report oldest live age, clean up after settlement, isolate instances and exclude request-only work.",
+      "contracts": [
+        "X01"
+      ],
+      "relatedContracts": [
+        "C11",
+        "C12",
+        "C15",
+        "C25"
+      ],
+      "typescript": [
+        {
+          "test": "reports leaders, followers, oldest age, and settlement cleanup",
+          "path": "test/dialcache-liveness.test.ts",
+          "scope": "Asserts that the TypeScript binding reports leaders, followers, oldest age, and settlement cleanup.",
+          "sha256": "2d51e3a6123f4b056fdfbaabb3847ddcfdc8493d73a0f93c3d00c7ba425a809f"
+        },
+        {
+          "test": "keeps process state isolated by instance and excludes request-local-only work",
+          "path": "test/dialcache-liveness.test.ts",
+          "scope": "Asserts that the TypeScript binding keeps process state isolated by instance and excludes request-local-only work.",
+          "sha256": "2d51e3a6123f4b056fdfbaabb3847ddcfdc8493d73a0f93c3d00c7ba425a809f"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestProcessCoalescingInspectionTracksLiveOwnership",
+          "path": "go/bindings_test.go",
+          "scope": "One process leader and follower appear in a live snapshot with nonnil age; settlement clears counts and age.",
+          "sha256": "2bd84fa77e7de519ba4f2e9aeb78970e5195911ed525045d84a931c7acab17a3"
+        },
+        {
+          "test": "TestPreciseCoalescingAge",
+          "path": "go/clock_precision_test.go",
+          "scope": "Reported oldest process-flight age is computed from elapsed interval before rounding, across fractional native clock origins.",
+          "sha256": "2fb513f60bf67d84ec036fcaf8e4e09ef7e8f0092f6488ccd6c63086234604ce"
+        },
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestCoalescingInspectionSeparatesKeysInstancesAndRequestWork",
+          "scope": "Two keys aggregate leaders and followers with distinct start ages; settling the oldest source selects the remaining age, source rejection cleans up, another instance stays isolated, and request-only sharing never appears in process inspection.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        }
+      ],
+      "adaptation": "Inspection is a public diagnostic feature not currently represented by portable event traces.",
+      "gaps": []
+    },
+    {
+      "id": "X02.compression-resource-cap",
+      "rule": "Compression refuses oversized writes and decompression expansion beyond its cap, reports the corresponding outcome, and retains the original payload rather than accepting truncated output.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "W06",
+        "W07",
+        "W08",
+        "C27"
+      ],
+      "typescript": [
+        {
+          "test": "refuses to compress payloads larger than the decompression cap",
+          "path": "test/compression.test.ts",
+          "scope": "Asserts that the TypeScript binding refuses to compress payloads larger than the decompression cap.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        },
+        {
+          "test": "returns read_over_limit and the original payload when decompression would exceed the cap",
+          "path": "test/compression.test.ts",
+          "scope": "Asserts that the TypeScript binding returns read_over_limit and the original payload when decompression would exceed the cap.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestCompressionLimitsAndIndependentLoads",
+          "path": "go/codec_test.go",
+          "scope": "Controllable expansion limits retain raw input and report over-limit outcomes; repeated decompression/escape loads do not mutate retained input; threshold and level reject invalid settings.",
+          "sha256": "c50ea59c78bfe50e1182c347bd2918d99e0598a52d463b116e6ab33f671e2e0a"
+        }
+      ],
+      "adaptation": "Resource-limit outcomes are tested with controllable caps; this is not a performance or arbitrary decompression-bomb proof.",
+      "gaps": []
+    },
+    {
+      "id": "X02.compression-config-runtime",
+      "rule": "Compression defaults and explicit disable are distinct; invalid thresholds/levels reject and missing native zstd support prevents enabled construction.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "W07",
+        "W08"
+      ],
+      "typescript": [
+        {
+          "test": "enables compression with documented defaults when unset",
+          "path": "test/compression.test.ts",
+          "scope": "Asserts that the TypeScript binding enables compression with documented defaults when unset.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        },
+        {
+          "test": "rejects non-positive, fractional, and unsafe thresholds",
+          "path": "test/compression.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects non-positive, fractional, and unsafe thresholds.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        },
+        {
+          "test": "rejects levels outside the zstd range",
+          "path": "test/compression.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects levels outside the zstd range.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        },
+        {
+          "test": "fails fast at construction when compression is enabled",
+          "path": "test/compression-guard.test.ts",
+          "scope": "Asserts that the TypeScript binding fails fast at construction when compression is enabled.",
+          "sha256": "36ce809ae856d31fbaaabcdc005583c8f25f6e9a4a620abe98c25a2984c44556"
+        },
+        {
+          "test": "stays constructible with compression disabled",
+          "path": "test/compression-guard.test.ts",
+          "scope": "Asserts that the TypeScript binding stays constructible with compression disabled.",
+          "sha256": "36ce809ae856d31fbaaabcdc005583c8f25f6e9a4a620abe98c25a2984c44556"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestCompressionLimitsAndIndependentLoads",
+          "path": "go/codec_test.go",
+          "scope": "Controllable expansion limits retain raw input and report over-limit outcomes; repeated decompression/escape loads do not mutate retained input; threshold and level reject invalid settings.",
+          "sha256": "c50ea59c78bfe50e1182c347bd2918d99e0598a52d463b116e6ab33f671e2e0a"
+        },
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestCompressionConstructionDefaultsAndExplicitDisable",
+          "scope": "New rejects invalid enabled compression; documented 4096-byte/level-3 defaults select raw versus compressed writes at the serialized byte boundary; explicit disable preserves a large raw JSON write without compression outcomes.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        }
+      ],
+      "adaptation": "Node native zstd availability is a binding prerequisite; Go embeds a compressor dependency and has no equivalent optional runtime availability flag.",
+      "gaps": []
+    },
+    {
+      "id": "X02.malformed-compression-retains-raw",
+      "rule": "A marked body rejected by the native decoder is returned unchanged; an accepted body within the output cap uses the decoded result and the marker's text/binary conversion. Empty/truncated input acceptance and first-frame/trailing-byte handling follow the declared native decoder semantics.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "W06",
+        "W08",
+        "C27"
+      ],
+      "typescript": [
+        {
+          "test": "falls back to the raw payload when a marked Buffer is not zstd",
+          "path": "test/compression.test.ts",
+          "scope": "The tested invalid-zstd marked buffers return fallback_raw with the original payload reference.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        },
+        {
+          "test": "degrades marked payloads with empty or truncated bodies without throwing",
+          "path": "test/compression.test.ts",
+          "scope": "The tested empty and truncated marked bodies do not throw. Either decompressed or fallback_raw is accepted according to the native codec; fallback_raw must return the original payload reference.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        },
+        {
+          "test": "pins the legacy residual: a marker followed by a valid zstd stream is misread",
+          "path": "test/compression.test.ts",
+          "scope": "A legacy binary marker followed by the tested valid zstd stream is decoded; adding the tested CRC! trailer leaves that decoded payload unchanged.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestZstdFirstFrameAndMalformedBodies",
+          "path": "go/codec_test.go",
+          "scope": "The tested CRC! trailer and concatenated copy preserve the first decoded frame. The tested empty bodies for both markers and truncated compressed body return fallback_raw with unchanged bytes.",
+          "sha256": "c50ea59c78bfe50e1182c347bd2918d99e0598a52d463b116e6ab33f671e2e0a"
+        }
+      ],
+      "adaptation": "Legacy marker collisions can be indistinguishable from envelopes. Native codecs can differ in whether empty or truncated input is accepted; rejection preserves the marked bytes, while acceptance follows the decoder result and envelope type. Shared Quint envelope cases 135-170 cover rejected ff, 28b5 and 28b52ffd bodies under both markers, with native runners verifying the codec inputs before checking wrapper fallback. Selected first-frame and trailing-byte behaviors remain native adaptation evidence.",
+      "gaps": [
+        "Shared Quint wrapper evidence covers selected invalid/truncated headers, not arbitrary malformed streams, trailers, concatenated streams, dictionaries or windows. Their codec acceptance and resource boundaries remain native evidence; the listed tests establish only their specific fixtures."
+      ]
+    },
+    {
+      "id": "X02.retained-payload-ownership",
+      "rule": "Repeated decompression/escape reads do not mutate retained input and preserve binary byte identity/type; native views may share storage only under the documented immutable-payload assumption.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "W04",
+        "W06",
+        "C44",
+        "C50"
+      ],
+      "typescript": [
+        {
+          "test": "never mutates the marked input payload",
+          "path": "test/compression.test.ts",
+          "scope": "Asserts that the TypeScript binding never mutates the marked input payload.",
+          "sha256": "f959a21148ad1803f7c4870ee0ceacf494a1b43aa6b558974541dd9dab7612bf"
+        },
+        {
+          "test": "decodes UTF-8 and binary payloads without copying binary data",
+          "path": "test/redis-payload.test.ts",
+          "scope": "Asserts that the TypeScript binding decodes UTF-8 and binary payloads without copying binary data.",
+          "sha256": "6e672444310a10ca4bd806e37db5b9118c0e6784dbb0b2f7074e81689e23f03f"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestCompressionLimitsAndIndependentLoads",
+          "path": "go/codec_test.go",
+          "scope": "Controllable expansion limits retain raw input and report over-limit outcomes; repeated decompression/escape loads do not mutate retained input; threshold and level reject invalid settings.",
+          "sha256": "c50ea59c78bfe50e1182c347bd2918d99e0598a52d463b116e6ab33f671e2e0a"
+        },
+        {
+          "test": "TestBinaryCodecRemoteRoundTripPreservesBytesAndTag",
+          "path": "go/cache_test.go",
+          "scope": "A custom binary codec crosses remote publication/read with exact invalid-UTF8 bytes and binary tag, reusing one source result.",
+          "sha256": "5992ae0b963227eede25fcf25bb99082a0b42abcb4df0bf0302e067b61a6917a"
+        }
+      ],
+      "adaptation": "A copied observer result and a retained raw payload have different ownership; unexpected mutation changes later recovery/shadow behavior.",
+      "gaps": []
+    },
+    {
+      "id": "X02.redis-complete-write-dispatch",
+      "rule": "Each write dispatches exactly one native SET with a complete frame, supplied timestamp, rounded positive PX TTL and no watermark mutation.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "C31",
+        "C34",
+        "C37",
+        "W04",
+        "W05"
+      ],
+      "typescript": [
+        {
+          "test": "writes complete frames with one native SET",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding writes complete frames with one native SET.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "honors a supplied write timestamp without sampling the client clock",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding honors a supplied write timestamp without sampling the client clock.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "writes string and binary values as complete frames with one SET each",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding writes string and binary values as complete frames with one SET each.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestRedisAdapterMutationDispatch",
+          "path": "go/redis_adapter_test.go",
+          "scope": "Native SET uses the supplied complete frame and ceil-PX TTL; invalid TTL never dispatches; EVALSHA rejection retries identical EVAL arguments and an invalid reply does not retry.",
+          "sha256": "205e25513e3edfb0ccbe5b477a8a69b19b4f3b235be63e7c22eb7de2eb42585b"
+        }
+      ],
+      "adaptation": "Pure vectors prove bytes and bounds; command-boundary tests prove actual command count and arguments.",
+      "gaps": []
+    },
+    {
+      "id": "X02.redis-primary-atomic-read",
+      "rule": "Tracked adapter reads atomically observe value/watermark on the Cluster primary and preserve client WATCH state; writes and invalidations route by the correct hash-tag key.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "W01",
+        "W04",
+        "C33"
+      ],
+      "typescript": [
+        {
+          "test": "forces tracked Cluster MGET reads to the primary",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding forces tracked Cluster MGET reads to the primary.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "uses GET and a non-atomic primary MGET batch that preserves caller WATCH state",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding uses GET and a non-atomic primary MGET batch that preserves caller WATCH state.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        },
+        {
+          "test": "routes tracked cluster MGET directly to the slot primary",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding routes tracked cluster MGET directly to the slot primary.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestRedisIntegration",
+          "path": "go/redis_integration_test.go",
+          "scope": "Real Redis, Valkey and Cluster run exact invalidation vectors, mixed TS/Go data exchange and complete-frame primary-read assertions.",
+          "sha256": "45d854bc6feae418bccd0aba95df2565d6fbcbc01d4150f64c3dd0001ad0b0bb"
+        },
+        {
+          "test": "TestRedisAdapterReadsAndBoundaries",
+          "path": "go/redis_adapter_test.go",
+          "scope": "Tracked native MGET validates pair length and element types; mutation validators reject non-OK and non-integer-one reply domains.",
+          "sha256": "205e25513e3edfb0ccbe5b477a8a69b19b4f3b235be63e7c22eb7de2eb42585b"
+        }
+      ],
+      "adaptation": "Batch atomicity naming is GLIDE-specific; the MGET command itself is atomic. This is E01 adapter/environment evidence, not a proof from core replay.",
+      "gaps": []
+    },
+    {
+      "id": "X02.redis-invalidation-retry",
+      "rule": "A rejected EVALSHA dispatch retries once with EVAL using identical logical arguments; a reply-domain violation does not retry, and terminal error identity/cause follows the binding contract.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "W09",
+        "C29",
+        "C38"
+      ],
+      "typescript": [
+        {
+          "test": "retries a rejected EVALSHA once with EVAL by source",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding retries a rejected EVALSHA once with EVAL by source.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "does not retry an invalidation reply-domain violation",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding does not retry an invalidation reply-domain violation.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "surfaces the invalidation retry rejection unmodified",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding surfaces the invalidation retry rejection unmodified.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "chains the original rejection when the invalidation retry also fails",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding chains the original rejection when the invalidation retry also fails.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestRedisAdapterMutationDispatch",
+          "path": "go/redis_adapter_test.go",
+          "scope": "Native SET uses the supplied complete frame and ceil-PX TTL; invalid TTL never dispatches; EVALSHA rejection retries identical EVAL arguments and an invalid reply does not retry.",
+          "sha256": "205e25513e3edfb0ccbe5b477a8a69b19b4f3b235be63e7c22eb7de2eb42585b"
+        },
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestRedisAdapterSurfacesInvalidationRetryError",
+          "scope": "A NOSCRIPT EVALSHA rejection causes exactly one EVAL with unchanged logical arguments; terminal EVAL error identity and existing cause are returned unchanged, without attaching the earlier NOSCRIPT error.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        }
+      ],
+      "adaptation": "Retry is allowed for every command rejection, not only NOSCRIPT; idempotent watermark advancement makes ambiguous response loss safe.",
+      "gaps": []
+    },
+    {
+      "id": "X02.redis-cancellation-binding",
+      "rule": "Core read budget/cancellation is carried through the native client context/options without erasing unrelated client invocation options.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "C23",
+        "C56"
+      ],
+      "typescript": [
+        {
+          "test": "passes the cooperative read signal through node-redis command options",
+          "path": "test/node-redis.test.ts",
+          "scope": "Asserts that the TypeScript binding passes the cooperative read signal through node-redis command options.",
+          "sha256": "c9d458295cae96574f285c4472d75c1d0f0de9c3a1245262614a9277966e378f"
+        },
+        {
+          "test": "preserves GLIDE invocation options when given a core read context",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding preserves GLIDE invocation options when given a core read context.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        }
+      ],
+      "go": [
+        {
+          "path": "go/feature_boundary_test.go",
+          "test": "TestRedisAdapterForwardsReadContextCancellation",
+          "scope": "Hooked GET and tracked MGET receive the supplied cancellation channel and context metadata; cancelling after dispatch returns context.Canceled through the adapter.",
+          "sha256": "f7d071b12ec7f03cb0d5a0a7fe68438038b2fdd78337336e472d72d3585c6d8f"
+        }
+      ],
+      "adaptation": "Native context options are integration mechanics; C56 generated histories check cooperative cancellation consequences.",
+      "gaps": []
+    },
+    {
+      "id": "X02.redis-real-interop",
+      "rule": "Bundled adapters and TS/Go shared storage interoperate on supported standalone Redis, Valkey and Cluster deployments, including actual invalidation vectors and primary read behavior.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "W01",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09"
+      ],
+      "typescript": [
+        {
+          "test": "uses one wire format across node-redis and Valkey GLIDE",
+          "path": "test/redis-real.integration.test.ts",
+          "scope": "Asserts that the TypeScript binding uses one wire format across node-redis and Valkey GLIDE.",
+          "sha256": "cb04c5891e64534319a983e45176e83ffe4c53e6cc6e2f1decd89b87ce636e5a"
+        },
+        {
+          "test": "round-trips compressed payloads through tracked writes and invalidation",
+          "path": "test/redis-real.integration.test.ts",
+          "scope": "Asserts that the TypeScript binding round-trips compressed payloads through tracked writes and invalidation.",
+          "sha256": "cb04c5891e64534319a983e45176e83ffe4c53e6cc6e2f1decd89b87ce636e5a"
+        },
+        {
+          "test": "routes cache operations across slots and reloads invalidation scripts per node",
+          "path": "test/redis-cluster.integration.test.ts",
+          "scope": "Asserts that the TypeScript binding routes cache operations across slots and reloads invalidation scripts per node.",
+          "sha256": "7c6f642d578cab1b1237743a305bc8d9c315267e94057c61fd67ed2ba4f8bc66"
+        },
+        {
+          "test": "keeps tracked keys colocated and rejects mismatched hash tags",
+          "path": "test/redis-cluster.integration.test.ts",
+          "scope": "Asserts that the TypeScript binding keeps tracked keys colocated and rejects mismatched hash tags.",
+          "sha256": "7c6f642d578cab1b1237743a305bc8d9c315267e94057c61fd67ed2ba4f8bc66"
+        }
+      ],
+      "go": [
+        {
+          "test": "TestRedisIntegration",
+          "path": "go/redis_integration_test.go",
+          "scope": "Real Redis, Valkey and Cluster run exact invalidation vectors, mixed TS/Go data exchange and complete-frame primary-read assertions.",
+          "sha256": "45d854bc6feae418bccd0aba95df2565d6fbcbc01d4150f64c3dd0001ad0b0bb"
+        }
+      ],
+      "adaptation": "Real-server dispatch, Lua semantics, topology and mixed-language data are outside an in-memory conformance driver.",
+      "gaps": []
+    },
+    {
+      "id": "B01.renamed-and-removed-options",
+      "rule": "Untyped TS callers receive deliberate errors for removed rampSampler, Redis keyPrefix/createClient/watermarkTtlSec, and renamed urnPrefix options instead of silently accepting obsolete configuration.",
+      "contracts": [
+        "B01"
+      ],
+      "relatedContracts": [
+        "C16",
+        "W01"
+      ],
+      "typescript": [
+        {
+          "test": "rejects the removed public ramp sampler override",
+          "path": "test/dialcache-config-ramp.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects the removed public ramp sampler override.",
+          "sha256": "8375f7c9f7cb492b59177a263ac1b3e2279d85577fd9a16c461ec118bbea3dfa"
+        },
+        {
+          "test": "rejects the renamed urnPrefix option for untyped callers",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects the renamed urnPrefix option for untyped callers.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "rejects the renamed DialCacheKey urnPrefix option for untyped callers",
+          "path": "test/dialcache-local.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects the renamed DialCacheKey urnPrefix option for untyped callers.",
+          "sha256": "743f881019970183e744c8c848b9ca9651a21635d2310dcb3e11c2993bc7337e"
+        },
+        {
+          "test": "rejects the removed Redis keyPrefix option value %s for untyped callers",
+          "path": "test/dialcache-redis.test.ts",
+          "scope": "Explicit legacy Redis keyPrefix fields reject for both a supplied value and an own property set to undefined, preserving deliberate migration errors.",
+          "sha256": "f0adbf2e0fbc9e1359ba255ce7b29019568e534a20d1e27af5a3177a4df061a0"
+        },
+        {
+          "test": "rejects the removed Redis createClient option value %s for untyped callers",
+          "path": "test/dialcache-redis.test.ts",
+          "scope": "Explicit legacy Redis createClient fields reject for both a supplied value and an own property set to undefined, preserving deliberate migration errors.",
+          "sha256": "f0adbf2e0fbc9e1359ba255ce7b29019568e534a20d1e27af5a3177a4df061a0"
+        },
+        {
+          "test": "rejects the removed Redis watermarkTtlSec option value %s for untyped callers",
+          "path": "test/dialcache-redis.test.ts",
+          "scope": "Explicit legacy Redis watermarkTtlSec fields reject for both a supplied value and an own property set to undefined, preserving deliberate migration errors.",
+          "sha256": "f0adbf2e0fbc9e1359ba255ce7b29019568e534a20d1e27af5a3177a4df061a0"
+        }
+      ],
+      "go": [],
+      "adaptation": "Go has typed options and does not inherit removed historical TS fields.",
+      "gaps": [],
+      "notApplicable": {
+        "go": "Go has typed options and does not inherit removed historical TS fields."
+      }
+    },
+    {
+      "id": "X02.glide-client-identity",
+      "rule": "GLIDE accepts the supported direct module/client identity and rejects wrappers, conflicting module instances, ambiguous identities or absent Batch support.",
+      "contracts": [
+        "X02"
+      ],
+      "relatedContracts": [
+        "W04",
+        "C55"
+      ],
+      "typescript": [
+        {
+          "test": "rejects forwarding wrappers instead of silently treating them as standalone",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects forwarding wrappers instead of silently treating them as standalone.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        },
+        {
+          "test": "rejects a direct client from a different GLIDE module instance",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects a direct client from a different GLIDE module instance.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        },
+        {
+          "test": "rejects an ambiguous client identity",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding rejects an ambiguous client identity.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        },
+        {
+          "test": "requires GLIDE 2.x Batch support",
+          "path": "test/valkey-glide.test.ts",
+          "scope": "Asserts that the TypeScript binding requires GLIDE 2.x Batch support.",
+          "sha256": "1144ccd7deabea1ed6657b87da7e9718d63bbedded8a2c5a65014098d8a543db"
+        }
+      ],
+      "go": [],
+      "adaptation": "Go uses go-redis, so GLIDE module identity is an explicit TS-specific integration boundary.",
+      "gaps": [],
+      "notApplicable": {
+        "go": "Go uses go-redis, so GLIDE module identity is an explicit TS-specific integration boundary."
+      }
+    }
+  ]
+}

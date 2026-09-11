@@ -2,7 +2,7 @@
 
 ## Project overview
 
-DialCache is a TypeScript caching library with explicit request-scoped enablement, local and Redis layers, runtime rollout controls, request coalescing, targeted invalidation, and adapter-based observability.
+DialCache has TypeScript and Go implementations with explicit request-scoped enablement, local and Redis layers, runtime rollout controls, request coalescing, targeted invalidation, and adapter-based observability.
 
 ## Structure
 
@@ -26,6 +26,8 @@ src/
   serializer.ts         # Serializer contract and JSON implementation
   internal/             # Cache layers, runtime config, payload compression, and invalidation Lua script
 test/                   # Unit and Redis integration tests
+go/                     # Go module, public cache and adapters, shared-corpus replay
+formal/                 # Quint behavioral source of truth, contracts and portable vectors
 ```
 
 ## Critical behavior
@@ -54,14 +56,28 @@ test/                   # Unit and Redis integration tests
 - Keep Redis client-specific behavior in adapters; core code depends on `DialCacheRedisClient`.
 - Public exports belong in the root or an explicit integration entry point such as `src/node-redis.ts`, `src/prometheus.ts`, or `src/redis-protocol.ts`.
 - Use `corepack pnpm` for project commands.
+- Start formal work at `formal/README.md`. `formal/WALKTHROUGH.md` follows one
+  contract through Quint, generated inputs and both language replays;
+  `formal/AUTHORING.md` explains how to extend that chain. Read the relevant
+  model and profile bindings before opening large generated JSON artifacts.
+- For formal specification changes, follow `formal/AUTHORING.md`: keep models
+  readable as behavior definitions, share helpers with identical meaning, retain
+  independent property checks, and register executable evidence in the catalogs.
+- Define portable behavior in Quint first. Require consequential generated
+  witnesses and replay the same histories in TypeScript and Go; keep native
+  API, wire and integration tests for their explicit boundaries.
 
 ## Validation
 
 ```bash
 corepack pnpm install --frozen-lockfile
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm build
-corepack pnpm test:package
-corepack pnpm test:integration
+make check
+make integration
 ```
+
+Use `make formal` for complete Quint model checks, corpus generation and both
+ports' full replay, then `make mutations` for assertion-strength checks.
+`make ci` runs all validation in the required order. `make help` lists targets
+and prerequisites; `formal/README.md` documents the fast PR and full-validation
+workflows. Full behavior/model/replay changes require full validation before
+merge; smoke tests cannot satisfy the full conformance gate.

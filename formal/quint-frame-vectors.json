@@ -1,0 +1,5359 @@
+{
+  "schemaVersion": 3,
+  "provenance": {
+    "model": "formal/dialcache-frame-vectors.qnt",
+    "sourceSha256": {
+      "formal/dialcache-frame-vectors.qnt": "881f930b99107fee24f73cd4f193360223fe8adf8b6be29de771555b56e6cb6b",
+      "formal/wire-text.qnt": "c78f8c674f4e1470b0d2b605b209d82e3aab0e35fb4e0efae813247bf093eb27",
+      "formal/generate-frame-vectors.mjs": "9f8a145bc38c3a7aa3efe86b354f3cb13518070ad0e5054622359d0a7329321b"
+    }
+  },
+  "frameVectors": [
+    {
+      "name": "Quint frame 000 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "",
+      "frameHex": "01000000000000000000"
+    },
+    {
+      "name": "Quint frame 001 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "",
+      "frameHex": "01000000000000000100"
+    },
+    {
+      "name": "Quint frame 002 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "",
+      "frameHex": "0100000000000000ff00"
+    },
+    {
+      "name": "Quint frame 003 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "",
+      "frameHex": "01000000000000010000"
+    },
+    {
+      "name": "Quint frame 004 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "",
+      "frameHex": "01000000010000000000"
+    },
+    {
+      "name": "Quint frame 005 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "",
+      "frameHex": "01001fffffffffffff00"
+    },
+    {
+      "name": "Quint frame 006 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "A\u0000B",
+      "frameHex": "01000000000000000000410042"
+    },
+    {
+      "name": "Quint frame 007 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "A\u0000B",
+      "frameHex": "01000000000000000100410042"
+    },
+    {
+      "name": "Quint frame 008 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "A\u0000B",
+      "frameHex": "0100000000000000ff00410042"
+    },
+    {
+      "name": "Quint frame 009 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "A\u0000B",
+      "frameHex": "01000000000000010000410042"
+    },
+    {
+      "name": "Quint frame 010 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "A\u0000B",
+      "frameHex": "01000000010000000000410042"
+    },
+    {
+      "name": "Quint frame 011 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "A\u0000B",
+      "frameHex": "01001fffffffffffff00410042"
+    },
+    {
+      "name": "Quint frame 012 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "߿ࠀ",
+      "frameHex": "010000000000000000007fc280dfbfe0a080"
+    },
+    {
+      "name": "Quint frame 013 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "߿ࠀ",
+      "frameHex": "010000000000000001007fc280dfbfe0a080"
+    },
+    {
+      "name": "Quint frame 014 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "߿ࠀ",
+      "frameHex": "0100000000000000ff007fc280dfbfe0a080"
+    },
+    {
+      "name": "Quint frame 015 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "߿ࠀ",
+      "frameHex": "010000000000000100007fc280dfbfe0a080"
+    },
+    {
+      "name": "Quint frame 016 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "߿ࠀ",
+      "frameHex": "010000000100000000007fc280dfbfe0a080"
+    },
+    {
+      "name": "Quint frame 017 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "߿ࠀ",
+      "frameHex": "01001fffffffffffff007fc280dfbfe0a080"
+    },
+    {
+      "name": "Quint frame 018 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "﻿A",
+      "frameHex": "01000000000000000000efbbbf41"
+    },
+    {
+      "name": "Quint frame 019 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "﻿A",
+      "frameHex": "01000000000000000100efbbbf41"
+    },
+    {
+      "name": "Quint frame 020 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "﻿A",
+      "frameHex": "0100000000000000ff00efbbbf41"
+    },
+    {
+      "name": "Quint frame 021 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "﻿A",
+      "frameHex": "01000000000000010000efbbbf41"
+    },
+    {
+      "name": "Quint frame 022 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "﻿A",
+      "frameHex": "01000000010000000000efbbbf41"
+    },
+    {
+      "name": "Quint frame 023 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "﻿A",
+      "frameHex": "01001fffffffffffff00efbbbf41"
+    },
+    {
+      "name": "Quint frame 024 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800",
+      "frameHex": "01000000000000000000efbfbd"
+    },
+    {
+      "name": "Quint frame 025 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800",
+      "frameHex": "01000000000000000100efbfbd"
+    },
+    {
+      "name": "Quint frame 026 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800",
+      "frameHex": "0100000000000000ff00efbfbd"
+    },
+    {
+      "name": "Quint frame 027 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800",
+      "frameHex": "01000000000000010000efbfbd"
+    },
+    {
+      "name": "Quint frame 028 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800",
+      "frameHex": "01000000010000000000efbfbd"
+    },
+    {
+      "name": "Quint frame 029 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800",
+      "frameHex": "01001fffffffffffff00efbfbd"
+    },
+    {
+      "name": "Quint frame 030 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "\udc00",
+      "frameHex": "01000000000000000000efbfbd"
+    },
+    {
+      "name": "Quint frame 031 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "\udc00",
+      "frameHex": "01000000000000000100efbfbd"
+    },
+    {
+      "name": "Quint frame 032 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "\udc00",
+      "frameHex": "0100000000000000ff00efbfbd"
+    },
+    {
+      "name": "Quint frame 033 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "\udc00",
+      "frameHex": "01000000000000010000efbfbd"
+    },
+    {
+      "name": "Quint frame 034 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "\udc00",
+      "frameHex": "01000000010000000000efbfbd"
+    },
+    {
+      "name": "Quint frame 035 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "\udc00",
+      "frameHex": "01001fffffffffffff00efbfbd"
+    },
+    {
+      "name": "Quint frame 036 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800A",
+      "frameHex": "01000000000000000000efbfbd41"
+    },
+    {
+      "name": "Quint frame 037 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800A",
+      "frameHex": "01000000000000000100efbfbd41"
+    },
+    {
+      "name": "Quint frame 038 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800A",
+      "frameHex": "0100000000000000ff00efbfbd41"
+    },
+    {
+      "name": "Quint frame 039 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800A",
+      "frameHex": "01000000000000010000efbfbd41"
+    },
+    {
+      "name": "Quint frame 040 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800A",
+      "frameHex": "01000000010000000000efbfbd41"
+    },
+    {
+      "name": "Quint frame 041 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800A",
+      "frameHex": "01001fffffffffffff00efbfbd41"
+    },
+    {
+      "name": "Quint frame 042 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800𐀀",
+      "frameHex": "01000000000000000000efbfbdf0908080"
+    },
+    {
+      "name": "Quint frame 043 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800𐀀",
+      "frameHex": "01000000000000000100efbfbdf0908080"
+    },
+    {
+      "name": "Quint frame 044 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800𐀀",
+      "frameHex": "0100000000000000ff00efbfbdf0908080"
+    },
+    {
+      "name": "Quint frame 045 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800𐀀",
+      "frameHex": "01000000000000010000efbfbdf0908080"
+    },
+    {
+      "name": "Quint frame 046 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800𐀀",
+      "frameHex": "01000000010000000000efbfbdf0908080"
+    },
+    {
+      "name": "Quint frame 047 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "\ud800𐀀",
+      "frameHex": "01001fffffffffffff00efbfbdf0908080"
+    },
+    {
+      "name": "Quint frame 048 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "😀",
+      "frameHex": "01000000000000000000f09f9880"
+    },
+    {
+      "name": "Quint frame 049 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "😀",
+      "frameHex": "01000000000000000100f09f9880"
+    },
+    {
+      "name": "Quint frame 050 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "😀",
+      "frameHex": "0100000000000000ff00f09f9880"
+    },
+    {
+      "name": "Quint frame 051 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "😀",
+      "frameHex": "01000000000000010000f09f9880"
+    },
+    {
+      "name": "Quint frame 052 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "😀",
+      "frameHex": "01000000010000000000f09f9880"
+    },
+    {
+      "name": "Quint frame 053 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "😀",
+      "frameHex": "01001fffffffffffff00f09f9880"
+    },
+    {
+      "name": "Quint frame 054 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "􏿿",
+      "frameHex": "01000000000000000000f48fbfbf"
+    },
+    {
+      "name": "Quint frame 055 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "􏿿",
+      "frameHex": "01000000000000000100f48fbfbf"
+    },
+    {
+      "name": "Quint frame 056 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "􏿿",
+      "frameHex": "0100000000000000ff00f48fbfbf"
+    },
+    {
+      "name": "Quint frame 057 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "􏿿",
+      "frameHex": "01000000000000010000f48fbfbf"
+    },
+    {
+      "name": "Quint frame 058 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "􏿿",
+      "frameHex": "01000000010000000000f48fbfbf"
+    },
+    {
+      "name": "Quint frame 059 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "􏿿",
+      "frameHex": "01001fffffffffffff00f48fbfbf"
+    },
+    {
+      "name": "Quint frame 060 encode",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "payloadUtf8": "￿",
+      "frameHex": "01000000000000000000efbfbf"
+    },
+    {
+      "name": "Quint frame 061 encode",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "￿",
+      "frameHex": "01000000000000000100efbfbf"
+    },
+    {
+      "name": "Quint frame 062 encode",
+      "createdAtMs": 255,
+      "payloadType": "string",
+      "payloadUtf8": "￿",
+      "frameHex": "0100000000000000ff00efbfbf"
+    },
+    {
+      "name": "Quint frame 063 encode",
+      "createdAtMs": 256,
+      "payloadType": "string",
+      "payloadUtf8": "￿",
+      "frameHex": "01000000000000010000efbfbf"
+    },
+    {
+      "name": "Quint frame 064 encode",
+      "createdAtMs": 4294967296,
+      "payloadType": "string",
+      "payloadUtf8": "￿",
+      "frameHex": "01000000010000000000efbfbf"
+    },
+    {
+      "name": "Quint frame 065 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "payloadUtf8": "￿",
+      "frameHex": "01001fffffffffffff00efbfbf"
+    },
+    {
+      "name": "Quint frame 066 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "",
+      "frameHex": "01000000000000000001"
+    },
+    {
+      "name": "Quint frame 067 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "",
+      "frameHex": "01001fffffffffffff01"
+    },
+    {
+      "name": "Quint frame 068 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "00",
+      "frameHex": "0100000000000000000100"
+    },
+    {
+      "name": "Quint frame 069 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "00",
+      "frameHex": "01001fffffffffffff0100"
+    },
+    {
+      "name": "Quint frame 070 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "41",
+      "frameHex": "0100000000000000000141"
+    },
+    {
+      "name": "Quint frame 071 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "41",
+      "frameHex": "01001fffffffffffff0141"
+    },
+    {
+      "name": "Quint frame 072 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "7f",
+      "frameHex": "010000000000000000017f"
+    },
+    {
+      "name": "Quint frame 073 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "7f",
+      "frameHex": "01001fffffffffffff017f"
+    },
+    {
+      "name": "Quint frame 074 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "80",
+      "frameHex": "0100000000000000000180"
+    },
+    {
+      "name": "Quint frame 075 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "80",
+      "frameHex": "01001fffffffffffff0180"
+    },
+    {
+      "name": "Quint frame 076 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "ff",
+      "frameHex": "01000000000000000001ff"
+    },
+    {
+      "name": "Quint frame 077 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "ff",
+      "frameHex": "01001fffffffffffff01ff"
+    },
+    {
+      "name": "Quint frame 078 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "c080",
+      "frameHex": "01000000000000000001c080"
+    },
+    {
+      "name": "Quint frame 079 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "c080",
+      "frameHex": "01001fffffffffffff01c080"
+    },
+    {
+      "name": "Quint frame 080 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "c280",
+      "frameHex": "01000000000000000001c280"
+    },
+    {
+      "name": "Quint frame 081 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "c280",
+      "frameHex": "01001fffffffffffff01c280"
+    },
+    {
+      "name": "Quint frame 082 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "dfbf",
+      "frameHex": "01000000000000000001dfbf"
+    },
+    {
+      "name": "Quint frame 083 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "dfbf",
+      "frameHex": "01001fffffffffffff01dfbf"
+    },
+    {
+      "name": "Quint frame 084 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "c2",
+      "frameHex": "01000000000000000001c2"
+    },
+    {
+      "name": "Quint frame 085 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "c2",
+      "frameHex": "01001fffffffffffff01c2"
+    },
+    {
+      "name": "Quint frame 086 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "c241",
+      "frameHex": "01000000000000000001c241"
+    },
+    {
+      "name": "Quint frame 087 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "c241",
+      "frameHex": "01001fffffffffffff01c241"
+    },
+    {
+      "name": "Quint frame 088 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "e282",
+      "frameHex": "01000000000000000001e282"
+    },
+    {
+      "name": "Quint frame 089 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "e282",
+      "frameHex": "01001fffffffffffff01e282"
+    },
+    {
+      "name": "Quint frame 090 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "e28241",
+      "frameHex": "01000000000000000001e28241"
+    },
+    {
+      "name": "Quint frame 091 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "e28241",
+      "frameHex": "01001fffffffffffff01e28241"
+    },
+    {
+      "name": "Quint frame 092 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "e09fbf",
+      "frameHex": "01000000000000000001e09fbf"
+    },
+    {
+      "name": "Quint frame 093 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "e09fbf",
+      "frameHex": "01001fffffffffffff01e09fbf"
+    },
+    {
+      "name": "Quint frame 094 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "e0a080",
+      "frameHex": "01000000000000000001e0a080"
+    },
+    {
+      "name": "Quint frame 095 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "e0a080",
+      "frameHex": "01001fffffffffffff01e0a080"
+    },
+    {
+      "name": "Quint frame 096 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "ed9fbf",
+      "frameHex": "01000000000000000001ed9fbf"
+    },
+    {
+      "name": "Quint frame 097 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "ed9fbf",
+      "frameHex": "01001fffffffffffff01ed9fbf"
+    },
+    {
+      "name": "Quint frame 098 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "eda080",
+      "frameHex": "01000000000000000001eda080"
+    },
+    {
+      "name": "Quint frame 099 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "eda080",
+      "frameHex": "01001fffffffffffff01eda080"
+    },
+    {
+      "name": "Quint frame 100 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "efbbbf41",
+      "frameHex": "01000000000000000001efbbbf41"
+    },
+    {
+      "name": "Quint frame 101 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "efbbbf41",
+      "frameHex": "01001fffffffffffff01efbbbf41"
+    },
+    {
+      "name": "Quint frame 102 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "efbfbf",
+      "frameHex": "01000000000000000001efbfbf"
+    },
+    {
+      "name": "Quint frame 103 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "efbfbf",
+      "frameHex": "01001fffffffffffff01efbfbf"
+    },
+    {
+      "name": "Quint frame 104 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "f08fbfbf",
+      "frameHex": "01000000000000000001f08fbfbf"
+    },
+    {
+      "name": "Quint frame 105 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "f08fbfbf",
+      "frameHex": "01001fffffffffffff01f08fbfbf"
+    },
+    {
+      "name": "Quint frame 106 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "f0908080",
+      "frameHex": "01000000000000000001f0908080"
+    },
+    {
+      "name": "Quint frame 107 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "f0908080",
+      "frameHex": "01001fffffffffffff01f0908080"
+    },
+    {
+      "name": "Quint frame 108 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "f48fbfbf",
+      "frameHex": "01000000000000000001f48fbfbf"
+    },
+    {
+      "name": "Quint frame 109 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "f48fbfbf",
+      "frameHex": "01001fffffffffffff01f48fbfbf"
+    },
+    {
+      "name": "Quint frame 110 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "f4908080",
+      "frameHex": "01000000000000000001f4908080"
+    },
+    {
+      "name": "Quint frame 111 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "f4908080",
+      "frameHex": "01001fffffffffffff01f4908080"
+    },
+    {
+      "name": "Quint frame 112 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "f5808080",
+      "frameHex": "01000000000000000001f5808080"
+    },
+    {
+      "name": "Quint frame 113 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "f5808080",
+      "frameHex": "01001fffffffffffff01f5808080"
+    },
+    {
+      "name": "Quint frame 114 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "f09080",
+      "frameHex": "01000000000000000001f09080"
+    },
+    {
+      "name": "Quint frame 115 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "f09080",
+      "frameHex": "01001fffffffffffff01f09080"
+    },
+    {
+      "name": "Quint frame 116 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "e2c2a2",
+      "frameHex": "01000000000000000001e2c2a2"
+    },
+    {
+      "name": "Quint frame 117 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "e2c2a2",
+      "frameHex": "01001fffffffffffff01e2c2a2"
+    },
+    {
+      "name": "Quint frame 118 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "8080",
+      "frameHex": "010000000000000000018080"
+    },
+    {
+      "name": "Quint frame 119 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "8080",
+      "frameHex": "01001fffffffffffff018080"
+    },
+    {
+      "name": "Quint frame 120 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "410042",
+      "frameHex": "01000000000000000001410042"
+    },
+    {
+      "name": "Quint frame 121 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "410042",
+      "frameHex": "01001fffffffffffff01410042"
+    },
+    {
+      "name": "Quint frame 122 encode",
+      "createdAtMs": 0,
+      "payloadType": "binary",
+      "payloadHex": "f09f9880",
+      "frameHex": "01000000000000000001f09f9880"
+    },
+    {
+      "name": "Quint frame 123 encode",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "binary",
+      "payloadHex": "f09f9880",
+      "frameHex": "01001fffffffffffff01f09f9880"
+    }
+  ],
+  "trackedDecodeVectors": [
+    {
+      "name": "Quint frame 126 decode",
+      "frameHex": "01000000000000010000",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "Quint frame 127 decode",
+      "frameHex": "01000000000000010001",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": ""
+      }
+    },
+    {
+      "name": "Quint frame 130 decode",
+      "frameHex": "0100000000000001000000",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "\u0000"
+      }
+    },
+    {
+      "name": "Quint frame 131 decode",
+      "frameHex": "0100000000000001000100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "00"
+      }
+    },
+    {
+      "name": "Quint frame 134 decode",
+      "frameHex": "0100000000000001000041",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 135 decode",
+      "frameHex": "0100000000000001000141",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 138 decode",
+      "frameHex": "010000000000000100007f",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "Quint frame 139 decode",
+      "frameHex": "010000000000000100017f",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "7f"
+      }
+    },
+    {
+      "name": "Quint frame 142 decode",
+      "frameHex": "0100000000000001000080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 143 decode",
+      "frameHex": "0100000000000001000180",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "80"
+      }
+    },
+    {
+      "name": "Quint frame 146 decode",
+      "frameHex": "01000000000000010000ff",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 147 decode",
+      "frameHex": "01000000000000010001ff",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "ff"
+      }
+    },
+    {
+      "name": "Quint frame 150 decode",
+      "frameHex": "01000000000000010000c080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "��"
+      }
+    },
+    {
+      "name": "Quint frame 151 decode",
+      "frameHex": "01000000000000010001c080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "c080"
+      }
+    },
+    {
+      "name": "Quint frame 154 decode",
+      "frameHex": "01000000000000010000c280",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "Quint frame 155 decode",
+      "frameHex": "01000000000000010001c280",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "c280"
+      }
+    },
+    {
+      "name": "Quint frame 158 decode",
+      "frameHex": "01000000000000010000dfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "߿"
+      }
+    },
+    {
+      "name": "Quint frame 159 decode",
+      "frameHex": "01000000000000010001dfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "dfbf"
+      }
+    },
+    {
+      "name": "Quint frame 162 decode",
+      "frameHex": "01000000000000010000c2",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 163 decode",
+      "frameHex": "01000000000000010001c2",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "c2"
+      }
+    },
+    {
+      "name": "Quint frame 166 decode",
+      "frameHex": "01000000000000010000c241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�A"
+      }
+    },
+    {
+      "name": "Quint frame 167 decode",
+      "frameHex": "01000000000000010001c241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "c241"
+      }
+    },
+    {
+      "name": "Quint frame 170 decode",
+      "frameHex": "01000000000000010000e282",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 171 decode",
+      "frameHex": "01000000000000010001e282",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e282"
+      }
+    },
+    {
+      "name": "Quint frame 174 decode",
+      "frameHex": "01000000000000010000e28241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�A"
+      }
+    },
+    {
+      "name": "Quint frame 175 decode",
+      "frameHex": "01000000000000010001e28241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e28241"
+      }
+    },
+    {
+      "name": "Quint frame 178 decode",
+      "frameHex": "01000000000000010000e09fbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "���"
+      }
+    },
+    {
+      "name": "Quint frame 179 decode",
+      "frameHex": "01000000000000010001e09fbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e09fbf"
+      }
+    },
+    {
+      "name": "Quint frame 182 decode",
+      "frameHex": "01000000000000010000e0a080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "ࠀ"
+      }
+    },
+    {
+      "name": "Quint frame 183 decode",
+      "frameHex": "01000000000000010001e0a080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e0a080"
+      }
+    },
+    {
+      "name": "Quint frame 186 decode",
+      "frameHex": "01000000000000010000ed9fbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "퟿"
+      }
+    },
+    {
+      "name": "Quint frame 187 decode",
+      "frameHex": "01000000000000010001ed9fbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "ed9fbf"
+      }
+    },
+    {
+      "name": "Quint frame 190 decode",
+      "frameHex": "01000000000000010000eda080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "���"
+      }
+    },
+    {
+      "name": "Quint frame 191 decode",
+      "frameHex": "01000000000000010001eda080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "eda080"
+      }
+    },
+    {
+      "name": "Quint frame 194 decode",
+      "frameHex": "01000000000000010000efbbbf41",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "﻿A"
+      }
+    },
+    {
+      "name": "Quint frame 195 decode",
+      "frameHex": "01000000000000010001efbbbf41",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "efbbbf41"
+      }
+    },
+    {
+      "name": "Quint frame 198 decode",
+      "frameHex": "01000000000000010000efbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "￿"
+      }
+    },
+    {
+      "name": "Quint frame 199 decode",
+      "frameHex": "01000000000000010001efbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "efbfbf"
+      }
+    },
+    {
+      "name": "Quint frame 202 decode",
+      "frameHex": "01000000000000010000f08fbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "����"
+      }
+    },
+    {
+      "name": "Quint frame 203 decode",
+      "frameHex": "01000000000000010001f08fbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f08fbfbf"
+      }
+    },
+    {
+      "name": "Quint frame 206 decode",
+      "frameHex": "01000000000000010000f0908080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "𐀀"
+      }
+    },
+    {
+      "name": "Quint frame 207 decode",
+      "frameHex": "01000000000000010001f0908080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f0908080"
+      }
+    },
+    {
+      "name": "Quint frame 210 decode",
+      "frameHex": "01000000000000010000f48fbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "􏿿"
+      }
+    },
+    {
+      "name": "Quint frame 211 decode",
+      "frameHex": "01000000000000010001f48fbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f48fbfbf"
+      }
+    },
+    {
+      "name": "Quint frame 214 decode",
+      "frameHex": "01000000000000010000f4908080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "����"
+      }
+    },
+    {
+      "name": "Quint frame 215 decode",
+      "frameHex": "01000000000000010001f4908080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f4908080"
+      }
+    },
+    {
+      "name": "Quint frame 218 decode",
+      "frameHex": "01000000000000010000f5808080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "����"
+      }
+    },
+    {
+      "name": "Quint frame 219 decode",
+      "frameHex": "01000000000000010001f5808080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f5808080"
+      }
+    },
+    {
+      "name": "Quint frame 222 decode",
+      "frameHex": "01000000000000010000f09080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 223 decode",
+      "frameHex": "01000000000000010001f09080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f09080"
+      }
+    },
+    {
+      "name": "Quint frame 226 decode",
+      "frameHex": "01000000000000010000e2c2a2",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�¢"
+      }
+    },
+    {
+      "name": "Quint frame 227 decode",
+      "frameHex": "01000000000000010001e2c2a2",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e2c2a2"
+      }
+    },
+    {
+      "name": "Quint frame 230 decode",
+      "frameHex": "010000000000000100008080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "��"
+      }
+    },
+    {
+      "name": "Quint frame 231 decode",
+      "frameHex": "010000000000000100018080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "8080"
+      }
+    },
+    {
+      "name": "Quint frame 234 decode",
+      "frameHex": "01000000000000010000410042",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "A\u0000B"
+      }
+    },
+    {
+      "name": "Quint frame 235 decode",
+      "frameHex": "01000000000000010001410042",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "410042"
+      }
+    },
+    {
+      "name": "Quint frame 238 decode",
+      "frameHex": "01000000000000010000f09f9880",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "😀"
+      }
+    },
+    {
+      "name": "Quint frame 239 decode",
+      "frameHex": "01000000000000010001f09f9880",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f09f9880"
+      }
+    },
+    {
+      "name": "Quint frame 405 decode",
+      "frameHex": null,
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 406 decode",
+      "frameHex": null,
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 407 decode",
+      "frameHex": null,
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 408 decode",
+      "frameHex": null,
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 409 decode",
+      "frameHex": null,
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 410 decode",
+      "frameHex": null,
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 411 decode",
+      "frameHex": null,
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 412 decode",
+      "frameHex": null,
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 413 decode",
+      "frameHex": null,
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 414 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 415 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 416 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 417 decode",
+      "frameHex": null,
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 418 decode",
+      "frameHex": null,
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 419 decode",
+      "frameHex": null,
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 420 decode",
+      "frameHex": null,
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 421 decode",
+      "frameHex": null,
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 422 decode",
+      "frameHex": null,
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 423 decode",
+      "frameHex": null,
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 424 decode",
+      "frameHex": null,
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 425 decode",
+      "frameHex": null,
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 426 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 427 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 428 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 429 decode",
+      "frameHex": null,
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 430 decode",
+      "frameHex": null,
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 431 decode",
+      "frameHex": null,
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 432 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 433 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 434 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 435 decode",
+      "frameHex": null,
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 436 decode",
+      "frameHex": null,
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 437 decode",
+      "frameHex": null,
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 438 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 439 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 440 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 441 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 442 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 443 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 444 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 445 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 446 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 447 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 448 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 449 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 450 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 451 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 452 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 453 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 454 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 455 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 456 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 457 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 458 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 459 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 460 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 461 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 462 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 463 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 464 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 465 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 466 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 467 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 468 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 469 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 470 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 471 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 472 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 473 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 474 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 475 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 476 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 477 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 478 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 479 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 480 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 481 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 482 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 483 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 484 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 485 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 486 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 487 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 488 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 489 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 490 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 491 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 492 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 493 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 494 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 495 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 496 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 497 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 498 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 499 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 500 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 501 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 502 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 503 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 504 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 505 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 506 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 507 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 508 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 509 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 510 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 511 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 512 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "Quint frame 513 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 514 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 515 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 516 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 517 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 518 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 519 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 520 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 521 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 522 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 523 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 524 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 525 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 526 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 527 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 528 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 529 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 530 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 531 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 532 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 533 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 534 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 535 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 536 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 537 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 538 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 539 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 540 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 541 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 542 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 543 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 544 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 545 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 546 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 547 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 548 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 549 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 550 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 551 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1
+      }
+    },
+    {
+      "name": "Quint frame 552 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 553 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 554 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 2
+      }
+    },
+    {
+      "name": "Quint frame 555 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 556 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 557 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 558 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 559 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 560 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 561 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 562 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 563 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 564 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 565 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 566 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 567 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 568 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 569 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    }
+  ],
+  "untrackedDecodeVectors": [
+    {
+      "name": "Quint frame 124 decode",
+      "frameHex": "01000000000000010000",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "Quint frame 125 decode",
+      "frameHex": "01000000000000010001",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": ""
+      }
+    },
+    {
+      "name": "Quint frame 128 decode",
+      "frameHex": "0100000000000001000000",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "\u0000"
+      }
+    },
+    {
+      "name": "Quint frame 129 decode",
+      "frameHex": "0100000000000001000100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "00"
+      }
+    },
+    {
+      "name": "Quint frame 132 decode",
+      "frameHex": "0100000000000001000041",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 133 decode",
+      "frameHex": "0100000000000001000141",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 136 decode",
+      "frameHex": "010000000000000100007f",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "Quint frame 137 decode",
+      "frameHex": "010000000000000100017f",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "7f"
+      }
+    },
+    {
+      "name": "Quint frame 140 decode",
+      "frameHex": "0100000000000001000080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 141 decode",
+      "frameHex": "0100000000000001000180",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "80"
+      }
+    },
+    {
+      "name": "Quint frame 144 decode",
+      "frameHex": "01000000000000010000ff",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 145 decode",
+      "frameHex": "01000000000000010001ff",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "ff"
+      }
+    },
+    {
+      "name": "Quint frame 148 decode",
+      "frameHex": "01000000000000010000c080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "��"
+      }
+    },
+    {
+      "name": "Quint frame 149 decode",
+      "frameHex": "01000000000000010001c080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "c080"
+      }
+    },
+    {
+      "name": "Quint frame 152 decode",
+      "frameHex": "01000000000000010000c280",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "Quint frame 153 decode",
+      "frameHex": "01000000000000010001c280",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "c280"
+      }
+    },
+    {
+      "name": "Quint frame 156 decode",
+      "frameHex": "01000000000000010000dfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "߿"
+      }
+    },
+    {
+      "name": "Quint frame 157 decode",
+      "frameHex": "01000000000000010001dfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "dfbf"
+      }
+    },
+    {
+      "name": "Quint frame 160 decode",
+      "frameHex": "01000000000000010000c2",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 161 decode",
+      "frameHex": "01000000000000010001c2",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "c2"
+      }
+    },
+    {
+      "name": "Quint frame 164 decode",
+      "frameHex": "01000000000000010000c241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�A"
+      }
+    },
+    {
+      "name": "Quint frame 165 decode",
+      "frameHex": "01000000000000010001c241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "c241"
+      }
+    },
+    {
+      "name": "Quint frame 168 decode",
+      "frameHex": "01000000000000010000e282",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 169 decode",
+      "frameHex": "01000000000000010001e282",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e282"
+      }
+    },
+    {
+      "name": "Quint frame 172 decode",
+      "frameHex": "01000000000000010000e28241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�A"
+      }
+    },
+    {
+      "name": "Quint frame 173 decode",
+      "frameHex": "01000000000000010001e28241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e28241"
+      }
+    },
+    {
+      "name": "Quint frame 176 decode",
+      "frameHex": "01000000000000010000e09fbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "���"
+      }
+    },
+    {
+      "name": "Quint frame 177 decode",
+      "frameHex": "01000000000000010001e09fbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e09fbf"
+      }
+    },
+    {
+      "name": "Quint frame 180 decode",
+      "frameHex": "01000000000000010000e0a080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "ࠀ"
+      }
+    },
+    {
+      "name": "Quint frame 181 decode",
+      "frameHex": "01000000000000010001e0a080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e0a080"
+      }
+    },
+    {
+      "name": "Quint frame 184 decode",
+      "frameHex": "01000000000000010000ed9fbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "퟿"
+      }
+    },
+    {
+      "name": "Quint frame 185 decode",
+      "frameHex": "01000000000000010001ed9fbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "ed9fbf"
+      }
+    },
+    {
+      "name": "Quint frame 188 decode",
+      "frameHex": "01000000000000010000eda080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "���"
+      }
+    },
+    {
+      "name": "Quint frame 189 decode",
+      "frameHex": "01000000000000010001eda080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "eda080"
+      }
+    },
+    {
+      "name": "Quint frame 192 decode",
+      "frameHex": "01000000000000010000efbbbf41",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "﻿A"
+      }
+    },
+    {
+      "name": "Quint frame 193 decode",
+      "frameHex": "01000000000000010001efbbbf41",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "efbbbf41"
+      }
+    },
+    {
+      "name": "Quint frame 196 decode",
+      "frameHex": "01000000000000010000efbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "￿"
+      }
+    },
+    {
+      "name": "Quint frame 197 decode",
+      "frameHex": "01000000000000010001efbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "efbfbf"
+      }
+    },
+    {
+      "name": "Quint frame 200 decode",
+      "frameHex": "01000000000000010000f08fbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "����"
+      }
+    },
+    {
+      "name": "Quint frame 201 decode",
+      "frameHex": "01000000000000010001f08fbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f08fbfbf"
+      }
+    },
+    {
+      "name": "Quint frame 204 decode",
+      "frameHex": "01000000000000010000f0908080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "𐀀"
+      }
+    },
+    {
+      "name": "Quint frame 205 decode",
+      "frameHex": "01000000000000010001f0908080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f0908080"
+      }
+    },
+    {
+      "name": "Quint frame 208 decode",
+      "frameHex": "01000000000000010000f48fbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "􏿿"
+      }
+    },
+    {
+      "name": "Quint frame 209 decode",
+      "frameHex": "01000000000000010001f48fbfbf",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f48fbfbf"
+      }
+    },
+    {
+      "name": "Quint frame 212 decode",
+      "frameHex": "01000000000000010000f4908080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "����"
+      }
+    },
+    {
+      "name": "Quint frame 213 decode",
+      "frameHex": "01000000000000010001f4908080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f4908080"
+      }
+    },
+    {
+      "name": "Quint frame 216 decode",
+      "frameHex": "01000000000000010000f5808080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "����"
+      }
+    },
+    {
+      "name": "Quint frame 217 decode",
+      "frameHex": "01000000000000010001f5808080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f5808080"
+      }
+    },
+    {
+      "name": "Quint frame 220 decode",
+      "frameHex": "01000000000000010000f09080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "Quint frame 221 decode",
+      "frameHex": "01000000000000010001f09080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f09080"
+      }
+    },
+    {
+      "name": "Quint frame 224 decode",
+      "frameHex": "01000000000000010000e2c2a2",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "�¢"
+      }
+    },
+    {
+      "name": "Quint frame 225 decode",
+      "frameHex": "01000000000000010001e2c2a2",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "e2c2a2"
+      }
+    },
+    {
+      "name": "Quint frame 228 decode",
+      "frameHex": "010000000000000100008080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "��"
+      }
+    },
+    {
+      "name": "Quint frame 229 decode",
+      "frameHex": "010000000000000100018080",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "8080"
+      }
+    },
+    {
+      "name": "Quint frame 232 decode",
+      "frameHex": "01000000000000010000410042",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "A\u0000B"
+      }
+    },
+    {
+      "name": "Quint frame 233 decode",
+      "frameHex": "01000000000000010001410042",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "410042"
+      }
+    },
+    {
+      "name": "Quint frame 236 decode",
+      "frameHex": "01000000000000010000f09f9880",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "string",
+        "payloadUtf8": "😀"
+      }
+    },
+    {
+      "name": "Quint frame 237 decode",
+      "frameHex": "01000000000000010001f09f9880",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 256,
+        "payloadType": "binary",
+        "payloadHex": "f09f9880"
+      }
+    },
+    {
+      "name": "Quint frame 240 decode",
+      "frameHex": null,
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 241 decode",
+      "frameHex": null,
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 242 decode",
+      "frameHex": null,
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 243 decode",
+      "frameHex": null,
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 244 decode",
+      "frameHex": null,
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 245 decode",
+      "frameHex": null,
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 246 decode",
+      "frameHex": null,
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 247 decode",
+      "frameHex": null,
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 248 decode",
+      "frameHex": null,
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 249 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 250 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 251 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 252 decode",
+      "frameHex": null,
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 253 decode",
+      "frameHex": null,
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 254 decode",
+      "frameHex": null,
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 255 decode",
+      "frameHex": null,
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 256 decode",
+      "frameHex": null,
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 257 decode",
+      "frameHex": null,
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 258 decode",
+      "frameHex": null,
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 259 decode",
+      "frameHex": null,
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 260 decode",
+      "frameHex": null,
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 261 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 262 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 263 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 264 decode",
+      "frameHex": null,
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 265 decode",
+      "frameHex": null,
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 266 decode",
+      "frameHex": null,
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 267 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 268 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 269 decode",
+      "frameHex": null,
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 270 decode",
+      "frameHex": null,
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 271 decode",
+      "frameHex": null,
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 272 decode",
+      "frameHex": null,
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "Quint frame 273 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 274 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 275 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 276 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 277 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 278 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 279 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 280 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 281 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 282 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 283 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 284 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 285 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 286 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 287 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 288 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 289 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 290 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 291 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 292 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 293 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 294 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 295 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 296 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 297 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 298 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 299 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 300 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 301 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 302 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 303 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 304 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 305 decode",
+      "frameHex": "0100",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 306 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 307 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 308 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 309 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 310 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 311 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 312 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 313 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 314 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 315 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 316 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 317 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 318 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 319 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 320 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 321 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 322 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 323 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 324 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 325 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 326 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 327 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 328 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 329 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 330 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 331 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 332 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 333 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 334 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 335 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 336 decode",
+      "frameHex": "02000000000000000100",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 337 decode",
+      "frameHex": "02000000000000000101",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 338 decode",
+      "frameHex": "02000000000000000102",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "Quint frame 339 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 340 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 341 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 342 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 343 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 344 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 345 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 346 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 347 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 348 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 349 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 350 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 351 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 352 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 353 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 354 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 355 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 356 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 357 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 358 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 359 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 360 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 361 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 362 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 363 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 364 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 365 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 366 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 367 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 368 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 369 decode",
+      "frameHex": "0100000000000000000041",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 370 decode",
+      "frameHex": "0100000000000000000141",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 371 decode",
+      "frameHex": "0100000000000000000241",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 372 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 373 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 374 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 375 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 376 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 377 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 378 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 379 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 380 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 381 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 382 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 383 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "1",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 384 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 385 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 386 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "001",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 387 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 388 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 389 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "2",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 390 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 391 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 392 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 393 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 394 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 395 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 396 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 397 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 398 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 399 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 400 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 401 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "Quint frame 402 decode",
+      "frameHex": "0100000000000000010041",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "A"
+      }
+    },
+    {
+      "name": "Quint frame 403 decode",
+      "frameHex": "0100000000000000010141",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "41"
+      }
+    },
+    {
+      "name": "Quint frame 404 decode",
+      "frameHex": "0100000000000000010241",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    }
+  ],
+  "invalidTimestampVectors": [
+    {
+      "name": "Quint frame 570 encode",
+      "input": -1
+    },
+    {
+      "name": "Quint frame 571 encode",
+      "input": 0.5
+    },
+    {
+      "name": "Quint frame 572 encode",
+      "input": 9007199254740992
+    },
+    {
+      "name": "Quint frame 573 encode",
+      "input": 0,
+      "specialInput": "NaN"
+    },
+    {
+      "name": "Quint frame 574 encode",
+      "input": 0,
+      "specialInput": "Infinity"
+    },
+    {
+      "name": "Quint frame 575 encode",
+      "input": 0,
+      "specialInput": "-Infinity"
+    }
+  ],
+  "durationVectors": [
+    {
+      "name": "Quint frame 576 duration",
+      "input": -1,
+      "expected": null
+    },
+    {
+      "name": "Quint frame 577 duration",
+      "input": 0,
+      "expected": null
+    },
+    {
+      "name": "Quint frame 578 duration",
+      "input": 0.5,
+      "expected": 1
+    },
+    {
+      "name": "Quint frame 579 duration",
+      "input": 1,
+      "expected": 1
+    },
+    {
+      "name": "Quint frame 580 duration",
+      "input": 1.999,
+      "expected": 2
+    },
+    {
+      "name": "Quint frame 581 duration",
+      "input": 31536000000,
+      "expected": 31536000000
+    },
+    {
+      "name": "Quint frame 582 duration",
+      "input": 31535999999.999,
+      "expected": 31536000000
+    },
+    {
+      "name": "Quint frame 583 duration",
+      "input": 31536000000.001,
+      "expected": null
+    },
+    {
+      "name": "Quint frame 584 duration",
+      "input": 31536000001,
+      "expected": null
+    },
+    {
+      "name": "Quint frame 585 duration",
+      "input": 9007199254740992,
+      "expected": null
+    },
+    {
+      "name": "Quint frame 586 duration",
+      "input": 0,
+      "specialInput": "NaN",
+      "expected": null
+    },
+    {
+      "name": "Quint frame 587 duration",
+      "input": 0,
+      "specialInput": "Infinity",
+      "expected": null
+    },
+    {
+      "name": "Quint frame 588 duration",
+      "input": 0,
+      "specialInput": "-Infinity",
+      "expected": null
+    }
+  ]
+}

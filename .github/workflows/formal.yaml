@@ -1,0 +1,45 @@
+name: Formal smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formal-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Retain the familiar status name; this is explicitly the fast smoke gate.
+  quint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-validation
+        with:
+          go: "true"
+      - name: Audit contracts and replay committed Quint smoke in both ports
+        run: make audit smoke
+      - name: Detect changes requiring fresh Quint artifact generation
+        id: fixture-scope
+        run: node .github/scripts/fixture-scope.mjs
+      - uses: ./.github/actions/setup-quint
+        if: steps.fixture-scope.outputs.recompute == 'true'
+      - name: Recompute all committed Quint artifacts after relevant changes
+        if: steps.fixture-scope.outputs.recompute == 'true'
+        run: make fixtures-check
+      - name: Preserve smoke and fixture diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-smoke-evidence
+          path: .formal-traces/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

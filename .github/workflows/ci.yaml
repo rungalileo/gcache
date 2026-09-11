@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  typescript:
     runs-on: ubuntu-latest
     # id-token lets the Codecov upload authenticate via OIDC instead of a
     # long-lived token secret.
@@ -22,16 +22,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-        with:
-          version: 10.33.0
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm test
+      - uses: ./.github/actions/setup-validation
+      - name: Check TypeScript types, native tests, build and package
+        run: make check-ts
       # push events only reach this workflow for main, so this uploads
       # coverage exactly when a commit lands there — never for PRs.
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
@@ -41,8 +34,8 @@ jobs:
           disable_search: true
           use_oidc: true
           fail_ci_if_error: true
-      - run: pnpm build
-      - run: pnpm test:integration
+      - name: Check real Redis, Valkey and Cluster integrations
+        run: make integration-ts
       # Prove the exact consumer floor (first 22.x with node:zlib zstd);
       # development and integration stay on Node 24.
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -50,8 +43,32 @@ jobs:
           node-version: "22.15.0"
           cache: "pnpm"
       - name: Test packed package on the minimum Node.js version
+        run: make package-floor
+
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+        with:
+          go: "true"
+      - name: Check Go formatting, vet and native tests with race detection
+        run: make check-go
+      - name: Check real Redis, Valkey, Cluster and TypeScript interoperability with race detection
+        run: make integration-go
+
+  # The existing required `test` status now requires both native language jobs.
+  test:
+    needs: [typescript, go]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require successful TypeScript and Go checks
+        env:
+          TYPESCRIPT_RESULT: ${{ needs.typescript.result }}
+          GO_RESULT: ${{ needs.go.result }}
         run: |
-          node --version
-          # Prove zstd runs AND the output cap enforces at the floor, not just that it imports.
-          node -e "const z=require('node:zlib');const b=z.zstdCompressSync(Buffer.from('dialcache floor smoke'),{params:{[z.constants.ZSTD_c_compressionLevel]:3}});const out=z.zstdDecompressSync(b,{maxOutputLength:1024});if(out.toString('utf8')!=='dialcache floor smoke'){throw new Error('zstd floor smoke failed')};let code;try{z.zstdDecompressSync(b,{maxOutputLength:4})}catch(e){code=e.code};if(code!=='ERR_BUFFER_TOO_LARGE'){throw new Error('zstd cap not enforced at floor: '+code)}"
-          pnpm test:package
+          test "$TYPESCRIPT_RESULT" = success
+          test "$GO_RESULT" = success

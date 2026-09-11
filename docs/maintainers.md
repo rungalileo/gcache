@@ -7,18 +7,41 @@ benchmarks, and the existing release process.
 
 ## Validation
 
-Use the repository's pinned pnpm through Corepack:
+Use Node.js 24 and the repository's pinned pnpm through Corepack. Go checks
+use the CI-pinned Go toolchain; full formal checks also require the pinned
+Quint executable. Run `make help` for targets and prerequisites:
 
 ```bash
 corepack pnpm install --frozen-lockfile
-corepack pnpm check
-corepack pnpm docs:build
-corepack pnpm test:integration
+make check
+make integration
 ```
 
-`check` runs strict typechecking, unit tests with coverage, bundles/declarations,
-and packed ESM/CJS consumer checks. Integration tests use Testcontainers and
-require a Docker-compatible runtime for Redis, Valkey, and Redis Cluster.
+`make check` runs strict TypeScript checks and coverage, bundles/declarations,
+packed ESM/CJS consumer checks, Go vet/formatting/race tests, documentation
+builds, and evidence inventories. Both implementations replay the committed
+Quint smoke fixtures and protocol cases. Integration tests require a
+Docker-compatible runtime for Redis, Valkey, and Redis Cluster and exercise
+both language bindings.
+
+`make formal` checks the scheduled Quint models, generates the complete corpus,
+and requires full TypeScript and Go replay with matching evidence fingerprints.
+`make mutations` then challenges the tests with the catalogued implementation
+faults; it requires current full replay reports.
+`make ci NODE22_BIN=/path/to/node22/bin/node` runs the complete pipeline,
+including integrations, mutations and the exact Node 22.15.0 package floor.
+See the repository's
+[formal guide](https://github.com/lan17/DialCache/blob/main/formal/README.md#generating-and-replaying-behavior)
+for setup, reports and single-history reproduction.
+
+Pull requests run fast native/smoke checks and real integrations. Changes to
+model or generator inputs also trigger fresh Quint artifact recomputation.
+Complete exploration and mutation measurement run through the manual and
+weekly full-validation workflow, using the same Make targets as local runs.
+Run full validation for changes to behavior, models or replay tooling before
+merge, and before release or accepting another port. A scheduled result applies
+to its recorded revision; it does not validate a later PR head. A smoke pass
+does not establish full conformance.
 
 CI uses Node.js 24 for development and integration, then validates the packed
 package and zstd at the exact 22.x consumer floor, Node.js 22.15.0. The published

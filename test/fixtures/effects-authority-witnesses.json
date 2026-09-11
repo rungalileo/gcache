@@ -1,0 +1,3390 @@
+[
+  {
+    "regression": "observerFailuresCannotPreventCacheHitTest",
+    "trace": {
+      "source": {
+        "model": "formal/dialcache-effects-conformance.qnt",
+        "recipe": "formal/fixture-recipes.json#test/fixtures/effects-authority-witnesses.json/observerFailuresCannotPreventCacheHitTest"
+      },
+      "states": [
+        {
+          "input": {
+            "choice": {
+              "#bigint": "2"
+            },
+            "name": "init"
+          },
+          "mbt::actionTaken": "init",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "2"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "1"
+            },
+            "name": "observerFault"
+          },
+          "mbt::actionTaken": "observerFault",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "1"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "seedRemote"
+          },
+          "mbt::actionTaken": "seedRemote",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "releaseRead"
+          },
+          "mbt::actionTaken": "releaseRead",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "1"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "releaseLoad"
+          },
+          "mbt::actionTaken": "releaseLoad",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "1"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "load",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "regression": "observerFailuresCannotPreventPublicationTest",
+    "trace": {
+      "source": {
+        "model": "formal/dialcache-effects-conformance.qnt",
+        "recipe": "formal/fixture-recipes.json#test/fixtures/effects-authority-witnesses.json/observerFailuresCannotPreventPublicationTest"
+      },
+      "states": [
+        {
+          "input": {
+            "choice": {
+              "#bigint": "2"
+            },
+            "name": "init"
+          },
+          "mbt::actionTaken": "init",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "2"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "1"
+            },
+            "name": "observerFault"
+          },
+          "mbt::actionTaken": "observerFault",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "1"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "releaseRead"
+          },
+          "mbt::actionTaken": "releaseRead",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "resolveLoader"
+          },
+          "mbt::actionTaken": "resolveLoader",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "releaseDump"
+          },
+          "mbt::actionTaken": "releaseDump",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "releaseWrite"
+          },
+          "mbt::actionTaken": "releaseWrite",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "2"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "1"
+            },
+            "name": "releaseRead"
+          },
+          "mbt::actionTaken": "releaseRead",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "1"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "2"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "1"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "releaseLoad"
+          },
+          "mbt::actionTaken": "releaseLoad",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              }
+            ],
+            "reads": {
+              "#bigint": "2"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "1"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "load",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "regression": "observerFailuresCannotReplaceSourceErrorTest",
+    "trace": {
+      "source": {
+        "model": "formal/dialcache-effects-conformance.qnt",
+        "recipe": "formal/fixture-recipes.json#test/fixtures/effects-authority-witnesses.json/observerFailuresCannotReplaceSourceErrorTest"
+      },
+      "states": [
+        {
+          "input": {
+            "choice": {
+              "#bigint": "2"
+            },
+            "name": "init"
+          },
+          "mbt::actionTaken": "init",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "2"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "1"
+            },
+            "name": "observerFault"
+          },
+          "mbt::actionTaken": "observerFault",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "1"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "failRead"
+          },
+          "mbt::actionTaken": "failRead",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "cache_read",
+                "event": "error",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "rejectLoader"
+          },
+          "mbt::actionTaken": "rejectLoader",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "2"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "cache_read",
+                "event": "error",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "fallback",
+                "event": "error",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "regression": "writeStampAfterSerializationClearsInterveningFenceTest",
+    "trace": {
+      "source": {
+        "model": "formal/dialcache-effects-conformance.qnt",
+        "recipe": "formal/fixture-recipes.json#test/fixtures/effects-authority-witnesses.json/writeStampAfterSerializationClearsInterveningFenceTest"
+      },
+      "states": [
+        {
+          "input": {
+            "choice": {
+              "#bigint": "2"
+            },
+            "name": "init"
+          },
+          "mbt::actionTaken": "init",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "2"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "releaseRead"
+          },
+          "mbt::actionTaken": "releaseRead",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "resolveLoader"
+          },
+          "mbt::actionTaken": "resolveLoader",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "invalidate"
+          },
+          "mbt::actionTaken": "invalidate",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "invalidation",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "tick"
+          },
+          "mbt::actionTaken": "tick",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "invalidation",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "releaseDump"
+          },
+          "mbt::actionTaken": "releaseDump",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "invalidation",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "10"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "releaseWrite"
+          },
+          "mbt::actionTaken": "releaseWrite",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "invalidation",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "10"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "2"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "invalidation",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "10"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "1"
+            },
+            "name": "releaseRead"
+          },
+          "mbt::actionTaken": "releaseRead",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "1"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "2"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "1"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "invalidation",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "10"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "releaseLoad"
+          },
+          "mbt::actionTaken": "releaseLoad",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              }
+            ],
+            "reads": {
+              "#bigint": "2"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "1"
+            },
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writes": {
+              "#bigint": "1"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "value_absent",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "invalidation",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "10"
+                },
+                "detail": "dump",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "size",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1"
+                },
+                "detail": "",
+                "event": "storedSize",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "writeDispatch",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "load",
+                "event": "serialization",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "regression": "futureFrameReportsPositiveObservingOffsetTest",
+    "trace": {
+      "source": {
+        "model": "formal/dialcache-effects-conformance.qnt",
+        "recipe": "formal/fixture-recipes.json#test/fixtures/effects-authority-witnesses.json/futureFrameReportsPositiveObservingOffsetTest"
+      },
+      "states": [
+        {
+          "input": {
+            "choice": {
+              "#bigint": "2"
+            },
+            "name": "init"
+          },
+          "mbt::actionTaken": "init",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "2"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "seedRemote"
+          },
+          "mbt::actionTaken": "seedRemote",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "rollbackWall"
+          },
+          "mbt::actionTaken": "rollbackWall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "releaseRead"
+          },
+          "mbt::actionTaken": "releaseRead",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1000"
+                },
+                "detail": "",
+                "event": "futureOffset",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "unclassified",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "rejectLoader"
+          },
+          "mbt::actionTaken": "rejectLoader",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "2"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "1000"
+                },
+                "detail": "",
+                "event": "futureOffset",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "unclassified",
+                "event": "miss",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "fallback",
+                "event": "error",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "regression": "coalescedFailureKeepsOneLeaderAndFollowerTrailTest",
+    "trace": {
+      "source": {
+        "model": "formal/dialcache-effects-conformance.qnt",
+        "recipe": "formal/fixture-recipes.json#test/fixtures/effects-authority-witnesses.json/coalescedFailureKeepsOneLeaderAndFollowerTrailTest"
+      },
+      "states": [
+        {
+          "input": {
+            "choice": {
+              "#bigint": "2"
+            },
+            "name": "init"
+          },
+          "mbt::actionTaken": "init",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "2"
+              }
+            }
+          },
+          "s": {
+            "calls": [],
+            "reads": {
+              "#bigint": "0"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": []
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "-1"
+            },
+            "name": "beginCall"
+          },
+          "mbt::actionTaken": "beginCall",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "None",
+              "value": {
+                "#tup": []
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "0"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "coalesced",
+                "location": "process"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "failRead"
+          },
+          "mbt::actionTaken": "failRead",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "coalesced",
+                "location": "process"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "cache_read",
+                "event": "error",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "choice": {
+              "#bigint": "0"
+            },
+            "name": "rejectLoader"
+          },
+          "mbt::actionTaken": "rejectLoader",
+          "mbt::nondetPicks": {
+            "choice": {
+              "tag": "Some",
+              "value": {
+                "#bigint": "0"
+              }
+            }
+          },
+          "s": {
+            "calls": [
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              }
+            ],
+            "reads": {
+              "#bigint": "1"
+            },
+            "loaders": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "0"
+            },
+            "dumps": {
+              "#bigint": "0"
+            },
+            "writes": {
+              "#bigint": "0"
+            },
+            "events": [
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "request",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "policy_disabled",
+                "event": "disabled",
+                "location": "local"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "coalesced",
+                "location": "process"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "cache_read",
+                "event": "error",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "get",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "fallback",
+                "event": "error",
+                "location": "remote"
+              },
+              {
+                "amount": {
+                  "#bigint": "0"
+                },
+                "detail": "",
+                "event": "fallback",
+                "location": "remote"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,780 @@
+{
+  "#meta": {
+    "format": "ITF",
+    "source": "formal/dialcache-conformance.qnt",
+    "recipe": "formal/fixture-recipes.json#formal/conformance-smoke.itf.json/smoke"
+  },
+  "vars": [
+    "input",
+    "s",
+    "mbt::actionTaken",
+    "mbt::nondetPicks"
+  ],
+  "states": [
+    {
+      "input": {
+        "name": "init",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "init",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "1"
+        },
+        "lastResult": {
+          "#bigint": "0"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "0"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localLoaderCalls": {
+          "#bigint": "0"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "0"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localCached": false,
+        "localValue": {
+          "#bigint": "0"
+        },
+        "coalescedCached": false,
+        "coalescedValue": {
+          "#bigint": "0"
+        },
+        "remoteReadable": false,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "redisReads": {
+          "#bigint": "0"
+        },
+        "redisWrites": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "outsideCall",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "outsideCall",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "1"
+        },
+        "lastResult": {
+          "#bigint": "1"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localLoaderCalls": {
+          "#bigint": "0"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "0"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localCached": false,
+        "localValue": {
+          "#bigint": "0"
+        },
+        "coalescedCached": false,
+        "coalescedValue": {
+          "#bigint": "0"
+        },
+        "remoteReadable": false,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "redisReads": {
+          "#bigint": "0"
+        },
+        "redisWrites": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "requestLocalPair",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "requestLocalPair",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "1"
+        },
+        "lastResult": {
+          "#bigint": "1"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "0"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "0"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localCached": false,
+        "localValue": {
+          "#bigint": "0"
+        },
+        "coalescedCached": false,
+        "coalescedValue": {
+          "#bigint": "0"
+        },
+        "remoteReadable": false,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "redisReads": {
+          "#bigint": "0"
+        },
+        "redisWrites": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "localCall",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "localCall",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "1"
+        },
+        "lastResult": {
+          "#bigint": "1"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "0"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": false,
+        "coalescedValue": {
+          "#bigint": "0"
+        },
+        "remoteReadable": false,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "redisReads": {
+          "#bigint": "0"
+        },
+        "redisWrites": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "bumpSource",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "bumpSource",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "2"
+        },
+        "lastResult": {
+          "#bigint": "1"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "0"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": false,
+        "coalescedValue": {
+          "#bigint": "0"
+        },
+        "remoteReadable": false,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "redisReads": {
+          "#bigint": "0"
+        },
+        "redisWrites": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "localCall",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "localCall",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "2"
+        },
+        "lastResult": {
+          "#bigint": "1"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "0"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": false,
+        "coalescedValue": {
+          "#bigint": "0"
+        },
+        "remoteReadable": false,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "redisReads": {
+          "#bigint": "0"
+        },
+        "redisWrites": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "coalescedLocalPair",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "coalescedLocalPair",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "2"
+        },
+        "lastResult": {
+          "#bigint": "2"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "0"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": false,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "redisReads": {
+          "#bigint": "0"
+        },
+        "redisWrites": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "remoteCall",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "remoteCall",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "2"
+        },
+        "lastResult": {
+          "#bigint": "2"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "redisReads": {
+          "#bigint": "1"
+        },
+        "redisWrites": {
+          "#bigint": "1"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "bumpSource",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "bumpSource",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "3"
+        },
+        "lastResult": {
+          "#bigint": "2"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "redisReads": {
+          "#bigint": "1"
+        },
+        "redisWrites": {
+          "#bigint": "1"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "remoteCall",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "remoteCall",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "3"
+        },
+        "lastResult": {
+          "#bigint": "2"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "redisReads": {
+          "#bigint": "2"
+        },
+        "redisWrites": {
+          "#bigint": "1"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "invalidateRemote",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "invalidateRemote",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "3"
+        },
+        "lastResult": {
+          "#bigint": "2"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": false,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "redisReads": {
+          "#bigint": "2"
+        },
+        "redisWrites": {
+          "#bigint": "2"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "remoteCall",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "remoteCall",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "3"
+        },
+        "lastResult": {
+          "#bigint": "3"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "2"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": true,
+        "remoteValue": {
+          "#bigint": "3"
+        },
+        "redisReads": {
+          "#bigint": "3"
+        },
+        "redisWrites": {
+          "#bigint": "3"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "bumpSource",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "bumpSource",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "4"
+        },
+        "lastResult": {
+          "#bigint": "3"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "2"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": true,
+        "remoteValue": {
+          "#bigint": "3"
+        },
+        "redisReads": {
+          "#bigint": "3"
+        },
+        "redisWrites": {
+          "#bigint": "3"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "remoteReadFailureCall",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "remoteReadFailureCall",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "4"
+        },
+        "lastResult": {
+          "#bigint": "4"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "1"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "3"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": true,
+        "remoteValue": {
+          "#bigint": "3"
+        },
+        "redisReads": {
+          "#bigint": "4"
+        },
+        "redisWrites": {
+          "#bigint": "3"
+        }
+      }
+    },
+    {
+      "input": {
+        "name": "requestLocalPair",
+        "choice": {
+          "#bigint": "-1"
+        }
+      },
+      "mbt::actionTaken": "requestLocalPair",
+      "mbt::nondetPicks": {},
+      "s": {
+        "sourceVersion": {
+          "#bigint": "4"
+        },
+        "lastResult": {
+          "#bigint": "4"
+        },
+        "outsideLoaderCalls": {
+          "#bigint": "1"
+        },
+        "requestLoaderCalls": {
+          "#bigint": "2"
+        },
+        "localLoaderCalls": {
+          "#bigint": "1"
+        },
+        "coalescedLoaderCalls": {
+          "#bigint": "1"
+        },
+        "remoteLoaderCalls": {
+          "#bigint": "3"
+        },
+        "localCached": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "coalescedCached": true,
+        "coalescedValue": {
+          "#bigint": "2"
+        },
+        "remoteReadable": true,
+        "remoteValue": {
+          "#bigint": "3"
+        },
+        "redisReads": {
+          "#bigint": "4"
+        },
+        "redisWrites": {
+          "#bigint": "3"
+        }
+      }
+    }
+  ]
+}

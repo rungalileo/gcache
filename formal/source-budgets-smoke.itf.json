@@ -1,0 +1,891 @@
+{
+  "#meta": {
+    "format": "ITF",
+    "source": "formal/dialcache-source-budgets-conformance.qnt",
+    "recipe": "formal/fixture-recipes.json#formal/source-budgets-smoke.itf.json/smoke"
+  },
+  "vars": [
+    "input",
+    "s",
+    "mbt::actionTaken",
+    "mbt::nondetPicks"
+  ],
+  "states": [
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "init"
+      },
+      "mbt::actionTaken": "init",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "kinds": [],
+        "localExpires": {
+          "#bigint": "0"
+        },
+        "localValue": {
+          "#bigint": "0"
+        },
+        "localWriter": {
+          "#bigint": "-1"
+        },
+        "mode": {
+          "#bigint": "2"
+        },
+        "now": {
+          "#bigint": "0"
+        },
+        "o": {
+          "calls": [],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "owners": [],
+        "policyOwners": [],
+        "registered": {
+          "#bigint": "-1"
+        },
+        "sources": []
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "kinds": [
+          {
+            "#bigint": "0"
+          }
+        ],
+        "localExpires": {
+          "#bigint": "0"
+        },
+        "localValue": {
+          "#bigint": "0"
+        },
+        "localWriter": {
+          "#bigint": "-1"
+        },
+        "mode": {
+          "#bigint": "2"
+        },
+        "now": {
+          "#bigint": "0"
+        },
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "owners": [
+          {
+            "#bigint": "-1"
+          }
+        ],
+        "policyOwners": [
+          {
+            "#bigint": "0"
+          }
+        ],
+        "registered": {
+          "#bigint": "-1"
+        },
+        "sources": []
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "kinds": [
+          {
+            "#bigint": "0"
+          }
+        ],
+        "localExpires": {
+          "#bigint": "0"
+        },
+        "localValue": {
+          "#bigint": "0"
+        },
+        "localWriter": {
+          "#bigint": "-1"
+        },
+        "mode": {
+          "#bigint": "2"
+        },
+        "now": {
+          "#bigint": "0"
+        },
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "owners": [
+          {
+            "#bigint": "0"
+          }
+        ],
+        "policyOwners": [
+          {
+            "#bigint": "-1"
+          }
+        ],
+        "registered": {
+          "#bigint": "0"
+        },
+        "sources": [
+          {
+            "budget": {
+              "#bigint": "10"
+            },
+            "cacheable": true,
+            "outside": false,
+            "rawPending": true,
+            "result": {
+              "#bigint": "0"
+            },
+            "settled": {
+              "#bigint": "-1"
+            },
+            "started": {
+              "#bigint": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "6"
+        },
+        "name": "advance"
+      },
+      "mbt::actionTaken": "advance",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "6"
+          }
+        }
+      },
+      "s": {
+        "kinds": [
+          {
+            "#bigint": "0"
+          }
+        ],
+        "localExpires": {
+          "#bigint": "0"
+        },
+        "localValue": {
+          "#bigint": "0"
+        },
+        "localWriter": {
+          "#bigint": "-1"
+        },
+        "mode": {
+          "#bigint": "2"
+        },
+        "now": {
+          "#bigint": "6"
+        },
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "owners": [
+          {
+            "#bigint": "0"
+          }
+        ],
+        "policyOwners": [
+          {
+            "#bigint": "-1"
+          }
+        ],
+        "registered": {
+          "#bigint": "0"
+        },
+        "sources": [
+          {
+            "budget": {
+              "#bigint": "10"
+            },
+            "cacheable": true,
+            "outside": false,
+            "rawPending": true,
+            "result": {
+              "#bigint": "0"
+            },
+            "settled": {
+              "#bigint": "-1"
+            },
+            "started": {
+              "#bigint": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "kinds": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "localExpires": {
+          "#bigint": "0"
+        },
+        "localValue": {
+          "#bigint": "0"
+        },
+        "localWriter": {
+          "#bigint": "-1"
+        },
+        "mode": {
+          "#bigint": "2"
+        },
+        "now": {
+          "#bigint": "6"
+        },
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "owners": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "-1"
+          }
+        ],
+        "policyOwners": [
+          {
+            "#bigint": "-1"
+          },
+          {
+            "#bigint": "1"
+          }
+        ],
+        "registered": {
+          "#bigint": "0"
+        },
+        "sources": [
+          {
+            "budget": {
+              "#bigint": "10"
+            },
+            "cacheable": true,
+            "outside": false,
+            "rawPending": true,
+            "result": {
+              "#bigint": "0"
+            },
+            "settled": {
+              "#bigint": "-1"
+            },
+            "started": {
+              "#bigint": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "kinds": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "localExpires": {
+          "#bigint": "0"
+        },
+        "localValue": {
+          "#bigint": "0"
+        },
+        "localWriter": {
+          "#bigint": "-1"
+        },
+        "mode": {
+          "#bigint": "2"
+        },
+        "now": {
+          "#bigint": "6"
+        },
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "owners": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "policyOwners": [
+          {
+            "#bigint": "-1"
+          },
+          {
+            "#bigint": "-1"
+          }
+        ],
+        "registered": {
+          "#bigint": "0"
+        },
+        "sources": [
+          {
+            "budget": {
+              "#bigint": "10"
+            },
+            "cacheable": true,
+            "outside": false,
+            "rawPending": true,
+            "result": {
+              "#bigint": "0"
+            },
+            "settled": {
+              "#bigint": "-1"
+            },
+            "started": {
+              "#bigint": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "3"
+        },
+        "name": "advance"
+      },
+      "mbt::actionTaken": "advance",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "3"
+          }
+        }
+      },
+      "s": {
+        "kinds": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "localExpires": {
+          "#bigint": "0"
+        },
+        "localValue": {
+          "#bigint": "0"
+        },
+        "localWriter": {
+          "#bigint": "-1"
+        },
+        "mode": {
+          "#bigint": "2"
+        },
+        "now": {
+          "#bigint": "9"
+        },
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "owners": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "policyOwners": [
+          {
+            "#bigint": "-1"
+          },
+          {
+            "#bigint": "-1"
+          }
+        ],
+        "registered": {
+          "#bigint": "0"
+        },
+        "sources": [
+          {
+            "budget": {
+              "#bigint": "10"
+            },
+            "cacheable": true,
+            "outside": false,
+            "rawPending": true,
+            "result": {
+              "#bigint": "0"
+            },
+            "settled": {
+              "#bigint": "-1"
+            },
+            "started": {
+              "#bigint": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "advance"
+      },
+      "mbt::actionTaken": "advance",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "kinds": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "localExpires": {
+          "#bigint": "0"
+        },
+        "localValue": {
+          "#bigint": "0"
+        },
+        "localWriter": {
+          "#bigint": "-1"
+        },
+        "mode": {
+          "#bigint": "2"
+        },
+        "now": {
+          "#bigint": "10"
+        },
+        "o": {
+          "calls": [
+            {
+              "#bigint": "4"
+            },
+            {
+              "#bigint": "4"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "owners": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "policyOwners": [
+          {
+            "#bigint": "-1"
+          },
+          {
+            "#bigint": "-1"
+          }
+        ],
+        "registered": {
+          "#bigint": "-1"
+        },
+        "sources": [
+          {
+            "budget": {
+              "#bigint": "10"
+            },
+            "cacheable": true,
+            "outside": false,
+            "rawPending": true,
+            "result": {
+              "#bigint": "4"
+            },
+            "settled": {
+              "#bigint": "10"
+            },
+            "started": {
+              "#bigint": "0"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

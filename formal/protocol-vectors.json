@@ -1,0 +1,1468 @@
+{
+  "schemaVersion": 3,
+  "keyVectors": [
+    {
+      "name": "default untracked key",
+      "input": {
+        "namespace": "urn",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": false,
+        "args": []
+      },
+      "logicalKey": "urn:user_id:123#GetUser",
+      "valueKey": "urn:user_id:123#GetUser:dialcache-frame-v1",
+      "watermarkKey": null
+    },
+    {
+      "name": "tracked key with sorted argument",
+      "input": {
+        "namespace": "users-api",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": true,
+        "args": [
+          [
+            "locale",
+            "en"
+          ]
+        ]
+      },
+      "logicalKey": "{users-api:user_id:123}?locale=en#GetUser",
+      "valueKey": "{users-api:user_id:123}?locale=en#GetUser:dialcache-frame-v1",
+      "watermarkKey": "{users-api:user_id:123}#watermark"
+    },
+    {
+      "name": "delimiter-safe components",
+      "input": {
+        "namespace": "users api",
+        "keyType": "user/id",
+        "id": "123?filter=active",
+        "useCase": "Get#User",
+        "trackForInvalidation": false,
+        "args": [
+          [
+            "a&b",
+            "x=y"
+          ]
+        ]
+      },
+      "logicalKey": "users%20api:user%2Fid:123%3Ffilter%3Dactive?a%26b=x%3Dy#Get%23User",
+      "valueKey": "users%20api:user%2Fid:123%3Ffilter%3Dactive?a%26b=x%3Dy#Get%23User:dialcache-frame-v1",
+      "watermarkKey": null
+    },
+    {
+      "name": "Unicode components",
+      "input": {
+        "namespace": "café",
+        "keyType": "種類",
+        "id": "😀",
+        "useCase": "読み込み",
+        "args": [
+          [
+            "é",
+            "雪 / ☃"
+          ]
+        ],
+        "trackForInvalidation": true
+      },
+      "logicalKey": "{caf%C3%A9:%E7%A8%AE%E9%A1%9E:%F0%9F%98%80}?%C3%A9=%E9%9B%AA%20%2F%20%E2%98%83#%E8%AA%AD%E3%81%BF%E8%BE%BC%E3%81%BF",
+      "valueKey": "{caf%C3%A9:%E7%A8%AE%E9%A1%9E:%F0%9F%98%80}?%C3%A9=%E9%9B%AA%20%2F%20%E2%98%83#%E8%AA%AD%E3%81%BF%E8%BE%BC%E3%81%BF:dialcache-frame-v1",
+      "watermarkKey": "{caf%C3%A9:%E7%A8%AE%E9%A1%9E:%F0%9F%98%80}#watermark"
+    },
+    {
+      "name": "URI component punctuation",
+      "input": {
+        "namespace": "~!*'()-._",
+        "keyType": "kind",
+        "id": "a+b%c",
+        "useCase": "case",
+        "args": [
+          [
+            "q",
+            "a b+c"
+          ]
+        ],
+        "trackForInvalidation": false
+      },
+      "logicalKey": "~!*'()-._:kind:a%2Bb%25c?q=a%20b%2Bc#case",
+      "valueKey": "~!*'()-._:kind:a%2Bb%25c?q=a%20b%2Bc#case:dialcache-frame-v1",
+      "watermarkKey": null
+    },
+    {
+      "name": "argument order is caller-owned",
+      "input": {
+        "namespace": "urn",
+        "keyType": "id",
+        "id": "1",
+        "useCase": "Get",
+        "args": [
+          [
+            "z",
+            "2"
+          ],
+          [
+            "a",
+            "1"
+          ],
+          [
+            "a",
+            "3"
+          ]
+        ],
+        "trackForInvalidation": false
+      },
+      "logicalKey": "urn:id:1?z=2&a=1&a=3#Get",
+      "valueKey": "urn:id:1?z=2&a=1&a=3#Get:dialcache-frame-v1",
+      "watermarkKey": null
+    },
+    {
+      "name": "empty ID use case and argument",
+      "input": {
+        "namespace": "urn",
+        "keyType": "id",
+        "id": "",
+        "useCase": "",
+        "args": [
+          [
+            "",
+            ""
+          ]
+        ],
+        "trackForInvalidation": true
+      },
+      "logicalKey": "{urn:id:}?=#",
+      "valueKey": "{urn:id:}?=#:dialcache-frame-v1",
+      "watermarkKey": "{urn:id:}#watermark"
+    },
+    {
+      "name": "untracked braces are escaped",
+      "input": {
+        "namespace": "urn",
+        "keyType": "{kind}",
+        "id": "{1}",
+        "useCase": "Get",
+        "args": [],
+        "trackForInvalidation": false
+      },
+      "logicalKey": "urn:%7Bkind%7D:%7B1%7D#Get",
+      "valueKey": "urn:%7Bkind%7D:%7B1%7D#Get:dialcache-frame-v1",
+      "watermarkKey": null
+    }
+  ],
+  "normalizeArgsVectors": [
+    {
+      "name": "sort and omit undefined",
+      "input": {
+        "z": "last",
+        "missing": "__UNDEFINED__",
+        "a": 1,
+        "nil": null,
+        "flag": false
+      },
+      "undefinedSentinel": "__UNDEFINED__",
+      "expected": [
+        [
+          "a",
+          "1"
+        ],
+        [
+          "flag",
+          "false"
+        ],
+        [
+          "nil",
+          "null"
+        ],
+        [
+          "z",
+          "last"
+        ]
+      ]
+    },
+    {
+      "name": "scalar string normalization",
+      "input": {
+        "negativeZero": 0,
+        "number": 1,
+        "text": "1"
+      },
+      "expected": [
+        [
+          "negativeZero",
+          "0"
+        ],
+        [
+          "number",
+          "1"
+        ],
+        [
+          "text",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "UTF-16 ordering including supplementary characters",
+      "input": {
+        "": "BMP",
+        "😀": "supplementary",
+        "A": 1,
+        "a": 2,
+        "é": 3
+      },
+      "expected": [
+        [
+          "A",
+          "1"
+        ],
+        [
+          "a",
+          "2"
+        ],
+        [
+          "é",
+          "3"
+        ],
+        [
+          "😀",
+          "supplementary"
+        ],
+        [
+          "",
+          "BMP"
+        ]
+      ]
+    },
+    {
+      "name": "number formatting boundaries",
+      "input": {
+        "small": 0.000001,
+        "tiny": 1e-7,
+        "large": 1e+21,
+        "integer": 9007199254740991,
+        "fraction": 1.25
+      },
+      "expected": [
+        [
+          "fraction",
+          "1.25"
+        ],
+        [
+          "integer",
+          "9007199254740991"
+        ],
+        [
+          "large",
+          "1e+21"
+        ],
+        [
+          "small",
+          "0.000001"
+        ],
+        [
+          "tiny",
+          "1e-7"
+        ]
+      ]
+    },
+    {
+      "name": "non-JSON scalar input tags",
+      "input": {},
+      "specialArgs": {
+        "negativeZero": "-0",
+        "nan": "NaN",
+        "positiveInfinity": "Infinity",
+        "negativeInfinity": "-Infinity"
+      },
+      "bigintArgs": {
+        "wide": "9007199254740993"
+      },
+      "expected": [
+        [
+          "nan",
+          "NaN"
+        ],
+        [
+          "negativeInfinity",
+          "-Infinity"
+        ],
+        [
+          "negativeZero",
+          "0"
+        ],
+        [
+          "positiveInfinity",
+          "Infinity"
+        ],
+        [
+          "wide",
+          "9007199254740993"
+        ]
+      ]
+    },
+    {
+      "name": "empty arguments",
+      "input": {},
+      "expected": []
+    }
+  ],
+  "frameVectors": [
+    {
+      "name": "utf8 cached at 1000",
+      "createdAtMs": 1000,
+      "payloadType": "string",
+      "payloadUtf8": "cached",
+      "frameHex": "0100000000000003e800636163686564"
+    },
+    {
+      "name": "binary payload at 2000",
+      "createdAtMs": 2000,
+      "payloadType": "binary",
+      "payloadHex": "00ff80",
+      "frameHex": "0100000000000007d00100ff80"
+    },
+    {
+      "name": "zero timestamp empty text",
+      "createdAtMs": 0,
+      "payloadType": "string",
+      "frameHex": "01000000000000000000",
+      "payloadUtf8": ""
+    },
+    {
+      "name": "safe integer ceiling",
+      "createdAtMs": 9007199254740991,
+      "payloadType": "string",
+      "frameHex": "01001fffffffffffff0078",
+      "payloadUtf8": "x"
+    },
+    {
+      "name": "UTF-8 multibyte",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "frameHex": "01000000000000000100e99baaf09f9880",
+      "payloadUtf8": "雪😀"
+    },
+    {
+      "name": "empty binary",
+      "createdAtMs": 1,
+      "payloadType": "binary",
+      "frameHex": "01000000000000000101",
+      "payloadHex": ""
+    },
+    {
+      "name": "isolated high surrogate in text is replaced before UTF-8 encoding",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "A\ud800B",
+      "frameHex": "0100000000000000010041efbfbd42"
+    },
+    {
+      "name": "isolated low surrogate in text is replaced before UTF-8 encoding",
+      "createdAtMs": 1,
+      "payloadType": "string",
+      "payloadUtf8": "A\udc00B",
+      "frameHex": "0100000000000000010041efbfbd42"
+    }
+  ],
+  "trackedDecodeVectors": [
+    {
+      "name": "missing value",
+      "frameHex": null,
+      "watermarkUtf8": "1000",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent",
+        "observedWatermarkMs": 1000
+      }
+    },
+    {
+      "name": "strictly newer than watermark",
+      "frameHex": "0100000000000003e900636163686564",
+      "watermarkUtf8": "1000",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1001,
+        "payloadType": "string",
+        "payloadUtf8": "cached"
+      }
+    },
+    {
+      "name": "equal timestamp is fenced",
+      "frameHex": "0100000000000003e800636163686564",
+      "watermarkUtf8": "1000",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1000
+      }
+    },
+    {
+      "name": "missing watermark uses zero baseline",
+      "frameHex": "0100000000000003e800636163686564",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1000,
+        "payloadType": "string",
+        "payloadUtf8": "cached"
+      }
+    },
+    {
+      "name": "malformed watermark hides unsupported encoding",
+      "frameHex": "0100000000000003e802636163686564",
+      "watermarkUtf8": "invalid",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "fence hides unsupported encoding",
+      "frameHex": "0100000000000003e802636163686564",
+      "watermarkUtf8": "1000",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1000
+      }
+    },
+    {
+      "name": "eligible unsupported encoding is an error",
+      "frameHex": "0100000000000003e902636163686564",
+      "watermarkUtf8": "1000",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "nil and malformed watermark",
+      "frameHex": null,
+      "watermarkUtf8": "invalid",
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "nil and missing watermark",
+      "frameHex": null,
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "short frame preserves fence",
+      "frameHex": "01",
+      "watermarkUtf8": "7",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 7
+      }
+    },
+    {
+      "name": "unsupported frame hides encoding error",
+      "frameHex": "00000000000000000102",
+      "watermarkUtf8": "7",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 7
+      }
+    },
+    {
+      "name": "zero timestamp ignores encoding error",
+      "frameHex": "01000000000000000002",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified",
+        "observedWatermarkMs": 0
+      }
+    },
+    {
+      "name": "zero without watermark",
+      "frameHex": "01000000000000000000",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "older frame fenced",
+      "frameHex": "0100000000000003e700",
+      "watermarkUtf8": "1000",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 1000
+      }
+    },
+    {
+      "name": "binary payload",
+      "frameHex": "0100000000000000010100ff80",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": "00ff80"
+      }
+    },
+    {
+      "name": "empty binary payload",
+      "frameHex": "01000000000000000101",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "binary",
+        "payloadHex": ""
+      }
+    },
+    {
+      "name": "empty UTF-8 payload",
+      "frameHex": "01000000000000000100",
+      "watermarkUtf8": null,
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "maximum safe watermark fences equal frame",
+      "frameHex": "01001fffffffffffff00",
+      "watermarkUtf8": "9007199254740991",
+      "expected": {
+        "kind": "miss",
+        "reason": "watermark_fenced",
+        "observedWatermarkMs": 9007199254740991
+      }
+    },
+    {
+      "name": "leading zero watermark",
+      "frameHex": "01000000000000000100",
+      "watermarkUtf8": "0000",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "unsafe timestamp deferred to core",
+      "frameHex": "01002000000000000000",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 9007199254740992,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "unsafe timestamp preserves encoding error",
+      "frameHex": "01002000000000000002",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "empty watermark",
+      "frameHex": "01000000000000000200",
+      "watermarkUtf8": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "negative watermark",
+      "frameHex": "01000000000000000200",
+      "watermarkUtf8": "-1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "decimal watermark",
+      "frameHex": "01000000000000000200",
+      "watermarkUtf8": "1.0",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "exponent watermark",
+      "frameHex": "01000000000000000200",
+      "watermarkUtf8": "1e3",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "whitespace watermark",
+      "frameHex": "01000000000000000200",
+      "watermarkUtf8": " 1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "plus sign watermark",
+      "frameHex": "01000000000000000200",
+      "watermarkUtf8": "+1",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "unsafe watermark",
+      "frameHex": "01000000000000000200",
+      "watermarkUtf8": "9007199254740992",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "nonfinite watermark",
+      "frameHex": "01000000000000000200",
+      "watermarkUtf8": "Infinity",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "invalid lead preserves surrounding JSON quotes",
+      "frameHex": "0100000000000000010022ff22",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "\"�\""
+      }
+    },
+    {
+      "name": "isolated continuation bytes replace separately",
+      "frameHex": "0100000000000000010080bf",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "��"
+      }
+    },
+    {
+      "name": "truncated valid prefix is one replacement",
+      "frameHex": "01000000000000000100e282",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "interrupted valid prefix preserves ASCII",
+      "frameHex": "01000000000000000100e28241",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "�A"
+      }
+    },
+    {
+      "name": "overlong sequences replace each invalid subpart",
+      "frameHex": "01000000000000000100c0afe08080",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "�����"
+      }
+    },
+    {
+      "name": "UTF-8 encoded surrogate replaces each invalid subpart",
+      "frameHex": "01000000000000000100eda080",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "���"
+      }
+    },
+    {
+      "name": "above Unicode maximum replaces each invalid subpart",
+      "frameHex": "01000000000000000100f4908080",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "����"
+      }
+    },
+    {
+      "name": "UTF-8 BOM remains payload data",
+      "frameHex": "01000000000000000100efbbbf61",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "﻿a"
+      }
+    },
+    {
+      "name": "valid UTF-8 scalar boundaries and noncharacters",
+      "frameHex": "01000000000000000100c280dfbfe0a080ed9fbfee8080efbfbff0908080f48fbfbf",
+      "watermarkUtf8": "0",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "߿ࠀ퟿￿𐀀􏿿"
+      }
+    }
+  ],
+  "invalidTimestampVectors": [
+    {
+      "name": "negative",
+      "input": -1
+    },
+    {
+      "name": "fractional",
+      "input": 1.5
+    },
+    {
+      "name": "unsafe integer",
+      "input": 9007199254740992
+    }
+  ],
+  "untrackedDecodeVectors": [
+    {
+      "name": "missing value",
+      "frameHex": null,
+      "expected": {
+        "kind": "miss",
+        "reason": "value_absent"
+      }
+    },
+    {
+      "name": "empty frame",
+      "frameHex": "",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "short frame",
+      "frameHex": "0100",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "unknown version",
+      "frameHex": "02000000000000000100",
+      "expected": {
+        "kind": "miss",
+        "reason": "unclassified"
+      }
+    },
+    {
+      "name": "zero timestamp readable",
+      "frameHex": "01000000000000000000",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 0,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "UTF-8",
+      "frameHex": "01000000000000000100e99baa",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "雪"
+      }
+    },
+    {
+      "name": "binary",
+      "frameHex": "0100000000000000020100ff",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 2,
+        "payloadType": "binary",
+        "payloadHex": "00ff"
+      }
+    },
+    {
+      "name": "unsupported encoding",
+      "frameHex": "01000000000000000102",
+      "expected": {
+        "kind": "payload_encoding_error"
+      }
+    },
+    {
+      "name": "unsafe timestamp deferred to core",
+      "frameHex": "01002000000000000000",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 9007199254740992,
+        "payloadType": "string",
+        "payloadUtf8": ""
+      }
+    },
+    {
+      "name": "invalid lead preserves surrounding JSON quotes",
+      "frameHex": "0100000000000000010022ff22",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "\"�\""
+      }
+    },
+    {
+      "name": "isolated continuation bytes replace separately",
+      "frameHex": "0100000000000000010080bf",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "��"
+      }
+    },
+    {
+      "name": "truncated valid prefix is one replacement",
+      "frameHex": "01000000000000000100e282",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "�"
+      }
+    },
+    {
+      "name": "interrupted valid prefix preserves ASCII",
+      "frameHex": "01000000000000000100e28241",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "�A"
+      }
+    },
+    {
+      "name": "overlong sequences replace each invalid subpart",
+      "frameHex": "01000000000000000100c0afe08080",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "�����"
+      }
+    },
+    {
+      "name": "UTF-8 encoded surrogate replaces each invalid subpart",
+      "frameHex": "01000000000000000100eda080",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "���"
+      }
+    },
+    {
+      "name": "above Unicode maximum replaces each invalid subpart",
+      "frameHex": "01000000000000000100f4908080",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "����"
+      }
+    },
+    {
+      "name": "UTF-8 BOM remains payload data",
+      "frameHex": "01000000000000000100efbbbf61",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "﻿a"
+      }
+    },
+    {
+      "name": "valid UTF-8 scalar boundaries and noncharacters",
+      "frameHex": "01000000000000000100c280dfbfe0a080ed9fbfee8080efbfbff0908080f48fbfbf",
+      "expected": {
+        "kind": "hit",
+        "createdAtMs": 1,
+        "payloadType": "string",
+        "payloadUtf8": "߿ࠀ퟿￿𐀀􏿿"
+      }
+    }
+  ],
+  "envelopeVectors": [
+    {
+      "name": "empty",
+      "inputHex": "",
+      "escapedHex": "",
+      "decodedHex": "",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "raw nonmarker",
+      "inputHex": "03ff",
+      "escapedHex": "03ff",
+      "decodedHex": "03ff",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "escape zero",
+      "inputHex": "00ff",
+      "escapedHex": "0000ff",
+      "decodedHex": "00ff",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "escape UTF-8 marker",
+      "inputHex": "01ff",
+      "escapedHex": "0001ff",
+      "decodedHex": "01ff",
+      "outcome": "fallback_raw"
+    },
+    {
+      "name": "escape binary marker",
+      "inputHex": "02ff",
+      "escapedHex": "0002ff",
+      "decodedHex": "02ff",
+      "outcome": "fallback_raw"
+    },
+    {
+      "name": "strip produced escape",
+      "inputHex": "0001ff",
+      "escapedHex": "000001ff",
+      "decodedHex": "01ff",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "legacy zero prefix",
+      "inputHex": "0003ff",
+      "escapedHex": "000003ff",
+      "decodedHex": "0003ff",
+      "outcome": "passthrough"
+    }
+  ],
+  "compressedDecodeVectors": [
+    {
+      "name": "zstd UTF-8 marker",
+      "inputHex": "0128b52ffd2003190000616263",
+      "payloadType": "string",
+      "payloadUtf8": "abc"
+    },
+    {
+      "name": "zstd binary marker",
+      "inputHex": "0228b52ffd2003190000616263",
+      "payloadType": "binary",
+      "payloadHex": "616263"
+    },
+    {
+      "name": "zstd UTF-8 invalid lead preserves surrounding JSON quotes",
+      "inputHex": "0128b52ffd200319000022ff22",
+      "payloadType": "string",
+      "payloadUtf8": "\"�\""
+    },
+    {
+      "name": "zstd UTF-8 isolated continuation bytes replace separately",
+      "inputHex": "0128b52ffd200211000080bf",
+      "payloadType": "string",
+      "payloadUtf8": "��"
+    },
+    {
+      "name": "zstd UTF-8 truncated valid prefix is one replacement",
+      "inputHex": "0128b52ffd2002110000e282",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "zstd UTF-8 interrupted valid prefix preserves ASCII",
+      "inputHex": "0128b52ffd2003190000e28241",
+      "payloadType": "string",
+      "payloadUtf8": "�A"
+    },
+    {
+      "name": "zstd UTF-8 overlong sequences replace each invalid subpart",
+      "inputHex": "0128b52ffd2005290000c0afe08080",
+      "payloadType": "string",
+      "payloadUtf8": "�����"
+    },
+    {
+      "name": "zstd UTF-8 UTF-8 encoded surrogate replaces each invalid subpart",
+      "inputHex": "0128b52ffd2003190000eda080",
+      "payloadType": "string",
+      "payloadUtf8": "���"
+    },
+    {
+      "name": "zstd UTF-8 above Unicode maximum replaces each invalid subpart",
+      "inputHex": "0128b52ffd2004210000f4908080",
+      "payloadType": "string",
+      "payloadUtf8": "����"
+    },
+    {
+      "name": "zstd UTF-8 UTF-8 BOM remains payload data",
+      "inputHex": "0128b52ffd2004210000efbbbf61",
+      "payloadType": "string",
+      "payloadUtf8": "﻿a"
+    },
+    {
+      "name": "zstd UTF-8 valid UTF-8 scalar boundaries and noncharacters",
+      "inputHex": "0128b52ffd2018c10000c280dfbfe0a080ed9fbfee8080efbfbff0908080f48fbfbf",
+      "payloadType": "string",
+      "payloadUtf8": "߿ࠀ퟿￿𐀀􏿿"
+    },
+    {
+      "name": "zstd binary malformed UTF-8 stays exact bytes",
+      "inputHex": "0228b52ffd200319000022ff22",
+      "payloadType": "binary",
+      "payloadHex": "22ff22"
+    }
+  ],
+  "rampVectors": [
+    {
+      "name": "default untracked key local",
+      "input": {
+        "namespace": "urn",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": false,
+        "args": []
+      },
+      "layer": "local",
+      "sample": 46.46399952471256
+    },
+    {
+      "name": "default untracked key remote",
+      "input": {
+        "namespace": "urn",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": false,
+        "args": []
+      },
+      "layer": "remote",
+      "sample": 83.45502603333443
+    },
+    {
+      "name": "default untracked key shadow",
+      "input": {
+        "namespace": "urn",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": false,
+        "args": []
+      },
+      "layer": "shadow",
+      "sample": 48.42016121838242
+    },
+    {
+      "name": "tracked key with sorted argument local",
+      "input": {
+        "namespace": "users-api",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": true,
+        "args": [
+          [
+            "locale",
+            "en"
+          ]
+        ]
+      },
+      "layer": "local",
+      "sample": 40.78426456544548
+    },
+    {
+      "name": "tracked key with sorted argument remote",
+      "input": {
+        "namespace": "users-api",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": true,
+        "args": [
+          [
+            "locale",
+            "en"
+          ]
+        ]
+      },
+      "layer": "remote",
+      "sample": 54.53186724334955
+    },
+    {
+      "name": "tracked key with sorted argument shadow",
+      "input": {
+        "namespace": "users-api",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": true,
+        "args": [
+          [
+            "locale",
+            "en"
+          ]
+        ]
+      },
+      "layer": "shadow",
+      "sample": 62.1185424271971
+    },
+    {
+      "name": "delimiter-safe components local",
+      "input": {
+        "namespace": "users api",
+        "keyType": "user/id",
+        "id": "123?filter=active",
+        "useCase": "Get#User",
+        "trackForInvalidation": false,
+        "args": [
+          [
+            "a&b",
+            "x=y"
+          ]
+        ]
+      },
+      "layer": "local",
+      "sample": 83.71857923921198
+    },
+    {
+      "name": "delimiter-safe components remote",
+      "input": {
+        "namespace": "users api",
+        "keyType": "user/id",
+        "id": "123?filter=active",
+        "useCase": "Get#User",
+        "trackForInvalidation": false,
+        "args": [
+          [
+            "a&b",
+            "x=y"
+          ]
+        ]
+      },
+      "layer": "remote",
+      "sample": 67.15931040234864
+    },
+    {
+      "name": "delimiter-safe components shadow",
+      "input": {
+        "namespace": "users api",
+        "keyType": "user/id",
+        "id": "123?filter=active",
+        "useCase": "Get#User",
+        "trackForInvalidation": false,
+        "args": [
+          [
+            "a&b",
+            "x=y"
+          ]
+        ]
+      },
+      "layer": "shadow",
+      "sample": 41.6332233697176
+    },
+    {
+      "name": "Unicode components local",
+      "input": {
+        "namespace": "café",
+        "keyType": "種類",
+        "id": "😀",
+        "useCase": "読み込み",
+        "args": [
+          [
+            "é",
+            "雪 / ☃"
+          ]
+        ],
+        "trackForInvalidation": true
+      },
+      "layer": "local",
+      "sample": 6.5833760891109705
+    },
+    {
+      "name": "Unicode components remote",
+      "input": {
+        "namespace": "café",
+        "keyType": "種類",
+        "id": "😀",
+        "useCase": "読み込み",
+        "args": [
+          [
+            "é",
+            "雪 / ☃"
+          ]
+        ],
+        "trackForInvalidation": true
+      },
+      "layer": "remote",
+      "sample": 60.48575977329165
+    },
+    {
+      "name": "Unicode components shadow",
+      "input": {
+        "namespace": "café",
+        "keyType": "種類",
+        "id": "😀",
+        "useCase": "読み込み",
+        "args": [
+          [
+            "é",
+            "雪 / ☃"
+          ]
+        ],
+        "trackForInvalidation": true
+      },
+      "layer": "shadow",
+      "sample": 19.825804862193763
+    },
+    {
+      "name": "URI component punctuation local",
+      "input": {
+        "namespace": "~!*'()-._",
+        "keyType": "kind",
+        "id": "a+b%c",
+        "useCase": "case",
+        "args": [
+          [
+            "q",
+            "a b+c"
+          ]
+        ],
+        "trackForInvalidation": false
+      },
+      "layer": "local",
+      "sample": 34.87079148180783
+    },
+    {
+      "name": "URI component punctuation remote",
+      "input": {
+        "namespace": "~!*'()-._",
+        "keyType": "kind",
+        "id": "a+b%c",
+        "useCase": "case",
+        "args": [
+          [
+            "q",
+            "a b+c"
+          ]
+        ],
+        "trackForInvalidation": false
+      },
+      "layer": "remote",
+      "sample": 23.32933230791241
+    },
+    {
+      "name": "URI component punctuation shadow",
+      "input": {
+        "namespace": "~!*'()-._",
+        "keyType": "kind",
+        "id": "a+b%c",
+        "useCase": "case",
+        "args": [
+          [
+            "q",
+            "a b+c"
+          ]
+        ],
+        "trackForInvalidation": false
+      },
+      "layer": "shadow",
+      "sample": 52.120728115551174
+    }
+  ],
+  "compressionWriteVectors": [
+    {
+      "name": "string below threshold",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 100,
+      "outcome": "below_threshold"
+    },
+    {
+      "name": "string at threshold",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 160,
+      "outcome": "compressed"
+    },
+    {
+      "name": "threshold measures UTF8 bytes",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 100,
+      "outcome": "compressed"
+    },
+    {
+      "name": "binary compression preserves byte type",
+      "payloadType": "binary",
+      "payloadHex": "6469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c63616368656469616c6361636865",
+      "thresholdBytes": 64,
+      "outcome": "compressed"
+    },
+    {
+      "name": "tiny payload cannot grow under compression",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 1,
+      "outcome": "not_smaller"
+    },
+    {
+      "name": "below threshold binary marker is escaped",
+      "payloadType": "binary",
+      "payloadHex": "0173686f7274",
+      "thresholdBytes": 100,
+      "outcome": "below_threshold"
+    }
+  ],
+  "durationVectors": [
+    {
+      "name": "one millisecond",
+      "input": 1,
+      "expected": 1
+    },
+    {
+      "name": "round up fraction",
+      "input": 1.1,
+      "expected": 2
+    },
+    {
+      "name": "submillisecond round up",
+      "input": 0.1,
+      "expected": 1
+    },
+    {
+      "name": "maximum duration",
+      "input": 31536000000,
+      "expected": 31536000000
+    },
+    {
+      "name": "zero rejected",
+      "input": 0,
+      "expected": null
+    },
+    {
+      "name": "negative rejected",
+      "input": -1,
+      "expected": null
+    },
+    {
+      "name": "over maximum rejected",
+      "input": 31536000000.1,
+      "expected": null
+    }
+  ],
+  "invalidKeyVectors": [
+    {
+      "name": "namespace rejects bad{namespace",
+      "input": {
+        "namespace": "bad{namespace",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": true,
+        "args": []
+      }
+    },
+    {
+      "name": "namespace rejects bad}namespace",
+      "input": {
+        "namespace": "bad}namespace",
+        "keyType": "user_id",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": true,
+        "args": []
+      }
+    },
+    {
+      "name": "keyType rejects bad{type",
+      "input": {
+        "namespace": "urn",
+        "keyType": "bad{type",
+        "id": "123",
+        "useCase": "GetUser",
+        "trackForInvalidation": true,
+        "args": []
+      }
+    },
+    {
+      "name": "id rejects bad}id",
+      "input": {
+        "namespace": "urn",
+        "keyType": "user_id",
+        "id": "bad}id",
+        "useCase": "GetUser",
+        "trackForInvalidation": true,
+        "args": []
+      }
+    },
+    {
+      "name": "untracked ID rejects isolated high surrogate",
+      "input": {
+        "namespace": "urn",
+        "keyType": "id",
+        "id": "\ud800",
+        "useCase": "Get",
+        "trackForInvalidation": false,
+        "args": []
+      }
+    },
+    {
+      "name": "untracked ID rejects isolated low surrogate",
+      "input": {
+        "namespace": "urn",
+        "keyType": "id",
+        "id": "\udc00",
+        "useCase": "Get",
+        "trackForInvalidation": false,
+        "args": []
+      }
+    }
+  ]
+}

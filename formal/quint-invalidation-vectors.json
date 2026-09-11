@@ -1,0 +1,5283 @@
+{
+  "schemaVersion": 2,
+  "provenance": {
+    "model": "formal/dialcache-invalidation-transition.qnt",
+    "sourceSha256": {
+      "formal/dialcache-invalidation-transition.qnt": "f1d3a70e5a8acb79b3ffd3558714a74fc456c7e2641c661c3fb4b61220236e69",
+      "formal/generate-invalidation-vectors.mjs": "08f3069325d731dd6a35232e99c2889ef42589d77fab1439c3d655f1bf6503d6"
+    }
+  },
+  "vectors": [
+    {
+      "name": "Quint 000: zero buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 001: zero buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 002: zero buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 13659000
+        }
+      }
+    },
+    {
+      "name": "Quint 003: zero buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 004: zero buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 005: zero buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 006: zero buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 007: zero buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 008: zero buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 009: zero buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 010: zero buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 011: zero buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 012: buffered cutoff / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 013: buffered cutoff / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 014: buffered cutoff / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 13659000
+        }
+      }
+    },
+    {
+      "name": "Quint 015: buffered cutoff / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 016: buffered cutoff / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 017: buffered cutoff / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 018: buffered cutoff / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 019: buffered cutoff / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 020: buffered cutoff / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 021: buffered cutoff / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 022: buffered cutoff / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 023: buffered cutoff / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 024: retention above floor / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 7660000
+        }
+      }
+    },
+    {
+      "name": "Quint 025: retention above floor / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 7660000
+        }
+      }
+    },
+    {
+      "name": "Quint 026: retention above floor / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 13659000
+        }
+      }
+    },
+    {
+      "name": "Quint 027: retention above floor / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 028: retention above floor / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 029: retention above floor / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 030: retention above floor / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 031: retention above floor / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 7660000
+        }
+      }
+    },
+    {
+      "name": "Quint 032: retention above floor / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 7660000
+        }
+      }
+    },
+    {
+      "name": "Quint 033: retention above floor / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 7660000
+        }
+      }
+    },
+    {
+      "name": "Quint 034: retention above floor / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 035: retention above floor / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 7660000
+        }
+      }
+    },
+    {
+      "name": "Quint 036: maximum buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 037: maximum buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 038: maximum buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 039: maximum buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 040: maximum buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 041: maximum buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 042: maximum buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 043: maximum buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 044: maximum buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 045: maximum buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 046: maximum buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 047: maximum buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "Quint 048: maximum safe sum / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 049: maximum safe sum / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 050: maximum safe sum / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 051: maximum safe sum / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 052: maximum safe sum / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 053: maximum safe sum / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 054: maximum safe sum / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 055: maximum safe sum / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 056: maximum safe sum / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 057: maximum safe sum / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 058: maximum safe sum / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 059: maximum safe sum / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 060: leading decimal zeros / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 061: leading decimal zeros / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 062: leading decimal zeros / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 13659000
+        }
+      }
+    },
+    {
+      "name": "Quint 063: leading decimal zeros / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 064: leading decimal zeros / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 065: leading decimal zeros / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 066: leading decimal zeros / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 067: leading decimal zeros / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 068: leading decimal zeros / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 069: leading decimal zeros / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 070: leading decimal zeros / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 071: leading decimal zeros / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "000200",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 072: negative buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 073: negative buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 074: negative buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 075: negative buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 076: negative buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 077: negative buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 078: negative buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 079: negative buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 080: negative buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 081: negative buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 082: negative buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 083: negative buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 084: fractional buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 085: fractional buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 086: fractional buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 087: fractional buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 088: fractional buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 089: fractional buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 090: fractional buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 091: fractional buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 092: fractional buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 093: fractional buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 094: fractional buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 095: fractional buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 096: over-limit buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 097: over-limit buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 098: over-limit buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 099: over-limit buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 100: over-limit buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 101: over-limit buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 102: over-limit buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 103: over-limit buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 104: over-limit buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 105: over-limit buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 106: over-limit buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 107: over-limit buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 108: unsafe buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 109: unsafe buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 110: unsafe buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 111: unsafe buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 112: unsafe buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 113: unsafe buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 114: unsafe buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 115: unsafe buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 116: unsafe buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 117: unsafe buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 118: unsafe buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 119: unsafe buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "9007199254740992",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 120: exponent timestamp / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 121: exponent timestamp / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 122: exponent timestamp / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 123: exponent timestamp / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 124: exponent timestamp / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 125: exponent timestamp / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 126: exponent timestamp / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 127: exponent timestamp / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 128: exponent timestamp / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 129: exponent timestamp / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 130: exponent timestamp / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 131: exponent timestamp / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 132: negative timestamp / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 133: negative timestamp / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 134: negative timestamp / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 135: negative timestamp / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 136: negative timestamp / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 137: negative timestamp / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 138: negative timestamp / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 139: negative timestamp / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 140: negative timestamp / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 141: negative timestamp / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 142: negative timestamp / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 143: negative timestamp / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 144: unsafe sum / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 145: unsafe sum / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 146: unsafe sum / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 147: unsafe sum / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 148: unsafe sum / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 149: unsafe sum / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 150: unsafe sum / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 151: unsafe sum / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 152: unsafe sum / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 153: unsafe sum / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 154: unsafe sum / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 155: unsafe sum / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 156: empty buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 157: empty buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 158: empty buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 159: empty buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 160: empty buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 161: empty buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 162: empty buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 163: empty buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 164: empty buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 165: empty buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 166: empty buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 167: empty buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 168: explicit plus buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 169: explicit plus buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 170: explicit plus buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 171: explicit plus buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 172: explicit plus buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 173: explicit plus buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 174: explicit plus buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 175: explicit plus buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 176: explicit plus buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 177: explicit plus buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 178: explicit plus buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 179: explicit plus buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "+1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 180: space-prefixed buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 181: space-prefixed buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 182: space-prefixed buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 183: space-prefixed buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 184: space-prefixed buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 185: space-prefixed buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 186: space-prefixed buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 187: space-prefixed buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 188: space-prefixed buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 189: space-prefixed buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 190: space-prefixed buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 191: space-prefixed buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": " 1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 192: hexadecimal buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 193: hexadecimal buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 194: hexadecimal buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 195: hexadecimal buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 196: hexadecimal buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 197: hexadecimal buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 198: hexadecimal buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 199: hexadecimal buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 200: hexadecimal buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 201: hexadecimal buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 202: hexadecimal buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 203: hexadecimal buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0x10",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 204: newline-suffixed buffer / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 205: newline-suffixed buffer / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 206: newline-suffixed buffer / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 207: newline-suffixed buffer / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 208: newline-suffixed buffer / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 209: newline-suffixed buffer / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 210: newline-suffixed buffer / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 211: newline-suffixed buffer / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 212: newline-suffixed buffer / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 213: newline-suffixed buffer / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 214: newline-suffixed buffer / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 215: newline-suffixed buffer / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "1\n",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 216: fractional timestamp / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 217: fractional timestamp / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 218: fractional timestamp / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 219: fractional timestamp / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 220: fractional timestamp / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 221: fractional timestamp / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 222: fractional timestamp / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 223: fractional timestamp / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 224: fractional timestamp / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 225: fractional timestamp / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 226: fractional timestamp / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 227: fractional timestamp / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1.5",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 228: unsafe timestamp / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 229: unsafe timestamp / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 230: unsafe timestamp / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 231: unsafe timestamp / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 232: unsafe timestamp / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 233: unsafe timestamp / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 234: unsafe timestamp / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 235: unsafe timestamp / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 236: unsafe timestamp / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 237: unsafe timestamp / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 238: unsafe timestamp / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 239: unsafe timestamp / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740992",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 240: maximum timestamp / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 241: maximum timestamp / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 242: maximum timestamp / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 243: maximum timestamp / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 244: maximum timestamp / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 245: maximum timestamp / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 246: maximum timestamp / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 247: maximum timestamp / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 248: maximum timestamp / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 249: maximum timestamp / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 250: maximum timestamp / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 251: maximum timestamp / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 252: zero timestamp / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 253: zero timestamp / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 254: zero timestamp / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 13660000
+        }
+      }
+    },
+    {
+      "name": "Quint 255: zero timestamp / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 256: zero timestamp / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 257: zero timestamp / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 258: zero timestamp / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 259: zero timestamp / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 260: zero timestamp / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 261: zero timestamp / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 262: zero timestamp / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 263: zero timestamp / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "0",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 264: empty timestamp / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "Quint 265: empty timestamp / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 266: empty timestamp / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 267: empty timestamp / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 268: empty timestamp / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 269: empty timestamp / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 270: empty timestamp / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 271: empty timestamp / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 272: empty timestamp / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 273: empty timestamp / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "0000900",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 274: empty timestamp / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "9007199254740992",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 275: empty timestamp / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "",
+          "ttlMs": 100
+        }
+      }
+    },
+    {
+      "name": "Quint 276: all-zero decimal text / absent",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 277: all-zero decimal text / valid finite",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 278: all-zero decimal text / future finite",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 13660000
+        }
+      }
+    },
+    {
+      "name": "Quint 279: all-zero decimal text / valid longer TTL",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 280: all-zero decimal text / valid persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 281: all-zero decimal text / malformed finite",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 282: all-zero decimal text / malformed persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "Quint 283: all-zero decimal text / ordered finite list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 284: all-zero decimal text / ordered persistent list",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 285: all-zero decimal text / leading-zero stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "0000900",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "900",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "Quint 286: all-zero decimal text / unsafe stored decimal",
+      "existing": {
+        "kind": "string",
+        "value": "9007199254740992",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "Quint 287: all-zero decimal text / empty stored string",
+      "existing": {
+        "kind": "string",
+        "value": "",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "000",
+      "invalidatedAtMs": "000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "0",
+          "ttlMs": 7200000
+        }
+      }
+    }
+  ]
+}

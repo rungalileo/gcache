@@ -1,0 +1,6203 @@
+{
+  "#meta": {
+    "format": "ITF",
+    "source": "formal/dialcache-scope-conformance.qnt",
+    "recipe": "formal/fixture-recipes.json#formal/scope-smoke.itf.json/smoke"
+  },
+  "vars": [
+    "input",
+    "s",
+    "mbt::actionTaken",
+    "mbt::nondetPicks"
+  ],
+  "states": [
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "init"
+      },
+      "mbt::actionTaken": "init",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "5"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "5"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "5"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "5"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "openScope"
+      },
+      "mbt::actionTaken": "openScope",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "3"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "7"
+        },
+        "name": "resolveLoader"
+      },
+      "mbt::actionTaken": "resolveLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "7"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "openScope"
+      },
+      "mbt::actionTaken": "openScope",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "5"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "5"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "3"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "3"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "3"
+        },
+        "name": "openScope"
+      },
+      "mbt::actionTaken": "openScope",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "3"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "3"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "3"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "4"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "4"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "4"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "4"
+        },
+        "name": "openScope"
+      },
+      "mbt::actionTaken": "openScope",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "4"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "4"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "4"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "3"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "3"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "4"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "5"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "5"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "3"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "6"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "3"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "5"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "5"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "3"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "6"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "3"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "34"
+        },
+        "name": "resolveLoader"
+      },
+      "mbt::actionTaken": "resolveLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "34"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "6"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "3"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "4"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "4"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "6"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "4"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "7"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "4"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "6"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "6"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "7"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "4"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "4"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "4"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "7"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "5"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "8"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "5"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "8"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "6"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "9"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "6"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "50"
+        },
+        "name": "resolveLoader"
+      },
+      "mbt::actionTaken": "resolveLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "50"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "9"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "6"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "9"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "6"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "9"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "7"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "10"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "7"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "8"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "8"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "10"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "7"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "10"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "7"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "10"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "8"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "9"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "9"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "10"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "8"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "10"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "8"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "10"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "8"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "11"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "8"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "10"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "10"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "11"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "8"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "11"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "9"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "11"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "9"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "11"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "9"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "4"
+        },
+        "name": "closeScope"
+      },
+      "mbt::actionTaken": "closeScope",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "4"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "11"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "9"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "11"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "9"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "12"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "9"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "4"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "4"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "12"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "10"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "12"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "10"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "11"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "11"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "12"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "10"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "13"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "10"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "86"
+        },
+        "name": "resolveLoader"
+      },
+      "mbt::actionTaken": "resolveLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "86"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "13"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "10"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "13"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "11"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "closeScope"
+      },
+      "mbt::actionTaken": "closeScope",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "13"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "11"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "13"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "11"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "releasePolicy"
+      },
+      "mbt::actionTaken": "releasePolicy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "14"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "11"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "5"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "5"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "15"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "11"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "policy"
+      },
+      "mbt::actionTaken": "policy",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "15"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "11"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "13"
+        },
+        "name": "rejectLoader"
+      },
+      "mbt::actionTaken": "rejectLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "13"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "15"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "11"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "o": {
+          "calls": [
+            {
+              "#bigint": "9"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "8"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "3"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "15"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "12"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false
+          ],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "d": {
+          "ages": [],
+          "coalesced": [],
+          "fallbackErrors": [
+            "request_local",
+            "local",
+            "local",
+            "local",
+            "request_local",
+            "local",
+            "request_local",
+            "local"
+          ],
+          "warnings": {
+            "#bigint": "0"
+          }
+        }
+      }
+    }
+  ]
+}

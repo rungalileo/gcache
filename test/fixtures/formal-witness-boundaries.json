@@ -1,0 +1,3229 @@
+[
+  {
+    "witness": "first-stale-age-recovers-without-publication",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/first-stale-age-recovers-without-publication"
+    },
+    "initialState": {
+      "acceptedMaxAge": {
+        "#bigint": "5000"
+      },
+      "activeLoader": {
+        "#bigint": "0"
+      },
+      "attached": [
+        false,
+        false
+      ],
+      "canRecover": false,
+      "canWrite": false,
+      "candidate": {
+        "#bigint": "0"
+      },
+      "candidateCreated": {
+        "#bigint": "0"
+      },
+      "classifier": {
+        "#bigint": "0"
+      },
+      "closed": [
+        false,
+        false
+      ],
+      "created": {
+        "#bigint": "99000"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [],
+        "fallbackErrors": [],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "0"
+      },
+      "expires": {
+        "#bigint": "70000"
+      },
+      "frame": {
+        "#bigint": "1"
+      },
+      "instanceClassifier": {
+        "#bigint": "1"
+      },
+      "loadFailed": false,
+      "maxAge": {
+        "#bigint": "5000"
+      },
+      "memo": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "now": {
+        "#bigint": "10000"
+      },
+      "o": {
+        "calls": [],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "0"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "0"
+        },
+        "reads": {
+          "#bigint": "0"
+        },
+        "recovery": [],
+        "shadow": [],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "observedFence": {
+        "#bigint": "0"
+      },
+      "phase": {
+        "#bigint": "0"
+      },
+      "readFailed": false,
+      "request": false,
+      "sourceError": {
+        "#bigint": "3"
+      },
+      "sources": [],
+      "wall": {
+        "#bigint": "100000"
+      },
+      "watermark": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "attached": [
+            false,
+            true
+          ],
+          "canRecover": true,
+          "canWrite": true,
+          "candidate": {
+            "#bigint": "1"
+          },
+          "candidateCreated": {
+            "#bigint": "99000"
+          },
+          "deadline": {
+            "#bigint": "10010"
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "1"
+            },
+            "policyCalls": {
+              "#bigint": "1"
+            },
+            "reads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "2"
+          },
+          "sources": [
+            {
+              "#bigint": "0"
+            }
+          ]
+        }
+      },
+      {
+        "action": "invalidate",
+        "statePatch": {
+          "o": {
+            "invalidations": {
+              "#bigint": "1"
+            },
+            "maintenance": [
+              "ok"
+            ]
+          },
+          "watermark": {
+            "#bigint": "100000"
+          }
+        }
+      },
+      {
+        "action": "invalidate",
+        "statePatch": {
+          "o": {
+            "invalidations": {
+              "#bigint": "2"
+            },
+            "maintenance": [
+              "ok",
+              "ok"
+            ]
+          }
+        }
+      },
+      {
+        "action": "advance",
+        "statePatch": {
+          "now": {
+            "#bigint": "10001"
+          },
+          "wall": {
+            "#bigint": "100001"
+          }
+        }
+      },
+      {
+        "action": "rejectTimeout",
+        "statePatch": {
+          "d": {
+            "fallbackErrors": [
+              "remote"
+            ]
+          },
+          "o": {
+            "classifications": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "3"
+          },
+          "sources": [
+            {
+              "#bigint": "2"
+            }
+          ]
+        }
+      },
+      {
+        "action": "seed",
+        "statePatch": {
+          "created": {
+            "#bigint": "99001"
+          },
+          "expires": {
+            "#bigint": "70001"
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "d": {
+            "coalesced": [
+              "process"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "2"
+            }
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "attached": [
+            true,
+            true
+          ],
+          "d": {
+            "coalesced": [
+              "process",
+              "process"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "3"
+            }
+          }
+        }
+      },
+      {
+        "action": "seed",
+        "statePatch": {
+          "created": {
+            "#bigint": "99002"
+          }
+        }
+      },
+      {
+        "action": "readFault",
+        "statePatch": {
+          "readFailed": true
+        }
+      },
+      {
+        "action": "readFault",
+        "statePatch": {
+          "readFailed": false
+        }
+      },
+      {
+        "action": "loadFault",
+        "statePatch": {}
+      },
+      {
+        "action": "policy",
+        "statePatch": {}
+      },
+      {
+        "action": "rollbackWall",
+        "statePatch": {
+          "wall": {
+            "#bigint": "99001"
+          }
+        }
+      },
+      {
+        "action": "releaseLoad",
+        "statePatch": {
+          "d": {
+            "ages": [
+              {
+                "#bigint": "1"
+              }
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              }
+            ],
+            "recovery": [
+              "served"
+            ]
+          },
+          "phase": {
+            "#bigint": "0"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "last-recovery-age-serves",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/last-recovery-age-serves"
+    },
+    "initialState": {
+      "acceptedMaxAge": {
+        "#bigint": "5000"
+      },
+      "activeLoader": {
+        "#bigint": "0"
+      },
+      "attached": [
+        true,
+        true
+      ],
+      "canRecover": true,
+      "canWrite": true,
+      "candidate": {
+        "#bigint": "1"
+      },
+      "candidateCreated": {
+        "#bigint": "99000"
+      },
+      "classifier": {
+        "#bigint": "2"
+      },
+      "closed": [
+        false,
+        false
+      ],
+      "created": {
+        "#bigint": "93001"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [
+          "request_local",
+          "process"
+        ],
+        "fallbackErrors": [
+          "remote"
+        ],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "10010"
+      },
+      "expires": {
+        "#bigint": "70000"
+      },
+      "frame": {
+        "#bigint": "1"
+      },
+      "instanceClassifier": {
+        "#bigint": "2"
+      },
+      "loadFailed": false,
+      "maxAge": {
+        "#bigint": "5000"
+      },
+      "memo": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "now": {
+        "#bigint": "10000"
+      },
+      "o": {
+        "calls": [
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          }
+        ],
+        "classifications": {
+          "#bigint": "1"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "1"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "3"
+        },
+        "reads": {
+          "#bigint": "1"
+        },
+        "recovery": [],
+        "shadow": [],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "observedFence": {
+        "#bigint": "0"
+      },
+      "phase": {
+        "#bigint": "0"
+      },
+      "readFailed": false,
+      "request": true,
+      "sourceError": {
+        "#bigint": "3"
+      },
+      "sources": [
+        {
+          "#bigint": "2"
+        }
+      ],
+      "wall": {
+        "#bigint": "98000"
+      },
+      "watermark": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "activeLoader": {
+            "#bigint": "1"
+          },
+          "attached": [
+            true,
+            false
+          ],
+          "candidateCreated": {
+            "#bigint": "93001"
+          },
+          "classifier": {
+            "#bigint": "0"
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "2"
+            },
+            "policyCalls": {
+              "#bigint": "4"
+            },
+            "reads": {
+              "#bigint": "2"
+            }
+          },
+          "phase": {
+            "#bigint": "2"
+          },
+          "sources": [
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            }
+          ]
+        }
+      },
+      {
+        "action": "rejectLoader",
+        "statePatch": {
+          "d": {
+            "fallbackErrors": [
+              "remote",
+              "remote"
+            ]
+          },
+          "o": {
+            "classifications": {
+              "#bigint": "2"
+            },
+            "loads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "3"
+          },
+          "sources": [
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "2"
+            }
+          ]
+        }
+      },
+      {
+        "action": "loadFault",
+        "statePatch": {}
+      },
+      {
+        "action": "policy",
+        "statePatch": {}
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "d": {
+            "coalesced": [
+              "request_local",
+              "process",
+              "request_local"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "5"
+            }
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "attached": [
+            true,
+            true
+          ],
+          "d": {
+            "coalesced": [
+              "request_local",
+              "process",
+              "request_local",
+              "process"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "6"
+            }
+          }
+        }
+      },
+      {
+        "action": "policy",
+        "statePatch": {
+          "maxAge": {
+            "#bigint": "2000"
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "d": {
+            "coalesced": [
+              "request_local",
+              "process",
+              "request_local",
+              "process",
+              "request_local"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "7"
+            }
+          }
+        }
+      },
+      {
+        "action": "releaseLoad",
+        "statePatch": {
+          "d": {
+            "ages": [
+              {
+                "#bigint": "4999"
+              }
+            ]
+          },
+          "memo": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              }
+            ],
+            "recovery": [
+              "served"
+            ]
+          },
+          "phase": {
+            "#bigint": "0"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "exact-maximum-after-decode-rejects",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/exact-maximum-after-decode-rejects"
+    },
+    "initialState": {
+      "acceptedMaxAge": {
+        "#bigint": "5000"
+      },
+      "activeLoader": {
+        "#bigint": "0"
+      },
+      "attached": [
+        false,
+        false
+      ],
+      "canRecover": false,
+      "canWrite": false,
+      "candidate": {
+        "#bigint": "0"
+      },
+      "candidateCreated": {
+        "#bigint": "0"
+      },
+      "classifier": {
+        "#bigint": "0"
+      },
+      "closed": [
+        false,
+        false
+      ],
+      "created": {
+        "#bigint": "99000"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [],
+        "fallbackErrors": [],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "0"
+      },
+      "expires": {
+        "#bigint": "70000"
+      },
+      "frame": {
+        "#bigint": "1"
+      },
+      "instanceClassifier": {
+        "#bigint": "3"
+      },
+      "loadFailed": false,
+      "maxAge": {
+        "#bigint": "5000"
+      },
+      "memo": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "now": {
+        "#bigint": "10000"
+      },
+      "o": {
+        "calls": [],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "0"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "0"
+        },
+        "reads": {
+          "#bigint": "0"
+        },
+        "recovery": [],
+        "shadow": [],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "observedFence": {
+        "#bigint": "0"
+      },
+      "phase": {
+        "#bigint": "0"
+      },
+      "readFailed": false,
+      "request": false,
+      "sourceError": {
+        "#bigint": "3"
+      },
+      "sources": [],
+      "wall": {
+        "#bigint": "100000"
+      },
+      "watermark": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "attached": [
+            true,
+            false
+          ],
+          "canRecover": true,
+          "canWrite": true,
+          "candidate": {
+            "#bigint": "1"
+          },
+          "candidateCreated": {
+            "#bigint": "99000"
+          },
+          "deadline": {
+            "#bigint": "10010"
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "1"
+            },
+            "policyCalls": {
+              "#bigint": "1"
+            },
+            "reads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "2"
+          },
+          "sources": [
+            {
+              "#bigint": "0"
+            }
+          ]
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "attached": [
+            true,
+            true
+          ],
+          "d": {
+            "coalesced": [
+              "process"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "2"
+            }
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "d": {
+            "coalesced": [
+              "process",
+              "process"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "3"
+            }
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "d": {
+            "coalesced": [
+              "process",
+              "process",
+              "process"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "4"
+            }
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "d": {
+            "coalesced": [
+              "process",
+              "process",
+              "process",
+              "process"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "5"
+            }
+          }
+        }
+      },
+      {
+        "action": "invalidate",
+        "statePatch": {
+          "o": {
+            "invalidations": {
+              "#bigint": "1"
+            },
+            "maintenance": [
+              "ok"
+            ]
+          },
+          "watermark": {
+            "#bigint": "100000"
+          }
+        }
+      },
+      {
+        "action": "loadFault",
+        "statePatch": {
+          "loadFailed": true
+        }
+      },
+      {
+        "action": "seed",
+        "statePatch": {}
+      },
+      {
+        "action": "advance",
+        "statePatch": {
+          "d": {
+            "fallbackErrors": [
+              "remote"
+            ]
+          },
+          "now": {
+            "#bigint": "14000"
+          },
+          "o": {
+            "classifications": {
+              "#bigint": "1"
+            },
+            "loads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "3"
+          },
+          "sourceError": {
+            "#bigint": "4"
+          },
+          "sources": [
+            {
+              "#bigint": "1"
+            }
+          ],
+          "wall": {
+            "#bigint": "104000"
+          }
+        }
+      },
+      {
+        "action": "resolveLoader",
+        "statePatch": {
+          "sources": [
+            {
+              "#bigint": "2"
+            }
+          ]
+        }
+      },
+      {
+        "action": "seed",
+        "statePatch": {
+          "created": {
+            "#bigint": "103001"
+          },
+          "expires": {
+            "#bigint": "74000"
+          }
+        }
+      },
+      {
+        "action": "loadFault",
+        "statePatch": {
+          "loadFailed": false
+        }
+      },
+      {
+        "action": "releaseLoad",
+        "statePatch": {
+          "o": {
+            "calls": [
+              {
+                "#bigint": "4"
+              },
+              {
+                "#bigint": "4"
+              },
+              {
+                "#bigint": "4"
+              },
+              {
+                "#bigint": "4"
+              },
+              {
+                "#bigint": "4"
+              }
+            ],
+            "recovery": [
+              "miss"
+            ]
+          },
+          "phase": {
+            "#bigint": "0"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "failed-fresh-decode-is-not-recovery",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/failed-fresh-decode-is-not-recovery"
+    },
+    "initialState": {
+      "acceptedMaxAge": {
+        "#bigint": "5000"
+      },
+      "activeLoader": {
+        "#bigint": "1"
+      },
+      "attached": [
+        true,
+        true
+      ],
+      "canRecover": false,
+      "canWrite": true,
+      "candidate": {
+        "#bigint": "2"
+      },
+      "candidateCreated": {
+        "#bigint": "100000"
+      },
+      "classifier": {
+        "#bigint": "1"
+      },
+      "closed": [
+        false,
+        false
+      ],
+      "created": {
+        "#bigint": "100000"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [
+          "process",
+          "process",
+          "process"
+        ],
+        "fallbackErrors": [],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "10010"
+      },
+      "expires": {
+        "#bigint": "15000"
+      },
+      "frame": {
+        "#bigint": "2"
+      },
+      "instanceClassifier": {
+        "#bigint": "0"
+      },
+      "loadFailed": true,
+      "maxAge": {
+        "#bigint": "5000"
+      },
+      "memo": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "now": {
+        "#bigint": "10000"
+      },
+      "o": {
+        "calls": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "2"
+          }
+        ],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "2"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "2"
+        },
+        "loads": {
+          "#bigint": "1"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "5"
+        },
+        "reads": {
+          "#bigint": "2"
+        },
+        "recovery": [],
+        "shadow": [],
+        "sourceScopes": [],
+        "writeTtls": [
+          {
+            "#bigint": "5000"
+          },
+          {
+            "#bigint": "5000"
+          }
+        ],
+        "writes": {
+          "#bigint": "2"
+        }
+      },
+      "observedFence": {
+        "#bigint": "0"
+      },
+      "phase": {
+        "#bigint": "0"
+      },
+      "readFailed": false,
+      "request": false,
+      "sourceError": {
+        "#bigint": "3"
+      },
+      "sources": [
+        {
+          "#bigint": "2"
+        },
+        {
+          "#bigint": "2"
+        }
+      ],
+      "wall": {
+        "#bigint": "100000"
+      },
+      "watermark": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "attached": [
+            false,
+            true
+          ],
+          "canRecover": true,
+          "classifier": {
+            "#bigint": "2"
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loads": {
+              "#bigint": "2"
+            },
+            "policyCalls": {
+              "#bigint": "6"
+            },
+            "reads": {
+              "#bigint": "3"
+            }
+          },
+          "phase": {
+            "#bigint": "1"
+          }
+        }
+      },
+      {
+        "action": "policy",
+        "statePatch": {
+          "maxAge": {
+            "#bigint": "2000"
+          }
+        }
+      },
+      {
+        "action": "invalidate",
+        "statePatch": {
+          "o": {
+            "invalidations": {
+              "#bigint": "1"
+            },
+            "maintenance": [
+              "ok"
+            ]
+          },
+          "watermark": {
+            "#bigint": "100000"
+          }
+        }
+      },
+      {
+        "action": "advance",
+        "statePatch": {
+          "now": {
+            "#bigint": "14000"
+          },
+          "wall": {
+            "#bigint": "104000"
+          }
+        }
+      },
+      {
+        "action": "releaseLoad",
+        "statePatch": {
+          "activeLoader": {
+            "#bigint": "2"
+          },
+          "canRecover": false,
+          "deadline": {
+            "#bigint": "14010"
+          },
+          "o": {
+            "loaders": {
+              "#bigint": "3"
+            }
+          },
+          "phase": {
+            "#bigint": "2"
+          },
+          "sources": [
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            }
+          ]
+        }
+      },
+      {
+        "action": "rollbackWall",
+        "statePatch": {
+          "wall": {
+            "#bigint": "103000"
+          }
+        }
+      },
+      {
+        "action": "joinCall",
+        "statePatch": {
+          "attached": [
+            true,
+            true
+          ],
+          "d": {
+            "coalesced": [
+              "process",
+              "process",
+              "process",
+              "process"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "7"
+            }
+          }
+        }
+      },
+      {
+        "action": "rejectLoader",
+        "statePatch": {
+          "d": {
+            "fallbackErrors": [
+              "remote"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              }
+            ]
+          },
+          "phase": {
+            "#bigint": "0"
+          },
+          "sources": [
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "2"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "witness": "classifier-error-keeps-error-without-decode",
+    "profile": "recovery",
+    "provenance": {
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/classifier-error-keeps-error-without-decode"
+    },
+    "initialState": {
+      "acceptedMaxAge": {
+        "#bigint": "5000"
+      },
+      "activeLoader": {
+        "#bigint": "0"
+      },
+      "attached": [
+        false,
+        false
+      ],
+      "canRecover": false,
+      "canWrite": false,
+      "candidate": {
+        "#bigint": "0"
+      },
+      "candidateCreated": {
+        "#bigint": "0"
+      },
+      "classifier": {
+        "#bigint": "0"
+      },
+      "closed": [
+        false,
+        false
+      ],
+      "created": {
+        "#bigint": "99000"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [],
+        "fallbackErrors": [],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "0"
+      },
+      "expires": {
+        "#bigint": "70000"
+      },
+      "frame": {
+        "#bigint": "1"
+      },
+      "instanceClassifier": {
+        "#bigint": "2"
+      },
+      "loadFailed": false,
+      "maxAge": {
+        "#bigint": "5000"
+      },
+      "memo": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "now": {
+        "#bigint": "10000"
+      },
+      "o": {
+        "calls": [],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "0"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "0"
+        },
+        "reads": {
+          "#bigint": "0"
+        },
+        "recovery": [],
+        "shadow": [],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "observedFence": {
+        "#bigint": "0"
+      },
+      "phase": {
+        "#bigint": "0"
+      },
+      "readFailed": false,
+      "request": true,
+      "sourceError": {
+        "#bigint": "3"
+      },
+      "sources": [],
+      "wall": {
+        "#bigint": "100000"
+      },
+      "watermark": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "attached": [
+            true,
+            false
+          ],
+          "canRecover": true,
+          "canWrite": true,
+          "candidate": {
+            "#bigint": "1"
+          },
+          "candidateCreated": {
+            "#bigint": "99000"
+          },
+          "classifier": {
+            "#bigint": "2"
+          },
+          "deadline": {
+            "#bigint": "10010"
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "1"
+            },
+            "policyCalls": {
+              "#bigint": "1"
+            },
+            "reads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "2"
+          },
+          "sources": [
+            {
+              "#bigint": "0"
+            }
+          ]
+        }
+      },
+      {
+        "action": "rejectLoader",
+        "statePatch": {
+          "d": {
+            "fallbackErrors": [
+              "remote"
+            ]
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              }
+            ],
+            "classifications": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "0"
+          },
+          "sources": [
+            {
+              "#bigint": "2"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "witness": "same-c1-bytes-confirm-mismatch",
+    "profile": "shadow",
+    "provenance": {
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/same-c1-bytes-confirm-mismatch"
+    },
+    "initialState": {
+      "abandoned": false,
+      "acceptedInvalidLog": true,
+      "acceptedLog": false,
+      "c0": {
+        "#bigint": "0"
+      },
+      "c0Created": {
+        "#bigint": "100000"
+      },
+      "comparator": {
+        "#bigint": "2"
+      },
+      "comparisonMs": {
+        "#bigint": "0"
+      },
+      "created": {
+        "#bigint": "100001"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [],
+        "configErrors": {
+          "#bigint": "3"
+        },
+        "fallbackErrors": [
+          "local",
+          "local",
+          "local",
+          "local",
+          "local"
+        ],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "10010"
+      },
+      "defaultLog": false,
+      "dumpFailed": false,
+      "fence": {
+        "#bigint": "100000"
+      },
+      "frame": {
+        "#bigint": "8"
+      },
+      "hook": true,
+      "invalidLog": false,
+      "invalidShadow": false,
+      "loadFailed": false,
+      "log": false,
+      "mismatchAuthorizations": [],
+      "now": {
+        "#bigint": "10001"
+      },
+      "o": {
+        "calls": [
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          }
+        ],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "1"
+        },
+        "loaders": {
+          "#bigint": "6"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [
+          "ok"
+        ],
+        "policyCalls": {
+          "#bigint": "6"
+        },
+        "reads": {
+          "#bigint": "6"
+        },
+        "recovery": [],
+        "shadow": [
+          "source_error",
+          "source_error",
+          "source_error",
+          "fill_fenced",
+          "source_error",
+          "source_error"
+        ],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "phase": {
+        "#bigint": "7"
+      },
+      "readFailed": false,
+      "shadowActive": true,
+      "source": {
+        "#bigint": "3"
+      },
+      "sourcePending": false,
+      "sourceValue": {
+        "#bigint": "0"
+      },
+      "sourceWorkMs": {
+        "#bigint": "0"
+      },
+      "wall": {
+        "#bigint": "100001"
+      },
+      "watermark": {
+        "#bigint": "100000"
+      },
+      "writeFailed": false,
+      "writeStamp": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "acceptedInvalidLog": false,
+          "c0Created": {
+            "#bigint": "0"
+          },
+          "deadline": {
+            "#bigint": "10011"
+          },
+          "fence": {
+            "#bigint": "0"
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "7"
+            },
+            "policyCalls": {
+              "#bigint": "7"
+            },
+            "reads": {
+              "#bigint": "7"
+            }
+          },
+          "phase": {
+            "#bigint": "1"
+          },
+          "source": {
+            "#bigint": "1"
+          },
+          "sourcePending": true
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "c0": {
+            "#bigint": "8"
+          },
+          "c0Created": {
+            "#bigint": "100001"
+          },
+          "phase": {
+            "#bigint": "2"
+          }
+        }
+      },
+      {
+        "action": "resolveLoader",
+        "statePatch": {
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              }
+            ],
+            "loads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "3"
+          },
+          "source": {
+            "#bigint": "2"
+          },
+          "sourcePending": false,
+          "sourceValue": {
+            "#bigint": "2"
+          }
+        }
+      },
+      {
+        "action": "logPolicy",
+        "statePatch": {
+          "invalidLog": true
+        }
+      },
+      {
+        "action": "releaseLoad",
+        "statePatch": {
+          "o": {
+            "comparisons": {
+              "#bigint": "1"
+            },
+            "reads": {
+              "#bigint": "8"
+            }
+          },
+          "phase": {
+            "#bigint": "4"
+          }
+        }
+      },
+      {
+        "action": "reencode",
+        "statePatch": {
+          "frame": {
+            "#bigint": "7"
+          }
+        }
+      },
+      {
+        "action": "reencode",
+        "statePatch": {
+          "frame": {
+            "#bigint": "8"
+          }
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "d": {
+            "ages": [
+              {
+                "#bigint": "0"
+              }
+            ]
+          },
+          "mismatchAuthorizations": [
+            false
+          ],
+          "o": {
+            "shadow": [
+              "source_error",
+              "source_error",
+              "source_error",
+              "fill_fenced",
+              "source_error",
+              "source_error",
+              "mismatch"
+            ]
+          },
+          "phase": {
+            "#bigint": "7"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "different-c1-bytes-supersede",
+    "profile": "shadow",
+    "provenance": {
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/different-c1-bytes-supersede"
+    },
+    "initialState": {
+      "abandoned": false,
+      "acceptedInvalidLog": false,
+      "acceptedLog": false,
+      "c0": {
+        "#bigint": "2"
+      },
+      "c0Created": {
+        "#bigint": "97010"
+      },
+      "comparator": {
+        "#bigint": "2"
+      },
+      "comparisonMs": {
+        "#bigint": "0"
+      },
+      "created": {
+        "#bigint": "97010"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [],
+        "configErrors": {
+          "#bigint": "2"
+        },
+        "fallbackErrors": [
+          "local",
+          "local",
+          "local",
+          "local"
+        ],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "10020"
+      },
+      "defaultLog": false,
+      "dumpFailed": true,
+      "fence": {
+        "#bigint": "0"
+      },
+      "frame": {
+        "#bigint": "2"
+      },
+      "hook": true,
+      "invalidLog": false,
+      "invalidShadow": false,
+      "loadFailed": false,
+      "log": false,
+      "mismatchAuthorizations": [],
+      "now": {
+        "#bigint": "10010"
+      },
+      "o": {
+        "calls": [
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "4"
+          },
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "3"
+          }
+        ],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "1"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "5"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "5"
+        },
+        "reads": {
+          "#bigint": "5"
+        },
+        "recovery": [],
+        "shadow": [
+          "source_error",
+          "source_error",
+          "timeout",
+          "filled",
+          "source_error"
+        ],
+        "sourceScopes": [],
+        "writeTtls": [
+          {
+            "#bigint": "60000"
+          }
+        ],
+        "writes": {
+          "#bigint": "1"
+        }
+      },
+      "phase": {
+        "#bigint": "7"
+      },
+      "readFailed": false,
+      "shadowActive": true,
+      "source": {
+        "#bigint": "3"
+      },
+      "sourcePending": false,
+      "sourceValue": {
+        "#bigint": "0"
+      },
+      "sourceWorkMs": {
+        "#bigint": "0"
+      },
+      "wall": {
+        "#bigint": "97010"
+      },
+      "watermark": {
+        "#bigint": "0"
+      },
+      "writeFailed": false,
+      "writeStamp": {
+        "#bigint": "97010"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "c0": {
+            "#bigint": "0"
+          },
+          "c0Created": {
+            "#bigint": "0"
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "4"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "6"
+            },
+            "policyCalls": {
+              "#bigint": "6"
+            },
+            "reads": {
+              "#bigint": "6"
+            }
+          },
+          "phase": {
+            "#bigint": "1"
+          },
+          "source": {
+            "#bigint": "1"
+          },
+          "sourcePending": true
+        }
+      },
+      {
+        "action": "resolveLoader",
+        "statePatch": {
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "4"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              }
+            ]
+          },
+          "source": {
+            "#bigint": "2"
+          },
+          "sourcePending": false,
+          "sourceValue": {
+            "#bigint": "2"
+          }
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "c0": {
+            "#bigint": "2"
+          },
+          "c0Created": {
+            "#bigint": "97010"
+          },
+          "o": {
+            "loads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "3"
+          }
+        }
+      },
+      {
+        "action": "releaseLoad",
+        "statePatch": {
+          "o": {
+            "comparisons": {
+              "#bigint": "1"
+            },
+            "reads": {
+              "#bigint": "7"
+            }
+          },
+          "phase": {
+            "#bigint": "4"
+          }
+        }
+      },
+      {
+        "action": "shadowPolicy",
+        "statePatch": {
+          "shadowActive": false
+        }
+      },
+      {
+        "action": "seed",
+        "statePatch": {
+          "frame": {
+            "#bigint": "3"
+          }
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "o": {
+            "shadow": [
+              "source_error",
+              "source_error",
+              "timeout",
+              "filled",
+              "source_error",
+              "superseded"
+            ]
+          },
+          "phase": {
+            "#bigint": "7"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "late-shadow-dump-cannot-dispatch-write",
+    "profile": "shadow",
+    "provenance": {
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/late-shadow-dump-cannot-dispatch-write"
+    },
+    "initialState": {
+      "abandoned": false,
+      "acceptedInvalidLog": true,
+      "acceptedLog": false,
+      "c0": {
+        "#bigint": "0"
+      },
+      "c0Created": {
+        "#bigint": "100002"
+      },
+      "comparator": {
+        "#bigint": "3"
+      },
+      "comparisonMs": {
+        "#bigint": "10"
+      },
+      "created": {
+        "#bigint": "100002"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [],
+        "configErrors": {
+          "#bigint": "3"
+        },
+        "fallbackErrors": [
+          "local",
+          "local",
+          "local",
+          "local"
+        ],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "10024"
+      },
+      "defaultLog": false,
+      "dumpFailed": true,
+      "fence": {
+        "#bigint": "0"
+      },
+      "frame": {
+        "#bigint": "7"
+      },
+      "hook": true,
+      "invalidLog": true,
+      "invalidShadow": false,
+      "loadFailed": false,
+      "log": false,
+      "mismatchAuthorizations": [],
+      "now": {
+        "#bigint": "10014"
+      },
+      "o": {
+        "calls": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          }
+        ],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "1"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "3"
+        },
+        "loaders": {
+          "#bigint": "6"
+        },
+        "loads": {
+          "#bigint": "1"
+        },
+        "maintenance": [
+          "mutation_error",
+          "mutation_error",
+          "mutation_error"
+        ],
+        "policyCalls": {
+          "#bigint": "6"
+        },
+        "reads": {
+          "#bigint": "6"
+        },
+        "recovery": [],
+        "shadow": [
+          "redis_error",
+          "redis_error",
+          "redis_error",
+          "timeout",
+          "source_error",
+          "source_error"
+        ],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "phase": {
+        "#bigint": "7"
+      },
+      "readFailed": false,
+      "shadowActive": true,
+      "source": {
+        "#bigint": "3"
+      },
+      "sourcePending": false,
+      "sourceValue": {
+        "#bigint": "0"
+      },
+      "sourceWorkMs": {
+        "#bigint": "0"
+      },
+      "wall": {
+        "#bigint": "98014"
+      },
+      "watermark": {
+        "#bigint": "0"
+      },
+      "writeFailed": true,
+      "writeStamp": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "c0Created": {
+            "#bigint": "0"
+          },
+          "d": {
+            "configErrors": {
+              "#bigint": "4"
+            }
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "7"
+            },
+            "policyCalls": {
+              "#bigint": "7"
+            },
+            "reads": {
+              "#bigint": "7"
+            }
+          },
+          "phase": {
+            "#bigint": "1"
+          },
+          "source": {
+            "#bigint": "1"
+          },
+          "sourcePending": true
+        }
+      },
+      {
+        "action": "resolveLoader",
+        "statePatch": {
+          "o": {
+            "calls": [
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              }
+            ]
+          },
+          "source": {
+            "#bigint": "2"
+          },
+          "sourcePending": false,
+          "sourceValue": {
+            "#bigint": "2"
+          }
+        }
+      },
+      {
+        "action": "shadowPolicy",
+        "statePatch": {
+          "invalidLog": false,
+          "shadowActive": false
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "c0Created": {
+            "#bigint": "100002"
+          },
+          "o": {
+            "dumps": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "5"
+          }
+        }
+      },
+      {
+        "action": "advance",
+        "statePatch": {
+          "abandoned": true,
+          "now": {
+            "#bigint": "10024"
+          },
+          "o": {
+            "shadow": [
+              "redis_error",
+              "redis_error",
+              "redis_error",
+              "timeout",
+              "source_error",
+              "source_error",
+              "timeout"
+            ]
+          },
+          "wall": {
+            "#bigint": "98024"
+          }
+        }
+      },
+      {
+        "action": "seedUnicode",
+        "statePatch": {
+          "created": {
+            "#bigint": "98024"
+          },
+          "frame": {
+            "#bigint": "8"
+          }
+        }
+      },
+      {
+        "action": "seed",
+        "statePatch": {
+          "frame": {
+            "#bigint": "4"
+          }
+        }
+      },
+      {
+        "action": "dumpFault",
+        "statePatch": {}
+      },
+      {
+        "action": "releaseDump",
+        "statePatch": {
+          "phase": {
+            "#bigint": "7"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "fill-write-error-preserves-caller",
+    "profile": "shadow",
+    "provenance": {
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/fill-write-error-preserves-caller"
+    },
+    "initialState": {
+      "abandoned": false,
+      "acceptedInvalidLog": false,
+      "acceptedLog": false,
+      "c0": {
+        "#bigint": "0"
+      },
+      "c0Created": {
+        "#bigint": "0"
+      },
+      "comparator": {
+        "#bigint": "3"
+      },
+      "comparisonMs": {
+        "#bigint": "0"
+      },
+      "created": {
+        "#bigint": "0"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [],
+        "configErrors": {
+          "#bigint": "0"
+        },
+        "fallbackErrors": [],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "0"
+      },
+      "defaultLog": false,
+      "dumpFailed": false,
+      "fence": {
+        "#bigint": "0"
+      },
+      "frame": {
+        "#bigint": "0"
+      },
+      "hook": true,
+      "invalidLog": false,
+      "invalidShadow": false,
+      "loadFailed": false,
+      "log": true,
+      "mismatchAuthorizations": [],
+      "now": {
+        "#bigint": "10001"
+      },
+      "o": {
+        "calls": [],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "0"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "0"
+        },
+        "reads": {
+          "#bigint": "0"
+        },
+        "recovery": [],
+        "shadow": [],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "phase": {
+        "#bigint": "0"
+      },
+      "readFailed": false,
+      "shadowActive": true,
+      "source": {
+        "#bigint": "0"
+      },
+      "sourcePending": false,
+      "sourceValue": {
+        "#bigint": "0"
+      },
+      "sourceWorkMs": {
+        "#bigint": "0"
+      },
+      "wall": {
+        "#bigint": "100001"
+      },
+      "watermark": {
+        "#bigint": "0"
+      },
+      "writeFailed": false,
+      "writeStamp": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "acceptedLog": true,
+          "deadline": {
+            "#bigint": "10011"
+          },
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "1"
+            },
+            "policyCalls": {
+              "#bigint": "1"
+            },
+            "reads": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "1"
+          },
+          "source": {
+            "#bigint": "1"
+          },
+          "sourcePending": true
+        }
+      },
+      {
+        "action": "resolveLoader",
+        "statePatch": {
+          "o": {
+            "calls": [
+              {
+                "#bigint": "2"
+              }
+            ]
+          },
+          "source": {
+            "#bigint": "2"
+          },
+          "sourcePending": false,
+          "sourceValue": {
+            "#bigint": "2"
+          }
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "o": {
+            "dumps": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "5"
+          }
+        }
+      },
+      {
+        "action": "loadFault",
+        "statePatch": {
+          "loadFailed": true
+        }
+      },
+      {
+        "action": "dumpFault",
+        "statePatch": {
+          "dumpFailed": true
+        }
+      },
+      {
+        "action": "readFault",
+        "statePatch": {}
+      },
+      {
+        "action": "dumpFault",
+        "statePatch": {
+          "dumpFailed": false
+        }
+      },
+      {
+        "action": "releaseDump",
+        "statePatch": {
+          "o": {
+            "writeTtls": [
+              {
+                "#bigint": "60000"
+              }
+            ],
+            "writes": {
+              "#bigint": "1"
+            }
+          },
+          "phase": {
+            "#bigint": "6"
+          },
+          "writeStamp": {
+            "#bigint": "100001"
+          }
+        }
+      },
+      {
+        "action": "writeFault",
+        "statePatch": {
+          "writeFailed": true
+        }
+      },
+      {
+        "action": "releaseWrite",
+        "statePatch": {
+          "o": {
+            "shadow": [
+              "fill_error"
+            ]
+          },
+          "phase": {
+            "#bigint": "7"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "witness": "dark-read-error-still-allows-source-result",
+    "profile": "shadow",
+    "provenance": {
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-witness-boundaries.json/dark-read-error-still-allows-source-result"
+    },
+    "initialState": {
+      "abandoned": false,
+      "acceptedInvalidLog": false,
+      "acceptedLog": false,
+      "c0": {
+        "#bigint": "0"
+      },
+      "c0Created": {
+        "#bigint": "0"
+      },
+      "comparator": {
+        "#bigint": "3"
+      },
+      "comparisonMs": {
+        "#bigint": "10"
+      },
+      "created": {
+        "#bigint": "98001"
+      },
+      "d": {
+        "ages": [],
+        "coalesced": [],
+        "configErrors": {
+          "#bigint": "2"
+        },
+        "fallbackErrors": [
+          "local",
+          "local"
+        ],
+        "warnings": {
+          "#bigint": "0"
+        }
+      },
+      "deadline": {
+        "#bigint": "10011"
+      },
+      "defaultLog": false,
+      "dumpFailed": true,
+      "fence": {
+        "#bigint": "0"
+      },
+      "frame": {
+        "#bigint": "7"
+      },
+      "hook": true,
+      "invalidLog": false,
+      "invalidShadow": false,
+      "loadFailed": true,
+      "log": false,
+      "mismatchAuthorizations": [],
+      "now": {
+        "#bigint": "10001"
+      },
+      "o": {
+        "calls": [
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "3"
+          },
+          {
+            "#bigint": "2"
+          }
+        ],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "2"
+        },
+        "loaders": {
+          "#bigint": "3"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [
+          "ok",
+          "ok"
+        ],
+        "policyCalls": {
+          "#bigint": "3"
+        },
+        "reads": {
+          "#bigint": "2"
+        },
+        "recovery": [],
+        "shadow": [
+          "redis_error",
+          "redis_error"
+        ],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "phase": {
+        "#bigint": "7"
+      },
+      "readFailed": true,
+      "shadowActive": true,
+      "source": {
+        "#bigint": "2"
+      },
+      "sourcePending": false,
+      "sourceValue": {
+        "#bigint": "2"
+      },
+      "sourceWorkMs": {
+        "#bigint": "0"
+      },
+      "wall": {
+        "#bigint": "98001"
+      },
+      "watermark": {
+        "#bigint": "100021"
+      },
+      "writeFailed": false,
+      "writeStamp": {
+        "#bigint": "0"
+      }
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "statePatch": {
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "4"
+            },
+            "policyCalls": {
+              "#bigint": "4"
+            },
+            "reads": {
+              "#bigint": "3"
+            }
+          },
+          "phase": {
+            "#bigint": "1"
+          },
+          "source": {
+            "#bigint": "1"
+          },
+          "sourcePending": true,
+          "sourceValue": {
+            "#bigint": "0"
+          }
+        }
+      },
+      {
+        "action": "invalidate",
+        "statePatch": {
+          "o": {
+            "invalidations": {
+              "#bigint": "3"
+            },
+            "maintenance": [
+              "ok",
+              "ok",
+              "ok"
+            ]
+          }
+        }
+      },
+      {
+        "action": "releaseRead",
+        "statePatch": {
+          "o": {
+            "shadow": [
+              "redis_error",
+              "redis_error",
+              "redis_error"
+            ]
+          },
+          "phase": {
+            "#bigint": "7"
+          }
+        }
+      },
+      {
+        "action": "writeFault",
+        "statePatch": {}
+      },
+      {
+        "action": "resolveLoader",
+        "statePatch": {
+          "o": {
+            "calls": [
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "3"
+              },
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "1"
+              }
+            ]
+          },
+          "source": {
+            "#bigint": "2"
+          },
+          "sourcePending": false,
+          "sourceValue": {
+            "#bigint": "1"
+          }
+        }
+      }
+    ]
+  }
+]

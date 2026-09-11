@@ -1,0 +1,136 @@
+name: Full formal verification
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "11 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formal-full-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  corpus:
+    # Scheduled workflows run the default branch; keep the intended main scope explicit.
+    if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+        with:
+          quint: "true"
+      - name: Check models, regenerate artifacts and require full TypeScript replay
+        run: make formal-corpus
+      - name: Preserve formal corpus, completion and counterexamples
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-traces
+          path: .formal-traces/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  typescript-mutations:
+    needs: corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-traces
+          path: .formal-traces
+      - name: Require TypeScript assertion-based fault detection
+        run: make mutations-ts
+      - name: Preserve TypeScript mutation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: typescript-semantic-evidence
+          path: .formal-traces/semantic/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  go-parity:
+    needs: corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+        with:
+          go: "true"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-traces
+          path: .formal-traces
+      - name: Require Go replay of the complete corpus with race detection
+        run: make formal-go
+      - name: Preserve Go parity completion evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: go-parity-evidence
+          path: |
+            .formal-traces/go-replay.jsonl
+            .formal-traces/go-replay-summary.json
+            .formal-traces/go-context.json
+            .formal-traces/go-completion.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  go-mutations:
+    needs: [corpus, go-parity]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+        with:
+          go: "true"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-traces
+          path: .formal-traces
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: go-parity-evidence
+          path: .formal-traces
+      - name: Require Go assertion-based fault detection
+        run: make mutations-go
+      - name: Preserve Go mutation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: go-semantic-evidence
+          path: .formal-traces/go-semantic/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  # A failed or skipped dependency cannot turn smoke evidence into full acceptance.
+  formal-full:
+    needs: [corpus, typescript-mutations, go-parity, go-mutations]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the complete corpus, both ports and both mutation measurements
+        env:
+          CORPUS_RESULT: ${{ needs.corpus.result }}
+          TYPESCRIPT_RESULT: ${{ needs.typescript-mutations.result }}
+          GO_RESULT: ${{ needs.go-parity.result }}
+          GO_MUTATIONS_RESULT: ${{ needs.go-mutations.result }}
+        run: |
+          test "$CORPUS_RESULT" = success
+          test "$TYPESCRIPT_RESULT" = success
+          test "$GO_RESULT" = success
+          test "$GO_MUTATIONS_RESULT" = success

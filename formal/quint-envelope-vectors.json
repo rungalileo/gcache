@@ -1,0 +1,5426 @@
+{
+  "schemaVersion": 3,
+  "provenance": {
+    "model": "formal/dialcache-envelope-vectors.qnt",
+    "sourceSha256": {
+      "formal/dialcache-envelope-vectors.qnt": "b29c45bf19972d31c9958b05eef1d94a3dbea0ee791d7adf786dc91ae6da465c",
+      "formal/wire-text.qnt": "c78f8c674f4e1470b0d2b605b209d82e3aab0e35fb4e0efae813247bf093eb27",
+      "formal/generate-envelope-vectors.mjs": "e7e2b908242ba7da03e5a18807eb57371d471510f4605c2f2866a409da51c0e9"
+    }
+  },
+  "envelopeVectors": [
+    {
+      "name": "Quint envelope 000 envelope",
+      "inputHex": "",
+      "escapedHex": "",
+      "decodedHex": "",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 001 envelope",
+      "inputHex": "00",
+      "escapedHex": "0000",
+      "decodedHex": "00",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 002 envelope",
+      "inputHex": "01",
+      "escapedHex": "0001",
+      "decodedHex": "01",
+      "outcome": "fallback_raw"
+    },
+    {
+      "name": "Quint envelope 003 envelope",
+      "inputHex": "02",
+      "escapedHex": "0002",
+      "decodedHex": "02",
+      "outcome": "fallback_raw"
+    },
+    {
+      "name": "Quint envelope 004 envelope",
+      "inputHex": "03",
+      "escapedHex": "03",
+      "decodedHex": "03",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 005 envelope",
+      "inputHex": "ff",
+      "escapedHex": "ff",
+      "decodedHex": "ff",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 006 envelope",
+      "inputHex": "0000",
+      "escapedHex": "000000",
+      "decodedHex": "00",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 007 envelope",
+      "inputHex": "0001",
+      "escapedHex": "000001",
+      "decodedHex": "01",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 008 envelope",
+      "inputHex": "0002",
+      "escapedHex": "000002",
+      "decodedHex": "02",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 009 envelope",
+      "inputHex": "0003",
+      "escapedHex": "000003",
+      "decodedHex": "0003",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 010 envelope",
+      "inputHex": "00ff",
+      "escapedHex": "0000ff",
+      "decodedHex": "00ff",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 011 envelope",
+      "inputHex": "000001",
+      "escapedHex": "00000001",
+      "decodedHex": "0001",
+      "outcome": "passthrough"
+    },
+    {
+      "name": "Quint envelope 012 envelope",
+      "inputHex": "01ff",
+      "escapedHex": "0001ff",
+      "decodedHex": "01ff",
+      "outcome": "fallback_raw"
+    },
+    {
+      "name": "Quint envelope 013 envelope",
+      "inputHex": "02ff",
+      "escapedHex": "0002ff",
+      "decodedHex": "02ff",
+      "outcome": "fallback_raw"
+    },
+    {
+      "name": "Quint envelope 014 envelope",
+      "inputHex": "0300",
+      "escapedHex": "0300",
+      "decodedHex": "0300",
+      "outcome": "passthrough"
+    }
+  ],
+  "compressedDecodeVectors": [
+    {
+      "name": "Quint envelope 015 decode",
+      "inputHex": "0128b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": ""
+    },
+    {
+      "name": "Quint envelope 016 decode",
+      "inputHex": "0228b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": ""
+    },
+    {
+      "name": "Quint envelope 017 decode",
+      "inputHex": "0128b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": ""
+    },
+    {
+      "name": "Quint envelope 018 decode",
+      "inputHex": "0228b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": ""
+    },
+    {
+      "name": "Quint envelope 019 decode",
+      "inputHex": "0128b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": ""
+    },
+    {
+      "name": "Quint envelope 020 decode",
+      "inputHex": "0228b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": ""
+    },
+    {
+      "name": "Quint envelope 021 decode",
+      "inputHex": "0128b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": ""
+    },
+    {
+      "name": "Quint envelope 022 decode",
+      "inputHex": "0228b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": ""
+    },
+    {
+      "name": "Quint envelope 023 decode",
+      "inputHex": "0128b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": ""
+    },
+    {
+      "name": "Quint envelope 024 decode",
+      "inputHex": "0228b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": ""
+    },
+    {
+      "name": "Quint envelope 025 decode",
+      "inputHex": "0128b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": ""
+    },
+    {
+      "name": "Quint envelope 026 decode",
+      "inputHex": "0228b52ffd2000010000",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": ""
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": ""
+    },
+    {
+      "name": "Quint envelope 027 decode",
+      "inputHex": "0128b52ffd2003190000616263",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2003190000616263"
+    },
+    {
+      "name": "Quint envelope 028 decode",
+      "inputHex": "0228b52ffd2003190000616263",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2003190000616263"
+    },
+    {
+      "name": "Quint envelope 029 decode",
+      "inputHex": "0128b52ffd2003190000616263",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2003190000616263"
+    },
+    {
+      "name": "Quint envelope 030 decode",
+      "inputHex": "0228b52ffd2003190000616263",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2003190000616263"
+    },
+    {
+      "name": "Quint envelope 031 decode",
+      "inputHex": "0128b52ffd2003190000616263",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "abc"
+    },
+    {
+      "name": "Quint envelope 032 decode",
+      "inputHex": "0228b52ffd2003190000616263",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "616263"
+    },
+    {
+      "name": "Quint envelope 033 decode",
+      "inputHex": "0128b52ffd2003190000616263",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "abc"
+    },
+    {
+      "name": "Quint envelope 034 decode",
+      "inputHex": "0228b52ffd2003190000616263",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "616263"
+    },
+    {
+      "name": "Quint envelope 035 decode",
+      "inputHex": "0128b52ffd2003190000616263",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "abc"
+    },
+    {
+      "name": "Quint envelope 036 decode",
+      "inputHex": "0228b52ffd2003190000616263",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "616263"
+    },
+    {
+      "name": "Quint envelope 037 decode",
+      "inputHex": "0128b52ffd2003190000616263",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "abc"
+    },
+    {
+      "name": "Quint envelope 038 decode",
+      "inputHex": "0228b52ffd2003190000616263",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "616263"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "616263"
+    },
+    {
+      "name": "Quint envelope 039 decode",
+      "inputHex": "0128b52ffd2003190000000102",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2003190000000102"
+    },
+    {
+      "name": "Quint envelope 040 decode",
+      "inputHex": "0228b52ffd2003190000000102",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2003190000000102"
+    },
+    {
+      "name": "Quint envelope 041 decode",
+      "inputHex": "0128b52ffd2003190000000102",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2003190000000102"
+    },
+    {
+      "name": "Quint envelope 042 decode",
+      "inputHex": "0228b52ffd2003190000000102",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2003190000000102"
+    },
+    {
+      "name": "Quint envelope 043 decode",
+      "inputHex": "0128b52ffd2003190000000102",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "\u0000\u0001\u0002"
+    },
+    {
+      "name": "Quint envelope 044 decode",
+      "inputHex": "0228b52ffd2003190000000102",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "000102"
+    },
+    {
+      "name": "Quint envelope 045 decode",
+      "inputHex": "0128b52ffd2003190000000102",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "\u0000\u0001\u0002"
+    },
+    {
+      "name": "Quint envelope 046 decode",
+      "inputHex": "0228b52ffd2003190000000102",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "000102"
+    },
+    {
+      "name": "Quint envelope 047 decode",
+      "inputHex": "0128b52ffd2003190000000102",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "\u0000\u0001\u0002"
+    },
+    {
+      "name": "Quint envelope 048 decode",
+      "inputHex": "0228b52ffd2003190000000102",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "000102"
+    },
+    {
+      "name": "Quint envelope 049 decode",
+      "inputHex": "0128b52ffd2003190000000102",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "\u0000\u0001\u0002"
+    },
+    {
+      "name": "Quint envelope 050 decode",
+      "inputHex": "0228b52ffd2003190000000102",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "000102"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "000102"
+    },
+    {
+      "name": "Quint envelope 051 decode",
+      "inputHex": "0128b52ffd2001090000ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 052 decode",
+      "inputHex": "0228b52ffd2001090000ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "ff"
+    },
+    {
+      "name": "Quint envelope 053 decode",
+      "inputHex": "0128b52ffd2001090000ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 054 decode",
+      "inputHex": "0228b52ffd2001090000ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "ff"
+    },
+    {
+      "name": "Quint envelope 055 decode",
+      "inputHex": "0128b52ffd2001090000ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 056 decode",
+      "inputHex": "0228b52ffd2001090000ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "ff"
+    },
+    {
+      "name": "Quint envelope 057 decode",
+      "inputHex": "0128b52ffd2001090000ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 058 decode",
+      "inputHex": "0228b52ffd2001090000ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "ff"
+    },
+    {
+      "name": "Quint envelope 059 decode",
+      "inputHex": "0128b52ffd2001090000ff",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 060 decode",
+      "inputHex": "0228b52ffd2001090000ff",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "ff"
+    },
+    {
+      "name": "Quint envelope 061 decode",
+      "inputHex": "0128b52ffd2001090000ff",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 062 decode",
+      "inputHex": "0228b52ffd2001090000ff",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "ff"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "ff"
+    },
+    {
+      "name": "Quint envelope 063 decode",
+      "inputHex": "0128b52ffd2002110000e282",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2002110000e282"
+    },
+    {
+      "name": "Quint envelope 064 decode",
+      "inputHex": "0228b52ffd2002110000e282",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2002110000e282"
+    },
+    {
+      "name": "Quint envelope 065 decode",
+      "inputHex": "0128b52ffd2002110000e282",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2002110000e282"
+    },
+    {
+      "name": "Quint envelope 066 decode",
+      "inputHex": "0228b52ffd2002110000e282",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2002110000e282"
+    },
+    {
+      "name": "Quint envelope 067 decode",
+      "inputHex": "0128b52ffd2002110000e282",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 068 decode",
+      "inputHex": "0228b52ffd2002110000e282",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "e282"
+    },
+    {
+      "name": "Quint envelope 069 decode",
+      "inputHex": "0128b52ffd2002110000e282",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 070 decode",
+      "inputHex": "0228b52ffd2002110000e282",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "e282"
+    },
+    {
+      "name": "Quint envelope 071 decode",
+      "inputHex": "0128b52ffd2002110000e282",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 072 decode",
+      "inputHex": "0228b52ffd2002110000e282",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "e282"
+    },
+    {
+      "name": "Quint envelope 073 decode",
+      "inputHex": "0128b52ffd2002110000e282",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�"
+    },
+    {
+      "name": "Quint envelope 074 decode",
+      "inputHex": "0228b52ffd2002110000e282",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e282"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "e282"
+    },
+    {
+      "name": "Quint envelope 075 decode",
+      "inputHex": "0128b52ffd2003190000e28241",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2003190000e28241"
+    },
+    {
+      "name": "Quint envelope 076 decode",
+      "inputHex": "0228b52ffd2003190000e28241",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2003190000e28241"
+    },
+    {
+      "name": "Quint envelope 077 decode",
+      "inputHex": "0128b52ffd2003190000e28241",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2003190000e28241"
+    },
+    {
+      "name": "Quint envelope 078 decode",
+      "inputHex": "0228b52ffd2003190000e28241",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2003190000e28241"
+    },
+    {
+      "name": "Quint envelope 079 decode",
+      "inputHex": "0128b52ffd2003190000e28241",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�A"
+    },
+    {
+      "name": "Quint envelope 080 decode",
+      "inputHex": "0228b52ffd2003190000e28241",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "e28241"
+    },
+    {
+      "name": "Quint envelope 081 decode",
+      "inputHex": "0128b52ffd2003190000e28241",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�A"
+    },
+    {
+      "name": "Quint envelope 082 decode",
+      "inputHex": "0228b52ffd2003190000e28241",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "e28241"
+    },
+    {
+      "name": "Quint envelope 083 decode",
+      "inputHex": "0128b52ffd2003190000e28241",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�A"
+    },
+    {
+      "name": "Quint envelope 084 decode",
+      "inputHex": "0228b52ffd2003190000e28241",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "e28241"
+    },
+    {
+      "name": "Quint envelope 085 decode",
+      "inputHex": "0128b52ffd2003190000e28241",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "�A"
+    },
+    {
+      "name": "Quint envelope 086 decode",
+      "inputHex": "0228b52ffd2003190000e28241",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "e28241"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "e28241"
+    },
+    {
+      "name": "Quint envelope 087 decode",
+      "inputHex": "0128b52ffd2003190000eda080",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2003190000eda080"
+    },
+    {
+      "name": "Quint envelope 088 decode",
+      "inputHex": "0228b52ffd2003190000eda080",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2003190000eda080"
+    },
+    {
+      "name": "Quint envelope 089 decode",
+      "inputHex": "0128b52ffd2003190000eda080",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2003190000eda080"
+    },
+    {
+      "name": "Quint envelope 090 decode",
+      "inputHex": "0228b52ffd2003190000eda080",
+      "maxDecompressedBytes": 2,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2003190000eda080"
+    },
+    {
+      "name": "Quint envelope 091 decode",
+      "inputHex": "0128b52ffd2003190000eda080",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "���"
+    },
+    {
+      "name": "Quint envelope 092 decode",
+      "inputHex": "0228b52ffd2003190000eda080",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "eda080"
+    },
+    {
+      "name": "Quint envelope 093 decode",
+      "inputHex": "0128b52ffd2003190000eda080",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "���"
+    },
+    {
+      "name": "Quint envelope 094 decode",
+      "inputHex": "0228b52ffd2003190000eda080",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "eda080"
+    },
+    {
+      "name": "Quint envelope 095 decode",
+      "inputHex": "0128b52ffd2003190000eda080",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "���"
+    },
+    {
+      "name": "Quint envelope 096 decode",
+      "inputHex": "0228b52ffd2003190000eda080",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "eda080"
+    },
+    {
+      "name": "Quint envelope 097 decode",
+      "inputHex": "0128b52ffd2003190000eda080",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "���"
+    },
+    {
+      "name": "Quint envelope 098 decode",
+      "inputHex": "0228b52ffd2003190000eda080",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "eda080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "eda080"
+    },
+    {
+      "name": "Quint envelope 099 decode",
+      "inputHex": "0128b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2004210000efbbbf41"
+    },
+    {
+      "name": "Quint envelope 100 decode",
+      "inputHex": "0228b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2004210000efbbbf41"
+    },
+    {
+      "name": "Quint envelope 101 decode",
+      "inputHex": "0128b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2004210000efbbbf41"
+    },
+    {
+      "name": "Quint envelope 102 decode",
+      "inputHex": "0228b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2004210000efbbbf41"
+    },
+    {
+      "name": "Quint envelope 103 decode",
+      "inputHex": "0128b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "﻿A"
+    },
+    {
+      "name": "Quint envelope 104 decode",
+      "inputHex": "0228b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "efbbbf41"
+    },
+    {
+      "name": "Quint envelope 105 decode",
+      "inputHex": "0128b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "﻿A"
+    },
+    {
+      "name": "Quint envelope 106 decode",
+      "inputHex": "0228b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "efbbbf41"
+    },
+    {
+      "name": "Quint envelope 107 decode",
+      "inputHex": "0128b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "﻿A"
+    },
+    {
+      "name": "Quint envelope 108 decode",
+      "inputHex": "0228b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "efbbbf41"
+    },
+    {
+      "name": "Quint envelope 109 decode",
+      "inputHex": "0128b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "﻿A"
+    },
+    {
+      "name": "Quint envelope 110 decode",
+      "inputHex": "0228b52ffd2004210000efbbbf41",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "efbbbf41"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "efbbbf41"
+    },
+    {
+      "name": "Quint envelope 111 decode",
+      "inputHex": "0128b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2004210000f09f9880"
+    },
+    {
+      "name": "Quint envelope 112 decode",
+      "inputHex": "0228b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2004210000f09f9880"
+    },
+    {
+      "name": "Quint envelope 113 decode",
+      "inputHex": "0128b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2004210000f09f9880"
+    },
+    {
+      "name": "Quint envelope 114 decode",
+      "inputHex": "0228b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2004210000f09f9880"
+    },
+    {
+      "name": "Quint envelope 115 decode",
+      "inputHex": "0128b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "😀"
+    },
+    {
+      "name": "Quint envelope 116 decode",
+      "inputHex": "0228b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "f09f9880"
+    },
+    {
+      "name": "Quint envelope 117 decode",
+      "inputHex": "0128b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "😀"
+    },
+    {
+      "name": "Quint envelope 118 decode",
+      "inputHex": "0228b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "f09f9880"
+    },
+    {
+      "name": "Quint envelope 119 decode",
+      "inputHex": "0128b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "😀"
+    },
+    {
+      "name": "Quint envelope 120 decode",
+      "inputHex": "0228b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "f09f9880"
+    },
+    {
+      "name": "Quint envelope 121 decode",
+      "inputHex": "0128b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "😀"
+    },
+    {
+      "name": "Quint envelope 122 decode",
+      "inputHex": "0228b52ffd2004210000f09f9880",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f09f9880"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "f09f9880"
+    },
+    {
+      "name": "Quint envelope 123 decode",
+      "inputHex": "0128b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2004210000f4908080"
+    },
+    {
+      "name": "Quint envelope 124 decode",
+      "inputHex": "0228b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2004210000f4908080"
+    },
+    {
+      "name": "Quint envelope 125 decode",
+      "inputHex": "0128b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd2004210000f4908080"
+    },
+    {
+      "name": "Quint envelope 126 decode",
+      "inputHex": "0228b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 3,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "read_over_limit",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd2004210000f4908080"
+    },
+    {
+      "name": "Quint envelope 127 decode",
+      "inputHex": "0128b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "����"
+    },
+    {
+      "name": "Quint envelope 128 decode",
+      "inputHex": "0228b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "f4908080"
+    },
+    {
+      "name": "Quint envelope 129 decode",
+      "inputHex": "0128b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "����"
+    },
+    {
+      "name": "Quint envelope 130 decode",
+      "inputHex": "0228b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 4,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "f4908080"
+    },
+    {
+      "name": "Quint envelope 131 decode",
+      "inputHex": "0128b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "����"
+    },
+    {
+      "name": "Quint envelope 132 decode",
+      "inputHex": "0228b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "f4908080"
+    },
+    {
+      "name": "Quint envelope 133 decode",
+      "inputHex": "0128b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "string",
+      "payloadUtf8": "����"
+    },
+    {
+      "name": "Quint envelope 134 decode",
+      "inputHex": "0228b52ffd2004210000f4908080",
+      "maxDecompressedBytes": 5,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": true,
+        "decodedHex": "f4908080"
+      },
+      "outcome": "decompressed",
+      "payloadType": "binary",
+      "payloadHex": "f4908080"
+    },
+    {
+      "name": "Quint envelope 135 decode",
+      "inputHex": "01ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "01ff"
+    },
+    {
+      "name": "Quint envelope 136 decode",
+      "inputHex": "02ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "02ff"
+    },
+    {
+      "name": "Quint envelope 137 decode",
+      "inputHex": "01ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "01ff"
+    },
+    {
+      "name": "Quint envelope 138 decode",
+      "inputHex": "02ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "02ff"
+    },
+    {
+      "name": "Quint envelope 139 decode",
+      "inputHex": "01ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "01ff"
+    },
+    {
+      "name": "Quint envelope 140 decode",
+      "inputHex": "02ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "02ff"
+    },
+    {
+      "name": "Quint envelope 141 decode",
+      "inputHex": "01ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "01ff"
+    },
+    {
+      "name": "Quint envelope 142 decode",
+      "inputHex": "02ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "02ff"
+    },
+    {
+      "name": "Quint envelope 143 decode",
+      "inputHex": "01ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "01ff"
+    },
+    {
+      "name": "Quint envelope 144 decode",
+      "inputHex": "02ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "02ff"
+    },
+    {
+      "name": "Quint envelope 145 decode",
+      "inputHex": "01ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "01ff"
+    },
+    {
+      "name": "Quint envelope 146 decode",
+      "inputHex": "02ff",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "02ff"
+    },
+    {
+      "name": "Quint envelope 147 decode",
+      "inputHex": "0128b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b5"
+    },
+    {
+      "name": "Quint envelope 148 decode",
+      "inputHex": "0228b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b5"
+    },
+    {
+      "name": "Quint envelope 149 decode",
+      "inputHex": "0128b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b5"
+    },
+    {
+      "name": "Quint envelope 150 decode",
+      "inputHex": "0228b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b5"
+    },
+    {
+      "name": "Quint envelope 151 decode",
+      "inputHex": "0128b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b5"
+    },
+    {
+      "name": "Quint envelope 152 decode",
+      "inputHex": "0228b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b5"
+    },
+    {
+      "name": "Quint envelope 153 decode",
+      "inputHex": "0128b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b5"
+    },
+    {
+      "name": "Quint envelope 154 decode",
+      "inputHex": "0228b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b5"
+    },
+    {
+      "name": "Quint envelope 155 decode",
+      "inputHex": "0128b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b5"
+    },
+    {
+      "name": "Quint envelope 156 decode",
+      "inputHex": "0228b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b5"
+    },
+    {
+      "name": "Quint envelope 157 decode",
+      "inputHex": "0128b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b5"
+    },
+    {
+      "name": "Quint envelope 158 decode",
+      "inputHex": "0228b5",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b5"
+    },
+    {
+      "name": "Quint envelope 159 decode",
+      "inputHex": "0128b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd"
+    },
+    {
+      "name": "Quint envelope 160 decode",
+      "inputHex": "0228b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd"
+    },
+    {
+      "name": "Quint envelope 161 decode",
+      "inputHex": "0128b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd"
+    },
+    {
+      "name": "Quint envelope 162 decode",
+      "inputHex": "0228b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd"
+    },
+    {
+      "name": "Quint envelope 163 decode",
+      "inputHex": "0128b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd"
+    },
+    {
+      "name": "Quint envelope 164 decode",
+      "inputHex": "0228b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd"
+    },
+    {
+      "name": "Quint envelope 165 decode",
+      "inputHex": "0128b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd"
+    },
+    {
+      "name": "Quint envelope 166 decode",
+      "inputHex": "0228b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd"
+    },
+    {
+      "name": "Quint envelope 167 decode",
+      "inputHex": "0128b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd"
+    },
+    {
+      "name": "Quint envelope 168 decode",
+      "inputHex": "0228b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": false,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd"
+    },
+    {
+      "name": "Quint envelope 169 decode",
+      "inputHex": "0128b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0128b52ffd"
+    },
+    {
+      "name": "Quint envelope 170 decode",
+      "inputHex": "0228b52ffd",
+      "maxDecompressedBytes": 1,
+      "newWritesEnabled": true,
+      "codecFixture": {
+        "succeeds": false,
+        "decodedHex": ""
+      },
+      "outcome": "fallback_raw",
+      "payloadType": "binary",
+      "payloadHex": "0228b52ffd"
+    }
+  ],
+  "compressionWriteVectors": [
+    {
+      "name": "Quint envelope 171 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 1,
+      "maxDecompressedBytes": 0,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 172 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 1,
+      "maxDecompressedBytes": 0,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 173 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 2,
+      "maxDecompressedBytes": 0,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 174 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 1,
+      "maxDecompressedBytes": 1,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 175 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 1,
+      "maxDecompressedBytes": 1,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 176 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 2,
+      "maxDecompressedBytes": 1,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 177 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 1,
+      "maxDecompressedBytes": 2,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 178 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 1,
+      "maxDecompressedBytes": 2,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 179 write short",
+      "payloadType": "string",
+      "payloadUtf8": "x",
+      "thresholdBytes": 2,
+      "maxDecompressedBytes": 2,
+      "originalBytes": 1,
+      "rawStoredBytes": 1,
+      "escapedHex": "78",
+      "codecBytes": {
+        "typescript": 10,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 1,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 1,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 180 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 16,
+      "maxDecompressedBytes": 16,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 17,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 181 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 16,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 17,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 182 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 16,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 17,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 183 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 16,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 184 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 185 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 17,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 186 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 16,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 187 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 188 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 17,
+      "rawStoredBytes": 17,
+      "escapedHex": "6161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 17,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 17,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 189 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 190 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 191 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 192 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 193 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 194 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 195 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 196 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 197 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 18,
+      "rawStoredBytes": 18,
+      "escapedHex": "616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 198 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 199 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 200 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 201 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 202 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 203 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 204 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 205 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 11,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 206 write text-size-boundary",
+      "payloadType": "string",
+      "payloadUtf8": "aaaaaaaaaaaaaaaaaaa",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "61616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 10
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 207 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 16,
+      "maxDecompressedBytes": 16,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 208 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 16,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 209 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 16,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 210 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 16,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 211 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 212 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 213 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 16,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 214 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 215 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 17,
+      "rawStoredBytes": 18,
+      "escapedHex": "000161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 26
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 18,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 216 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 217 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 218 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 17,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 219 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 220 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 221 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 222 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 17,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 223 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 224 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "016161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 18,
+      "rawStoredBytes": 19,
+      "escapedHex": "00016161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 225 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 226 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 227 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 228 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 229 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 230 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 231 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 232 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 233 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "01616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0001616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 234 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 21,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 21,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 235 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 21,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 21,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 236 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 21,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 21,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 21,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 237 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 238 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 239 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 21,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 21,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 21,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 240 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 21,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 241 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 21,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 242 write escaped-size-boundary",
+      "payloadType": "binary",
+      "payloadHex": "0161616161616161616161616161616161616161",
+      "thresholdBytes": 21,
+      "maxDecompressedBytes": 21,
+      "originalBytes": 20,
+      "rawStoredBytes": 21,
+      "escapedHex": "000161616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 21,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 21,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 243 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 244 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 245 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 246 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 247 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 248 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 249 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 250 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 251 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "00616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0000616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 252 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 253 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 254 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 255 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 256 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 257 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 258 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 259 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 2
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 260 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "02616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 20,
+      "escapedHex": "0002616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 20,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 261 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 262 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 263 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 18,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 264 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 265 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 266 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 19,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 267 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 18,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 268 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 19,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 2
+        },
+        "go": {
+          "outcome": "not_smaller",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 269 write binary-marker-class",
+      "payloadType": "binary",
+      "payloadHex": "03616161616161616161616161616161616161",
+      "thresholdBytes": 20,
+      "maxDecompressedBytes": 20,
+      "originalBytes": 19,
+      "rawStoredBytes": 19,
+      "escapedHex": "03616161616161616161616161616161616161",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 19,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 270 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 63,
+      "maxDecompressedBytes": 63,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 271 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 64,
+      "maxDecompressedBytes": 63,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 272 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 65,
+      "maxDecompressedBytes": 63,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 273 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 63,
+      "maxDecompressedBytes": 64,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 274 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 64,
+      "maxDecompressedBytes": 64,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 275 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 65,
+      "maxDecompressedBytes": 64,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 276 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 63,
+      "maxDecompressedBytes": 65,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 277 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 64,
+      "maxDecompressedBytes": 65,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 18,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 19,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 278 write utf8-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "éééééééééééééééééééééééééééééééé",
+      "thresholdBytes": 65,
+      "maxDecompressedBytes": 65,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "codecBytes": {
+        "typescript": 17,
+        "go": 18
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 279 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 63,
+      "maxDecompressedBytes": 63,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 280 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 64,
+      "maxDecompressedBytes": 63,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 281 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 65,
+      "maxDecompressedBytes": 63,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 282 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 63,
+      "maxDecompressedBytes": 64,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 20,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 21,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 283 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 64,
+      "maxDecompressedBytes": 64,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 20,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 21,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 284 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 65,
+      "maxDecompressedBytes": 64,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 285 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 63,
+      "maxDecompressedBytes": 65,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 20,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 21,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 286 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 64,
+      "maxDecompressedBytes": 65,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 20,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 21,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 287 write supplementary-byte-threshold",
+      "payloadType": "string",
+      "payloadUtf8": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "thresholdBytes": 65,
+      "maxDecompressedBytes": 65,
+      "originalBytes": 64,
+      "rawStoredBytes": 64,
+      "escapedHex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "codecBytes": {
+        "typescript": 19,
+        "go": 20
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 64,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 288 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 159,
+      "maxDecompressedBytes": 159,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 160,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 160,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 289 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 160,
+      "maxDecompressedBytes": 159,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "write_over_limit",
+          "storedBytes": 160,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "write_over_limit",
+          "storedBytes": 160,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 290 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 161,
+      "maxDecompressedBytes": 159,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 160,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 160,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 291 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 159,
+      "maxDecompressedBytes": 160,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 27,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 28,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 292 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 160,
+      "maxDecompressedBytes": 160,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 27,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 28,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 293 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 161,
+      "maxDecompressedBytes": 160,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 160,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 160,
+          "marker": -1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 294 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 159,
+      "maxDecompressedBytes": 161,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 27,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 28,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 295 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 160,
+      "maxDecompressedBytes": 161,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "compressed",
+          "storedBytes": 27,
+          "marker": 1
+        },
+        "go": {
+          "outcome": "compressed",
+          "storedBytes": 28,
+          "marker": 1
+        }
+      }
+    },
+    {
+      "name": "Quint envelope 296 write compressible",
+      "payloadType": "string",
+      "payloadUtf8": "dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache dialcache ",
+      "thresholdBytes": 161,
+      "maxDecompressedBytes": 161,
+      "originalBytes": 160,
+      "rawStoredBytes": 160,
+      "escapedHex": "6469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c6361636865206469616c636163686520",
+      "codecBytes": {
+        "typescript": 26,
+        "go": 27
+      },
+      "expectedByBinding": {
+        "typescript": {
+          "outcome": "below_threshold",
+          "storedBytes": 160,
+          "marker": -1
+        },
+        "go": {
+          "outcome": "below_threshold",
+          "storedBytes": 160,
+          "marker": -1
+        }
+      }
+    }
+  ]
+}

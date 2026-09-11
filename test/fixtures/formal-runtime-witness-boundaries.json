@@ -1,0 +1,1633 @@
+[
+  {
+    "title": "memo-created-after-invalidation",
+    "witness": "invalidation-preserves-request-hit",
+    "profile": "layers",
+    "provenance": {
+      "model": "formal/dialcache-layers-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-runtime-witness-boundaries.json/memo-created-after-invalidation"
+    },
+    "initialState": {
+      "capacity": {
+        "#bigint": "2"
+      },
+      "closed": [
+        false,
+        false,
+        false
+      ],
+      "created": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "localValues": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "lru": [
+        [],
+        []
+      ],
+      "memo": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "memoSlots": [],
+      "now": {
+        "#bigint": "10000"
+      },
+      "o": {
+        "calls": [],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "0"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "0"
+        },
+        "reads": {
+          "#bigint": "0"
+        },
+        "recovery": [],
+        "shadow": [],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "owners": [],
+      "policy": {
+        "#bigint": "0"
+      },
+      "processFlights": [
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        }
+      ],
+      "remoteAvailable": true,
+      "remoteValues": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "requestFlights": [
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        }
+      ],
+      "sources": [],
+      "tracked": true,
+      "watermark": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "6"
+          }
+        },
+        "statePatch": {
+          "memoSlots": [
+            {
+              "#bigint": "6"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "1"
+            },
+            "policyCalls": {
+              "#bigint": "1"
+            },
+            "reads": {
+              "#bigint": "1"
+            }
+          },
+          "owners": [
+            {
+              "#bigint": "0"
+            }
+          ],
+          "processFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "requestFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "sources": [
+            {
+              "fence": {
+                "#bigint": "0"
+              },
+              "instance": {
+                "#bigint": "0"
+              },
+              "key": {
+                "#bigint": "2"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "0"
+              },
+              "shared": true
+            }
+          ]
+        }
+      },
+      {
+        "action": "invalidate",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        },
+        "statePatch": {
+          "o": {
+            "invalidations": {
+              "#bigint": "1"
+            },
+            "maintenance": [
+              "ok"
+            ]
+          },
+          "watermark": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "10000"
+            }
+          ]
+        }
+      },
+      {
+        "action": "resolveLoader",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        },
+        "statePatch": {
+          "created": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "10000"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "memo": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "2"
+              }
+            ],
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writeTtls": [
+              {
+                "#bigint": "60000"
+              }
+            ],
+            "writes": {
+              "#bigint": "1"
+            }
+          },
+          "processFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "remoteValues": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "requestFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "sources": [
+            {
+              "fence": {
+                "#bigint": "0"
+              },
+              "instance": {
+                "#bigint": "0"
+              },
+              "key": {
+                "#bigint": "2"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "2"
+              },
+              "shared": true
+            }
+          ]
+        }
+      },
+      {
+        "action": "seed",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "3"
+          }
+        },
+        "statePatch": {
+          "created": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "10000"
+            },
+            {
+              "#bigint": "10000"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "remoteValues": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            }
+          ]
+        }
+      },
+      {
+        "action": "beginCall",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "6"
+          }
+        },
+        "statePatch": {
+          "memoSlots": [
+            {
+              "#bigint": "6"
+            },
+            {
+              "#bigint": "6"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "2"
+              },
+              {
+                "#bigint": "2"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "2"
+            }
+          },
+          "owners": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "title": "preexisting-memo-survives",
+    "witness": "invalidation-preserves-request-hit",
+    "profile": "layers",
+    "provenance": {
+      "model": "formal/dialcache-layers-conformance.qnt",
+      "recipe": "formal/fixture-recipes.json#test/fixtures/formal-runtime-witness-boundaries.json/preexisting-memo-survives"
+    },
+    "initialState": {
+      "capacity": {
+        "#bigint": "0"
+      },
+      "closed": [
+        false,
+        false,
+        false
+      ],
+      "created": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "localValues": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "lru": [
+        [],
+        []
+      ],
+      "memo": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "memoSlots": [],
+      "now": {
+        "#bigint": "10000"
+      },
+      "o": {
+        "calls": [],
+        "classifications": {
+          "#bigint": "0"
+        },
+        "comparisons": {
+          "#bigint": "0"
+        },
+        "dumps": {
+          "#bigint": "0"
+        },
+        "invalidations": {
+          "#bigint": "0"
+        },
+        "loaders": {
+          "#bigint": "0"
+        },
+        "loads": {
+          "#bigint": "0"
+        },
+        "maintenance": [],
+        "policyCalls": {
+          "#bigint": "0"
+        },
+        "reads": {
+          "#bigint": "0"
+        },
+        "recovery": [],
+        "shadow": [],
+        "sourceScopes": [],
+        "writeTtls": [],
+        "writes": {
+          "#bigint": "0"
+        }
+      },
+      "owners": [],
+      "policy": {
+        "#bigint": "0"
+      },
+      "processFlights": [
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        }
+      ],
+      "remoteAvailable": true,
+      "remoteValues": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ],
+      "requestFlights": [
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        },
+        {
+          "#bigint": "-1"
+        }
+      ],
+      "sources": [],
+      "tracked": true,
+      "watermark": [
+        {
+          "#bigint": "0"
+        },
+        {
+          "#bigint": "0"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "action": "beginCall",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        },
+        "statePatch": {
+          "memoSlots": [
+            {
+              "#bigint": "2"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "1"
+            },
+            "policyCalls": {
+              "#bigint": "1"
+            },
+            "reads": {
+              "#bigint": "1"
+            }
+          },
+          "owners": [
+            {
+              "#bigint": "0"
+            }
+          ],
+          "processFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "requestFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "sources": [
+            {
+              "fence": {
+                "#bigint": "0"
+              },
+              "instance": {
+                "#bigint": "0"
+              },
+              "key": {
+                "#bigint": "2"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "0"
+              },
+              "shared": true
+            }
+          ]
+        }
+      },
+      {
+        "action": "resolveLoader",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        },
+        "statePatch": {
+          "created": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "10000"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "memo": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "1"
+              }
+            ],
+            "dumps": {
+              "#bigint": "1"
+            },
+            "writeTtls": [
+              {
+                "#bigint": "60000"
+              }
+            ],
+            "writes": {
+              "#bigint": "1"
+            }
+          },
+          "processFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "remoteValues": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "requestFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "sources": [
+            {
+              "fence": {
+                "#bigint": "0"
+              },
+              "instance": {
+                "#bigint": "0"
+              },
+              "key": {
+                "#bigint": "2"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "1"
+              },
+              "shared": true
+            }
+          ]
+        }
+      },
+      {
+        "action": "invalidate",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        },
+        "statePatch": {
+          "o": {
+            "invalidations": {
+              "#bigint": "1"
+            },
+            "maintenance": [
+              "ok"
+            ]
+          },
+          "watermark": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "10000"
+            }
+          ]
+        }
+      },
+      {
+        "action": "policy",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        },
+        "statePatch": {}
+      },
+      {
+        "action": "beginCall",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "19"
+          }
+        },
+        "statePatch": {
+          "memoSlots": [
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "2"
+            },
+            "policyCalls": {
+              "#bigint": "2"
+            },
+            "reads": {
+              "#bigint": "2"
+            }
+          },
+          "owners": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "processFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "sources": [
+            {
+              "fence": {
+                "#bigint": "0"
+              },
+              "instance": {
+                "#bigint": "0"
+              },
+              "key": {
+                "#bigint": "2"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "1"
+              },
+              "shared": true
+            },
+            {
+              "fence": {
+                "#bigint": "10000"
+              },
+              "instance": {
+                "#bigint": "1"
+              },
+              "key": {
+                "#bigint": "3"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "0"
+              },
+              "shared": true
+            }
+          ]
+        }
+      },
+      {
+        "action": "resolveLoader",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "3"
+          }
+        },
+        "statePatch": {
+          "o": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              }
+            ]
+          },
+          "processFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "sources": [
+            {
+              "fence": {
+                "#bigint": "0"
+              },
+              "instance": {
+                "#bigint": "0"
+              },
+              "key": {
+                "#bigint": "2"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "1"
+              },
+              "shared": true
+            },
+            {
+              "fence": {
+                "#bigint": "10000"
+              },
+              "instance": {
+                "#bigint": "1"
+              },
+              "key": {
+                "#bigint": "3"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "1"
+              },
+              "shared": true
+            }
+          ]
+        }
+      },
+      {
+        "action": "seed",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        },
+        "statePatch": {
+          "created": [
+            {
+              "#bigint": "10000"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "10000"
+            },
+            {
+              "#bigint": "0"
+            }
+          ],
+          "remoteValues": [
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "0"
+            }
+          ]
+        }
+      },
+      {
+        "action": "beginCall",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "15"
+          }
+        },
+        "statePatch": {
+          "memoSlots": [
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "0"
+              }
+            ],
+            "loaders": {
+              "#bigint": "3"
+            },
+            "policyCalls": {
+              "#bigint": "3"
+            },
+            "reads": {
+              "#bigint": "3"
+            }
+          },
+          "owners": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            }
+          ],
+          "processFlights": [
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ],
+          "sources": [
+            {
+              "fence": {
+                "#bigint": "0"
+              },
+              "instance": {
+                "#bigint": "0"
+              },
+              "key": {
+                "#bigint": "2"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "1"
+              },
+              "shared": true
+            },
+            {
+              "fence": {
+                "#bigint": "10000"
+              },
+              "instance": {
+                "#bigint": "1"
+              },
+              "key": {
+                "#bigint": "3"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "1"
+              },
+              "shared": true
+            },
+            {
+              "fence": {
+                "#bigint": "10000"
+              },
+              "instance": {
+                "#bigint": "0"
+              },
+              "key": {
+                "#bigint": "3"
+              },
+              "local": false,
+              "remote": true,
+              "result": {
+                "#bigint": "0"
+              },
+              "shared": true
+            }
+          ]
+        }
+      },
+      {
+        "action": "beginCall",
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        },
+        "statePatch": {
+          "memoSlots": [
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "-1"
+            },
+            {
+              "#bigint": "2"
+            }
+          ],
+          "o": {
+            "calls": [
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "1"
+              },
+              {
+                "#bigint": "0"
+              },
+              {
+                "#bigint": "1"
+              }
+            ],
+            "policyCalls": {
+              "#bigint": "4"
+            }
+          },
+          "owners": [
+            {
+              "#bigint": "0"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "-1"
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

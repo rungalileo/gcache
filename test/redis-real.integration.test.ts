@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { readGeneratedInvalidationVectors } from "../formal/generate-invalidation-vectors.mjs";
+import { readFileSync } from "node:fs";
 
 import * as valkeyGlide from "@valkey/valkey-glide";
 import { commandOptions, createClient } from "redis";
@@ -179,6 +181,75 @@ describe.each(engines)("DialCache Redis protocol on $name", ({ image }) => {
     await admin?.quit();
     await container?.stop();
   });
+
+  // Fixture setup, the actual protocol transition, and observation share one
+  // atomic script. Redis 6.2 still advances TTL time inside Lua, so bound expiry
+  // drift by measured server time, never a fixed CI/network tolerance.
+  // Only the setup/observation wrapper is test-owned; the transition is the
+  // same exported Lua used by both production adapters.
+  type InvalidationVectorState =
+    | { kind: "absent"; ttlMs: -2 }
+    | { kind: "string"; value: string; ttlMs: number }
+    | { kind: "list"; values: string[]; ttlMs: number };
+  const invalidationVectors = JSON.parse(readFileSync(new URL("../formal/invalidation-vectors.json", import.meta.url), "utf8")) as {
+    schemaVersion: number;
+    vectors: Array<{
+      name: string; existing: InvalidationVectorState;
+      futureBufferMs: string; invalidatedAtMs: string;
+      expected: { error?: boolean; state: InvalidationVectorState };
+    }>;
+  };
+  const generatedInvalidationVectors = readGeneratedInvalidationVectors();
+  for (const vector of [...invalidationVectors.vectors, ...generatedInvalidationVectors.vectors]) {
+    it(`portable invalidation: ${vector.name}`, async () => {
+      if (admin === undefined) throw new Error("Redis test client did not start");
+      expect(invalidationVectors.schemaVersion).toBe(2);
+      const script = `
+redis.replicate_commands()
+local function now_ms()
+  local now = redis.call("TIME")
+  return tonumber(now[1]) * 1000 + math.floor(tonumber(now[2]) / 1000)
+end
+local started_at = now_ms()
+redis.call("DEL", KEYS[1])
+if ARGV[3] == "string" then redis.call("SET", KEYS[1], ARGV[4]) end
+if ARGV[3] == "list" then
+  for _, value in ipairs(cjson.decode(ARGV[4])) do redis.call("RPUSH", KEYS[1], value) end
+end
+if tonumber(ARGV[5]) > 0 then redis.call("PEXPIRE", KEYS[1], ARGV[5]) end
+local result = (function()
+${INVALIDATE_CACHE_SCRIPT}
+end)()
+local status = result == 1 and "ok" or (type(result) == "table" and result.err and "error" or "unexpected_reply")
+local kind = redis.call("TYPE", KEYS[1]).ok
+local content = {}
+if kind == "string" then content = redis.call("GET", KEYS[1]) end
+if kind == "list" then content = redis.call("LRANGE", KEYS[1], 0, -1) end
+if kind == "none" then kind = "absent" end
+local ttl_ms = redis.call("PTTL", KEYS[1])
+return {status, kind, content, ttl_ms, now_ms() - started_at}
+`;
+      const initial = vector.existing;
+      const expected = vector.expected.state;
+      const observed = await admin.eval(script, {
+        keys: ["{portable-invalidation}#watermark"],
+        arguments: [vector.futureBufferMs, vector.invalidatedAtMs, initial.kind,
+          initial.kind === "string" ? initial.value : initial.kind === "list" ? JSON.stringify(initial.values) : "",
+          String(initial.ttlMs)],
+      });
+      expect(observed).toEqual([vector.expected.error ? "error" : "ok", expected.kind,
+        expected.kind === "string" ? expected.value : expected.kind === "list" ? expected.values : [],
+        expect.any(Number), expect.any(Number)]);
+      const [, , , ttlMs, elapsedMs] = observed as [string, string, string | string[], number, number];
+      expect(elapsedMs).toBeGreaterThanOrEqual(0);
+      if (expected.ttlMs < 0) {
+        expect(ttlMs).toBe(expected.ttlMs);
+      } else {
+        expect(ttlMs).toBeGreaterThanOrEqual(Math.max(0, expected.ttlMs - elapsedMs));
+        expect(ttlMs).toBeLessThanOrEqual(expected.ttlMs);
+      }
+    });
+  }
 
   describe.each(adapterKinds)("with $name", ({ kind }) => {
     let client: RedisAdapterHarness | undefined;

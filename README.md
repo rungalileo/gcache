@@ -132,6 +132,7 @@ for sampling and comparison behavior.
 | Recovery from selected source failures | [Stale-on-error](https://lan17.github.io/DialCache/stale-on-error.html) |
 | Shared execution and deadlines | [Coalescing and liveness](https://lan17.github.io/DialCache/coalescing.html) |
 | Methods, options, and exports | [API reference](https://lan17.github.io/DialCache/api.html) |
+| Go implementation and shared behavior contracts | [Go guide](go/README.md) · [Quint specification](formal/README.md) · [Worked walkthrough](formal/WALKTHROUGH.md) |
 
 The [documentation index](https://lan17.github.io/DialCache/) also links to client
 setup, observability, upgrades, and the maintainer guide. Everything is

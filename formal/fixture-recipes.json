@@ -1,0 +1,2461 @@
+{
+  "schemaVersion": 1,
+  "description": "Recipes select external actions or named public Quint runs and project their output. No expected values or private initial state belong here.",
+  "projections": {
+    "conformance": {
+      "sourceVersion": true,
+      "lastResult": true,
+      "outsideLoaderCalls": true,
+      "requestLoaderCalls": true,
+      "localLoaderCalls": true,
+      "coalescedLoaderCalls": true,
+      "remoteLoaderCalls": true,
+      "localCached": true,
+      "localValue": true,
+      "coalescedCached": true,
+      "coalescedValue": true,
+      "remoteReadable": true,
+      "remoteValue": true,
+      "redisReads": true,
+      "redisWrites": true
+    },
+    "effects": {
+      "acceptedAt": true,
+      "acceptedWall": true,
+      "activeLoader": true,
+      "activeRead": true,
+      "baseReadBudget": true,
+      "calls": true,
+      "deadline": true,
+      "decodeStarted": true,
+      "dumps": true,
+      "events": true,
+      "invalidations": true,
+      "loaders": true,
+      "loads": true,
+      "now": true,
+      "observedFence": true,
+      "observerFailed": true,
+      "phase": true,
+      "policyCalls": true,
+      "readAborts": true,
+      "readBudget": true,
+      "readBudgets": true,
+      "readStarted": true,
+      "readStates": true,
+      "reads": true,
+      "refill": true,
+      "reply": true,
+      "replyAt": true,
+      "sources": true,
+      "storedTimestamp": true,
+      "tracked": true,
+      "wall": true,
+      "watermark": true,
+      "writeTimestamp": true,
+      "writes": true
+    },
+    "scope": {
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "d": {
+        "ages": true,
+        "coalesced": true,
+        "fallbackErrors": true,
+        "warnings": true
+      }
+    },
+    "policy": {
+      "dumpFailed": true,
+      "key": true,
+      "localExpires": true,
+      "localKey": true,
+      "localValue": true,
+      "now": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "overlay": true,
+      "owners": true,
+      "policyCall": true,
+      "policyErrors": true,
+      "policyReplies": true,
+      "providerFailed": true,
+      "readFailed": true,
+      "registered": true,
+      "remoteCreated": true,
+      "remoteExpires": true,
+      "remoteValues": true,
+      "sources": true,
+      "wall": true,
+      "writeFailed": true
+    },
+    "shadow": {
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "d": {
+        "ages": true,
+        "coalesced": true,
+        "configErrors": true,
+        "fallbackErrors": true,
+        "warnings": true,
+        "futureOffsets": true
+      }
+    },
+    "observations": {
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      }
+    },
+    "independent": {
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "io": {
+        "aborted": true,
+        "budgets": true,
+        "sourceErrors": true
+      }
+    },
+    "recovery-read": {
+      "acceptedFresh": true,
+      "acceptedMaximum": true,
+      "activeSource": true,
+      "canRecover": true,
+      "canWrite": true,
+      "candidate": true,
+      "candidateCreated": true,
+      "closed": true,
+      "compression": true,
+      "created": true,
+      "expires": true,
+      "frame": true,
+      "freshMs": true,
+      "io": {
+        "aborted": true,
+        "budgets": true,
+        "sourceErrors": true
+      },
+      "localExpires": true,
+      "localValue": true,
+      "localVersion": true,
+      "markerExpires": true,
+      "markers": true,
+      "maximumMs": true,
+      "memo": true,
+      "now": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "observedFence": true,
+      "phase": true,
+      "readReceipts": true,
+      "recoveryReceipts": true,
+      "scope": true,
+      "tracked": true,
+      "wall": true,
+      "watermark": true,
+      "writeFailed": true,
+      "writeReceipts": true
+    },
+    "local-failure": {
+      "acceptedRemote": true,
+      "failed": true,
+      "localBefore": true,
+      "localMiss": true,
+      "localValue": true,
+      "memo": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "pending": true,
+      "readFailed": true,
+      "receipts": true,
+      "remoteEnabled": true,
+      "remoteValue": true,
+      "scope": true
+    },
+    "runtime-boundaries": {
+      "admissions": true,
+      "allFeatures": true,
+      "cached": true,
+      "configured": true,
+      "defaultSharing": true,
+      "disabledBaseline": true,
+      "layer": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "open": true,
+      "owners": true,
+      "policy": true,
+      "registered": true,
+      "settlements": true,
+      "sources": true,
+      "waitingPolicy": true
+    },
+    "shadow-layers": {
+      "calls": true,
+      "dumps": true,
+      "jobs": true,
+      "localExpires": true,
+      "localValues": true,
+      "localWriters": true,
+      "memo": true,
+      "now": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "policy": {
+        "choice": true,
+        "freshMs": true,
+        "local": true,
+        "request": true,
+        "retainedMs": true,
+        "serving": true,
+        "shadow": true
+      },
+      "remoteCreated": true,
+      "remoteExpires": true,
+      "remoteValues": true,
+      "sources": true,
+      "work": true,
+      "writes": true
+    },
+    "local-clock": {
+      "constructed": true,
+      "entries": true,
+      "fills": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "probes": true,
+      "ticks": true
+    },
+    "source-budgets": {
+      "kinds": true,
+      "localExpires": true,
+      "localValue": true,
+      "localWriter": true,
+      "mode": true,
+      "now": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "owners": true,
+      "policyOwners": true,
+      "registered": true,
+      "sources": true
+    },
+    "effects-13": {
+      "calls": true,
+      "reads": true,
+      "loaders": true,
+      "loads": true,
+      "dumps": true,
+      "writes": true,
+      "events": true
+    },
+    "layers": {
+      "capacity": true,
+      "closed": true,
+      "created": true,
+      "localValues": true,
+      "lru": true,
+      "memo": true,
+      "memoSlots": true,
+      "now": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "owners": true,
+      "policy": true,
+      "processFlights": true,
+      "remoteAvailable": true,
+      "remoteValues": true,
+      "requestFlights": true,
+      "sources": true,
+      "tracked": true,
+      "watermark": true
+    },
+    "recovery": {
+      "acceptedMaxAge": true,
+      "candidate": true,
+      "candidateCreated": true,
+      "classifier": true,
+      "created": true,
+      "deadline": true,
+      "expires": true,
+      "frame": true,
+      "loadFailed": true,
+      "maxAge": true,
+      "now": true,
+      "phase": true,
+      "readFailed": true,
+      "wall": true,
+      "watermark": true,
+      "o": {
+        "calls": true,
+        "reads": true,
+        "loads": true,
+        "loaders": true,
+        "classifications": true,
+        "dumps": true,
+        "writes": true,
+        "recovery": true,
+        "shadow": true
+      },
+      "d": {
+        "ages": true
+      }
+    },
+    "shadow-16": {
+      "abandoned": true,
+      "c0": true,
+      "created": true,
+      "deadline": true,
+      "frame": true,
+      "loadFailed": true,
+      "now": true,
+      "phase": true,
+      "readFailed": true,
+      "wall": true,
+      "watermark": true,
+      "writeFailed": true,
+      "o": {
+        "calls": true,
+        "reads": true,
+        "loads": true,
+        "loaders": true,
+        "classifications": true,
+        "dumps": true,
+        "writes": true,
+        "recovery": true,
+        "shadow": true
+      },
+      "d": {
+        "ages": true
+      }
+    },
+    "recovery-17": {
+      "acceptedMaxAge": true,
+      "activeLoader": true,
+      "attached": true,
+      "canRecover": true,
+      "canWrite": true,
+      "candidate": true,
+      "candidateCreated": true,
+      "classifier": true,
+      "closed": true,
+      "created": true,
+      "d": {
+        "ages": true,
+        "coalesced": true,
+        "fallbackErrors": true,
+        "warnings": true
+      },
+      "deadline": true,
+      "expires": true,
+      "frame": true,
+      "instanceClassifier": true,
+      "loadFailed": true,
+      "maxAge": true,
+      "memo": true,
+      "now": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "observedFence": true,
+      "phase": true,
+      "readFailed": true,
+      "request": true,
+      "sourceError": true,
+      "sources": true,
+      "wall": true,
+      "watermark": true
+    },
+    "shadow-18": {
+      "abandoned": true,
+      "acceptedInvalidLog": true,
+      "acceptedLog": true,
+      "c0": true,
+      "c0Created": true,
+      "comparator": true,
+      "comparisonMs": true,
+      "created": true,
+      "d": {
+        "ages": true,
+        "coalesced": true,
+        "configErrors": true,
+        "fallbackErrors": true,
+        "warnings": true
+      },
+      "deadline": true,
+      "defaultLog": true,
+      "dumpFailed": true,
+      "fence": true,
+      "frame": true,
+      "hook": true,
+      "invalidLog": true,
+      "invalidShadow": true,
+      "loadFailed": true,
+      "log": true,
+      "mismatchAuthorizations": true,
+      "now": true,
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "phase": true,
+      "readFailed": true,
+      "shadowActive": true,
+      "source": true,
+      "sourcePending": true,
+      "sourceValue": true,
+      "sourceWorkMs": true,
+      "wall": true,
+      "watermark": true,
+      "writeFailed": true,
+      "writeStamp": true
+    },
+    "recovery-read-19": {
+      "o": {
+        "calls": true,
+        "classifications": true,
+        "comparisons": true,
+        "dumps": true,
+        "invalidations": true,
+        "loaders": true,
+        "loads": true,
+        "maintenance": true,
+        "policyCalls": true,
+        "reads": true,
+        "recovery": true,
+        "shadow": true,
+        "sourceScopes": true,
+        "writeTtls": true,
+        "writes": true
+      },
+      "io": {
+        "aborted": true,
+        "budgets": true,
+        "sourceErrors": true
+      },
+      "markers": true,
+      "compression": true
+    }
+  },
+  "artifacts": [
+    {
+      "path": "formal/conformance-smoke.itf.json",
+      "model": "formal/dialcache-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", -1],
+            ["outsideCall", -1],
+            ["requestLocalPair", -1],
+            ["localCall", -1],
+            ["bumpSource", -1],
+            ["localCall", -1],
+            ["coalescedLocalPair", -1],
+            ["remoteCall", -1],
+            ["bumpSource", -1],
+            ["remoteCall", -1],
+            ["invalidateRemote", -1],
+            ["remoteCall", -1],
+            ["bumpSource", -1],
+            ["remoteReadFailureCall", -1],
+            ["requestLocalPair", -1]
+          ],
+          "projection": "conformance"
+        }
+      ]
+    },
+    {
+      "path": "formal/effects-smoke.itf.json",
+      "model": "formal/dialcache-effects-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", 5],
+            ["futureFence", -1],
+            ["tick", -1],
+            ["adapterReply", 10],
+            ["tick", -1],
+            ["beginCall", -1],
+            ["failRead", 0],
+            ["seedRemote", -1],
+            ["seedRemote", -1],
+            ["rejectLoader", 0],
+            ["beginCall", -1],
+            ["releaseRead", 1],
+            ["resolveLoader", 1],
+            ["releaseDump", -1],
+            ["beginCall", -1],
+            ["seedRemote", -1],
+            ["failWrite", -1],
+            ["seedRemote", -1],
+            ["futureFence", -1],
+            ["beginCall", -1],
+            ["failRead", 2],
+            ["rejectLoader", 2],
+            ["beginCall", -1],
+            ["tick", -1],
+            ["rejectLoader", 3],
+            ["beginCall", -1],
+            ["beginCall", -1],
+            ["failRead", 3],
+            ["beginCall", -1],
+            ["releaseRead", 4],
+            ["failLoad", -1],
+            ["resolveLoader", 4],
+            ["jumpClock", -1],
+            ["failDump", -1],
+            ["seedRemote", -1],
+            ["jumpClock", -1],
+            ["seedRemote", -1],
+            ["tick", -1],
+            ["seedRemote", -1],
+            ["tick", -1],
+            ["seedRemote", -1],
+            ["seedRemote", -1],
+            ["seedRemote", -1],
+            ["tick", -1],
+            ["tick", -1],
+            ["tick", -1],
+            ["adapterReply", 10],
+            ["seedRemote", -1],
+            ["jumpClock", -1],
+            ["tick", -1],
+            ["seedRemote", -1],
+            ["rollbackWall", -1],
+            ["invalidate", -1],
+            ["readBudgetPolicy", 0],
+            ["jumpClock", -1],
+            ["seedRemote", -1],
+            ["jumpClock", -1],
+            ["tick", -1],
+            ["seedRemote", -1],
+            ["jumpClock", -1],
+            ["rollbackWall", -1]
+          ],
+          "projection": "effects"
+        }
+      ]
+    },
+    {
+      "path": "formal/scope-smoke.itf.json",
+      "model": "formal/dialcache-scope-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", -1],
+            ["beginCall", 5],
+            ["beginCall", 5],
+            ["openScope", 1],
+            ["rejectLoader", 1],
+            ["resolveLoader", 7],
+            ["policy", 2],
+            ["openScope", 2],
+            ["beginCall", 5],
+            ["beginCall", 2],
+            ["openScope", 3],
+            ["rejectLoader", 2],
+            ["releasePolicy", -1],
+            ["policy", 1],
+            ["policy", 1],
+            ["openScope", 4],
+            ["beginCall", 2],
+            ["rejectLoader", 3],
+            ["releasePolicy", -1],
+            ["beginCall", 0],
+            ["releasePolicy", -1],
+            ["rejectLoader", 5],
+            ["resolveLoader", 34],
+            ["beginCall", 4],
+            ["releasePolicy", -1],
+            ["rejectLoader", 6],
+            ["beginCall", 4],
+            ["releasePolicy", -1],
+            ["beginCall", 1],
+            ["releasePolicy", -1],
+            ["resolveLoader", 50],
+            ["policy", 0],
+            ["beginCall", 1],
+            ["releasePolicy", -1],
+            ["rejectLoader", 8],
+            ["policy", 0],
+            ["beginCall", 1],
+            ["rejectLoader", 9],
+            ["policy", 1],
+            ["policy", 1],
+            ["releasePolicy", -1],
+            ["rejectLoader", 10],
+            ["beginCall", 2],
+            ["policy", 2],
+            ["policy", 1],
+            ["closeScope", 4],
+            ["policy", 2],
+            ["releasePolicy", -1],
+            ["beginCall", 4],
+            ["policy", 0],
+            ["rejectLoader", 11],
+            ["releasePolicy", -1],
+            ["resolveLoader", 86],
+            ["beginCall", 1],
+            ["closeScope", 0],
+            ["policy", 1],
+            ["releasePolicy", -1],
+            ["beginCall", 5],
+            ["policy", 1],
+            ["rejectLoader", 13],
+            ["beginCall", 1]
+          ],
+          "projection": "scope"
+        }
+      ]
+    },
+    {
+      "path": "formal/recovery-smoke.itf.json",
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", 6],
+            ["beginCall", 0],
+            ["joinCall", 1],
+            ["joinCall", 0],
+            ["joinCall", 1],
+            ["invalidate", -1],
+            ["advance", 10],
+            ["seed", 0],
+            ["policy", 5000],
+            ["readFault", 0],
+            ["loadFault", 1],
+            ["joinCall", 1],
+            ["rejectLoader", 0],
+            ["readFault", 0],
+            ["closeScope", 0],
+            ["rollbackWall", -1],
+            ["releaseLoad", -1],
+            ["advance", 4000],
+            ["beginCall", 4],
+            ["joinCall", 1],
+            ["loadFault", 0],
+            ["rollbackWall", -1],
+            ["joinCall", 1],
+            ["resolveLoader", 1],
+            ["readFault", 1],
+            ["readFault", 1],
+            ["seed", 4],
+            ["policy", 5000],
+            ["closeScope", 1],
+            ["rollbackWall", -1],
+            ["loadFault", 0],
+            ["policy", 5000],
+            ["rollbackWall", -1],
+            ["invalidate", -1],
+            ["advance", 4000],
+            ["readFault", 1],
+            ["loadFault", 0],
+            ["rollbackWall", -1],
+            ["rollbackWall", -1],
+            ["readFault", 1],
+            ["loadFault", 1],
+            ["advance", 10],
+            ["seed", 3],
+            ["loadFault", 1],
+            ["advance", 4000],
+            ["invalidate", -1],
+            ["seed", 1],
+            ["policy", 5000],
+            ["readFault", 0],
+            ["readFault", 0],
+            ["loadFault", 1],
+            ["invalidate", -1],
+            ["seed", 4],
+            ["invalidate", -1],
+            ["rollbackWall", -1],
+            ["invalidate", -1],
+            ["readFault", 1],
+            ["loadFault", 1],
+            ["readFault", 1],
+            ["policy", 5000],
+            ["loadFault", 0]
+          ],
+          "projection": "scope"
+        }
+      ]
+    },
+    {
+      "path": "formal/policy-smoke.itf.json",
+      "model": "formal/dialcache-policy-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", -1],
+            ["beginCall", 0],
+            ["releasePolicy", -1],
+            ["resolveLoader", 1],
+            ["providerFault", 1],
+            ["beginCall", 0],
+            ["releasePolicy", -1],
+            ["resolveLoader", 9],
+            ["providerFault", 0],
+            ["beginCall", 0],
+            ["releasePolicy", -1]
+          ],
+          "projection": "policy"
+        }
+      ]
+    },
+    {
+      "path": "formal/shadow-smoke.itf.json",
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", 0],
+            ["beginCall", -1],
+            ["resolveLoader", 1],
+            ["releaseRead", -1],
+            ["invalidate", 20],
+            ["advance", 10],
+            ["shadowPolicy", 0],
+            ["shadowPolicy", 1],
+            ["releaseDump", -1],
+            ["writeFault", 1],
+            ["logPolicy", 2],
+            ["beginCall", -1],
+            ["releaseRead", -1],
+            ["loadFault", 0],
+            ["rejectLoader", -1],
+            ["seed", 6],
+            ["seed", 6],
+            ["beginCall", -1],
+            ["rejectLoader", -1],
+            ["releaseRead", -1],
+            ["seed", 4],
+            ["beginCall", -1],
+            ["resolveLoader", 1],
+            ["writeFault", 1],
+            ["seedUnicode", 8],
+            ["seed", 7],
+            ["advance", 1],
+            ["dumpFault", 1],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["readFault", 0],
+            ["releaseRead", -1],
+            ["rejectLoader", -1],
+            ["beginCall", -1],
+            ["resolveLoader", 2],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["releaseRead", -1],
+            ["rejectLoader", -1],
+            ["advance", 1],
+            ["advance", 10],
+            ["beginCall", -1],
+            ["seedUnicode", 8],
+            ["invalidate", 20],
+            ["loadFault", 0],
+            ["releaseRead", -1],
+            ["logPolicy", 1],
+            ["resolveLoader", 2],
+            ["releaseLoad", -1],
+            ["seed", 8],
+            ["releaseRead", -1],
+            ["logPolicy", 0],
+            ["seed", 2],
+            ["invalidate", 20],
+            ["readFault", 1],
+            ["shadowPolicy", 0],
+            ["loadFault", 0],
+            ["rollbackWall", -1],
+            ["shadowPolicy", 1],
+            ["readFault", 0],
+            ["dumpFault", 0]
+          ],
+          "projection": "shadow"
+        }
+      ]
+    },
+    {
+      "path": "formal/admission-smoke.itf.json",
+      "model": "formal/dialcache-admission-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", -1],
+            ["beginCall", 4],
+            ["beginCall", 4],
+            ["advance", 10],
+            ["beginCall", 0],
+            ["releaseRead", 1],
+            ["seed", 4],
+            ["releaseRead", 0],
+            ["advance", 10],
+            ["policy", 2],
+            ["beginCall", 5],
+            ["beginCall", 4],
+            ["beginCall", 4],
+            ["releaseLoad", 1],
+            ["rejectLoader", 0],
+            ["beginCall", 3],
+            ["beginCall", 4],
+            ["releaseRead", 5],
+            ["releaseRead", 3],
+            ["beginCall", 1],
+            ["releaseLoad", 0],
+            ["beginCall", 0],
+            ["advance", 10],
+            ["beginCall", 1],
+            ["releaseLoad", 2],
+            ["advance", 10],
+            ["policy", 2],
+            ["seed", 5],
+            ["beginCall", 3],
+            ["beginCall", 0],
+            ["releaseRead", 9],
+            ["releaseLoad", 3],
+            ["releaseLoad", 4],
+            ["beginCall", 0],
+            ["releaseRead", 11],
+            ["resolveLoader", 3],
+            ["seed", 3],
+            ["resolveLoader", 10],
+            ["releaseLoad", 5],
+            ["rejectLoader", 2],
+            ["releaseRead", 4],
+            ["beginCall", 1],
+            ["resolveLoader", 11],
+            ["beginCall", 5],
+            ["rejectLoader", 3],
+            ["releaseRead", 12],
+            ["releaseRead", 14],
+            ["advance", 10],
+            ["releaseLoad", 9],
+            ["releaseRead", 6],
+            ["advance", 10],
+            ["releaseLoad", 8],
+            ["releaseRead", 10],
+            ["releaseRead", 8],
+            ["releaseLoad", 12],
+            ["rejectLoader", 6],
+            ["releaseLoad", 13]
+          ],
+          "projection": "observations"
+        }
+      ]
+    },
+    {
+      "path": "formal/layers-smoke.itf.json",
+      "model": "formal/dialcache-layers-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", 4],
+            ["beginCall", 16],
+            ["beginCall", 3],
+            ["resolveLoader", 4],
+            ["resolveLoader", 2],
+            ["tick", -1],
+            ["invalidate", 0],
+            ["beginCall", 0],
+            ["beginCall", 12],
+            ["beginCall", 10],
+            ["resolveLoader", 6],
+            ["beginCall", 16],
+            ["beginCall", 1],
+            ["tick", -1],
+            ["beginCall", 7],
+            ["beginCall", 18],
+            ["beginCall", 15],
+            ["beginCall", 8],
+            ["beginCall", 1],
+            ["tick", -1],
+            ["seed", 4],
+            ["tick", -1],
+            ["beginCall", 0],
+            ["seed", 5],
+            ["resolveLoader", 9],
+            ["beginCall", 1],
+            ["tick", -1],
+            ["resolveLoader", 7],
+            ["tick", -1],
+            ["invalidate", 1],
+            ["beginCall", 0],
+            ["tick", -1],
+            ["beginCall", 11],
+            ["beginCall", 13],
+            ["invalidate", 1],
+            ["beginCall", 18],
+            ["seed", 7],
+            ["resolveLoader", 11],
+            ["tick", -1],
+            ["policy", 2],
+            ["beginCall", 16],
+            ["resolveLoader", 13],
+            ["invalidate", 0],
+            ["beginCall", 14],
+            ["policy", 3],
+            ["rejectLoader", 7],
+            ["policy", 3],
+            ["seed", 1],
+            ["tick", -1],
+            ["seed", 2],
+            ["closeScope", 2],
+            ["seed", 0],
+            ["policy", 3],
+            ["tick", -1],
+            ["seed", 3],
+            ["tick", -1],
+            ["invalidate", 1],
+            ["tick", -1],
+            ["tick", -1],
+            ["closeScope", 1],
+            ["tick", -1],
+            ["invalidate", 1],
+            ["tick", -1],
+            ["policy", 0],
+            ["policy", 2],
+            ["seed", 7],
+            ["tick", -1],
+            ["closeScope", 0],
+            ["tick", -1],
+            ["tick", -1],
+            ["tick", -1],
+            ["policy", 5],
+            ["seed", 4],
+            ["policy", 1],
+            ["invalidate", 0],
+            ["seed", 4],
+            ["seed", 1],
+            ["tick", -1],
+            ["policy", 3],
+            ["invalidate", 0],
+            ["tick", -1]
+          ],
+          "projection": "observations"
+        }
+      ]
+    },
+    {
+      "path": "formal/independent-smoke.itf.json",
+      "model": "formal/dialcache-independent-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", -1],
+            ["policy", 0],
+            ["invalidate", -1],
+            ["policy", 0],
+            ["beginCall", -1],
+            ["releaseRead", 0],
+            ["rejectLoader", 0],
+            ["seed", 2],
+            ["advance", 10],
+            ["beginCall", -1],
+            ["beginCall", -1],
+            ["releaseRead", 2],
+            ["invalidate", -1],
+            ["beginCall", -1],
+            ["rejectLoader", 1],
+            ["policy", 2],
+            ["policy", 3],
+            ["advance", 5],
+            ["releaseRead", 1],
+            ["policy", 3],
+            ["releaseRead", 3],
+            ["beginCall", -1],
+            ["releaseRead", 4],
+            ["rejectLoader", 4],
+            ["advance", 1],
+            ["beginCall", -1],
+            ["seed", 1],
+            ["policy", 3],
+            ["failRead", 5],
+            ["seed", 3],
+            ["seed", 0],
+            ["seed", 4],
+            ["policy", 0],
+            ["invalidate", -1],
+            ["rejectLoader", 5],
+            ["rejectLoader", 3],
+            ["invalidate", -1],
+            ["rejectLoader", 2],
+            ["advance", 1],
+            ["policy", 1],
+            ["invalidate", -1],
+            ["seed", 5],
+            ["invalidate", -1],
+            ["seed", 0],
+            ["seed", 5],
+            ["policy", 1],
+            ["policy", 0],
+            ["invalidate", -1],
+            ["policy", 0],
+            ["policy", 1],
+            ["invalidate", -1],
+            ["policy", 2],
+            ["invalidate", -1],
+            ["policy", 0],
+            ["advance", 1],
+            ["advance", 10],
+            ["invalidate", -1],
+            ["seed", 4],
+            ["seed", 0],
+            ["invalidate", -1],
+            ["invalidate", -1]
+          ],
+          "projection": "independent"
+        }
+      ]
+    },
+    {
+      "path": "formal/recovery-read-smoke.itf.json",
+      "model": "formal/dialcache-recovery-read-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", 1],
+            ["invalidate", -1],
+            ["observeMarker", -1],
+            ["advance", 1],
+            ["policy", 2],
+            ["beginCall", 2],
+            ["releaseRead", -1],
+            ["resolveLoader", -1],
+            ["observeMarker", -1],
+            ["beginCall", 2],
+            ["releaseRead", -1],
+            ["releaseLoad", -1],
+            ["advance", 999],
+            ["observeMarker", -1]
+          ],
+          "projection": "recovery-read"
+        }
+      ]
+    },
+    {
+      "path": "formal/local-failure-smoke.itf.json",
+      "model": "formal/dialcache-local-failure-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", -1],
+            ["beginCall", 2],
+            ["resolveLoader", 1],
+            ["seed", 2],
+            ["localFault", 1],
+            ["beginCall", 0],
+            ["localFault", 0],
+            ["beginCall", 2],
+            ["beginCall", 0]
+          ],
+          "projection": "local-failure"
+        }
+      ]
+    },
+    {
+      "path": "formal/runtime-boundaries-smoke.itf.json",
+      "model": "formal/dialcache-runtime-boundaries-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", 2],
+            ["policy", 5],
+            ["beginCall", -1],
+            ["releasePolicy", -1],
+            ["resolveLoader", 0],
+            ["policy", 8],
+            ["beginCall", -1],
+            ["releasePolicy", -1],
+            ["resolveLoader", 9],
+            ["beginCall", -1],
+            ["releasePolicy", -1]
+          ],
+          "projection": "runtime-boundaries"
+        }
+      ]
+    },
+    {
+      "path": "formal/shadow-layers-smoke.itf.json",
+      "model": "formal/dialcache-shadow-layers-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", -1],
+            ["policy", 2],
+            ["beginCall", 9],
+            ["resolveLoader", 1],
+            ["policy", 12],
+            ["beginCall", 9]
+          ],
+          "projection": "shadow-layers"
+        }
+      ]
+    },
+    {
+      "path": "formal/local-clock-smoke.itf.json",
+      "model": "formal/dialcache-local-clock-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", -1],
+            ["constructInstance", 0],
+            ["advanceTicks", 400],
+            ["constructInstance", 1],
+            ["advanceTicks", 300],
+            ["call", 0],
+            ["call", 2],
+            ["advanceTicks", 999200],
+            ["call", 1],
+            ["call", 3],
+            ["advanceTicks", 100],
+            ["call", 1],
+            ["call", 3]
+          ],
+          "projection": "local-clock"
+        }
+      ],
+      "actionBindings": {
+        "call": "callCache"
+      }
+    },
+    {
+      "path": "formal/source-budgets-smoke.itf.json",
+      "model": "formal/dialcache-source-budgets-conformance.qnt",
+      "format": "smoke",
+      "recipes": [
+        {
+          "id": "smoke",
+          "actions": [
+            ["init", 2],
+            ["beginCall", 0],
+            ["releasePolicy", 0],
+            ["advance", 6],
+            ["beginCall", 0],
+            ["releasePolicy", 1],
+            ["advance", 3],
+            ["advance", 1]
+          ],
+          "projection": "source-budgets"
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/effects-authority-witnesses.json",
+      "model": "formal/dialcache-effects-conformance.qnt",
+      "format": "named-list",
+      "recipes": [
+        {
+          "id": "observerFailuresCannotPreventCacheHitTest",
+          "regression": "observerFailuresCannotPreventCacheHitTest",
+          "projection": "effects-13"
+        },
+        {
+          "id": "observerFailuresCannotPreventPublicationTest",
+          "regression": "observerFailuresCannotPreventPublicationTest",
+          "projection": "effects-13"
+        },
+        {
+          "id": "observerFailuresCannotReplaceSourceErrorTest",
+          "regression": "observerFailuresCannotReplaceSourceErrorTest",
+          "projection": "effects-13"
+        },
+        {
+          "id": "writeStampAfterSerializationClearsInterveningFenceTest",
+          "regression": "writeStampAfterSerializationClearsInterveningFenceTest",
+          "projection": "effects-13"
+        },
+        {
+          "id": "futureFrameReportsPositiveObservingOffsetTest",
+          "regression": "futureFrameReportsPositiveObservingOffsetTest",
+          "projection": "effects-13"
+        },
+        {
+          "id": "coalescedFailureKeepsOneLeaderAndFollowerTrailTest",
+          "regression": "coalescedFailureKeepsOneLeaderAndFollowerTrailTest",
+          "projection": "effects-13"
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/formal-runtime-boundary-witnesses.json",
+      "model": "formal/dialcache-runtime-boundaries-conformance.qnt",
+      "format": "named-map",
+      "recipes": [
+        {
+          "id": "disabledBaselineRampedUpKeepsDefaultSharingTest",
+          "regression": "disabledBaselineRampedUpKeepsDefaultSharingTest",
+          "projection": "observations"
+        },
+        {
+          "id": "explicitNullCoalesceBypassesWithoutReplacingRemoteTest",
+          "regression": "explicitNullCoalesceBypassesWithoutReplacingRemoteTest",
+          "projection": "observations"
+        },
+        {
+          "id": "explicitNullRequestLocalBypassesWithoutReplacingRemoteTest",
+          "regression": "explicitNullRequestLocalBypassesWithoutReplacingRemoteTest",
+          "projection": "observations"
+        },
+        {
+          "id": "falseRequestLeafPreservesMemoForReenablementTest",
+          "regression": "falseRequestLeafPreservesMemoForReenablementTest",
+          "projection": "observations"
+        },
+        {
+          "id": "fullFeatureKillSwitchKeepsOmittedSharingAndRetainedMemoTest",
+          "regression": "fullFeatureKillSwitchKeepsOmittedSharingAndRetainedMemoTest",
+          "projection": "observations"
+        },
+        {
+          "id": "inheritedFalseKeepsIndependentMemoizingSourcesTest",
+          "regression": "inheritedFalseKeepsIndependentMemoizingSourcesTest",
+          "projection": "observations"
+        },
+        {
+          "id": "invalidCoalesceBypassesWithoutReplacingRemoteTest",
+          "regression": "invalidCoalesceBypassesWithoutReplacingRemoteTest",
+          "projection": "observations"
+        },
+        {
+          "id": "invalidRequestLocalBypassesWithoutReplacingRemoteTest",
+          "regression": "invalidRequestLocalBypassesWithoutReplacingRemoteTest",
+          "projection": "observations"
+        },
+        {
+          "id": "localAbsenceAndLiteralTextStayDistinctTest",
+          "regression": "localAbsenceAndLiteralTextStayDistinctTest",
+          "projection": "observations"
+        },
+        {
+          "id": "localCohortEqualityBypassesBeforeAboveSampleCachesTest",
+          "regression": "localCohortEqualityBypassesBeforeAboveSampleCachesTest",
+          "projection": "observations"
+        },
+        {
+          "id": "localFalsyValuesRemainDistinctAndReusableTest",
+          "regression": "localFalsyValuesRemainDistinctAndReusableTest",
+          "projection": "observations"
+        },
+        {
+          "id": "nullProviderInheritsConfiguredServingAndDefaultSharingTest",
+          "regression": "nullProviderInheritsConfiguredServingAndDefaultSharingTest",
+          "projection": "observations"
+        },
+        {
+          "id": "omittedRampAndSharingUseLibraryDefaultsTest",
+          "regression": "omittedRampAndSharingUseLibraryDefaultsTest",
+          "projection": "observations"
+        },
+        {
+          "id": "reenablingSharingUsesTheOmittedTrueDefaultTest",
+          "regression": "reenablingSharingUsesTheOmittedTrueDefaultTest",
+          "projection": "observations"
+        },
+        {
+          "id": "remoteAbsenceAndLiteralTextStayDistinctTest",
+          "regression": "remoteAbsenceAndLiteralTextStayDistinctTest",
+          "projection": "observations"
+        },
+        {
+          "id": "remoteCohortEqualityBypassesBeforeAboveSampleCachesTest",
+          "regression": "remoteCohortEqualityBypassesBeforeAboveSampleCachesTest",
+          "projection": "observations"
+        },
+        {
+          "id": "remoteFalsyValuesRemainDistinctAndReusableTest",
+          "regression": "remoteFalsyValuesRemainDistinctAndReusableTest",
+          "projection": "observations"
+        },
+        {
+          "id": "requestAbsenceAndLiteralTextStayDistinctTest",
+          "regression": "requestAbsenceAndLiteralTextStayDistinctTest",
+          "projection": "observations"
+        },
+        {
+          "id": "requestFalsyValuesRemainDistinctAndReusableTest",
+          "regression": "requestFalsyValuesRemainDistinctAndReusableTest",
+          "projection": "observations"
+        },
+        {
+          "id": "runtimeLocalTtlWithoutRampActivatesLayerTest",
+          "regression": "runtimeLocalTtlWithoutRampActivatesLayerTest",
+          "projection": "observations"
+        },
+        {
+          "id": "runtimeRemoteTtlWithoutRampActivatesLayerTest",
+          "regression": "runtimeRemoteTtlWithoutRampActivatesLayerTest",
+          "projection": "observations"
+        },
+        {
+          "id": "runtimeTrueEnablesSharingOverFalseDefaultTest",
+          "regression": "runtimeTrueEnablesSharingOverFalseDefaultTest",
+          "projection": "observations"
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/formal-runtime-witness-boundaries.json",
+      "format": "excerpts",
+      "recipes": [
+        {
+          "id": "memo-created-after-invalidation",
+          "model": "formal/dialcache-layers-conformance.qnt",
+          "profile": "layers",
+          "witness": "invalidation-preserves-request-hit",
+          "title": "memo-created-after-invalidation",
+          "actions": [
+            ["init", 1],
+            ["beginCall", 6],
+            ["invalidate", 1],
+            ["resolveLoader", 2],
+            ["seed", 3],
+            ["beginCall", 6]
+          ],
+          "startState": 0,
+          "projection": "layers",
+          "integers": "itf",
+          "choices": true
+        },
+        {
+          "id": "preexisting-memo-survives",
+          "model": "formal/dialcache-layers-conformance.qnt",
+          "profile": "layers",
+          "witness": "invalidation-preserves-request-hit",
+          "title": "preexisting-memo-survives",
+          "actions": [
+            ["init", 3],
+            ["beginCall", 2],
+            ["resolveLoader", 1],
+            ["invalidate", 1],
+            ["policy", 0],
+            ["beginCall", 19],
+            ["resolveLoader", 3],
+            ["seed", 1],
+            ["beginCall", 15],
+            ["beginCall", 2]
+          ],
+          "startState": 0,
+          "projection": "layers",
+          "integers": "itf",
+          "choices": true
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/formal-witness-attribution.json",
+      "format": "excerpts",
+      "recipes": [
+        {
+          "id": "recovery-age-sampled-at-successful-decode",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "recovery-age-sampled-at-successful-decode",
+          "actions": [
+            ["init", 2],
+            ["beginCall", 4],
+            ["invalidate", -1],
+            ["invalidate", -1],
+            ["advance", 1],
+            ["rejectTimeout", 0],
+            ["seed", 2],
+            ["joinCall", 1],
+            ["joinCall", 0],
+            ["seed", 1],
+            ["readFault", 1],
+            ["readFault", 0],
+            ["loadFault", 0],
+            ["policy", 5000],
+            ["rollbackWall", -1],
+            ["releaseLoad", -1]
+          ],
+          "startState": 0,
+          "projection": "recovery",
+          "integers": "native",
+          "choices": false
+        },
+        {
+          "id": "fenced-read-does-not-retain",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "fenced-read-does-not-retain",
+          "actions": [
+            ["init", 6],
+            ["invalidate", -1],
+            ["beginCall", 1],
+            ["readFault", 0],
+            ["rejectTimeout", 0],
+            ["beginCall", 0],
+            ["rejectLoader", 1]
+          ],
+          "startState": 4,
+          "projection": "recovery",
+          "integers": "native",
+          "choices": false
+        },
+        {
+          "id": "future-read-preserves-source-error",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "future-read-preserves-source-error",
+          "actions": [
+            ["init", 1],
+            ["policy", 5000],
+            ["seed", 5],
+            ["policy", 2000],
+            ["beginCall", 7],
+            ["advance", 4000]
+          ],
+          "startState": 3,
+          "projection": "recovery",
+          "integers": "native",
+          "choices": false
+        },
+        {
+          "id": "classifier-error-keeps-error-without-decode",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "classifier-error-keeps-error-without-decode",
+          "actions": [
+            ["init", 7],
+            ["beginCall", 3],
+            ["rejectLoader", 0]
+          ],
+          "startState": 0,
+          "projection": "recovery",
+          "integers": "native",
+          "choices": false
+        },
+        {
+          "id": "maximum-age-read-preserves-source-error",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "maximum-age-read-preserves-source-error",
+          "actions": [
+            ["init", 2],
+            ["beginCall", 0],
+            ["rejectLoader", 0],
+            ["policy", 2000],
+            ["joinCall", 1],
+            ["rollbackWall", -1],
+            ["advance", 4000],
+            ["joinCall", 0],
+            ["releaseLoad", -1],
+            ["policy", 5000],
+            ["policy", 5000],
+            ["beginCall", 7],
+            ["rejectTimeout", 1],
+            ["beginCall", 6],
+            ["rollbackWall", -1],
+            ["seed", 4],
+            ["joinCall", 1],
+            ["rejectTimeout", 2],
+            ["policy", 5000],
+            ["beginCall", 4],
+            ["joinCall", 0],
+            ["rejectLoader", 3]
+          ],
+          "startState": 18,
+          "projection": "recovery",
+          "integers": "native",
+          "choices": false
+        },
+        {
+          "id": "fenced-c1-supersedes-without-repair",
+          "model": "formal/dialcache-shadow-conformance.qnt",
+          "profile": "shadow",
+          "witness": "fenced-c1-supersedes-without-repair",
+          "actions": [
+            ["init", 2],
+            ["seed", 3],
+            ["shadowPolicy", 0],
+            ["beginCall", -1],
+            ["dumpFault", 0],
+            ["resolveLoader", 1],
+            ["advance", 10],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["releaseRead", -1],
+            ["invalidate", 0],
+            ["dumpFault", 1],
+            ["resolveLoader", 1],
+            ["releaseLoad", -1],
+            ["releaseRead", -1]
+          ],
+          "startState": 7,
+          "projection": "shadow-16",
+          "integers": "native",
+          "choices": false
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/formal-witness-boundaries.json",
+      "format": "excerpts",
+      "recipes": [
+        {
+          "id": "first-stale-age-recovers-without-publication",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "first-stale-age-recovers-without-publication",
+          "actions": [
+            ["init", 2],
+            ["beginCall", 4],
+            ["invalidate", -1],
+            ["invalidate", -1],
+            ["advance", 1],
+            ["rejectTimeout", 0],
+            ["seed", 2],
+            ["joinCall", 1],
+            ["joinCall", 0],
+            ["seed", 1],
+            ["readFault", 1],
+            ["readFault", 0],
+            ["loadFault", 0],
+            ["policy", 5000],
+            ["rollbackWall", -1],
+            ["releaseLoad", -1]
+          ],
+          "startState": 0,
+          "projection": "recovery-17",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "last-recovery-age-serves",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "last-recovery-age-serves",
+          "actions": [
+            ["init", 7],
+            ["beginCall", 3],
+            ["joinCall", 0],
+            ["rollbackWall", -1],
+            ["joinCall", 1],
+            ["rollbackWall", -1],
+            ["rejectLoader", 0],
+            ["seed", 3],
+            ["beginCall", 0],
+            ["rejectLoader", 1],
+            ["loadFault", 0],
+            ["policy", 5000],
+            ["joinCall", 0],
+            ["joinCall", 1],
+            ["policy", 2000],
+            ["joinCall", 0],
+            ["releaseLoad", -1]
+          ],
+          "startState": 7,
+          "projection": "recovery-17",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "exact-maximum-after-decode-rejects",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "exact-maximum-after-decode-rejects",
+          "actions": [
+            ["init", 0],
+            ["beginCall", 0],
+            ["joinCall", 1],
+            ["joinCall", 1],
+            ["joinCall", 1],
+            ["joinCall", 0],
+            ["invalidate", -1],
+            ["loadFault", 1],
+            ["seed", 2],
+            ["advance", 4000],
+            ["resolveLoader", 0],
+            ["seed", 1],
+            ["loadFault", 0],
+            ["releaseLoad", -1]
+          ],
+          "startState": 0,
+          "projection": "recovery-17",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "failed-fresh-decode-is-not-recovery",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "failed-fresh-decode-is-not-recovery",
+          "actions": [
+            ["init", 1],
+            ["beginCall", 6],
+            ["policy", 5000],
+            ["resolveLoader", 0],
+            ["loadFault", 0],
+            ["beginCall", 1],
+            ["joinCall", 0],
+            ["joinCall", 0],
+            ["loadFault", 1],
+            ["seed", 5],
+            ["joinCall", 1],
+            ["releaseLoad", -1],
+            ["seed", 0],
+            ["resolveLoader", 1],
+            ["beginCall", 6],
+            ["policy", 2000],
+            ["invalidate", -1],
+            ["advance", 4000],
+            ["releaseLoad", -1],
+            ["rollbackWall", -1],
+            ["joinCall", 0],
+            ["rejectLoader", 2]
+          ],
+          "startState": 13,
+          "projection": "recovery-17",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "classifier-error-keeps-error-without-decode",
+          "model": "formal/dialcache-recovery-conformance.qnt",
+          "profile": "recovery",
+          "witness": "classifier-error-keeps-error-without-decode",
+          "actions": [
+            ["init", 7],
+            ["beginCall", 3],
+            ["rejectLoader", 0]
+          ],
+          "startState": 0,
+          "projection": "recovery-17",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "same-c1-bytes-confirm-mismatch",
+          "model": "formal/dialcache-shadow-conformance.qnt",
+          "profile": "shadow",
+          "witness": "same-c1-bytes-confirm-mismatch",
+          "actions": [
+            ["init", 2],
+            ["beginCall", -1],
+            ["rejectLoader", -1],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["seed", 5],
+            ["seed", 2],
+            ["releaseRead", -1],
+            ["invalidate", 0],
+            ["rejectLoader", -1],
+            ["beginCall", -1],
+            ["rejectLoader", -1],
+            ["logPolicy", 2],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["releaseRead", -1],
+            ["resolveLoader", 2],
+            ["beginCall", -1],
+            ["rejectLoader", -1],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["shadowPolicy", 1],
+            ["rejectLoader", -1],
+            ["seedUnicode", 8],
+            ["logPolicy", 0],
+            ["advance", 1],
+            ["releaseRead", -1],
+            ["seed", 8],
+            ["beginCall", -1],
+            ["releaseRead", -1],
+            ["resolveLoader", 2],
+            ["logPolicy", 2],
+            ["releaseLoad", -1],
+            ["reencode", 7],
+            ["reencode", 8],
+            ["releaseRead", -1]
+          ],
+          "startState": 27,
+          "projection": "shadow-18",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "different-c1-bytes-supersede",
+          "model": "formal/dialcache-shadow-conformance.qnt",
+          "profile": "shadow",
+          "witness": "different-c1-bytes-supersede",
+          "actions": [
+            ["init", 2],
+            ["beginCall", -1],
+            ["loadFault", 1],
+            ["rejectLoader", -1],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["releaseRead", -1],
+            ["logPolicy", 2],
+            ["rollbackWall", -1],
+            ["dumpFault", 0],
+            ["seedUnicode", 8],
+            ["rejectLoader", -1],
+            ["beginCall", -1],
+            ["rollbackWall", -1],
+            ["rollbackWall", -1],
+            ["advance", 10],
+            ["releaseRead", -1],
+            ["resolveLoader", 1],
+            ["beginCall", -1],
+            ["resolveLoader", 2],
+            ["shadowPolicy", 0],
+            ["loadFault", 0],
+            ["releaseRead", -1],
+            ["seedUnicode", 8],
+            ["releaseDump", -1],
+            ["dumpFault", 1],
+            ["seed", 1],
+            ["releaseWrite", -1],
+            ["beginCall", -1],
+            ["releaseRead", -1],
+            ["rejectLoader", -1],
+            ["beginCall", -1],
+            ["resolveLoader", 2],
+            ["releaseRead", -1],
+            ["releaseLoad", -1],
+            ["shadowPolicy", 1],
+            ["seed", 3],
+            ["releaseRead", -1]
+          ],
+          "startState": 30,
+          "projection": "shadow-18",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "late-shadow-dump-cannot-dispatch-write",
+          "model": "formal/dialcache-shadow-conformance.qnt",
+          "profile": "shadow",
+          "witness": "late-shadow-dump-cannot-dispatch-write",
+          "actions": [
+            ["init", 10],
+            ["readFault", 1],
+            ["writeFault", 1],
+            ["beginCall", -1],
+            ["invalidate", 20],
+            ["seed", 5],
+            ["resolveLoader", 2],
+            ["releaseRead", -1],
+            ["readFault", 1],
+            ["beginCall", -1],
+            ["seed", 6],
+            ["loadFault", 1],
+            ["logPolicy", 0],
+            ["readFault", 1],
+            ["advance", 1],
+            ["dumpFault", 0],
+            ["advance", 1],
+            ["releaseRead", -1],
+            ["rejectLoader", -1],
+            ["beginCall", -1],
+            ["rejectLoader", -1],
+            ["dumpFault", 0],
+            ["logPolicy", 2],
+            ["seedUnicode", 8],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["seed", 2],
+            ["seedUnicode", 7],
+            ["resolveLoader", 2],
+            ["readFault", 0],
+            ["dumpFault", 1],
+            ["loadFault", 0],
+            ["releaseRead", -1],
+            ["writeFault", 1],
+            ["releaseLoad", -1],
+            ["beginCall", -1],
+            ["advance", 1],
+            ["advance", 1],
+            ["releaseRead", -1],
+            ["rejectLoader", -1],
+            ["logPolicy", 2],
+            ["beginCall", -1],
+            ["rejectLoader", -1],
+            ["invalidate", 0],
+            ["invalidate", 0],
+            ["rollbackWall", -1],
+            ["releaseRead", -1],
+            ["rollbackWall", -1],
+            ["beginCall", -1],
+            ["resolveLoader", 2],
+            ["shadowPolicy", 1],
+            ["releaseRead", -1],
+            ["advance", 10],
+            ["seedUnicode", 8],
+            ["seed", 4],
+            ["dumpFault", 1],
+            ["releaseDump", -1]
+          ],
+          "startState": 47,
+          "projection": "shadow-18",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "fill-write-error-preserves-caller",
+          "model": "formal/dialcache-shadow-conformance.qnt",
+          "profile": "shadow",
+          "witness": "fill-write-error-preserves-caller",
+          "actions": [
+            ["init", 3],
+            ["advance", 1],
+            ["logPolicy", 1],
+            ["beginCall", -1],
+            ["resolveLoader", 2],
+            ["releaseRead", -1],
+            ["loadFault", 1],
+            ["dumpFault", 1],
+            ["readFault", 0],
+            ["dumpFault", 0],
+            ["releaseDump", -1],
+            ["writeFault", 1],
+            ["releaseWrite", -1]
+          ],
+          "startState": 2,
+          "projection": "shadow-18",
+          "integers": "itf",
+          "choices": false
+        },
+        {
+          "id": "dark-read-error-still-allows-source-result",
+          "model": "formal/dialcache-shadow-conformance.qnt",
+          "profile": "shadow",
+          "witness": "dark-read-error-still-allows-source-result",
+          "actions": [
+            ["init", 10],
+            ["readFault", 1],
+            ["beginCall", -1],
+            ["logPolicy", 2],
+            ["rejectLoader", -1],
+            ["dumpFault", 1],
+            ["releaseRead", -1],
+            ["beginCall", -1],
+            ["invalidate", 0],
+            ["advance", 1],
+            ["rejectLoader", -1],
+            ["invalidate", 20],
+            ["shadowPolicy", 2],
+            ["dumpFault", 0],
+            ["releaseRead", -1],
+            ["rollbackWall", -1],
+            ["dumpFault", 1],
+            ["beginCall", -1],
+            ["resolveLoader", 2],
+            ["loadFault", 1],
+            ["logPolicy", 0],
+            ["rollbackWall", -1],
+            ["seedUnicode", 7],
+            ["beginCall", -1],
+            ["invalidate", 20],
+            ["releaseRead", -1],
+            ["writeFault", 0],
+            ["resolveLoader", 1]
+          ],
+          "startState": 22,
+          "projection": "shadow-18",
+          "integers": "itf",
+          "choices": false
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/local-failure-witnesses.json",
+      "model": "formal/dialcache-local-failure-conformance.qnt",
+      "format": "named-list",
+      "recipes": [
+        {
+          "id": "localReadFailureFallsThroughAndPreservesOldLocalTest",
+          "regression": "localReadFailureFallsThroughAndPreservesOldLocalTest",
+          "projection": "observations"
+        },
+        {
+          "id": "localReadFailureSkipsSourcePublicationButMemoizesTest",
+          "regression": "localReadFailureSkipsSourcePublicationButMemoizesTest",
+          "projection": "observations"
+        },
+        {
+          "id": "localWriteFailureKeepsSourceAndRequestMemoTest",
+          "regression": "localWriteFailureKeepsSourceAndRequestMemoTest",
+          "projection": "observations"
+        },
+        {
+          "id": "sourceFailureKeepsPreviouslyAcceptedStorageTest",
+          "regression": "sourceFailureKeepsPreviouslyAcceptedStorageTest",
+          "projection": "observations"
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/recovery-admission-witnesses.json",
+      "model": "formal/dialcache-recovery-read-conformance.qnt",
+      "format": "named-list",
+      "recipes": [
+        {
+          "id": "recoveredAbsenceSkipsSelectedShadowTest",
+          "regression": "recoveredAbsenceSkipsSelectedShadowTest",
+          "projection": "observations"
+        },
+        {
+          "id": "recoveredValueSkipsSelectedShadowTest",
+          "regression": "recoveredValueSkipsSelectedShadowTest",
+          "projection": "observations"
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/recovery-read-witnesses.json",
+      "model": "formal/dialcache-recovery-read-conformance.qnt",
+      "format": "named-list",
+      "recipes": [
+        {
+          "id": "closedRequestCannotReceiveCompressedRecoveryTest",
+          "regression": "closedRequestCannotReceiveCompressedRecoveryTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "compressedRecoveryMemoizesWithoutLocalPublicationTest",
+          "regression": "compressedRecoveryMemoizesWithoutLocalPublicationTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "compressedRecoveryRechecksMaximumAfterDecodeTest",
+          "regression": "compressedRecoveryRechecksMaximumAfterDecodeTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "corruptCompressedReadReportsRawFallbackTest",
+          "regression": "corruptCompressedReadReportsRawFallbackTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "corruptCompressedRecoveryKeepsOriginalSourceErrorTest",
+          "regression": "corruptCompressedRecoveryKeepsOriginalSourceErrorTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "failedInvalidationDoesNotCreateMarkerTest",
+          "regression": "failedInvalidationDoesNotCreateMarkerTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "failedInvalidationPreservesExistingMarkerTest",
+          "regression": "failedInvalidationPreservesExistingMarkerTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "freshCompressedReadReportsDecompressionTest",
+          "regression": "freshCompressedReadReportsDecompressionTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "freshnessAfterHeldReadTest",
+          "regression": "freshnessAfterHeldReadTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "heldReadJustBeforeFreshnessBoundaryStillHitsTest",
+          "regression": "heldReadJustBeforeFreshnessBoundaryStillHitsTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "laterInvalidationDoesNotRewriteObservedMissFenceTest",
+          "regression": "laterInvalidationDoesNotRewriteObservedMissFenceTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "maximumAgeBeforeDecodeKeepsOriginalErrorTest",
+          "regression": "maximumAgeBeforeDecodeKeepsOriginalErrorTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "ordinaryValueWorkDoesNotCreateMarkerTest",
+          "regression": "ordinaryValueWorkDoesNotCreateMarkerTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "ordinaryValueWorkDoesNotExtendMarkerTest",
+          "regression": "ordinaryValueWorkDoesNotExtendMarkerTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "physicalCapDoesNotClampLogicalRecoveryTest",
+          "regression": "physicalCapDoesNotClampLogicalRecoveryTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "retainedCompressedRecoverySurvivesInvalidationTest",
+          "regression": "retainedCompressedRecoverySurvivesInvalidationTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "retainedSnapshotSurvivesPhysicalExpiryTest",
+          "regression": "retainedSnapshotSurvivesPhysicalExpiryTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "trackedEncodingFailureSuppressesRefillTest",
+          "regression": "trackedEncodingFailureSuppressesRefillTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "trackedPhysicalRetentionExpiresAtCapTest",
+          "regression": "trackedPhysicalRetentionExpiresAtCapTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "trackedSourceNeedsRemoteValidationBeforeLocalReuseTest",
+          "regression": "trackedSourceNeedsRemoteValidationBeforeLocalReuseTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "unsafeTimestampSkipsSerializerAndAllowsRefillTest",
+          "regression": "unsafeTimestampSkipsSerializerAndAllowsRefillTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "unsupportedVersionSkipsSerializerAndAllowsRefillTest",
+          "regression": "unsupportedVersionSkipsSerializerAndAllowsRefillTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "untrackedCompressedRecoveryDoesNotWarmLocalTest",
+          "regression": "untrackedCompressedRecoveryDoesNotWarmLocalTest",
+          "projection": "recovery-read-19"
+        },
+        {
+          "id": "untrackedEncodingFailureStillPublishesLocalTest",
+          "regression": "untrackedEncodingFailureStillPublishesLocalTest",
+          "projection": "recovery-read-19"
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/shadow-diagnostics-witnesses.json",
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "format": "named-list",
+      "recipes": [
+        {
+          "id": "omittedLoggingKeepsMismatchMetricsOnlyTest",
+          "regression": "omittedLoggingKeepsMismatchMetricsOnlyTest",
+          "projection": "shadow"
+        },
+        {
+          "id": "explicitFalseLoggingOverridesEnabledDefaultTest",
+          "regression": "explicitFalseLoggingOverridesEnabledDefaultTest",
+          "projection": "shadow"
+        },
+        {
+          "id": "confirmationPastFreshnessKeepsOriginalPayloadAndAgeTest",
+          "regression": "confirmationPastFreshnessKeepsOriginalPayloadAndAgeTest",
+          "projection": "shadow"
+        },
+        {
+          "id": "confirmationRollbackKeepsPayloadAndClampsAgeTest",
+          "regression": "confirmationRollbackKeepsPayloadAndClampsAgeTest",
+          "projection": "shadow"
+        },
+        {
+          "id": "futureDarkAcquisitionReportsOffsetAndFillsMissTest",
+          "regression": "futureDarkAcquisitionReportsOffsetAndFillsMissTest",
+          "projection": "shadow"
+        },
+        {
+          "id": "futureLateDarkReadKeepsTimeoutAndReportsOffsetTest",
+          "regression": "futureLateDarkReadKeepsTimeoutAndReportsOffsetTest",
+          "projection": "shadow"
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/shadow-layers-witnesses.json",
+      "model": "formal/dialcache-shadow-layers-conformance.qnt",
+      "format": "named-list",
+      "recipes": [
+        {
+          "id": "acquiredMissDoesNotRereadBeforeFillTest",
+          "regression": "acquiredMissDoesNotRereadBeforeFillTest",
+          "projection": "observations"
+        },
+        {
+          "id": "darkFailureDoesNotUseEligibleStaleBytesTest",
+          "regression": "darkFailureDoesNotUseEligibleStaleBytesTest",
+          "projection": "observations"
+        },
+        {
+          "id": "darkFillRetainsPolicyThroughSerializationTest",
+          "regression": "darkFillRetainsPolicyThroughSerializationTest",
+          "projection": "observations"
+        },
+        {
+          "id": "darkPresentC0NeverBecomesLocalPublicationTest",
+          "regression": "darkPresentC0NeverBecomesLocalPublicationTest",
+          "projection": "observations"
+        },
+        {
+          "id": "darkPresentC0NeverBecomesRequestPublicationTest",
+          "regression": "darkPresentC0NeverBecomesRequestPublicationTest",
+          "projection": "observations"
+        },
+        {
+          "id": "darkPropagatedTimeoutIsSourceFailureTest",
+          "regression": "darkPropagatedTimeoutIsSourceFailureTest",
+          "projection": "observations"
+        },
+        {
+          "id": "darkSourcePublishesLocalBeforeShadowWriteTest",
+          "regression": "darkSourcePublishesLocalBeforeShadowWriteTest",
+          "projection": "observations"
+        },
+        {
+          "id": "darkSourcePublishesRequestBeforeShadowWriteTest",
+          "regression": "darkSourcePublishesRequestBeforeShadowWriteTest",
+          "projection": "observations"
+        },
+        {
+          "id": "deduplicatedJobKeepsIndependentCallerSourcesTest",
+          "regression": "deduplicatedJobKeepsIndependentCallerSourcesTest",
+          "projection": "observations"
+        },
+        {
+          "id": "expiredC0CanFillAndServeNewValueTest",
+          "regression": "expiredC0CanFillAndServeNewValueTest",
+          "projection": "observations"
+        },
+        {
+          "id": "fullMixedInstanceDoesNotBlockAnotherInstanceTest",
+          "regression": "fullMixedInstanceDoesNotBlockAnotherInstanceTest",
+          "projection": "observations"
+        },
+        {
+          "id": "invalidShadowKeepsLocalPublicationTest",
+          "regression": "invalidShadowKeepsLocalPublicationTest",
+          "projection": "observations"
+        },
+        {
+          "id": "ordinaryServingMissDoesNotAdmitDiagnosticSourceTest",
+          "regression": "ordinaryServingMissDoesNotAdmitDiagnosticSourceTest",
+          "projection": "observations"
+        },
+        {
+          "id": "retainedFreshC0StillComparesAfterFreshnessBoundaryTest",
+          "regression": "retainedFreshC0StillComparesAfterFreshnessBoundaryTest",
+          "projection": "observations"
+        },
+        {
+          "id": "servedAndDarkJobsShareCapacityButNotSourceOwnershipTest",
+          "regression": "servedAndDarkJobsShareCapacityButNotSourceOwnershipTest",
+          "projection": "observations"
+        },
+        {
+          "id": "servedDiagnosticSourceDoesNotPopulateLocalTest",
+          "regression": "servedDiagnosticSourceDoesNotPopulateLocalTest",
+          "projection": "observations"
+        },
+        {
+          "id": "servedPropagatedTimeoutPreservesHitTest",
+          "regression": "servedPropagatedTimeoutPreservesHitTest",
+          "projection": "observations"
+        },
+        {
+          "id": "shadowCohortAboveAdmitsTest",
+          "regression": "shadowCohortAboveAdmitsTest",
+          "projection": "observations"
+        },
+        {
+          "id": "shadowCohortBelowDoesNotAdmitTest",
+          "regression": "shadowCohortBelowDoesNotAdmitTest",
+          "projection": "observations"
+        },
+        {
+          "id": "shadowCohortEqualityDoesNotAdmitTest",
+          "regression": "shadowCohortEqualityDoesNotAdmitTest",
+          "projection": "observations"
+        },
+        {
+          "id": "unboundedCallerSurvivesDarkJobDeadlineTest",
+          "regression": "unboundedCallerSurvivesDarkJobDeadlineTest",
+          "projection": "observations"
+        },
+        {
+          "id": "validatedRemoteHitStopsFurtherShadowTest",
+          "regression": "validatedRemoteHitStopsFurtherShadowTest",
+          "projection": "observations"
+        }
+      ]
+    },
+    {
+      "path": "test/fixtures/source-budgets-witnesses.json",
+      "model": "formal/dialcache-source-budgets-conformance.qnt",
+      "format": "named-list",
+      "recipes": [
+        {
+          "id": "abandonedSourceCannotReplaceSuccessfulRetryTest",
+          "regression": "abandonedSourceCannotReplaceSuccessfulRetryTest",
+          "projection": "observations"
+        },
+        {
+          "id": "defaultSourceBudgetExpiresAtSixtySecondsTest",
+          "regression": "defaultSourceBudgetExpiresAtSixtySecondsTest",
+          "projection": "observations"
+        },
+        {
+          "id": "heldPolicyDoesNotSpendSourceBudgetTest",
+          "regression": "heldPolicyDoesNotSpendSourceBudgetTest",
+          "projection": "observations"
+        },
+        {
+          "id": "invalidKeyStillKeepsEnabledSourceDeadlineTest",
+          "regression": "invalidKeyStillKeepsEnabledSourceDeadlineTest",
+          "projection": "observations"
+        },
+        {
+          "id": "lateFollowerUsesLeadersRemainingBudgetTest",
+          "regression": "lateFollowerUsesLeadersRemainingBudgetTest",
+          "projection": "observations"
+        },
+        {
+          "id": "outsideAndInvalidOutsideCallsIgnoreDeadlineAndSharingTest",
+          "regression": "outsideAndInvalidOutsideCallsIgnoreDeadlineAndSharingTest",
+          "projection": "observations"
+        },
+        {
+          "id": "unboundedEnabledSourcePublishesAfterSixtySecondsTest",
+          "regression": "unboundedEnabledSourcePublishesAfterSixtySecondsTest",
+          "projection": "observations"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1992 @@
+{
+  "#meta": {
+    "format": "ITF",
+    "source": "formal/dialcache-local-clock-conformance.qnt",
+    "recipe": "formal/fixture-recipes.json#formal/local-clock-smoke.itf.json/smoke"
+  },
+  "vars": [
+    "input",
+    "s",
+    "mbt::actionTaken",
+    "mbt::nondetPicks"
+  ],
+  "states": [
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "init"
+      },
+      "mbt::actionTaken": "init",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          false,
+          false
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          }
+        ],
+        "fills": [],
+        "o": {
+          "calls": [],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [],
+        "ticks": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "constructInstance"
+      },
+      "mbt::actionTaken": "constructInstance",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          false
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          }
+        ],
+        "fills": [],
+        "o": {
+          "calls": [],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [],
+        "ticks": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "400"
+        },
+        "name": "advanceTicks"
+      },
+      "mbt::actionTaken": "advanceTicks",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "400"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          false
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          }
+        ],
+        "fills": [],
+        "o": {
+          "calls": [],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [],
+        "ticks": {
+          "#bigint": "400"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "constructInstance"
+      },
+      "mbt::actionTaken": "constructInstance",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          }
+        ],
+        "fills": [],
+        "o": {
+          "calls": [],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [],
+        "ticks": {
+          "#bigint": "400"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "300"
+        },
+        "name": "advanceTicks"
+      },
+      "mbt::actionTaken": "advanceTicks",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "300"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          }
+        ],
+        "fills": [],
+        "o": {
+          "calls": [],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [],
+        "ticks": {
+          "#bigint": "700"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "call"
+      },
+      "mbt::actionTaken": "call",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "0"
+            },
+            "value": {
+              "#bigint": "0"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          }
+        ],
+        "ticks": {
+          "#bigint": "700"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "call"
+      },
+      "mbt::actionTaken": "call",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          }
+        ],
+        "ticks": {
+          "#bigint": "700"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "999200"
+        },
+        "name": "advanceTicks"
+      },
+      "mbt::actionTaken": "advanceTicks",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "999200"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          }
+        ],
+        "ticks": {
+          "#bigint": "999900"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "call"
+      },
+      "mbt::actionTaken": "call",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          }
+        ],
+        "ticks": {
+          "#bigint": "999900"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "3"
+        },
+        "name": "call"
+      },
+      "mbt::actionTaken": "call",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "3"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          }
+        ],
+        "ticks": {
+          "#bigint": "999900"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "100"
+        },
+        "name": "advanceTicks"
+      },
+      "mbt::actionTaken": "advanceTicks",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "100"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "2"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          }
+        ],
+        "ticks": {
+          "#bigint": "1000000"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "call"
+      },
+      "mbt::actionTaken": "call",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "1000000"
+            },
+            "value": {
+              "#bigint": "2"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "1000000"
+            },
+            "value": {
+              "#bigint": "2"
+            }
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "3"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "2"
+            },
+            "ticks": {
+              "#bigint": "1000000"
+            }
+          }
+        ],
+        "ticks": {
+          "#bigint": "1000000"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "3"
+        },
+        "name": "call"
+      },
+      "mbt::actionTaken": "call",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "3"
+          }
+        }
+      },
+      "s": {
+        "constructed": [
+          true,
+          true
+        ],
+        "entries": [
+          {
+            "insertedTicks": {
+              "#bigint": "1000000"
+            },
+            "value": {
+              "#bigint": "2"
+            }
+          },
+          {
+            "insertedTicks": {
+              "#bigint": "1000000"
+            },
+            "value": {
+              "#bigint": "2"
+            }
+          }
+        ],
+        "fills": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            },
+            "value": {
+              "#bigint": "1"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "ticks": {
+              "#bigint": "1000000"
+            },
+            "value": {
+              "#bigint": "2"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "1000000"
+            },
+            "value": {
+              "#bigint": "2"
+            }
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "2"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "4"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "probes": [
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "1"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "0"
+              },
+              "value": {
+                "#bigint": "0"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "700"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "ticks": {
+              "#bigint": "999900"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "0"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "2"
+            },
+            "ticks": {
+              "#bigint": "1000000"
+            }
+          },
+          {
+            "instance": {
+              "#bigint": "1"
+            },
+            "offered": {
+              "#bigint": "2"
+            },
+            "previous": {
+              "insertedTicks": {
+                "#bigint": "700"
+              },
+              "value": {
+                "#bigint": "1"
+              }
+            },
+            "ranSource": true,
+            "returned": {
+              "#bigint": "2"
+            },
+            "ticks": {
+              "#bigint": "1000000"
+            }
+          }
+        ],
+        "ticks": {
+          "#bigint": "1000000"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1008 @@
+{
+  "#meta": {
+    "format": "ITF",
+    "source": "formal/dialcache-local-failure-conformance.qnt",
+    "recipe": "formal/fixture-recipes.json#formal/local-failure-smoke.itf.json/smoke"
+  },
+  "vars": [
+    "input",
+    "s",
+    "mbt::actionTaken",
+    "mbt::nondetPicks"
+  ],
+  "states": [
+    {
+      "input": {
+        "choice": {
+          "#bigint": "-1"
+        },
+        "name": "init"
+      },
+      "mbt::actionTaken": "init",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": false,
+        "failed": false,
+        "localBefore": {
+          "#bigint": "0"
+        },
+        "localMiss": false,
+        "localValue": {
+          "#bigint": "0"
+        },
+        "memo": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "0"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "0"
+          },
+          "reads": {
+            "#bigint": "0"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "pending": false,
+        "readFailed": false,
+        "receipts": [],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "scope": {
+          "#bigint": "2"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": true,
+        "failed": false,
+        "localBefore": {
+          "#bigint": "0"
+        },
+        "localMiss": true,
+        "localValue": {
+          "#bigint": "0"
+        },
+        "memo": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "0"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "0"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "1"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [],
+          "writes": {
+            "#bigint": "0"
+          }
+        },
+        "pending": true,
+        "readFailed": false,
+        "receipts": [],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "0"
+        },
+        "scope": {
+          "#bigint": "2"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "resolveLoader"
+      },
+      "mbt::actionTaken": "resolveLoader",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": true,
+        "failed": false,
+        "localBefore": {
+          "#bigint": "0"
+        },
+        "localMiss": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "memo": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "1"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "1"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [
+            {
+              "#bigint": "60000"
+            }
+          ],
+          "writes": {
+            "#bigint": "1"
+          }
+        },
+        "pending": false,
+        "readFailed": false,
+        "receipts": [
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "0"
+            },
+            "call": {
+              "#bigint": "0"
+            },
+            "readFailed": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "writeFailed": false
+          }
+        ],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "1"
+        },
+        "scope": {
+          "#bigint": "2"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "seed"
+      },
+      "mbt::actionTaken": "seed",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": true,
+        "failed": false,
+        "localBefore": {
+          "#bigint": "0"
+        },
+        "localMiss": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "memo": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "1"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "1"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [
+            {
+              "#bigint": "60000"
+            }
+          ],
+          "writes": {
+            "#bigint": "1"
+          }
+        },
+        "pending": false,
+        "readFailed": false,
+        "receipts": [
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "0"
+            },
+            "call": {
+              "#bigint": "0"
+            },
+            "readFailed": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "writeFailed": false
+          }
+        ],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "scope": {
+          "#bigint": "2"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "1"
+        },
+        "name": "localFault"
+      },
+      "mbt::actionTaken": "localFault",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": true,
+        "failed": true,
+        "localBefore": {
+          "#bigint": "0"
+        },
+        "localMiss": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "memo": [
+          {
+            "#bigint": "0"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "1"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "0"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "1"
+          },
+          "reads": {
+            "#bigint": "1"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [
+            {
+              "#bigint": "60000"
+            }
+          ],
+          "writes": {
+            "#bigint": "1"
+          }
+        },
+        "pending": false,
+        "readFailed": false,
+        "receipts": [
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "0"
+            },
+            "call": {
+              "#bigint": "0"
+            },
+            "readFailed": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "writeFailed": false
+          }
+        ],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "scope": {
+          "#bigint": "2"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": true,
+        "failed": true,
+        "localBefore": {
+          "#bigint": "1"
+        },
+        "localMiss": false,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "memo": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "1"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "1"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "2"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [
+            {
+              "#bigint": "60000"
+            }
+          ],
+          "writes": {
+            "#bigint": "1"
+          }
+        },
+        "pending": false,
+        "readFailed": true,
+        "receipts": [
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "0"
+            },
+            "call": {
+              "#bigint": "0"
+            },
+            "readFailed": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "writeFailed": false
+          },
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "1"
+            },
+            "call": {
+              "#bigint": "1"
+            },
+            "readFailed": true,
+            "returned": {
+              "#bigint": "2"
+            },
+            "writeFailed": false
+          }
+        ],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "scope": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "localFault"
+      },
+      "mbt::actionTaken": "localFault",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": true,
+        "failed": false,
+        "localBefore": {
+          "#bigint": "1"
+        },
+        "localMiss": false,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "memo": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "1"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "1"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "2"
+          },
+          "reads": {
+            "#bigint": "2"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [
+            {
+              "#bigint": "60000"
+            }
+          ],
+          "writes": {
+            "#bigint": "1"
+          }
+        },
+        "pending": false,
+        "readFailed": true,
+        "receipts": [
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "0"
+            },
+            "call": {
+              "#bigint": "0"
+            },
+            "readFailed": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "writeFailed": false
+          },
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "1"
+            },
+            "call": {
+              "#bigint": "1"
+            },
+            "readFailed": true,
+            "returned": {
+              "#bigint": "2"
+            },
+            "writeFailed": false
+          }
+        ],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "scope": {
+          "#bigint": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "2"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": true,
+        "failed": false,
+        "localBefore": {
+          "#bigint": "1"
+        },
+        "localMiss": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "memo": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "1"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "1"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "1"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "3"
+          },
+          "reads": {
+            "#bigint": "2"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [
+            {
+              "#bigint": "60000"
+            }
+          ],
+          "writes": {
+            "#bigint": "1"
+          }
+        },
+        "pending": false,
+        "readFailed": false,
+        "receipts": [
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "0"
+            },
+            "call": {
+              "#bigint": "0"
+            },
+            "readFailed": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "writeFailed": false
+          },
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "1"
+            },
+            "call": {
+              "#bigint": "1"
+            },
+            "readFailed": true,
+            "returned": {
+              "#bigint": "2"
+            },
+            "writeFailed": false
+          }
+        ],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "scope": {
+          "#bigint": "2"
+        }
+      }
+    },
+    {
+      "input": {
+        "choice": {
+          "#bigint": "0"
+        },
+        "name": "beginCall"
+      },
+      "mbt::actionTaken": "beginCall",
+      "mbt::nondetPicks": {
+        "choice": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "0"
+          }
+        }
+      },
+      "s": {
+        "acceptedRemote": true,
+        "failed": false,
+        "localBefore": {
+          "#bigint": "1"
+        },
+        "localMiss": true,
+        "localValue": {
+          "#bigint": "1"
+        },
+        "memo": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "0"
+          }
+        ],
+        "o": {
+          "calls": [
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            },
+            {
+              "#bigint": "1"
+            },
+            {
+              "#bigint": "2"
+            }
+          ],
+          "classifications": {
+            "#bigint": "0"
+          },
+          "comparisons": {
+            "#bigint": "0"
+          },
+          "dumps": {
+            "#bigint": "1"
+          },
+          "invalidations": {
+            "#bigint": "0"
+          },
+          "loaders": {
+            "#bigint": "1"
+          },
+          "loads": {
+            "#bigint": "1"
+          },
+          "maintenance": [],
+          "policyCalls": {
+            "#bigint": "4"
+          },
+          "reads": {
+            "#bigint": "2"
+          },
+          "recovery": [],
+          "shadow": [],
+          "sourceScopes": [],
+          "writeTtls": [
+            {
+              "#bigint": "60000"
+            }
+          ],
+          "writes": {
+            "#bigint": "1"
+          }
+        },
+        "pending": false,
+        "readFailed": false,
+        "receipts": [
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "0"
+            },
+            "call": {
+              "#bigint": "0"
+            },
+            "readFailed": false,
+            "returned": {
+              "#bigint": "1"
+            },
+            "writeFailed": false
+          },
+          {
+            "after": {
+              "#bigint": "1"
+            },
+            "before": {
+              "#bigint": "1"
+            },
+            "call": {
+              "#bigint": "1"
+            },
+            "readFailed": true,
+            "returned": {
+              "#bigint": "2"
+            },
+            "writeFailed": false
+          }
+        ],
+        "remoteEnabled": true,
+        "remoteValue": {
+          "#bigint": "2"
+        },
+        "scope": {
+          "#bigint": "0"
+        }
+      }
+    }
+  ]
+}

@@ -137,8 +137,9 @@ stale recovery is active and the separate one-hour tracked cap.
 A semantic miss includes absent, unsupported, logically expired, future-dated,
 and watermark-fenced frames. It does not include a present payload that fails
 `load`: that is `deserialization_error`, with no repair. Miss reason and observed
-fence are independent. A bundled `expired` result is classified after decoding
-and does not carry a watermark fence; it follows normal refill behavior.
+fence are independent. Core classifies logical expiry after the adapter decodes
+the wire frame, before the application serializer's `load` runs. That `expired`
+miss does not carry a watermark fence; it follows normal refill behavior.
 
 `filled` means the client accepted the write before the deadline. `fill_error`
 means payload preparation or writing failed. Neither proves what remains in

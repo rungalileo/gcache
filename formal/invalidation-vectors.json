@@ -1,0 +1,933 @@
+{
+  "schemaVersion": 2,
+  "vectors": [
+    {
+      "name": "absent marker gets the two hour floor",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "buffer determines marker cutoff",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "200",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1200",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "large buffer extends retention beyond the floor",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "4000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "4001000",
+          "ttlMs": 7660000
+        }
+      }
+    },
+    {
+      "name": "existing future cutoff never moves backwards",
+      "existing": {
+        "kind": "string",
+        "value": "10000000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "10000000",
+          "ttlMs": 13659000
+        }
+      }
+    },
+    {
+      "name": "existing longer TTL never shrinks",
+      "existing": {
+        "kind": "string",
+        "value": "900",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "persistent valid marker stays persistent",
+      "existing": {
+        "kind": "string",
+        "value": "2000",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "malformed finite marker is repaired with longer TTL preserved",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "malformed persistent marker stays persistent",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "wrong type persistent marker gets finite repair",
+      "existing": {
+        "kind": "list",
+        "ttlMs": -1,
+        "values": [
+          "unrelated"
+        ]
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "wrong type marker does not preserve unrelated TTL",
+      "existing": {
+        "kind": "list",
+        "ttlMs": 20000000,
+        "values": [
+          "unrelated"
+        ]
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "1000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "leading decimal zeros are canonicalized",
+      "existing": {
+        "kind": "string",
+        "value": "00002000",
+        "ttlMs": 100
+      },
+      "futureBufferMs": "0000",
+      "invalidatedAtMs": "0001000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "2000",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "maximum future buffer is supported",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "31536000000",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "31536001000",
+          "ttlMs": 31539660000
+        }
+      }
+    },
+    {
+      "name": "maximum safe sum is supported",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740990",
+      "expected": {
+        "state": {
+          "kind": "string",
+          "value": "9007199254740991",
+          "ttlMs": 7200000
+        }
+      }
+    },
+    {
+      "name": "negative buffer rejects before mutation",
+      "existing": {
+        "kind": "string",
+        "value": "123",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "123",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "fractional buffer rejects before mutation",
+      "existing": {
+        "kind": "string",
+        "value": "123",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "123",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "over-limit buffer rejects before mutation",
+      "existing": {
+        "kind": "string",
+        "value": "123",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "123",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "exponent timestamp rejects before mutation",
+      "existing": {
+        "kind": "string",
+        "value": "123",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "123",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "negative timestamp rejects before mutation",
+      "existing": {
+        "kind": "string",
+        "value": "123",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "123",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "unsafe sum rejects before mutation",
+      "existing": {
+        "kind": "string",
+        "value": "123",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "123",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "negative buffer preserves absent state",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "negative buffer preserves malformed finite string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "negative buffer preserves malformed persistent string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "negative buffer preserves finite list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "negative buffer preserves persistent list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "-1",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "fractional buffer preserves absent state",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "fractional buffer preserves malformed finite string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "fractional buffer preserves malformed persistent string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "fractional buffer preserves finite list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "fractional buffer preserves persistent list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1.5",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "over-limit buffer preserves absent state",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "over-limit buffer preserves malformed finite string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "over-limit buffer preserves malformed persistent string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "over-limit buffer preserves finite list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "over-limit buffer preserves persistent list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "31536000001",
+      "invalidatedAtMs": "1000",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "exponent timestamp preserves absent state",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "exponent timestamp preserves malformed finite string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "exponent timestamp preserves malformed persistent string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "exponent timestamp preserves finite list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "exponent timestamp preserves persistent list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "1e3",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "negative timestamp preserves absent state",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "negative timestamp preserves malformed finite string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "negative timestamp preserves malformed persistent string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "negative timestamp preserves finite list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "negative timestamp preserves persistent list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "0",
+      "invalidatedAtMs": "-1",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "unsafe sum preserves absent state",
+      "existing": {
+        "kind": "absent",
+        "ttlMs": -2
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "absent",
+          "ttlMs": -2
+        }
+      }
+    },
+    {
+      "name": "unsafe sum preserves malformed finite string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "unsafe sum preserves malformed persistent string",
+      "existing": {
+        "kind": "string",
+        "value": "bad",
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "string",
+          "value": "bad",
+          "ttlMs": -1
+        }
+      }
+    },
+    {
+      "name": "unsafe sum preserves finite list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": 20000000
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": 20000000
+        }
+      }
+    },
+    {
+      "name": "unsafe sum preserves persistent list contents",
+      "existing": {
+        "kind": "list",
+        "values": [
+          "first",
+          "second"
+        ],
+        "ttlMs": -1
+      },
+      "futureBufferMs": "1",
+      "invalidatedAtMs": "9007199254740991",
+      "expected": {
+        "error": true,
+        "state": {
+          "kind": "list",
+          "values": [
+            "first",
+            "second"
+          ],
+          "ttlMs": -1
+        }
+      }
+    }
+  ]
+}

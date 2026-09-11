@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "mutations": [
+    {
+      "id": "M01",
+      "case": "C45.maximum-age-exclusive",
+      "description": "Accept a retained candidate at the exact maximum age after decoding",
+      "typescriptMutation": "M01",
+      "edits": [
+        {
+          "path": "go/engine.go",
+          "before": "age, valid = x.frameAge(frame, \"remote\")\n\tif !valid || age >= x.policy.StaleOnErrorMaxAgeMS {",
+          "after": "age, valid = x.frameAge(frame, \"remote\")\n\tif !valid || age > x.policy.StaleOnErrorMaxAgeMS {"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M02",
+      "case": "C45.recheck-after-decode",
+      "description": "Reuse the pre-decode age instead of observing age after asynchronous decoding",
+      "typescriptMutation": "M02",
+      "edits": [
+        {
+          "path": "go/engine.go",
+          "before": "age, valid = x.frameAge(frame, \"remote\")",
+          "after": "// Fault injection: retain the pre-decode age and validity."
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M03",
+      "case": "C25.late-source-rejected",
+      "description": "Accept an externally settled result after its elapsed deadline when the timer has not run",
+      "typescriptMutation": "M03",
+      "edits": [
+        {
+          "path": "go/deadline.go",
+          "before": "case <-p.done:\n\t\t\ttimer.Stop()\n\t\t\tif elapsedNow(clock)-started < duration {",
+          "after": "case <-p.done:\n\t\t\ttimer.Stop()\n\t\t\tif true {"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M04",
+      "case": "C34.second-fence",
+      "description": "Skip the tracked fence recheck after serialization",
+      "typescriptMutation": "M04",
+      "edits": [
+        {
+          "path": "go/engine.go",
+          "before": "if fence != nil && uint64(stamp) <= *fence {",
+          "after": "if false && fence != nil && uint64(stamp) <= *fence {"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M05",
+      "case": "C03.detached-bypass",
+      "description": "Treat a detached context whose outer scope closed as still enabled",
+      "typescriptMutation": "M05",
+      "edits": [
+        {
+          "path": "go/cache.go",
+          "before": "return state.enabled && state.owner != nil && state.owner.live",
+          "after": "return state.enabled"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M06",
+      "case": "W04.strict-fence",
+      "description": "Accept a tracked frame timestamp equal to its watermark",
+      "typescriptMutation": "M06",
+      "edits": [
+        {
+          "path": "go/protocol.go",
+          "before": "if tracked && fence != nil && stamp <= *fence {",
+          "after": "if tracked && fence != nil && stamp < *fence {"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M07",
+      "case": "C51.changed-confirmation",
+      "description": "Confirm an unequal shadow result even when C1 contains different payload bytes",
+      "typescriptMutation": "M07",
+      "edits": [
+        {
+          "path": "go/shadow.go",
+          "before": "confirmation.Kind == \"miss\" || !bytes.Equal(frame.Payload, confirmation.Frame.Payload)",
+          "after": "confirmation.Kind == \"miss\" || false && !bytes.Equal(frame.Payload, confirmation.Frame.Payload)"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M08",
+      "case": "C60.invalid-logging-policy",
+      "description": "Enable mismatch logging after a malformed runtime logging flag",
+      "typescriptMutation": "M08",
+      "edits": [
+        {
+          "path": "go/policy.go",
+          "before": "resolved.Shadow.LogMismatches = flag\n\t\t\tresolved.Shadow.LoggingConfigError = !valid",
+          "after": "resolved.Shadow.LogMismatches = flag || !valid\n\t\t\tresolved.Shadow.LoggingConfigError = !valid"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M09",
+      "case": "C60.logging-default-off",
+      "description": "Enable mismatch logging when its flag is omitted",
+      "typescriptMutation": "M09",
+      "edits": [
+        {
+          "path": "go/policy.go",
+          "before": "resolved := ResolvedPolicy{Coalesce: true, RemoteReadTimeoutMS: defaults.RemoteReadTimeoutMS}",
+          "after": "resolved := ResolvedPolicy{Coalesce: true, RemoteReadTimeoutMS: defaults.RemoteReadTimeoutMS, Shadow: ResolvedShadow{LogMismatches: true}}"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M10",
+      "case": "C31.tracked-no-local-fill",
+      "description": "Publish an unvalidated tracked source value directly into local storage",
+      "typescriptMutation": "M10",
+      "edits": [
+        {
+          "path": "go/engine.go",
+          "before": "if localMiss && !x.op.Identity.Tracked {",
+          "after": "if localMiss {"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M11",
+      "case": "C09.fixed-local-ttl",
+      "description": "Renew the local insertion TTL on every cache hit",
+      "typescriptMutation": "M11",
+      "edits": [
+        {
+          "path": "go/cache.go",
+          "before": "item.used = c.sequence\n\t\tc.local[key] = item",
+          "after": "item.used = c.sequence\n\t\titem.insertedMS = c.options.Clock.ElapsedMS()\n\t\tc.local[key] = item"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M12",
+      "case": "W02.sorted-arguments",
+      "description": "Reverse the prescribed argument-name ordering",
+      "typescriptMutation": "M12",
+      "edits": [
+        {
+          "path": "go/protocol.go",
+          "before": "return utf16Less(result[i][0], result[j][0])",
+          "after": "return utf16Less(result[j][0], result[i][0])"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "generated",
+        "portable"
+      ]
+    },
+    {
+      "id": "M13",
+      "case": "C54.expired-before-start",
+      "description": "Dispatch dark shadow reads after the job deadline already elapsed before deferred work starts",
+      "typescriptMutation": "M13",
+      "edits": [
+        {
+          "path": "go/shadow.go",
+          "before": "if expired() {\n\t\t\treturn out(\"timeout\")\n\t\t}\n\t\tfill := false",
+          "after": "if false && expired() {\n\t\t\treturn out(\"timeout\")\n\t\t}\n\t\tfill := false"
+        }
+      ],
+      "requiredDetections": [
+        "generated",
+        "portable"
+      ],
+      "typescriptRequiredDetections": [
+        "ordinary",
+        "generated",
+        "portable"
+      ]
+    }
+  ]
+}

@@ -9,6 +9,9 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
+      // Package coverage measures shipped code. Formal tooling has its own
+      // model checks, replay gates, and positive/negative harness controls.
+      include: ["src/**/*.ts"],
       exclude: ["src/index.ts", "test/**"],
       thresholds: {
         lines: 95,

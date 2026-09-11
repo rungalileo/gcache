@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 1,
+  "specificationVersion": "0.1.0",
+  "status": "experimental",
+  "normativeDefinition": "formal/SPEC.md",
+  "behavioralAuthority": {
+    "kind": "quint",
+    "executionManifest": "formal/execution.json",
+    "conflictPolicy": "Review behavioral changes in Quint first, retain a distinguishing property and generated witness, and replay the same histories in every implementation. Prose explains the models; implementations are not alternate behavioral oracles."
+  },
+  "revisionPolicy": "Pin the repository commit and exact corpus; passing profiles is finite evidence, not full DialCache conformance.",
+  "behavioralSchemaVersion": 2,
+  "protocolSchemaVersion": 3,
+  "invalidationSchemaVersion": 2,
+  "profiles": [
+    {
+      "id": "core",
+      "version": 1,
+      "definition": "formal/CONFORMANCE.md",
+      "model": "formal/dialcache-conformance.qnt",
+      "smoke": "formal/conformance-smoke.itf.json"
+    },
+    {
+      "id": "effects",
+      "version": 2,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-effects-conformance.qnt",
+      "smoke": "formal/effects-smoke.itf.json",
+      "historyContracts": [
+        "C23",
+        "C25",
+        "C26"
+      ],
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/effects-authority-witnesses.ts",
+        "test/formal-effects-authority-witnesses.test.ts",
+        "test/fixtures/effects-authority-witnesses.json",
+        "test/formal-effects.test.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs"
+      ]
+    },
+    {
+      "id": "scope",
+      "version": 2,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-scope-conformance.qnt",
+      "smoke": "formal/scope-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/runtime-boundary-witnesses.ts"
+      ]
+    },
+    {
+      "id": "recovery",
+      "version": 1,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "smoke": "formal/recovery-smoke.itf.json",
+      "witnessSources": [
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts"
+      ]
+    },
+    {
+      "id": "policy",
+      "version": 3,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-policy-conformance.qnt",
+      "smoke": "formal/policy-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/runtime-boundary-witnesses.ts"
+      ]
+    },
+    {
+      "id": "shadow",
+      "version": 3,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "smoke": "formal/shadow-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/shadow-diagnostics-witnesses.ts",
+        "test/formal-shadow-diagnostics-witnesses.test.ts",
+        "test/formal/public-prefix-witnesses.ts",
+        "test/formal/feature-profile.ts",
+        "test/formal/itf.ts",
+        "test/formal/behavior-driver.ts",
+        "formal/replay-inputs.mjs"
+      ]
+    },
+    {
+      "id": "admission",
+      "version": 1,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-admission-conformance.qnt",
+      "smoke": "formal/admission-smoke.itf.json",
+      "witnessSources": [
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts"
+      ]
+    },
+    {
+      "id": "layers",
+      "version": 2,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-layers-conformance.qnt",
+      "smoke": "formal/layers-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/runtime-boundary-witnesses.ts"
+      ]
+    },
+    {
+      "id": "independent",
+      "version": 2,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-independent-conformance.qnt",
+      "smoke": "formal/independent-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts"
+      ]
+    },
+    {
+      "id": "recovery-read",
+      "version": 1,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-recovery-read-conformance.qnt",
+      "smoke": "formal/recovery-read-smoke.itf.json",
+      "limits": "Bounded request/local/remote composition with held reads/decode, tracked/untracked encoding failures, logical versus physical retention, compressed recovery, original indexed source errors, and external marker lifetime observations. No concurrent active sources, source timeout, read timeout, or shadow jobs; those remain separate profiles.",
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/recovery-read-profile.ts",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/recovery-read-witnesses.ts",
+        "test/formal/recovery-admission-witnesses.ts",
+        "test/formal-recovery-shadow-witnesses.test.ts",
+        "test/formal/public-prefix-witnesses.ts"
+      ]
+    },
+    {
+      "id": "local-failure",
+      "version": 1,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-local-failure-conformance.qnt",
+      "smoke": "formal/local-failure-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "limits": "One pending untracked source, two request memos, and local storage failure at the native storage/clock boundary; no elapsed time or concurrency.",
+      "witnessSources": [
+        "test/formal/local-failure-profile.ts",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/local-failure-witnesses.ts",
+        "test/formal/public-prefix-witnesses.ts",
+        "test/formal-public-prefix-witnesses.test.ts"
+      ]
+    },
+    {
+      "id": "runtime-boundaries",
+      "version": 1,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-runtime-boundaries-conformance.qnt",
+      "smoke": "formal/runtime-boundaries-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/runtime-boundaries-profile.ts",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/runtime-boundary-witnesses.ts",
+        "test/formal-runtime-boundary-witnesses.test.ts"
+      ]
+    },
+    {
+      "id": "shadow-layers",
+      "version": 1,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-shadow-layers-conformance.qnt",
+      "smoke": "formal/shadow-layers-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "witnessSources": [
+        "test/formal/shadow-layers-profile.ts",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/shadow-layers-witnesses.ts",
+        "test/formal-shadow-layers-witnesses.test.ts",
+        "test/formal/public-prefix-witnesses.ts"
+      ]
+    },
+    {
+      "id": "local-clock",
+      "version": 1,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-local-clock-conformance.qnt",
+      "smoke": "formal/local-clock-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "limits": "Microsecond environment advances, whole monotonic millisecond insertion and expiry projection, one-second local TTL, two real default cache instances constructed at distinct fractional process times, immediate healthy sources. No request memo, remote, policy provider, custom clocks, or precise source/read/shadow budgets in this profile.",
+      "witnessSources": [
+        "test/formal-local-clock.test.ts",
+        "test/formal/local-clock-profile.ts",
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs"
+      ]
+    },
+    {
+      "id": "source-budgets",
+      "version": 1,
+      "definition": "formal/BEHAVIOR.md",
+      "model": "formal/dialcache-source-budgets-conformance.qnt",
+      "smoke": "formal/source-budgets-smoke.itf.json",
+      "inputEncoding": "explicit-v1",
+      "limits": "Eight calls, one local key, held policy/source gates, default/unbounded/ten-millisecond source budgets, enabled/outside/invalid identities; no remote, request memo or shadow jobs.",
+      "witnessSources": [
+        "test/formal/source-budgets-profile.ts",
+        "test/formal/feature-profile.ts",
+        "test/formal/behavior-driver.ts",
+        "test/formal/itf.ts",
+        "formal/replay-inputs.mjs",
+        "test/formal/source-budgets-witnesses.ts",
+        "test/formal/public-prefix-witnesses.ts",
+        "test/formal-public-prefix-witnesses.test.ts"
+      ]
+    }
+  ],
+  "implementations": [
+    {
+      "id": "typescript",
+      "profiles": [
+        "core",
+        "effects",
+        "scope",
+        "recovery",
+        "policy",
+        "shadow",
+        "admission",
+        "layers",
+        "independent",
+        "recovery-read",
+        "local-failure",
+        "runtime-boundaries",
+        "shadow-layers",
+        "local-clock",
+        "source-budgets"
+      ],
+      "limits": "See formal/TEST-MAP.md; finite scenarios and bounded profiles do not cover every interaction."
+    },
+    {
+      "id": "go",
+      "profiles": [
+        "core",
+        "effects",
+        "scope",
+        "recovery",
+        "policy",
+        "shadow",
+        "admission",
+        "layers",
+        "independent",
+        "recovery-read",
+        "local-failure",
+        "runtime-boundaries",
+        "shadow-layers",
+        "local-clock",
+        "source-budgets"
+      ],
+      "definition": "go/README.md",
+      "limits": "Same generated histories and portable scenarios as TypeScript, all protocol vectors, plus native Redis/Valkey/Cluster and cross-language integration. Claims require current corpus and witness fingerprints; finite evidence does not prove every possible schedule. Native API and value adaptations are documented in the Go README and parity ledger."
+    }
+  ]
+}

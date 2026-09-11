@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const { validatePropertyResult } = await import(new URL("../formal/check-model-properties.mjs", import.meta.url).href) as {
+type Challenge = { id: string; contract: string; source: string; model: string; invariant: string; before: string; after: string; measures?: string };
+const { validatePropertyResult, selectChallenges } = await import(new URL("../formal/check-model-properties.mjs", import.meta.url).href) as {
   validatePropertyResult(result: unknown, exitCode: number, expectation: string): void;
+  selectChallenges(manifest: { challenges: Challenge[] }, only?: string): Challenge[];
 };
-const { modelPropertyChallenges } = await import(new URL("../formal/model-property-challenges.mjs", import.meta.url).href) as {
-  modelPropertyChallenges: Array<{ id: string; source: string; model: string; invariant: string; before: string; after: string }>;
-};
+const manifest = JSON.parse(readFileSync(new URL("../formal/execution.json", import.meta.url), "utf8")) as { challenges: Challenge[] };
 
 describe("model property challenge evidence", () => {
   it("accepts a successful baseline and a compiling initial-state invariant counterexample", () => {
@@ -25,9 +25,15 @@ describe("model property challenge evidence", () => {
     }
     expect(() => validatePropertyResult({ status: "ok", errors: [], trace: [{}] }, 0, "unknown")).toThrow(/Unknown/);
   });
+  it("reads the catalog from the execution manifest and selects only known challenge ids", () => {
+    expect(selectChallenges(manifest)).toBe(manifest.challenges);
+    const [first, second] = manifest.challenges;
+    expect(selectChallenges(manifest, `${second!.id},${first!.id}`)).toEqual([first, second]);
+    expect(() => selectChallenges(manifest, `${first!.id},invented-fault`)).toThrow(/Unknown model property challenges: invented-fault/);
+  });
   it("keeps unique compiling-fault anchors and named independent target properties", () => {
-    expect(new Set(modelPropertyChallenges.map(challenge => challenge.id)).size).toBe(modelPropertyChallenges.length);
-    for (const challenge of modelPropertyChallenges) {
+    expect(new Set(manifest.challenges.map(challenge => challenge.id)).size).toBe(manifest.challenges.length);
+    for (const challenge of manifest.challenges) {
       const source = readFileSync(new URL(`../${challenge.source}`, import.meta.url), "utf8");
       const model = readFileSync(new URL(`../${challenge.model}`, import.meta.url), "utf8");
       expect(source.split(challenge.before), challenge.id).toHaveLength(2);

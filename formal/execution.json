@@ -106,8 +106,7 @@
         "librarySourceDeadlineIsSixtySecondsTest",
         "explicitlyUnboundedEnabledSourceAcceptsLateValueTest",
         "keyFailureKeepsEnabledSourceDeadlineTest"
-      ],
-      "propertyChallenge": "formal/check-model-properties.mjs"
+      ]
     },
     {
       "path": "formal/dialcache-tracked-invalidation.qnt",
@@ -221,7 +220,8 @@
       "invariants": [
         "loaderCountsNonNegative",
         "redisCountsNonNegative",
-        "readableRemoteHasValue"
+        "readableRemoteHasValue",
+        "servedLayerValueMatchesCache"
       ],
       "regressions": [
         "disabledAndRequestCallsKeepTheirOwnLifetimesTest",
@@ -1283,5 +1283,585 @@
       "url": "https://github.com/apalache-mc/apalache/releases/download/v0.56.1/apalache-0.56.1.tgz",
       "sha256": "a61c07569d7195ddc589f01037fa10fafef4fb0796af2f1c9cb45226375dfbfc"
     }
-  }
+  },
+  "challenges": [
+    {
+      "id": "source-deadline-epoch",
+      "contract": "C23",
+      "source": "formal/dialcache-flight-deadlines.qnt",
+      "model": "formal/dialcache-flight-deadlines.qnt",
+      "invariant": "fallbackDeadlineStartsWithFallback",
+      "before": "fallbackDeadline: s.now + FALLBACK_TIMEOUT,",
+      "after": "fallbackDeadline: FALLBACK_TIMEOUT,"
+    },
+    {
+      "id": "recovery-inclusive-maximum",
+      "contract": "C45",
+      "source": "formal/cache-rules.qnt",
+      "model": "formal/dialcache-rule-checks.qnt",
+      "invariant": "recoveryBoundaryIsExclusive",
+      "before": "created <= observed and observed - created < ceiling",
+      "after": "created <= observed and observed - created <= ceiling"
+    },
+    {
+      "id": "recovery-future-candidate",
+      "contract": "C45",
+      "source": "formal/cache-rules.qnt",
+      "model": "formal/dialcache-rule-checks.qnt",
+      "invariant": "recoveryBoundaryIsExclusive",
+      "before": "created <= observed and observed - created < ceiling",
+      "after": "observed - created < ceiling"
+    },
+    {
+      "id": "legacy-recovery-inclusive-maximum",
+      "contract": "C45",
+      "source": "formal/cache-rules.qnt",
+      "model": "formal/dialcache-recovery-conformance.qnt",
+      "invariant": "recoveredValueWasWithinAcceptedAge",
+      "before": "created <= observed and observed - created < ceiling",
+      "after": "created <= observed and observed - created <= ceiling",
+      "measures": "Repeats the recovery-inclusive-maximum fault against recovery-conformance: the same shared-rule mutation must also be caught by that model's own invariant."
+    },
+    {
+      "id": "policy-inclusive-local-expiry",
+      "contract": "C09",
+      "source": "formal/dialcache-policy-conformance.qnt",
+      "model": "formal/dialcache-policy-conformance.qnt",
+      "invariant": "localHitsRespectInsertionExpiry",
+      "before": "val localHit = localEligible and localEntryLiveAt(s.now, s.localExpires)",
+      "after": "val localHit = localEligible and s.now <= s.localExpires"
+    },
+    {
+      "id": "local-precise-grid",
+      "contract": "C09",
+      "source": "formal/cache-rules.qnt",
+      "model": "formal/dialcache-rule-checks.qnt",
+      "invariant": "localGridUsesWholeMilliseconds",
+      "before": "localEntryLiveAt(observedTicks / ticksPerMs, insertedTicks / ticksPerMs + ttlMs)",
+      "after": "observedTicks - insertedTicks < ttlMs * ticksPerMs"
+    },
+    {
+      "id": "source-inclusive-deadline",
+      "contract": "C25",
+      "source": "formal/cache-rules.qnt",
+      "model": "formal/dialcache-rule-checks.qnt",
+      "invariant": "sourceBoundaryIsExclusive",
+      "before": "pure def deadlinePendingAt(observed: int, deadline: int): bool = observed < deadline",
+      "after": "pure def deadlinePendingAt(observed: int, deadline: int): bool = observed <= deadline"
+    },
+    {
+      "id": "fence-inclusive-timestamp",
+      "contract": "C33",
+      "source": "formal/cache-rules.qnt",
+      "model": "formal/dialcache-rule-checks.qnt",
+      "invariant": "fenceBoundaryIsExclusive",
+      "before": "pure def fenceAllows(created: int, watermark: int): bool = created > watermark",
+      "after": "pure def fenceAllows(created: int, watermark: int): bool = created >= watermark"
+    },
+    {
+      "id": "profile-source-wrong-clock",
+      "contract": "C23",
+      "source": "formal/dialcache-source-budgets-conformance.qnt",
+      "model": "formal/dialcache-source-connection.qnt",
+      "invariant": "sourceOriginsMatchContract",
+      "before": "rawPending: true, result: CALL_PENDING, started: x.now, settled: -1,",
+      "after": "rawPending: true, result: CALL_PENDING, started: 0, settled: -1,"
+    },
+    {
+      "id": "profile-source-wrong-owner",
+      "contract": "C24",
+      "source": "formal/dialcache-source-budgets-conformance.qnt",
+      "model": "formal/dialcache-source-connection.qnt",
+      "invariant": "sourceOwnersMatchContract",
+      "before": "owners: x.owners.replaceAt(call, source),",
+      "after": "owners: x.owners.replaceAt(call, 0),"
+    },
+    {
+      "id": "profile-recovery-wrong-snapshot",
+      "contract": "C44",
+      "source": "formal/dialcache-recovery-read-conformance.qnt",
+      "model": "formal/dialcache-recovery-connection.qnt",
+      "invariant": "retainedSnapshotMatchesAcquisition",
+      "before": "candidateCreated: s.created,",
+      "after": "candidateCreated: s.created + 1,"
+    },
+    {
+      "id": "recovery-read-wrong-admission-policy",
+      "contract": "C45",
+      "source": "formal/dialcache-recovery-read-conformance.qnt",
+      "model": "formal/dialcache-recovery-connection.qnt",
+      "invariant": "retainedSnapshotMatchesAcquisition",
+      "before": "scope: context, acceptedFresh: s.freshMs, acceptedMaximum: s.maximumMs,",
+      "after": "scope: context, acceptedFresh: s.freshMs, acceptedMaximum: s.maximumMs + 1,"
+    },
+    {
+      "id": "legacy-recovery-wrong-snapshot",
+      "contract": "C44",
+      "source": "formal/dialcache-recovery-conformance.qnt",
+      "model": "formal/dialcache-legacy-recovery-connection.qnt",
+      "invariant": "flightKeepsAcquiredSnapshot",
+      "before": "candidateCreated: s.created,",
+      "after": "candidateCreated: s.created + 1,"
+    },
+    {
+      "id": "independent-wrong-admission-policy",
+      "contract": "C45",
+      "source": "formal/dialcache-independent-conformance.qnt",
+      "model": "formal/dialcache-independent-connection.qnt",
+      "invariant": "independentSnapshotsMatchAcquisition",
+      "before": "source: NO_SOURCE, phase: READ_PENDING, maxAge: x.maxAge,",
+      "after": "source: NO_SOURCE, phase: READ_PENDING, maxAge: SHORT_RETENTION_MS,"
+    },
+    {
+      "id": "independent-wrong-recovered-value",
+      "contract": "C43",
+      "source": "formal/dialcache-independent-conformance.qnt",
+      "model": "formal/dialcache-independent-connection.qnt",
+      "invariant": "independentRecoveryMatchesContract",
+      "before": "call.error else load.value)",
+      "after": "call.error else VALUE_TWO)"
+    },
+    {
+      "id": "effects-source-wrong-clock",
+      "contract": "C23",
+      "source": "formal/dialcache-effects-conformance.qnt",
+      "model": "formal/dialcache-effects-connection.qnt",
+      "invariant": "effectsDeadlineMatchesSourceStart",
+      "before": "activeLoader: x.sources.length(), deadline: x.now + SOURCE_BUDGET_MS,",
+      "after": "activeLoader: x.sources.length(), deadline: SOURCE_BUDGET_MS,"
+    },
+    {
+      "id": "effects-wrong-acceptance-receipt",
+      "contract": "C25",
+      "source": "formal/dialcache-effects-conformance.qnt",
+      "model": "formal/dialcache-effects-connection.qnt",
+      "invariant": "effectsPublicationMatchesAcceptedSource",
+      "before": "acceptedAt: s.now, acceptedWall: s.wall,",
+      "after": "acceptedAt: s.now + 1, acceptedWall: s.wall,"
+    },
+    {
+      "id": "legacy-recovery-strands-followers",
+      "contract": "C24",
+      "source": "formal/dialcache-recovery-conformance.qnt",
+      "model": "formal/dialcache-legacy-recovery-connection.qnt",
+      "invariant": "flightRecoveryMatchesContract",
+      "before": "...finishPendingCalls(s.o, result)",
+      "after": "...{ calls: s.o.calls.replaceAt(s.o.calls.indices().filter(i => s.o.calls.nth(i) == CALL_PENDING).fold(s.o.calls.length(), (first, i) => if (i < first) i else first), result), ...s.o }"
+    },
+    {
+      "id": "independent-source-wrong-clock",
+      "contract": "C23",
+      "source": "formal/dialcache-independent-conformance.qnt",
+      "model": "formal/dialcache-independent-connection.qnt",
+      "invariant": "independentSourceOriginsMatchContract",
+      "before": "startedAt: x.now, settledAt: -1, outcome: CALL_PENDING }),\n    timers: x.timers.append({ read: false, index: x.sources.length(), at: x.now + SOURCE_BUDGET_MS }),",
+      "after": "startedAt: 0, settledAt: -1, outcome: CALL_PENDING }),\n    timers: x.timers.append({ read: false, index: x.sources.length(), at: SOURCE_BUDGET_MS }),"
+    },
+    {
+      "id": "independent-source-wrong-owner",
+      "contract": "C24",
+      "source": "formal/dialcache-independent-conformance.qnt",
+      "model": "formal/dialcache-independent-connection.qnt",
+      "invariant": "independentSourceOriginsMatchContract",
+      "before": "sources: x.sources.append({ caller: caller, active: true, pending: true,",
+      "after": "sources: x.sources.append({ caller: 0, active: true, pending: true,"
+    },
+    {
+      "id": "tracked-read-inclusive-fence",
+      "contract": "C33",
+      "source": "formal/cache-rules.qnt",
+      "model": "formal/dialcache-tracked-invalidation.qnt",
+      "invariant": "servedSnapshotClearedObservedFence",
+      "before": "pure def fenceAllows(created: int, watermark: int): bool = created > watermark",
+      "after": "pure def fenceAllows(created: int, watermark: int): bool = created >= watermark",
+      "measures": "Repeats the fence-inclusive-timestamp fault against tracked-invalidation: the same shared-rule mutation must also be caught by that model's own invariant."
+    },
+    {
+      "id": "policy-inclusive-remote-freshness",
+      "contract": "C22",
+      "source": "formal/dialcache-policy-conformance.qnt",
+      "model": "formal/dialcache-policy-conformance.qnt",
+      "invariant": "remoteHitsRespectAcquiredFreshness",
+      "before": "remoteEligible and freshAgeAllowed(s.remoteCreated.nth(s.key), s.wall, remoteTtl)",
+      "after": "remoteEligible and s.remoteCreated.nth(s.key) <= s.wall and s.wall - s.remoteCreated.nth(s.key) <= remoteTtl"
+    },
+    {
+      "id": "shadow-inclusive-c0-freshness",
+      "contract": "C22",
+      "source": "formal/dialcache-shadow-conformance.qnt",
+      "model": "formal/dialcache-shadow-conformance.qnt",
+      "invariant": "c0AcquisitionsRespectFreshness",
+      "before": "val acquired = if (freshAgeAllowed(s.created, s.wall, FRESHNESS_MS)) snapshot else NO_PAYLOAD",
+      "after": "val acquired = if (s.created <= s.wall and s.wall - s.created <= FRESHNESS_MS) snapshot else NO_PAYLOAD"
+    },
+    {
+      "id": "core-unhealthy-local-read-hits",
+      "contract": "C27",
+      "source": "formal/dialcache-core.qnt",
+      "model": "formal/dialcache-core.qnt",
+      "invariant": "failedLocalReadSkipsReuseAndPublication",
+      "before": "val localHit = localReadEligible and s.localHasValue",
+      "after": "val localHit = s.callLocal and s.localHasValue"
+    },
+    {
+      "id": "core-tracked-fallback-warms-local",
+      "contract": "C31",
+      "source": "formal/dialcache-core.qnt",
+      "model": "formal/dialcache-core.qnt",
+      "invariant": "trackedRemoteFallbackSuppressesLocalPublication",
+      "before": "      remoteHasValue: true,\n      localWriteFailures: if (localWriteFails and not(s.callTracked)) s.localWriteFailures + 1 else s.localWriteFailures,\n      localHasValue: if (localWriteEligible and not(s.callTracked)) true else s.localHasValue,\n      localWrites: if (localWriteEligible and not(s.callTracked)) s.localWrites + 1 else s.localWrites,",
+      "after": "      remoteHasValue: true,\n      localWriteFailures: if (localWriteFails) s.localWriteFailures + 1 else s.localWriteFailures,\n      localHasValue: if (localWriteEligible) true else s.localHasValue,\n      localWrites: if (localWriteEligible) s.localWrites + 1 else s.localWrites,"
+    },
+    {
+      "id": "runtime-policy-coalesce-defaults-off",
+      "contract": "C17",
+      "source": "formal/dialcache-runtime-policy.qnt",
+      "model": "formal/dialcache-runtime-policy.qnt",
+      "invariant": "featureLibraryDefaults",
+      "before": "coalesce: inherit(runtime.coalesce, baseline.coalesce, 1),",
+      "after": "coalesce: inherit(runtime.coalesce, baseline.coalesce, 0),"
+    },
+    {
+      "id": "runtime-policy-physical-ttl-ignores-recovery",
+      "contract": "C22",
+      "source": "formal/dialcache-runtime-policy.qnt",
+      "model": "formal/dialcache-runtime-policy.qnt",
+      "invariant": "existingRemoteEntryKeepsPhysicalTtl",
+      "before": "      remotePhysicalTtlAtInsert:\n        if (s.snapshot.recoveryAge > s.snapshot.remoteTtl) s.snapshot.recoveryAge\n        else s.snapshot.remoteTtl,",
+      "after": "      remotePhysicalTtlAtInsert: s.snapshot.remoteTtl,"
+    },
+    {
+      "id": "stale-recovery-inclusive-served-maximum",
+      "contract": "C45",
+      "source": "formal/dialcache-stale-recovery.qnt",
+      "model": "formal/dialcache-stale-recovery.qnt",
+      "invariant": "servedStaleIsStrictlyWithinMaxAge",
+      "before": "recoveryAgeAllowed(s.candidateCreatedAt, s.now, MAX_RECOVERY_AGE)",
+      "after": "recoveryAgeAllowed(s.candidateCreatedAt, s.now, MAX_RECOVERY_AGE + 1)"
+    },
+    {
+      "id": "stale-recovery-candidate-stamped-at-read",
+      "contract": "C44",
+      "source": "formal/dialcache-stale-recovery.qnt",
+      "model": "formal/dialcache-stale-recovery.qnt",
+      "invariant": "retainedCandidateWasEligible",
+      "before": "candidateCreatedAt: if (candidateAtInitialRead) s.frameCreatedAt else s.candidateCreatedAt,",
+      "after": "candidateCreatedAt: if (candidateAtInitialRead) s.now else s.candidateCreatedAt,"
+    },
+    {
+      "id": "shadow-validation-fenced-fill-writes",
+      "contract": "C53",
+      "source": "formal/dialcache-shadow-validation.qnt",
+      "model": "formal/dialcache-shadow-validation.qnt",
+      "invariant": "fencedFillDoesNotWrite",
+      "before": "      fillWrites: if (s.observedFencePresent and not(s.fillTimestampClearsFence))\n        s.fillWrites else s.fillWrites + 1,",
+      "after": "      fillWrites: s.fillWrites + 1,"
+    },
+    {
+      "id": "shadow-validation-fill-before-source",
+      "contract": "C49",
+      "source": "formal/dialcache-shadow-validation.qnt",
+      "model": "formal/dialcache-shadow-validation.qnt",
+      "invariant": "comparisonAndFillWaitForSource",
+      "before": "s' = { c0: C0Miss, phase: if (s.sourceAccepted) Filling else WaitingForSource, ...s },",
+      "after": "s' = { c0: C0Miss, phase: Filling, ...s },"
+    },
+    {
+      "id": "redis-protocol-inclusive-fence",
+      "contract": "C33",
+      "source": "formal/dialcache-redis-protocol.qnt",
+      "model": "formal/dialcache-redis-protocol.qnt",
+      "invariant": "fenceCanPrecedeEncodingError",
+      "before": "st.watermarkState == ValidWatermark and not(fenceAllows(st.frameTimestamp, st.watermarkValue)))",
+      "after": "st.watermarkState == ValidWatermark and st.frameTimestamp < st.watermarkValue)"
+    },
+    {
+      "id": "redis-protocol-untracked-fence",
+      "contract": "W04",
+      "source": "formal/dialcache-redis-protocol.qnt",
+      "model": "formal/dialcache-redis-protocol.qnt",
+      "invariant": "untrackedDecodingIgnoresWatermarks",
+      "before": "    else if (st.tracked and st.watermarkReply == BufferReply and\n      st.watermarkState == ValidWatermark",
+      "after": "    else if (st.watermarkReply == BufferReply and\n      st.watermarkState == ValidWatermark"
+    },
+    {
+      "id": "frame-vectors-inclusive-fence",
+      "contract": "C33",
+      "source": "formal/dialcache-frame-vectors.qnt",
+      "model": "formal/dialcache-frame-vectors.qnt",
+      "invariant": "trackedHitsStrictlyClearValidFence",
+      "before": "else if (request.tracked and fence >= 0 and not(fenceAllows(timestamp, fence)))",
+      "after": "else if (request.tracked and fence >= 0 and timestamp < fence)"
+    },
+    {
+      "id": "invalidation-transition-cutoff-moves-backwards",
+      "contract": "C38",
+      "source": "formal/dialcache-invalidation-transition.qnt",
+      "model": "formal/dialcache-invalidation-transition.qnt",
+      "invariant": "successfulCutoffIsExactMaximum",
+      "before": "val cutoff = if (priorCutoff > proposed) priorCutoff else proposed",
+      "after": "val cutoff = proposed"
+    },
+    {
+      "id": "invalidation-transition-inclusive-buffer-limit",
+      "contract": "C39",
+      "source": "formal/dialcache-invalidation-transition.qnt",
+      "model": "formal/dialcache-invalidation-transition.qnt",
+      "invariant": "argumentValidationIsExact",
+      "before": "if (not(buffer.valid) or buffer.value > MAX_BUFFER_MS or",
+      "after": "if (not(buffer.valid) or buffer.value >= MAX_BUFFER_MS or"
+    },
+    {
+      "id": "key-protocol-untracked-brace-rejection",
+      "contract": "W01",
+      "source": "formal/dialcache-key-protocol.qnt",
+      "model": "formal/dialcache-key-protocol.qnt",
+      "invariant": "keyAcceptanceRespectsTextAndHashTagDomain",
+      "before": "not(key.tracked) or (not(containsBrace(key.keyType)) and not(containsBrace(key.id)))",
+      "after": "not(containsBrace(key.keyType)) and not(containsBrace(key.id))"
+    },
+    {
+      "id": "cohort-inclusive-threshold",
+      "contract": "W03",
+      "source": "formal/cohort-boundaries.qnt",
+      "model": "formal/dialcache-key-protocol.qnt",
+      "invariant": "cohortNumeratorsAreUnsignedAndBoundariesStrict",
+      "before": "pure def cohortAdmits(sample: int, threshold: int): bool =\n    sample < threshold",
+      "after": "pure def cohortAdmits(sample: int, threshold: int): bool =\n    sample <= threshold"
+    },
+    {
+      "id": "envelope-vectors-tie-compresses",
+      "contract": "W07",
+      "source": "formal/dialcache-envelope-vectors.qnt",
+      "model": "formal/dialcache-envelope-vectors.qnt",
+      "invariant": "compressionUsesByteThresholdAndStrictShrink",
+      "before": "else if (codecBytes + 1 >= escaped.length()) { outcome: \"not_smaller\", ...uncompressed }",
+      "after": "else if (codecBytes + 1 > escaped.length()) { outcome: \"not_smaller\", ...uncompressed }"
+    },
+    {
+      "id": "envelope-vectors-escape-misses-binary-marker",
+      "contract": "W06",
+      "source": "formal/dialcache-envelope-vectors.qnt",
+      "model": "formal/dialcache-envelope-vectors.qnt",
+      "invariant": "escapeConsumesExactlyOnePrefix",
+      "before": "if (raw.length() > 1 and raw.nth(1) <= 2)",
+      "after": "if (raw.length() > 1 and raw.nth(1) <= 1)"
+    },
+    {
+      "id": "conformance-local-hit-returns-source",
+      "contract": "C05",
+      "source": "formal/dialcache-conformance.qnt",
+      "model": "formal/dialcache-conformance.qnt",
+      "invariant": "servedLayerValueMatchesCache",
+      "before": "      lastResult: s.localValue,",
+      "after": "      lastResult: s.sourceVersion,"
+    },
+    {
+      "id": "conformance-remote-miss-skips-publication",
+      "contract": "C28",
+      "source": "formal/dialcache-conformance.qnt",
+      "model": "formal/dialcache-conformance.qnt",
+      "invariant": "servedLayerValueMatchesCache",
+      "before": "      remoteLoaderCalls: s.remoteLoaderCalls + 1,\n      remoteReadable: true,\n      remoteValue: s.sourceVersion,",
+      "after": "      remoteLoaderCalls: s.remoteLoaderCalls + 1,\n      remoteValue: s.sourceVersion,"
+    },
+    {
+      "id": "effects-fenced-source-publishes",
+      "contract": "C34",
+      "source": "formal/dialcache-effects-conformance.qnt",
+      "model": "formal/dialcache-effects-conformance.qnt",
+      "invariant": "writeRequiresAcceptedSource",
+      "before": "else if (s.refill == REFILL_DENIED or not(fenceAllows(s.wall, s.observedFence))) {",
+      "after": "else if (s.refill == REFILL_DENIED) {"
+    },
+    {
+      "id": "effects-late-source-accepted",
+      "contract": "C25",
+      "source": "formal/dialcache-effects-conformance.qnt",
+      "model": "formal/dialcache-effects-conformance.qnt",
+      "invariant": "writeRequiresAcceptedSource",
+      "before": "    else if (not(deadlinePendingAt(s.now, s.deadline))) {\n      phase: IDLE, calls: finishPendingCalls(s.calls, CALL_TIMEOUT), ...measured\n    }",
+      "after": "    else if (false) {\n      phase: IDLE, calls: finishPendingCalls(s.calls, CALL_TIMEOUT), ...measured\n    }"
+    },
+    {
+      "id": "scope-late-source-repopulates-closed-memo",
+      "contract": "C03",
+      "source": "formal/dialcache-scope-conformance.qnt",
+      "model": "formal/dialcache-scope-conformance.qnt",
+      "invariant": "closedScopesHaveNoMemo",
+      "before": "val memoScopeStillOpen = sourceRecord.slot >= 0 and not(state.completed.nth(sourceRecord.slot))",
+      "after": "val memoScopeStillOpen = sourceRecord.slot >= 0"
+    },
+    {
+      "id": "scope-source-error-memoized",
+      "contract": "C15",
+      "source": "formal/dialcache-scope-conformance.qnt",
+      "model": "formal/dialcache-scope-conformance.qnt",
+      "invariant": "memoFollowsLatestSuccessfulSettlement",
+      "before": "memo: if (memoScopeStillOpen and result != SOURCE_ERROR) state.memo.replaceAt(sourceRecord.slot, result)",
+      "after": "memo: if (memoScopeStillOpen) state.memo.replaceAt(sourceRecord.slot, result)"
+    },
+    {
+      "id": "admission-duplicate-key-admitted",
+      "contract": "C54",
+      "source": "formal/dialcache-admission-conformance.qnt",
+      "model": "formal/dialcache-admission-conformance.qnt",
+      "invariant": "oneJobPerIdentity",
+      "before": "val admitted = entry.selected and not(duplicate or full)",
+      "after": "val admitted = entry.selected and not(full)"
+    },
+    {
+      "id": "admission-capacity-off-by-one",
+      "contract": "C54",
+      "source": "formal/dialcache-admission-conformance.qnt",
+      "model": "formal/dialcache-admission-conformance.qnt",
+      "invariant": "capacityIsPerInstance",
+      "before": "    ).size() >= JOBS_PER_INSTANCE\n    val admitted",
+      "after": "    ).size() > JOBS_PER_INSTANCE\n    val admitted"
+    },
+    {
+      "id": "layers-process-flight-crosses-instance",
+      "contract": "C11",
+      "source": "formal/dialcache-layers-conformance.qnt",
+      "model": "formal/dialcache-layers-conformance.qnt",
+      "invariant": "sourceOwnershipNeverCrossesKeyOrInstance",
+      "before": "or remoteEnabled(state))) state.processFlights.nth(inst * KEYS_PER_INSTANCE + key) else NO_OWNER",
+      "after": "or remoteEnabled(state))) state.processFlights.nth(key) else NO_OWNER"
+    },
+    {
+      "id": "layers-late-memo-into-closed-scope",
+      "contract": "C03",
+      "source": "formal/dialcache-layers-conformance.qnt",
+      "model": "formal/dialcache-layers-conformance.qnt",
+      "invariant": "closedScopesHaveNoMemo",
+      "before": "if (slot < 0 or state.closed.nth(slot / KEYS_PER_INSTANCE)) state else {",
+      "after": "if (slot < 0) state else {"
+    },
+    {
+      "id": "independent-fresh-frame-retained",
+      "contract": "C40",
+      "source": "formal/dialcache-independent-conformance.qnt",
+      "model": "formal/dialcache-independent-conformance.qnt",
+      "invariant": "retainedSnapshotsWereEligible",
+      "before": "retainedAgeAllowed(x.created, x.wall, FRESH_AGE_MS, call.maxAge)",
+      "after": "recoveryAgeAllowed(x.created, x.wall, call.maxAge)"
+    },
+    {
+      "id": "independent-deadline-settles-at-start",
+      "contract": "C24",
+      "source": "formal/dialcache-independent-conformance.qnt",
+      "model": "formal/dialcache-independent-conformance.qnt",
+      "invariant": "sourceSettlementsRespectOwnDeadline",
+      "before": "sources: x.sources.replaceAt(index, { active: false, settledAt: x.now, outcome: DEADLINE_ERROR, ...source }),",
+      "after": "sources: x.sources.replaceAt(index, { active: false, settledAt: source.startedAt, outcome: DEADLINE_ERROR, ...source }),"
+    },
+    {
+      "id": "recovery-read-inclusive-maximum",
+      "contract": "C45",
+      "source": "formal/dialcache-recovery-read-conformance.qnt",
+      "model": "formal/dialcache-recovery-read-conformance.qnt",
+      "invariant": "recoveredAgeUsesLogicalMaximum",
+      "before": "recoveryAgeAllowed(x.candidateCreated, x.wall, x.acceptedMaximum)",
+      "after": "recoveryAgeAllowed(x.candidateCreated, x.wall, x.acceptedMaximum + 1)"
+    },
+    {
+      "id": "recovery-read-recovery-warms-local",
+      "contract": "C43",
+      "source": "formal/dialcache-recovery-read-conformance.qnt",
+      "model": "formal/dialcache-recovery-read-conformance.qnt",
+      "invariant": "recoveredResultsNeverPublishShared",
+      "before": "      localValue: if (served and not(recovery)) value else s.localValue,\n      localExpires: if (served and not(recovery)) s.now + LOCAL_TTL_MS else s.localExpires,\n      localVersion: s.localVersion + (if (served and not(recovery)) 1 else 0),",
+      "after": "      localValue: if (served) value else s.localValue,\n      localExpires: if (served) s.now + LOCAL_TTL_MS else s.localExpires,\n      localVersion: s.localVersion + (if (served) 1 else 0),"
+    },
+    {
+      "id": "local-failure-write-fault-publishes",
+      "contract": "C27",
+      "source": "formal/dialcache-local-failure-conformance.qnt",
+      "model": "formal/dialcache-local-failure-conformance.qnt",
+      "invariant": "failedWriteKeepsAcceptedCallerResult",
+      "before": "localValue: if (x.localMiss and not(x.failed)) value else x.localValue,",
+      "after": "localValue: if (x.localMiss) value else x.localValue,"
+    },
+    {
+      "id": "local-failure-source-error-published",
+      "contract": "C27",
+      "source": "formal/dialcache-local-failure-conformance.qnt",
+      "model": "formal/dialcache-local-failure-conformance.qnt",
+      "invariant": "sourceErrorsNeverReplaceLocalValue",
+      "before": "s' = complete(recordPublication(s, SOURCE_ERROR), SOURCE_ERROR)",
+      "after": "s' = acquired(s, SOURCE_ERROR)"
+    },
+    {
+      "id": "runtime-boundaries-inclusive-cohort",
+      "contract": "W03",
+      "source": "formal/dialcache-runtime-boundaries-conformance.qnt",
+      "model": "formal/dialcache-runtime-boundaries-conformance.qnt",
+      "invariant": "equalAndLowerCohortsNeverTraverse",
+      "before": "else cohortAdmits(sample(state.layer), cohortThreshold(state.layer, state.policy)))",
+      "after": "else sample(state.layer) <= cohortThreshold(state.layer, state.policy))"
+    },
+    {
+      "id": "runtime-boundaries-inherited-sharing-ignores-default",
+      "contract": "C16",
+      "source": "formal/dialcache-runtime-boundaries-conformance.qnt",
+      "model": "formal/dialcache-runtime-boundaries-conformance.qnt",
+      "invariant": "inheritedDisabledSharingNeverJoins",
+      "before": "or (sharingMode(state.policy) == INHERIT_SHARING and state.defaultSharing)",
+      "after": "or sharingMode(state.policy) == INHERIT_SHARING"
+    },
+    {
+      "id": "shadow-layers-inclusive-c0-freshness",
+      "contract": "C22",
+      "source": "formal/dialcache-shadow-layers-conformance.qnt",
+      "model": "formal/dialcache-shadow-layers-conformance.qnt",
+      "invariant": "retainedC0WasFreshWhenAcquired",
+      "before": "if (freshAgeAllowed(state.remoteCreated.nth(key), state.now, state.policy.freshMs)) frame(state, key) else NO_VALUE",
+      "after": "if (freshAgeAllowed(state.remoteCreated.nth(key), state.now, state.policy.freshMs + 1)) frame(state, key) else NO_VALUE"
+    },
+    {
+      "id": "shadow-layers-fill-uses-current-retention",
+      "contract": "C18",
+      "source": "formal/dialcache-shadow-layers-conformance.qnt",
+      "model": "formal/dialcache-shadow-layers-conformance.qnt",
+      "invariant": "fillKeepsCapturedRetention",
+      "before": "else if (entry.cached == NO_VALUE) beginWrite(state, entry.source, job, entry.retainedMs)",
+      "after": "else if (entry.cached == NO_VALUE) beginWrite(state, entry.source, job, state.policy.retainedMs)"
+    },
+    {
+      "id": "local-clock-precise-ttl",
+      "contract": "C09",
+      "source": "formal/dialcache-local-clock-conformance.qnt",
+      "model": "formal/dialcache-local-clock-conformance.qnt",
+      "invariant": "localReadsUseCommonWholeMilliseconds",
+      "before": "entry.value != EMPTY_ENTRY and localEntryLiveOnGrid(ticks, entry.insertedTicks, LOCAL_TTL_MS, TICKS_PER_MS)",
+      "after": "entry.value != EMPTY_ENTRY and ticks - entry.insertedTicks < LOCAL_TTL_MS * TICKS_PER_MS"
+    },
+    {
+      "id": "local-clock-hit-renews-insertion",
+      "contract": "C09",
+      "source": "formal/dialcache-local-clock-conformance.qnt",
+      "model": "formal/dialcache-local-clock-conformance.qnt",
+      "invariant": "readsNeverRenewLocalInsertion",
+      "before": "entries: if (hit) s.entries else s.entries.replaceAt(instance, { value: offered, insertedTicks: s.ticks }),",
+      "after": "entries: s.entries.replaceAt(instance, { value: if (hit) previous.value else offered, insertedTicks: s.ticks }),"
+    },
+    {
+      "id": "source-budgets-outside-call-has-deadline",
+      "contract": "C01",
+      "source": "formal/dialcache-source-budgets-conformance.qnt",
+      "model": "formal/dialcache-source-budgets-conformance.qnt",
+      "invariant": "outsideSourcesHaveNoDeadline",
+      "before": "budget: if (outside) -1 else configuredBudget(x.mode),",
+      "after": "budget: configuredBudget(x.mode),"
+    },
+    {
+      "id": "source-budgets-settled-flight-stays-registered",
+      "contract": "C15",
+      "source": "formal/dialcache-source-budgets-conformance.qnt",
+      "model": "formal/dialcache-source-budgets-conformance.qnt",
+      "invariant": "registeredWorkIsNotAbandoned",
+      "before": "registered: if (x.registered == id) -1 else x.registered,",
+      "after": "registered: x.registered,"
+    }
+  ]
 }

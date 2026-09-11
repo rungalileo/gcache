@@ -4,6 +4,7 @@ import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readExecution, root, validateExecution } from './execution.mjs';
 import { normalizeReplayInputs } from './replay-inputs.mjs';
+import { bindTrace } from './replay/bindings.mjs';
 
 export function executionPlan(mode, manifest = readExecution(), seed = process.env.QUINT_SEED || manifest.settings.seed) {
   validateExecution(manifest);
@@ -20,7 +21,6 @@ export function executionPlan(mode, manifest = readExecution(), seed = process.e
         `--verbosity=${settings.verbosity}`, '--invariants', ...model.invariants] });
       if (model.regressions.length) commands.push({ command: 'quint', args: ['test', model.path,
         `--backend=${settings.backend}`, `--max-samples=${test.maxSamples}`] });
-      if (model.propertyChallenge) commands.push({ command: 'node', args: [model.propertyChallenge] });
     } else if (model.vectorExport) {
       commands.push({ command: 'node', args: [model.vectorExport.generator, '--check'] });
     } else if (model.generate) {
@@ -36,12 +36,22 @@ export function executionPlan(mode, manifest = readExecution(), seed = process.e
           `--backend=${settings.backend}`, '--max-samples=1', `--seed=${seed}`,
           `--match=^(${model.replayRegressions.join('|')})$`,
           `--out-itf=${outputDirectory}/{test}.itf.json`], outputDirectory,
-          expectedTraces: model.replayRegressions.length, explicitInputs: true,
+          expectedTraces: model.replayRegressions.length, explicitInputs: true, profile: model.profile,
           expectedFiles: model.replayRegressions.map(name => `${name}.itf.json`) });
       }
     }
   }
+  // Every compiling fault in the manifest catalog runs once, after the models
+  // it mutates have been checked in their unmodified form.
+  if (mode === 'check') commands.push({ command: 'node', args: ['formal/check-model-properties.mjs'] });
   return commands;
+}
+
+// Exported regression histories bind to the driver contract at generation
+// time, so an out-of-domain choice or unknown action fails here, not during a
+// later native replay. Binding reads only the trace; no driver executes.
+export function bindExportedTrace(profile, text, path) {
+  bindTrace(profile, JSON.parse(text), path);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -68,7 +78,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         if (job.expectedFiles && JSON.stringify([...files].sort()) !== JSON.stringify([...job.expectedFiles].sort())) throw new Error(`Regression trace inventory differs in ${job.outputDirectory}`);
         if (job.explicitInputs) for (const name of files) {
           const path = resolve(root, job.outputDirectory, name);
-          writeFileSync(path, JSON.stringify(normalizeReplayInputs(JSON.parse(readFileSync(path, 'utf8')))) + '\n');
+          const normalized = JSON.stringify(normalizeReplayInputs(JSON.parse(readFileSync(path, 'utf8')))) + '\n';
+          writeFileSync(path, normalized);
+          if (job.profile) bindExportedTrace(job.profile, normalized, `${job.outputDirectory}/${name}`);
         }
       }
     }

@@ -4,8 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readExecution } from './execution.mjs';
-import { modelPropertyChallenges } from './model-property-challenges.mjs';
+import { readExecution, validateExecution } from './execution.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 export function validatePropertyResult(result, exitCode, expectation) {
@@ -23,18 +22,34 @@ export function validatePropertyResult(result, exitCode, expectation) {
   }
 }
 
-export function measureModelProperties() {
+// Select a subset of the catalog by id for local iteration. The complete
+// catalog remains the only accepted evidence: a filtered report is never final.
+export function selectChallenges(manifest, only) {
+  if (only === undefined) return manifest.challenges;
+  const ids = new Set(only.split(',').filter(Boolean));
+  const selected = manifest.challenges.filter(challenge => ids.has(challenge.id));
+  const missing = [...ids].filter(id => !selected.some(challenge => challenge.id === id));
+  if (missing.length) throw new Error(`Unknown model property challenges: ${missing.join(', ')}`);
+  return selected;
+}
+
+export function measureModelProperties({ only } = {}) {
   const output = resolve(root, '.formal-traces/model-properties');
-  const { settings, check } = readExecution();
+  const manifest = readExecution();
+  // A complete measurement validates the whole manifest first; a filtered run
+  // is a local iteration aid and may precede catalog coverage.
+  if (only === undefined) validateExecution(manifest);
+  const challenges = selectChallenges(manifest, only);
+  const { settings, check } = manifest;
   const options = [`--backend=${settings.backend}`, `--n-threads=${settings.threads}`, `--seed=${settings.seed}`,
     `--max-samples=${check.maxSamples}`, `--max-steps=${check.maxSteps}`];
   const files = readdirSync(resolve(root, 'formal')).filter(name => name.endsWith('.qnt')).sort();
   const sources = new Map(files.map(name => [`formal/${name}`, readFileSync(resolve(root, 'formal', name), 'utf8')]));
   mkdirSync(output, { recursive: true });
-  const report = { schemaVersion: 2, complete: false, mode: 'bounded-simulation', options,
+  const report = { schemaVersion: 3, complete: false, partial: only !== undefined, mode: 'bounded-simulation', options,
     sources: Object.fromEntries([...sources].map(([path, source]) => [path, createHash('sha256').update(source).digest('hex')])),
-    catalogSha256: createHash('sha256').update(readFileSync(new URL('./model-property-challenges.mjs', import.meta.url))).digest('hex'),
-    challenges: [] };
+    catalogSha256: createHash('sha256').update(readFileSync(resolve(root, 'formal/execution.json'))).digest('hex'),
+    catalog: manifest.challenges.length, challenges: [] };
   const save = () => writeFileSync(resolve(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   save();
   const workspace = mkdtempSync(resolve(tmpdir(), 'dialcache-model-properties-'));
@@ -47,7 +62,7 @@ export function measureModelProperties() {
     const version = execute(['--version']);
     if (version.status !== 0) throw new Error('Cannot read Quint version');
     report.quintVersion = version.stdout.trim();
-    for (const challenge of modelPropertyChallenges) {
+    for (const challenge of challenges) {
       const source = sources.get(challenge.source);
       if (source === undefined || source.split(challenge.before).length !== 2) {
         throw new Error(`${challenge.id}: mutation anchor must match exactly once`);
@@ -77,7 +92,7 @@ export function measureModelProperties() {
       }
       console.log(`${challenge.id}: compiling fault violates ${challenge.invariant}`);
     }
-    report.complete = true;
+    report.complete = only === undefined;
     save();
     return report;
   } catch (error) {
@@ -87,4 +102,8 @@ export function measureModelProperties() {
   } finally { rmSync(workspace, { recursive: true, force: true }); }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) measureModelProperties();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [option, ...extra] = process.argv.slice(2);
+  if (extra.length || (option !== undefined && !option.startsWith('--only='))) throw new Error('Usage: node formal/check-model-properties.mjs [--only=id,id]');
+  measureModelProperties({ only: option?.slice('--only='.length) });
+}

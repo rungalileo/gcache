@@ -8,7 +8,7 @@ export const readExecution = () => JSON.parse(read('formal/execution.json'));
 // A scoped declaration scanner, not a Quint parser or typechecker. Ignore
 // comments and strings, and only inventory declarations directly in the one
 // module body. Quint remains responsible for syntax, types, and effects.
-export function scanDeclarations(source) {
+function tokenize(source) {
   const tokens = [];
   for (let i = 0; i < source.length;) {
     if (/\s/.test(source[i])) { i++; continue; }
@@ -37,11 +37,18 @@ export function scanDeclarations(source) {
     if (identifier) { tokens.push(identifier[0]); i += identifier[0].length; }
     else tokens.push(source[i++]);
   }
+  return tokens;
+}
 
+// Top-level declarations with their token bodies. A body runs from the
+// declaration name to the next top-level declaration keyword; module imports
+// and other non-declaration statements never attach to a declaration body.
+export function scanDeclarationBodies(source) {
+  const tokens = tokenize(source);
   const declarations = new Map(), stack = [];
   const kinds = new Set(['val', 'def', 'action', 'run', 'type', 'var', 'const', 'assume']);
   const closes = { '}': '{', ')': '(', ']': '[' };
-  let modules = 0;
+  let modules = 0, current;
   if (tokens[0] !== 'module') throw new Error('Expected a Quint module declaration');
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
@@ -56,13 +63,54 @@ export function scanDeclarations(source) {
       const name = tokens[i + 1];
       if (!name || !/^[A-Za-z_]\w*$/.test(name)) throw new Error(`Unsupported Quint ${token} declaration`);
       if (declarations.has(name)) throw new Error(`Duplicate Quint declaration: ${name}`);
-      declarations.set(name, token);
+      current = { kind: token, body: [] };
+      declarations.set(name, current);
+      i++;
+      continue;
     }
+    if (stack.length === 1 && stack[0] === '{' && token === 'pure') { current = undefined; continue; }
+    if (stack.length === 1 && stack[0] === '{' && ['import', 'export'].includes(token)) current = undefined;
+    if (stack.length >= 1 && current && !(stack.length === 1 && token === '}')) current.body.push(token);
     if (['{', '(', '['].includes(token)) stack.push(token);
     else if (Object.hasOwn(closes, token) && stack.pop() !== closes[token]) throw new Error('Unbalanced Quint delimiters');
   }
   if (stack.length || modules !== 1) throw new Error('Expected one balanced Quint module');
   return declarations;
+}
+
+export function scanDeclarations(source) {
+  return new Map([...scanDeclarationBodies(source)].map(([name, { kind }]) => [name, kind]));
+}
+
+// Replay classification for profile models. A run is public-only when every
+// transition it takes records an external command in `input`. A body patches
+// state when it assigns `s'` without recording a public command, keeps `input`
+// unchanged across a state assignment, or calls the shadow fixture patcher.
+const assigns = (body, variable) => body.some((token, i) =>
+  token === variable && body[i + 1] === "'" && body[i + 2] === '=' && body[i + 3] !== '=');
+function patchesDirectly(kind, body) {
+  if (body.some((token, i) => token === 'input' && body[i + 1] === "'" && body[i + 2] === '=' && body[i + 3] === 'input') ||
+      body.includes('modelFixture')) return true;
+  return assigns(body, 's') && (kind === 'run' || !assigns(body, 'input'));
+}
+export function classifyRuns(declarations) {
+  const patching = new Map();
+  const resolve = (name, trail = new Set()) => {
+    if (patching.has(name)) return patching.get(name);
+    if (trail.has(name)) return false;
+    trail.add(name);
+    const { kind, body } = declarations.get(name);
+    const result = patchesDirectly(kind, body) ||
+      body.some(token => token !== name && declarations.has(token) &&
+        ['action', 'def', 'val', 'run'].includes(declarations.get(token).kind) && resolve(token, trail));
+    patching.set(name, result);
+    return result;
+  };
+  const runs = { publicOnly: [], patching: [] };
+  for (const [name, { kind }] of declarations) {
+    if (kind === 'run') (resolve(name) ? runs.patching : runs.publicOnly).push(name);
+  }
+  return runs;
 }
 
 const positiveInteger = (value, label) => {
@@ -74,11 +122,59 @@ const names = (values, label, allowEmpty = false) => {
       new Set(values).size !== values.length) throw new Error(`Invalid ${label} inventory`);
 };
 const sameMembers = (left, right) => JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+const nonEmptyText = value => typeof value === 'string' && value.trim().length > 0;
+export const contractIds = text => [...text.matchAll(/^\| ([CWEB]\d{2}) \|/gm)].map(match => match[1]);
+
+// Compiling semantic faults, checked against independent model obligations.
+// Every scheduled model carries at least one challenge or an explicit waiver.
+function validateChallenges(manifest, { readSource, contracts, sources }) {
+  const { challenges } = manifest;
+  if (!Array.isArray(challenges) || !challenges.length) throw new Error('Model property challenge catalog is missing');
+  const models = new Map(manifest.models.map(model => [model.path, model]));
+  const fields = ['id', 'contract', 'source', 'model', 'invariant', 'before', 'after'];
+  const ids = new Set(), faults = new Map(), challengedModels = new Set();
+  for (const challenge of challenges) {
+    if (!challenge || typeof challenge !== 'object' || fields.some(key => typeof challenge[key] !== 'string' || !challenge[key])) {
+      throw new Error(`Invalid model property challenge: ${JSON.stringify(challenge)}`);
+    }
+    const unknown = Object.keys(challenge).filter(key => !fields.includes(key) && key !== 'measures');
+    if (unknown.length) throw new Error(`${challenge.id}: unsupported challenge field ${unknown.join(', ')}`);
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(challenge.id) || ids.has(challenge.id)) throw new Error(`Invalid or duplicate challenge id: ${challenge.id}`);
+    ids.add(challenge.id);
+    if (!contracts.includes(challenge.contract)) throw new Error(`${challenge.id}: unknown contract ${challenge.contract}`);
+    if (!sources.has(challenge.source)) throw new Error(`${challenge.id}: mutation source is not a scheduled model or library: ${challenge.source}`);
+    const model = models.get(challenge.model);
+    if (!model) throw new Error(`${challenge.id}: challenged model is not scheduled: ${challenge.model}`);
+    if (!model.invariants.includes(challenge.invariant)) throw new Error(`${challenge.id}: ${challenge.invariant} is not a scheduled invariant of ${challenge.model}`);
+    if (challenge.before === challenge.after) throw new Error(`${challenge.id}: mutation must change the source`);
+    if (readSource(challenge.source).split(challenge.before).length !== 2) throw new Error(`${challenge.id}: mutation anchor must match exactly once in ${challenge.source}`);
+    const fault = JSON.stringify([challenge.source, challenge.before, challenge.after]);
+    if (faults.has(fault) && !nonEmptyText(challenge.measures)) {
+      throw new Error(`${challenge.id}: repeats the fault of ${faults.get(fault)} without a measures note`);
+    }
+    if (challenge.measures !== undefined && (!nonEmptyText(challenge.measures) || !faults.has(fault))) {
+      throw new Error(`${challenge.id}: a measures note is only for a repeated fault`);
+    }
+    if (!faults.has(fault)) faults.set(fault, challenge.id);
+    challengedModels.add(challenge.model);
+  }
+  const waived = [];
+  for (const model of manifest.models) {
+    if (model.challengeWaiver !== undefined) {
+      if (!nonEmptyText(model.challengeWaiver) || challengedModels.has(model.path)) throw new Error(`${model.path}: challenge waiver must explain an unchallenged model`);
+      waived.push(model.path);
+    } else if (!challengedModels.has(model.path)) {
+      throw new Error(`${model.path}: scheduled invariants have no model property challenge and no challengeWaiver`);
+    }
+  }
+  return { challenges: challenges.length, distinctFaults: faults.size, challengedModels: challengedModels.size, waivedModels: waived.length };
+}
 
 export function validateExecution(manifest = readExecution(), {
   readSource = read,
   files = readdirSync(root + 'formal').filter(name => name.endsWith('.qnt')).map(name => 'formal/' + name),
   profiles = JSON.parse(read('formal/profiles.json')).profiles,
+  contracts = contractIds(read('formal/CONTRACTS.md')),
 } = {}) {
   if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.models) || !manifest.models.length ||
       !Array.isArray(manifest.libraries)) throw new Error('Unsupported model execution manifest');
@@ -97,11 +193,12 @@ export function validateExecution(manifest = readExecution(), {
   if (paths.some(path => typeof path !== 'string' || !/^formal\/[\w-]+\.qnt$/.test(path)) ||
       new Set(paths).size !== paths.length || !sameMembers(paths, files)) throw new Error('Model/library file inventory changed; review the execution schedule');
   const profileIds = [], outputDirectories = new Set([check.outputDirectory]);
-  let invariants = 0, regressions = 0, generatedTraces = 0, challenges = 0;
+  let invariants = 0, regressions = 0, generatedTraces = 0;
   let exportedRegressionTraces = 0, generatedVectors = 0, vectorModels = 0;
   const vectorPaths = new Set();
   for (const model of manifest.models) {
-    const declarations = scanDeclarations(readSource(model.path));
+    const bodies = scanDeclarationBodies(readSource(model.path));
+    const declarations = new Map([...bodies].map(([name, { kind }]) => [name, kind]));
     if (declarations.get('init') !== 'action' || declarations.get('step') !== 'action') throw new Error(`${model.path}: scheduled model needs init and step actions`);
     names(model.invariants, `${model.path} invariants`);
     if (model.symbolic !== undefined) {
@@ -121,10 +218,7 @@ export function validateExecution(manifest = readExecution(), {
     }
     invariants += model.invariants.length;
     regressions += model.regressions.length;
-    if (model.propertyChallenge !== undefined) {
-      if (model.path !== 'formal/dialcache-flight-deadlines.qnt' || model.propertyChallenge !== 'formal/check-model-properties.mjs') throw new Error('Unsupported model property challenge');
-      challenges++;
-    }
+    if (model.propertyChallenge !== undefined) throw new Error(`${model.path}: property challenges live in the manifest challenges catalog`);
     if (model.profile !== undefined || model.generate !== undefined) {
       const profile = profiles.find(profile => profile.id === model.profile);
       if (!profile || profile.model !== model.path || !model.generate) throw new Error(`${model.path}: generation profile differs from claim registry`);
@@ -145,6 +239,16 @@ export function validateExecution(manifest = readExecution(), {
       exportedRegressionTraces += model.replayRegressions.length;
       if (!model.profile || declarations.get('input') !== 'var' ||
           model.replayRegressions.some(name => !model.regressions.includes(name))) throw new Error(`${model.path}: replay regressions need declared input and scheduled tests`);
+    }
+    if (model.profile !== undefined) {
+      // Every deterministic history a driver could replay must be exported, and
+      // an exported history must never patch model state behind the driver.
+      const runs = classifyRuns(bodies);
+      const exported = new Set(model.replayRegressions ?? []);
+      const unexported = runs.publicOnly.filter(name => !exported.has(name));
+      const patched = runs.patching.filter(name => exported.has(name));
+      if (unexported.length) throw new Error(`${model.path}: public-only runs are not exported as replay regressions: ${unexported.join(', ')}`);
+      if (patched.length) throw new Error(`${model.path}: state-patching runs cannot be replay regressions: ${patched.join(', ')}`);
     }
     if (model.vectorExport !== undefined) {
       const vector = model.vectorExport;
@@ -169,8 +273,8 @@ export function validateExecution(manifest = readExecution(), {
     if ([...declarations.values()].some(kind => ['action', 'run', 'var'].includes(kind))) throw new Error(`${path}: a stateful model cannot be classified as a pure helper library`);
   }
   if (!sameMembers(profileIds, profiles.map(profile => profile.id))) throw new Error('Generated profile inventory differs from claim registry');
-  if (challenges !== 1) throw new Error('Source deadline model property challenge is missing');
-  return { models: manifest.models.length, libraries: manifest.libraries.length, profiles: profileIds.length, invariants, regressions, generatedTraces, exportedRegressionTraces, vectorModels, generatedVectors };
+  const challenges = validateChallenges(manifest, { readSource, contracts, sources: new Set(paths) });
+  return { models: manifest.models.length, libraries: manifest.libraries.length, profiles: profileIds.length, invariants, regressions, generatedTraces, exportedRegressionTraces, vectorModels, generatedVectors, ...challenges };
 }
 
 // Call after validateExecution: coverage links must name checks that run, not

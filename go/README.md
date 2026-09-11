@@ -187,8 +187,9 @@ make integration-go
 `make check` runs both languages' fast checks.
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs all local lanes in order,
 including symbolic checks and the exact Node 22.15.0 packed-package floor. For a
-full run resumed after `make formal-corpus`, use `make formal-go`; it validates
-the completed TS evidence before preparing Go.
+full run resumed after `make formal-corpus`, use `make formal-go`; it requires
+the completed TS report, then prepares Go with the shared witness evidence bound
+as an input.
 Reports and traces are kept in `.formal-traces/`. Source, corpus or witness
 changes invalidate completion reports; mutation targets reject stale evidence.
 
@@ -204,8 +205,12 @@ of a directory. Full directory replay rejects empty/incompatible corpora and
 requires exact witness/corpus/definition hashes. The shared coordinator supplies
 external commands and checks observations; all cache behavior executes in Go.
 Native source/adapter gates and clocks control the run. Expected states stay in
-the coordinator and never enter the native driver. The shared witness report
-certifies reached boundaries. Negative harness tests challenge those boundaries.
+the coordinator and never enter the native driver. The witness report Go
+consumes certifies reached boundaries only. It is produced by the shared
+`node formal/witnesses.mjs evaluate` command over the same corpus and binds only
+Quint models, the manifest/registry files and the `formal/replay` closure, so no
+TypeScript test run is a prerequisite for Go's completion. Negative harness
+tests challenge those boundaries.
 
 The Go implementation was developed from the models and contracts with
 TypeScript source review; it is not a clean-room implementation. Race detection

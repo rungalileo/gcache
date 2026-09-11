@@ -221,6 +221,13 @@ before the event being tested; even an equal-value replacement cannot prove
 that the earlier publication survived. Late-effect suppression alone does not
 prove that raw work retained capacity.
 
+Witness classifiers are the shared modules under
+[replay/witnesses/](./replay/witnesses/), one per profile. They read the
+explicit Quint `input` record, public observations and private predictions;
+their inputs must never name a TypeScript or Go file, because
+`node formal/witnesses.mjs evaluate` runs them for every port. Declare a new
+module in the profile's `witnessSources` in `profiles.json`.
+
 Add discriminating negative controls when introducing or changing witness
 classification. Preserve the matching fixture or phase, then remove or alter
 the final consequence and require the classifier to reject it. Exercise exact
@@ -271,3 +278,40 @@ investigate differences rather than replacing expectations to obtain a pass.
 Formatting and deduplication improve reviewability; they do not increase the
 number of behavioral cases or justify a broader conformance claim. Changes to
 behavior, bounds, or claims should be reviewed separately from cleanup.
+
+### Challenging every model
+
+`execution.json` also carries the model-property challenge catalog in its
+top-level `challenges` array. Each entry names a compiling single-site fault:
+`id`, the `contract` it violates, the `source` file to mutate (a scheduled model
+or a library), the `model` whose scheduled `invariant` must detect it, and the
+exact `before` text, which must occur once in `source`, with its `after`
+replacement. `node formal/execution.mjs` rejects an unknown contract, an
+unscheduled model or invariant, an ambiguous anchor, and a repeated
+`(source, before, after)` fault unless the entry carries a `measures` note
+explaining which additional invariant the repeat exercises.
+
+Every scheduled model must own at least one challenge whose `model` is that
+file. If no compiling single-site fault is detectable by its scheduled
+invariants, first add a receipt-style invariant that records the acquired
+timestamp, owner or captured policy and checks it independently of the helper
+it guards; only then, as a last resort, give the model entry a
+`challengeWaiver` string stating why. Waivers appear in the validation summary
+as `waivedModels`.
+
+Prefer semantic faults: an inclusive boundary comparison, a dropped guard, a
+wrong owner or a wrong clock. Verify a new entry with
+`node formal/check-model-properties.mjs --only=<id>` before running the whole
+catalog; a filtered report is a local aid and is never marked complete.
+
+### Exported runs are exactly the public-only runs
+
+A profile run is public-only when every transition it takes records a command
+in `input`. A run that assigns `s'` inline, keeps `input' = input` across a
+state assignment, or reaches such a fixture through a helper action is
+state-patching. `execution.mjs` classifies each run from the declaration bodies
+and requires the `replayRegressions` list to equal the public-only runs
+exactly, naming any unexported public run or exported patching run. Generation
+then binds each exported history to the driver contract, so a choice outside an
+action's declared domain fails `run-models.mjs generate` rather than a later
+native replay.

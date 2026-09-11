@@ -9,12 +9,17 @@ lists tool prerequisites and focused reproduction commands.
 | Task | Command | Evidence |
 | --- | --- | --- |
 | Routine implementation checks | `make check` | Native tests, coverage, package, docs and source audits |
-| Full portable acceptance | `make formal` | Rust model checks, generated histories, TS and Go replay, exact completion inventories; no Java |
+| Full portable acceptance | `make formal` | Rust model checks, generated histories, TS replay, shared witness evaluation, Go replay, exact completion inventories; no Java |
 | Finite symbolic rules | `make model-check` | Scheduled bounded checks with checksummed standalone Apalache; requires Java 21, `tar` and pinned Quint |
 | Challenge implementation assertions | `make mutations` | Compiling semantic faults tested against both completed ports |
 | Real server behavior | `make integration` | Redis, Valkey, Cluster and cross-language interoperability |
 | Explore another schedule sample | `make explore` | Separate source snapshot, recorded random seed, both-port replay |
 | All required local lanes | `make ci NODE22_BIN=/absolute/path/to/node22/bin/node` | Native, formal, separate symbolic, integration and mutation runs |
+
+`make formal-corpus` runs `node formal/witnesses.mjs evaluate --profile all`
+immediately after the complete TypeScript replay. That shared, language-neutral
+step is the sole producer of `.formal-traces/go-parity-witnesses/`; the
+TypeScript suite only checks the same gate.
 
 A behavior, model, or replay change requires full validation of its current
 inputs before merge. The default PR workflow runs faster checks; it does not
@@ -56,6 +61,30 @@ must come from a semantic assertion or invariant counterexample. A tool failure,
 missing witness, crash or timeout is a failed measurement. The selected fault
 catalogs and per-run reports define the denominator; do not infer a percentage
 of all possible defects from their scores.
+
+The model catalog in `execution.json` covers every scheduled model: currently 64
+challenges over 62 distinct faults, with no waivers. Its report distinguishes
+those two counts and marks a filtered `--only` run as partial; only the complete
+run is evidence.
+
+The weekly full workflow budgets `typescript-mutations` at 35 minutes and
+`go-mutations` at 40 minutes (a September 2026 run took 17 and 22.5 minutes).
+Its `formal-full` aggregate job retains a small `formal-summary` artifact for 90
+days: both completion and context reports, the Go replay summary, the symbolic
+`report.json` and, on scheduled or exploration runs, each exploration
+`report.json`. Trace corpora and mutation evidence keep the 14-day retention.
+
+When a redirected native step fails, the validation runner behind the Make
+targets prints an excerpt of its JSONL report instead of the whole file. Each
+failed test or package receives its own budget (a `Failed:` header plus up to 40
+of its most recent buffered lines); failures beyond 24 are counted in a trailing
+`… K more failed tests` line. Go 1.24+ `build-output`/`build-fail` events are
+keyed by `ImportPath`, so compiler errors appear under the failing import path.
+A `WARNING: DATA RACE` line anchors the buffer so the report head (the
+conflicting accesses) is kept and later lines are counted. Only plain, non-JSON
+lines matching a crash marker (`--- FAIL:`, `panic:`, `fatal error:`,
+`DATA RACE`) are promoted directly; a passing test that merely prints such text
+is never reported as a failure.
 
 ## Exploratory runs
 

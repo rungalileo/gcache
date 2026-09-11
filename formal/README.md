@@ -100,8 +100,12 @@ use, supply `APALACHE_ARCHIVE=/absolute/path/to/apalache-0.56.1.tgz`. Supplied
 archives must pass the same checksum check.
 
 Real-server tests require Docker. The package floor requires exact Node 22.15.0
-provided through `NODE22_BIN`. Make targets check the installed prerequisites;
-only the symbolic runner downloads its pinned solver archive.
+provided through `NODE22_BIN`. `make help` lists targets and prerequisites.
+`make model-check` and `make ci` additionally require Java 21 and `tar`, because
+the pinned Apalache distribution is unpacked from a checksummed tarball; both
+tools are probed before any step runs, and a missing one fails with a setup
+message instead of a mid-run extraction error. Only the symbolic runner
+downloads its pinned solver archive.
 
 ```sh
 make help          # Targets and prerequisites.
@@ -115,12 +119,13 @@ make explore       # Fresh recorded seed in an isolated source snapshot.
 make ci NODE22_BIN=/absolute/path/to/node22/bin/node
 ```
 
-`make formal-corpus` runs Rust model checks, generation and TS completion;
-`make formal-go` resumes with Go against that exact corpus. `make mutations-ts` and
-`make mutations-go` split the fault campaigns. `make fixtures-check` recomputes
-committed artifacts; after an intentional model edit, update them with
-`node formal/generate-artifacts.mjs --write` first. `make ci` includes the
-separate symbolic checks after `make formal`, as well as the other local lanes.
+`make formal-corpus` runs Rust model checks, generation, TS completion and the
+shared witness evaluation; `make formal-go` resumes with Go against that exact
+corpus. `make mutations-ts` and `make mutations-go` split the fault campaigns.
+`make fixtures-check` recomputes committed artifacts; after an intentional model
+edit, update them with `node formal/generate-artifacts.mjs --write` first.
+`make ci` includes the separate symbolic checks after `make formal`, as well as
+the other local lanes.
 
 Pinned acceptance clears inherited trace selectors and `QUINT_SEED`. Exploration
 keeps a separate source snapshot, seed, corpus and diagnostic replay evidence. See
@@ -130,8 +135,19 @@ Scheduled named public-action Quint regressions exercise their declared
 boundaries independently of sampling. Both ports replay those histories and the
 complete sampled corpus; required witness coverage is checked across their
 union. A model regression reaches implementations only when registered for
-replay in `execution.json`. Private state-patch checks stay model-only unless
-rewritten as public actions.
+replay in `execution.json`, and the manifest validator requires every
+public-only run to be registered. Private state-patch checks stay model-only
+unless rewritten as public actions.
+
+The replay protocol schema types every observation, fixture sentinel and the
+wall epoch, and the coordinator rejects a malformed observation as an
+infrastructure error before any comparison; see the
+[observation contract](./PORTING.md#observation-contract).
+
+`execution.json` also carries the challenge catalog: for every scheduled model,
+at least one compiling single-site fault that a named invariant must detect.
+`node formal/check-model-properties.mjs --only=<id>` measures one entry locally;
+only the complete run is evidence.
 
 Replay one failing feature history:
 

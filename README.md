@@ -134,6 +134,12 @@ for sampling and comparison behavior.
 | Methods, options, and exports | [API reference](https://lan17.github.io/DialCache/api.html) |
 | Go implementation and shared behavior contracts | [Go guide](go/README.md) · [Quint specification](formal/README.md) · [Worked walkthrough](formal/WALKTHROUGH.md) |
 
+The Go port and the TypeScript library replay the same Quint-generated
+histories. Whether those histories reach every required boundary is decided by
+one language-neutral evaluator, `node formal/witnesses.mjs evaluate`, that any
+port runs over the same corpus; no port depends on another port's test suite
+for its completion evidence.
+
 The [documentation index](https://lan17.github.io/DialCache/) also links to client
 setup, observability, upgrades, and the maintainer guide. Everything is
 [readable as Markdown on GitHub](https://github.com/lan17/DialCache/tree/main/docs).

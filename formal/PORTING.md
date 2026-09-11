@@ -33,6 +33,7 @@ API names, threading model, internal storage, or scheduling implementation.
 | External effects | Hold/release actual policy, Redis read/write, serialization, and decoding operations by their invocation IDs. A held operation cannot finish until its external release or specified failure. |
 | Clock control | Control wall time and elapsed time separately. Advance or shift only the specified clock; follow the profile's timer-delivery rule. Preserve fractional units in the local-clock profile. |
 | Storage inputs | Seed the specified bytes/value/TTL or execute invalidation. The adapter must expose the requested atomic primary snapshot and maintenance result. |
+| Settle | After every command, bring the implementation to quiescence under the `causally-ready-v1` contract: every task spawned by the implementation or the driver has finished or is blocked on a driver-owned gate, a driver-owned timer that is not yet due, or a driver-owned scope gate, and nothing is runnable. This obligation falls on the library as well as the test: it must expose its detached scheduling to the test executor (Go's `Defer` hook drained under `synctest.Wait`, the Node fake-timer microtask queue drained by `advanceTimersByTimeAsync(0)`) so the driver reaches quiescence without guessing turn counts or advancing deadline time. The TypeScript suite includes a no-settle control, [formal-settlement-control.test.ts](../test/formal-settlement-control.test.ts): a driver that skips its drain must fail the observation assertions of every BehaviorDriver-backed smoke history (currently all eight). Each port is expected to carry an equivalent control against its own driver. |
 | Observe | Read actual caller outcomes, source/effect counts, event order, timestamps, values and error categories after the step. Collect observations independently of expected model state. |
 | Cleanup | Drain or release test-owned work, restore clock/fault hooks, and isolate the next history. Unfinished work must not silently leak into another history. |
 
@@ -49,7 +50,7 @@ line on stdin and read one response per line on stdout. Each request includes
 the lifetime of that coordinator process, including across history sessions;
 match each response's version and ID. Responses contain `ok: true` and `result`,
 or `ok: false` and an error. [protocol.schema.json](./replay/protocol.schema.json)
-defines the message and command shapes.
+defines the message, command, observation, fixture and environment shapes.
 Malformed input, unknown commands, mismatched IDs, process failure and transport
 timeouts fail the test. The coordinator performs no cache operations.
 
@@ -62,10 +63,13 @@ timeouts fail the test. The coordinator performs no cache operations.
 
 After `prepare`, create the native fixture, execute setup and report observation
 index zero. Execute the returned `inputs`, settle authorized work and report the
-next index. The environment currently carries the actual `wallMs` clock used
-for dynamic inputs. Invocation counters and IDs also come from actual native
-observations. The coordinator retains expected state; its command responses do
-not contain predictions. Duplicate or skipped observation indices are errors.
+next index. The environment carries the driver's actual `wallMs` clock in epoch
+milliseconds; behavior, effects and core drivers start it at
+`2026-09-08T12:00:00.000Z` (`1788868800000` ms) and move it only through clock
+commands, as the [observation contract](#observation-contract) describes.
+Invocation counters and IDs also come from actual native observations. The
+coordinator retains expected state; its command responses do not contain
+predictions. Duplicate or skipped observation indices are errors.
 
 The shared command definitions and per-profile bindings are in
 [replay/bindings.mjs](./replay/bindings.mjs). Their normalization, dynamic input
@@ -136,6 +140,82 @@ Histories may deliberately finish with pending work. Their final assertions
 describe that state. Test teardown releases resources after those assertions;
 it must not change the recorded history to manufacture a completed outcome.
 
+## Observation contract
+
+Every `observe` request carries the driver's complete current observation. Its
+shape is defined under `$defs` in
+[protocol.schema.json](./replay/protocol.schema.json), and the coordinator
+validates each observation against the session profile's definition before
+comparing it. A shape violation fails with
+`Malformed replay observation: <definition> at observed.<path>`. It is an
+infrastructure error, never an observation mismatch: it carries no
+`expected:`/`actual:` evidence and cannot be credited to a mutation.
+
+| Caller | Definition | Encoding |
+| --- | --- | --- |
+| Feature profiles (12) | `behaviorObservation` | The full behavior record below; `events` is present exactly when the fixture has an `observe` list |
+| `effects` | `behaviorObservation` | The same record; the fixture observes every metric event kind plus `readContext`/`readAbort` |
+| `core` | `coreObservation` | Nine nonnegative integers: `sourceVersion`, `lastResult`, `outsideLoaderCalls`, `requestLoaderCalls`, `localLoaderCalls`, `coalescedLoaderCalls`, `remoteLoaderCalls`, `redisReads`, `redisWrites` |
+| `local-clock` | `localClockObservation` | The behavior record without `events`; `calls` holds the plain integer each call returned, `loaders` counts source invocations, every other counter is zero and every other list empty |
+
+Behavior observation fields:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `calls` | `callResult[]` | One entry per `begin`, in begin order: `{status:"pending"}`; `{status:"value", value}` where `value` is a JSON primitive or `{absent:true}` for a call that completed without a value; or `{status:"error", error}` where `error` is `source:N` (the N-th controlled source failure), `timeout:N` (the N-th fallback deadline error) or `unexpected:<text>` |
+| `loaders`, `reads`, `writes`, `invalidations`, `loads`, `dumps`, `policyCalls`, `classifications`, `comparisons` | nonnegative integer | Started effects, including held ones |
+| `maintenance` | `("ok" \| "mutation_error" \| "missing_remote")[]` | Outcome of each `invalidate` command, in order |
+| `sourceScopes` | `boolean[]` | `isEnabled()` inside each source invocation when the fixture sets `probeSourceScope` |
+| `writeTtls` | `integer[]` | `cacheTtlMs` of each remote write, in dispatch order |
+| `shadow`, `recovery` | `string[]` | `shadowValidation` and `staleRecovery` outcomes, in order |
+| `events` | `observedEvent[]` | Journal of the kinds named by the fixture's `observe` list, in actual callback order |
+
+Every event has `event`; additional label fields must be JSON primitives. The
+"cache labels" below are `cacheNamespace`, `useCase`, `keyType` and `layer`.
+
+| Kind | Required fields |
+| --- | --- |
+| `request` | cache labels |
+| `miss`, `disabled` | cache labels + `reason` |
+| `error` | cache labels + `error`, `inFallback` |
+| `coalesced` | `cacheNamespace`, `useCase`, `keyType`, `scope` (no layer) |
+| `invalidation` | `cacheNamespace`, `keyType`, `layer` (no use case) |
+| `shadowAge`, `recoveryAge` | `cacheNamespace`, `useCase`, `keyType`, `outcome`, `seconds` |
+| `futureOffset`, `get`, `fallback` | cache labels + `seconds` |
+| `size`, `storedSize` | cache labels + `bytes` |
+| `compression` | cache labels + `outcome` |
+| `serialization` | cache labels + `operation`, `seconds` |
+| `mismatchWarning` | `cacheNamespace`, `useCase`, `keyType`, `outcome`; optional `cacheKey`, `cachedValueJson`, `sourceValueJson` (string or null) |
+| `readContext` | `index`, `timeoutMs`, `aborted` |
+| `readAbort`, `writeDispatch` | `index` |
+| `marker` | `cutoffMs`, `ttlMs` (signed; a `-1` cutoff means no watermark) |
+
+Fixture sentinels are defined by `$defs/behaviorFixture`; `core` and
+`local-clock` receive `{}`. `policy` is required. `fallbackTimeoutMs` is a
+number, `null` (no deadline) or `"default"` (the library default); omitted means
+10 ms. `readTimeoutMs` is a number or `"default"`; omitted means 50 ms.
+`recovery` is `allow`, `deny`, `error` or `default`; `comparator` is `equal`,
+`unequal` or `error`. `observe` lists event kinds from the table above, and its
+presence, even empty, makes `events` required. `localMaxSize` and
+`shadowMaxInFlight` are nonnegative integers; `comparisonMs` and `sourceWorkMs`
+are nonnegative numbers; `tracked`, `remote`, `shadowHook`, `observerFailure`,
+`probeSourceScope` and `localFaultInjection` are booleans. The coordinator
+validates its own prepare response, fixture included, against this definition,
+so it cannot hand a port an unknown sentinel.
+
+`environment.wallMs` is the driver's actual wall clock in epoch milliseconds.
+Behavior, effects and core drivers start their controlled wall clock at
+`2026-09-08T12:00:00.000Z` (`1788868800000` ms) and move it only through
+`advance`, `shiftWall` and `advanceWall`; frame timestamps, adapter replies and
+marker cutoffs are computed relative to that epoch. The local-clock driver
+reports its real process clock, which no mapping consumes. `seed.ageMs`
+(signed), `seed.ttlMs` and `invalidate.futureBufferMs` are whole milliseconds.
+
+[coordinated-replay.ts](../test/formal/coordinated-replay.ts) replays any
+profile's history through the coordinator with the TypeScript drivers exactly as
+a native port does. The coordinator test runs every committed smoke history
+through it, so the schema is checked against real observations, not examples.
+
 ## Generated fixtures and fast local tests
 
 With the pinned Quint executable available, regenerate all committed
@@ -186,9 +266,9 @@ make integration   # Real-server interoperability; requires Docker.
 
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs all local lanes in order,
 including symbolic checks and the exact Node 22.15.0 package floor.
-`make formal-corpus` produces the full corpus and completed TS evidence;
-`make formal-go` validates that evidence and
-then prepares Go's run. These are the same entry points used by hosted CI.
+`make formal-corpus` produces the full corpus, the completed TS report and the
+shared witness evidence; `make formal-go` checks that both are current and then
+prepares Go's run. These are the same entry points used by hosted CI.
 The manual/weekly full workflow performs the complete formal, symbolic and mutation
 checks; PR CI keeps native/race/smoke/audit and real-server integration checks,
 with conditional artifact recomputation. Behavior/model changes require full
@@ -213,16 +293,19 @@ The shared inventory contains stable language-neutral IDs:
 Scenario/vector name components use URI percent encoding. The manifest drives
 the exact inventory; a passing smoke test cannot substitute for a scheduled
 history. Witness gates establish reachability across the corpus and are
-separate from implementation assertions. Current Go validation consumes the
-shared witness evidence produced during TS replay, checking exact corpus and
-definition hashes. Go independently executes and asserts every history.
+separate from implementation assertions. Every port evaluates them with the
+shared `node formal/witnesses.mjs evaluate` command described under
+[Witness evidence](#witness-evidence); Go validation consumes that evidence
+after checking its exact corpus and definition hashes, and independently
+executes and asserts every history.
 
 Prepare each port immediately before its native tests. For TS, the low-level
 command is `node formal/conformance.mjs prepare typescript .formal-traces/ts-context.json`.
-Run its complete native suite and validate its completion before using
+Run its complete native suite, evaluate the shared witness evidence, and
+validate its completion before using
 `node formal/conformance.mjs prepare go .formal-traces/go-context.json`.
-Go preparation consumes the witness evidence TS just produced. Do not prepare
-both contexts consecutively before running either suite.
+Go preparation binds the witness evidence the shared evaluator just produced.
+Do not prepare both contexts consecutively before running either suite.
 
 For another language, supply a JSON array containing every repository-relative
 implementation, driver, adapter, dependency-lock and test-configuration file
@@ -270,6 +353,69 @@ assertion records before producing completion results. A completion document
 is test evidence, not cryptographic attestation that an untrusted driver behaved
 honestly. Challenge each new driver with broken implementations and malformed
 histories, including lost publication, missing coalescing and deadline errors.
+
+## Witness evidence
+
+A witness is a required boundary, outcome or race that the generated corpus
+must reach; [coverage-witnesses.json](./coverage-witnesses.json) names them per
+profile. Each `witness/<profile>` completion leaf is decided by one shared,
+language-neutral evaluator under [replay/witnesses/](./replay/witnesses/). It
+reads the same histories every port replays (the profile's sampled traces plus
+its exported `replayRegressions`), keys every rule on the explicit Quint `input`
+record, and classifies from declared inputs, public observations and, where a
+rule needs it, the model's private predictions. Driver observations never enter
+it, and it never supplies an implementation's inputs.
+
+Run it once over a generated corpus:
+
+```sh
+node formal/witnesses.mjs evaluate --profile all
+```
+
+`--profile <name>` selects one profile, `--traces <dir>` relocates the corpus
+root (default `.formal-traces`), and `--out <dir>` selects the evidence
+directory (default `.formal-traces/go-parity-witnesses`). When a required
+witness or any declared action is unreached, the command fails listing every
+missing label and removes that profile's stale evidence file.
+
+For each complete profile it writes `<out>/<profile>.json`:
+
+| Field | Meaning |
+| --- | --- |
+| `schemaVersion` | `1` |
+| `profile` | Profile ID |
+| `traces` | Number of evaluated histories |
+| `required` | The registry's required labels, in registry order |
+| `seen` | Every reached label, sorted |
+| `inputs` | `{ path, sha256 }` for `formal/profiles.json`, `formal/coverage-witnesses.json`, `formal/execution.json`, the profile's model, `formal/conformance-observations.qnt`, every Quint library, the full `formal/replay` closure (which contains the classifiers) and the profile's `witnessSources`, deduplicated in that order |
+| `corpus` | `{ name, sha256 }` per history, sorted by file name |
+
+No input names a TypeScript or Go file, so completing the witness leaves does
+not require running another port's test suite. A port either runs the CLI
+itself before its native replay or consumes an evidence file whose `inputs`
+and `corpus` hashes match its own checkout and corpus byte for byte, as the Go
+replay does. The TypeScript suite calls the same `checkWitnesses` function for
+its gate; it no longer produces evidence.
+
+## Current limitations for a third port
+
+The `causally-ready-v1` settlement contract is defined in prose, in the
+[trace and observation contract](#trace-and-observation-contract) and the
+`Settle` row above; no machine-checkable definition exists. Its only executable
+control is the TypeScript no-settle test. The Go port has no equivalent control
+yet, so a third port writes its own against its own driver.
+
+Node 24 is required as test tooling: the coordinator and the witness evaluator
+are Node scripts that a port's test run spawns, and the completion checker and
+report adapters run on Node as well. The port's library itself needs no Node
+dependency, as the Go module shows.
+
+The Go transport validates every command the coordinator returns against
+`$defs/command` but does not validate its own observations locally, so the
+coordinator's schema check is the first to reject a malformed record. A port may
+validate each observation against `$defs/behaviorObservation`,
+`coreObservation` or `localClockObservation` before sending it; that attributes
+a shape defect to the driver without a coordinator round trip.
 
 ## New-port acceptance
 

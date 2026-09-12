@@ -29,12 +29,17 @@ async function server(handle: (stream: ServerHttp2Stream, bytes: Buffer, attempt
     session.on("error", () => {});
     session.on("close", () => sessions.delete(session));
   });
+  let closedStreams = 0;
+  const closeWaiters: Array<() => void> = [];
   service.on("stream", (stream, headers) => {
     expect(headers[":path"]).toBe("/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo");
     expect(headers[":method"]).toBe("POST");
     expect(headers["content-type"]).toBe("application/grpc");
     const chunks: Buffer[] = [];
     stream.on("error", () => {});
+    // Closure is observed on the server stream itself, not from the request
+    // body handler: a cancelled request may close before its body ends.
+    stream.on("close", () => { closedStreams++; for (const waiter of closeWaiters.splice(0)) waiter(); });
     stream.on("data", chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
     stream.on("end", () => handle(stream, Buffer.concat(chunks), ++attempts));
   });
@@ -43,7 +48,8 @@ async function server(handle: (stream: ServerHttp2Stream, bytes: Buffer, attempt
     for (const session of sessions) session.destroy();
     await new Promise<void>(resolve => service.close(() => resolve()));
   });
-  return { endpoint: `127.0.0.1:${(service.address() as { port: number }).port}`, attempts: () => attempts };
+  return { endpoint: `127.0.0.1:${(service.address() as { port: number }).port}`, attempts: () => attempts,
+    streamClosed: () => closedStreams > 0 ? Promise.resolve() : new Promise<void>(resolve => closeWaiters.push(resolve)) };
 }
 
 afterEach(async () => {
@@ -83,11 +89,13 @@ describe("owned Apalache reflection readiness", () => {
   });
 
   it("times out a server that accepts the request but never sends a response", async () => {
-    let closed = false;
-    const service = await server(stream => stream.on("close", () => { closed = true; }));
+    const service = await server(() => {});
     await expect(waitForApalache(service.endpoint, () => {}, 80)).rejects.toThrow(/reflection request timed out/);
-    await new Promise<void>(resolve => setImmediate(resolve));
-    expect(closed).toBe(true);
+    // The client cancels its stream on timeout; the server observes that close
+    // asynchronously, so wait for the event within a bound rather than one tick.
+    const closed = Promise.race([service.streamClosed(), new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("server stream did not close after the client cancelled")), 2000))]);
+    await expect(closed).resolves.toBeUndefined();
   });
 
   it("preserves an owned-process exit instead of retrying it as delayed readiness", async () => {

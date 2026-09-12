@@ -124,11 +124,15 @@ module dialcache_source_budgets_conformance {
       o: { calls: finishOwnedCalls(x.o.calls, x.owners, id, outcome), ...x.o }, ...x
     }
   }
+  // The profile's one deadline judgment. Timer delivery on an advance and the
+  // settle-time check share it, so the two sites cannot disagree at the boundary.
+  pure def sourceDeadlineReached(source: Source, now: int): bool =
+    not(sourceAcceptsAt(source.started, now, source.budget))
   pure def settleSource(x: State, id: int, outcome: int): State = {
     val source = x.sources.nth(id)
     val drained = { sources: x.sources.replaceAt(id, { rawPending: false, ...source }), ...x }
     if (source.result != CALL_PENDING) drained else complete(drained, id,
-      if (not(sourceAcceptsAt(source.started, x.now, source.budget))) DEADLINE_ERROR else outcome)
+      if (sourceDeadlineReached(source, x.now)) DEADLINE_ERROR else outcome)
   }
   action resolved(id: int, value: int): bool = all {
     id < s.sources.length(),
@@ -154,8 +158,7 @@ module dialcache_source_budgets_conformance {
     val advanced = { now: s.now + delta, ...s }
     s' = s.sources.indices().fold(advanced, (current, id) => {
       val source = current.sources.nth(id)
-      if (source.result == CALL_PENDING
-          and not(sourceAcceptsAt(source.started, current.now, source.budget)))
+      if (source.result == CALL_PENDING and sourceDeadlineReached(source, current.now))
         complete(current, id, DEADLINE_ERROR) else current
     })
   }

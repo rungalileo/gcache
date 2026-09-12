@@ -175,6 +175,14 @@ module dialcache_envelope_vectors {
     not(input.binary) or input.bytes.length() < 2 or input.bytes.nth(0) != 0 or input.bytes.nth(1) > 2 or
       (result.read.outcome == "passthrough" and result.read.binary
         and result.read.bytes == input.bytes.slice(1,input.bytes.length()))
+  // Complement of the one-prefix unescape: a leading zero followed by nothing
+  // or by a byte the writer never escapes (above 2) is legacy raw data. The
+  // reader hands every byte back, stated directly on the recorded input/result.
+  val unknownZeroPrefixPassesThroughUnchanged = input.command == "init" or input.command == "write" or
+    not(input.binary) or input.bytes.length() == 0 or input.bytes.nth(0) != 0 or
+    (input.bytes.length() > 1 and input.bytes.nth(1) <= 2) or
+      (result.read.outcome == "passthrough" and result.read.binary
+        and result.read.bytes == input.bytes and result.read.scalars == List())
   val successfulReadRespectsMarkerAndLimit = result.read.outcome != "decompressed" or
     (input.decoderSucceeds and input.decodedBytes.length() <= input.maximum
       and result.read.binary == (input.bytes.nth(0) == 2)
@@ -198,6 +206,7 @@ module dialcache_envelope_vectors {
   run allEnvelopeVectorsTest = init.then(CASE_COUNT.reps(i => execute(requestFor(i))
     .expect(rawEscapeIsLossless and readFailuresPreserveOriginalBinary
       and readDoesNotConsultNewWritePolicy and escapeConsumesExactlyOnePrefix
+      and unknownZeroPrefixPassesThroughUnchanged
       and successfulReadRespectsMarkerAndLimit and compressionUsesByteThresholdAndStrictShrink)))
   run escapedCompressedMarkerRemainsLiteralTest = init
     .then(execute({ command: "envelope", bytes: List(0,1,255), decoderSucceeds: true, decodedBytes: List(65), ...DEFAULT }))

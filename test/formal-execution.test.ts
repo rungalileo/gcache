@@ -33,8 +33,8 @@ const { root, scanDeclarations, scanDeclarationBodies, classifyRuns, validateExe
 const { checkSemanticCoverage } = await import(new URL("../formal/check-semantic-coverage.mjs", import.meta.url).href) as {
   checkSemanticCoverage(value: unknown): unknown;
 };
-const { bindExportedTrace } = await import(new URL("../formal/run-models.mjs", import.meta.url).href) as {
-  bindExportedTrace(profile: string, text: string, path: string): void;
+const { bindGeneratedTrace } = await import(new URL("../formal/run-models.mjs", import.meta.url).href) as {
+  bindGeneratedTrace(profile: string, text: string, path: string): void;
 };
 // Exercise pure metadata checks directly: large catalogs must not depend on
 // synchronous stdin pipes. The CLI dry-run check below still tests the launcher.
@@ -42,9 +42,9 @@ const validate = (value: unknown) => validateExecution(value);
 
 describe("formal execution schedule", () => {
   it("accounts for all models, selected invariants, regressions, generated traces and challenges without Quint", () => {
-    expect(validate(manifest())).toEqual({ models: 32, libraries: 5, profiles: 15, invariants: 215, regressions: 401,
+    expect(validate(manifest())).toEqual({ models: 32, libraries: 5, profiles: 15, invariants: 217, regressions: 401,
       generatedTraces: 5280, exportedRegressionTraces: 234, vectorModels: 4, generatedVectors: 1631,
-      challenges: 64, distinctFaults: 62, challengedModels: 32, waivedModels: 0 });
+      challenges: 67, distinctFaults: 64, challengedModels: 32, waivedModels: 0 });
   });
 
   it("rejects omitted models and dropped or renamed regressions", () => {
@@ -134,17 +134,17 @@ describe("formal execution schedule", () => {
     expect(() => validate(patched)).toThrow(/state-patching runs cannot be replay regressions: followerKeepsAcceptedReadBudgetTest/);
   });
 
-  it("rejects an exported regression whose choice leaves the driver domain at export time", () => {
+  it("rejects a generated history whose choice leaves the driver domain at generation time", () => {
     const smoke = readFileSync(root + "formal/local-failure-smoke.itf.json", "utf8");
-    expect(() => bindExportedTrace("local-failure", smoke, "smoke")).not.toThrow();
+    expect(() => bindGeneratedTrace("local-failure", smoke, "smoke")).not.toThrow();
     const trace = JSON.parse(smoke) as { states: Array<Record<string, any>> };
     const step = trace.states.find(state => state.input.name === "beginCall")!;
     step.input.choice["#bigint"] = "7";
     step["mbt::nondetPicks"].choice.value["#bigint"] = "7";
-    expect(() => bindExportedTrace("local-failure", JSON.stringify(trace), "regression")).toThrow(/regression step \d+: unsupported explicit choice/);
+    expect(() => bindGeneratedTrace("local-failure", JSON.stringify(trace), "regression")).toThrow(/regression step \d+: unsupported explicit choice/);
     const renamed = JSON.parse(smoke) as { states: Array<Record<string, any>> };
     renamed.states.find(state => state.input.name === "beginCall")!.input.name = "inventedAction";
-    expect(() => bindExportedTrace("local-failure", JSON.stringify(renamed), "regression")).toThrow(/unknown or misplaced action|conflicting action metadata/);
+    expect(() => bindGeneratedTrace("local-failure", JSON.stringify(renamed), "regression")).toThrow(/unknown or misplaced action|conflicting action metadata/);
   });
 
   it("validates every challenge against contracts, scheduled invariants and unique anchors", () => {
@@ -298,6 +298,15 @@ describe("formal execution schedule", () => {
     expect(sampled.map(job => [job.outputDirectory, job.expectedTraces])).toEqual(
       manifest().models.filter(model => model.generate).map(model => [model.generate!.outputDirectory, model.generate!.traces]),
     );
+    // Every sampled corpus is bound to its driver contract before use, exactly
+    // like the exported regressions; vector and verification jobs bind nothing.
+    for (const job of sampled) {
+      const model = manifest().models.find(model => model.path === job.args[1])!;
+      expect(model.profile, job.args[1]).toBeDefined();
+      expect(job.profile, job.args[1]).toBe(model.profile);
+      expect(job.explicitInputs, job.args[1]).toBe(model.replayRegressions !== undefined);
+    }
+    for (const job of [...vectors, ...check]) expect(job.profile, job.args.join(" ")).toBeUndefined();
     const regressions = generated.filter(job => job.args[0] === "test");
     expect(regressions).toHaveLength(manifest().models.filter(model => model.replayRegressions).length);
     for (const job of regressions) {

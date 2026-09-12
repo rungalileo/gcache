@@ -28,8 +28,8 @@ both language bindings.
 and requires full TypeScript and Go replay with matching evidence fingerprints.
 `make model-check` runs the separate finite symbolic checks; it needs Java 21,
 `tar` and a checksummed Apalache release and is the only lane that does.
-`make mutations` then challenges the tests with the catalogued implementation
-faults; it requires current full replay reports.
+`make mutations` challenges the tests with the catalogued implementation
+faults over that generated corpus; it does not depend on either replay report.
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs the complete pipeline,
 including integrations, mutations and the exact Node 22.15.0 package floor.
 See the repository's

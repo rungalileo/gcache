@@ -119,16 +119,17 @@ Use the [shared Make targets and pinned prerequisites](./README.md#generating-an
 
 ```sh
 make formal        # Regenerate and complete prepared TS and Go replay.
-make mutations     # Validate those reports, then measure both fault catalogs.
+make mutations     # Measure both fault catalogs over the generated corpus.
 ```
 
-`make mutations-ts` requires current full TS completion. `make mutations-go`
-requires both TS and Go completion; it cannot run until Go replay finishes.
-TS mutation measurement may run alongside Go replay after `make formal-corpus`.
-The targets reject missing, incomplete or stale completion evidence by checking
-its current source, corpus and witness fingerprints. Raw measurement programs
-remain `measure-semantics.mjs` and `measure-go-semantics.mjs`; the Make targets
-supply the preflight checks used by hosted full validation.
+`make mutations-ts` and `make mutations-go` depend only on the corpus produced
+by `make formal-generate` and its shared witness evidence, not on either port's
+completion report. Hosted CI runs both mutation lanes in parallel with both
+parity lanes off one generation job; the aggregate requires all of them. Each
+report records the source, corpus and witness fingerprints it measured. Raw
+measurement programs remain `measure-semantics.mjs` and
+`measure-go-semantics.mjs`; the Make targets supply the pinned prerequisite
+checks used by hosted full validation.
 
 The manual/weekly workflow runs the full corpus and fault checks. PR checks
 retain native/race/smoke/audit and real-server integration, plus fixture

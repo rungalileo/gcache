@@ -16,10 +16,13 @@ lists tool prerequisites and focused reproduction commands.
 | Explore another schedule sample | `make explore` | Separate source snapshot, recorded random seed, both-port replay |
 | All required local lanes | `make ci NODE22_BIN=/absolute/path/to/node22/bin/node` | Native, formal, separate symbolic, integration and mutation runs |
 
-`make formal-corpus` runs `node formal/witnesses.mjs evaluate --profile all`
-immediately after the complete TypeScript replay. That shared, language-neutral
-step is the sole producer of `.formal-traces/go-parity-witnesses/`; the
-TypeScript suite only checks the same gate.
+`make formal-generate` runs `node formal/witnesses.mjs evaluate --profile all`
+immediately after generation, before either port replays. That shared,
+language-neutral step is the sole producer of `.formal-traces/go-parity-witnesses/`;
+the TypeScript suite only checks the same gate. `make formal-ts`, `make formal-go`,
+`make mutations-ts` and `make mutations-go` depend only on the generated corpus
+and that witness evidence, so the hosted workflow runs them in parallel and the
+aggregate requires all of them.
 
 A behavior, model, or replay change requires full validation of its current
 inputs before merge. The default PR workflow runs faster checks; it does not

@@ -35,8 +35,9 @@ export function explorationPlan(directory, seed, options = {}) {
     if (script === 'formal/run-models.mjs') return [{ ...step, env: { ...step.env, QUINT_SEED: normalized } }];
     if (step.env?.DIALCACHE_MBT_TRACE_DIR) return [{ ...step, nativeReport: step.command === 'go' ? 'go' : 'typescript' }];
     // A seed's missing witness is classified by both native reports. The shared
-    // evaluator still writes evidence for complete profiles; its exit status
-    // must not stop Go from executing that seed's histories.
+    // evaluator runs before either replay and still writes evidence for complete
+    // profiles; its exit status must not stop either port from executing that
+    // seed's histories.
     if (script === 'formal/witnesses.mjs') return [{ ...step, tolerateFailure: true }];
     return [step];
   });

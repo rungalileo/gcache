@@ -260,15 +260,17 @@ from the repository root:
 make check         # Fast native checks and committed smoke; not full acceptance.
 make formal        # Rust model/corpus checks, then prepared TS and Go replay.
 make model-check   # Separate finite symbolic checks; requires Java 21 and tar.
-make mutations     # Requires valid completion reports from the full run.
+make mutations     # Measures both fault catalogs over the generated corpus.
 make integration   # Real-server interoperability; requires Docker.
 ```
 
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs all local lanes in order,
 including symbolic checks and the exact Node 22.15.0 package floor.
-`make formal-corpus` produces the full corpus, the completed TS report and the
-shared witness evidence; `make formal-go` checks that both are current and then
-prepares Go's run. These are the same entry points used by hosted CI.
+`make formal-generate` produces the full corpus and the shared witness evidence;
+`make formal-ts` and `make formal-go` each prepare and complete one port's run
+against them. The parity and mutation lanes depend only on the generated corpus
+and shared witness evidence and run in parallel in hosted CI, whose aggregate
+requires all of them. These are the same entry points used by hosted CI.
 The manual/weekly full workflow performs the complete formal, symbolic and mutation
 checks; PR CI keeps native/race/smoke/audit and real-server integration checks,
 with conditional artifact recomputation. Behavior/model changes require full

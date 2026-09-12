@@ -40,9 +40,10 @@ need full validation for their exact inputs before merge, and release/new-port
 acceptance needs the full evidence. Reports under `.formal-traces/` bind their
 source, corpus and witness fingerprints; changed inputs invalidate an old pass.
 
-`make formal-corpus` completes TS replay and then evaluates the shared,
-language-neutral witness evidence (`node formal/witnesses.mjs evaluate`) before
-`make formal-go` validates that report and prepares Go. `check-go-replay.mjs`
+`make formal-generate` generates the corpus and then evaluates the shared,
+language-neutral witness evidence (`node formal/witnesses.mjs evaluate`);
+`make formal-go` prepares Go against both, independently of the TypeScript
+replay, and the two ports' parity lanes run in parallel. `check-go-replay.mjs`
 and the shared completion gate reject missing histories, skipped witnesses,
 incomplete reports and stale inputs. Go independently executes every history;
 the shared evaluator supplies witness reachability over the common corpus, not

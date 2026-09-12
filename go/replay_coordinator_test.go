@@ -288,8 +288,11 @@ func replayObservationError(observed any, definition string, definitions obj) er
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		return fmt.Errorf("driver produced an unencodable %s observation: %w", definition, err)
 	}
+	// Name the record's keys, never its values: a value could carry the
+	// expected/actual markers the mutation lane reads as comparison evidence.
 	if !matchesReplaySchema(decoded, target, definitions) {
-		return fmt.Errorf("driver produced a malformed %s observation: %s", definition, raw)
+		keys, _ := decoded.(map[string]any)
+		return fmt.Errorf("driver produced a malformed %s observation with keys [%s]", definition, behaviorKeys(keys))
 	}
 	return nil
 }

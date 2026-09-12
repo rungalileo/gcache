@@ -8,10 +8,10 @@
     "counts": "Inventory counts establish accounting completeness only; they are not semantic coverage percentages or proof of parity."
   },
   "inputs": {
-    "semanticCasesSha256": "b1d1c63aa3ec2688e82b6507d6909c975a010246d645bbce00e517facae0e399",
-    "executionSha256": "b353c5c74425824b6af14a0ff496aee8486769027112568a265c422646ed14b0",
-    "sourceAuditSha256": "1b016b0b4d2894f199a72fe5e356982d16344110642e42e9fb6a0862bda0cf38",
-    "quintCaseAuditSha256": "da394be0bbf216ed3949418c2c2e4b8f3d88d989d512c84006b7c1f286824324",
+    "semanticCasesSha256": "b4bf9f49df5e1a2019616811014a37b0ab5c46d441e780609b0c2cd8ddc4b96a",
+    "executionSha256": "8dabaa93a4429e6fb5b409ef8c3ac9f9148a704370b2bb305b2ca69a062a9d5f",
+    "sourceAuditSha256": "cd8b7690847bb0e17cf2c73f15ab2899bc9e2c70070eefba6b43f54e1be67f37",
+    "quintCaseAuditSha256": "b5432029958cda110dd3fb97364ddac90205d8081690b974fe1611a60753415c",
     "featureCoverageSha256": "2e59570c657a6393d5f1bf2f33e27e3825c84a15ed54f902543327fcc08439a0",
     "coverageWitnessesSha256": "8fc8ab123150fdec059f5b75f84172d39af80d08d7a4211fa88c63c5a3f2874b",
     "profilesSha256": "49095970f95113fec3e6e75dd8fed9118aaa73a05329e7dcf202c703e9d1bf70"
@@ -45,7 +45,7 @@
     "casesWithQuintGeneratedVectors": 22,
     "withoutModelDrivenReplay": [],
     "quintModels": 32,
-    "scheduledInvariants": 215,
+    "scheduledInvariants": 217,
     "scheduledRegressions": 401,
     "quintGeneratedProtocolVectors": 1343,
     "quintGeneratedInvalidationVectors": 288,
@@ -5493,7 +5493,8 @@
       "quintProperties": [
         "formal/dialcache-stale-recovery.qnt:retainedCandidateWasEligible",
         "formal/dialcache-stale-recovery.qnt:futureFrameIsNotRetainedTest",
-        "formal/dialcache-stale-recovery.qnt:initiallyFutureCannotRecoverAfterClockAdvanceTest"
+        "formal/dialcache-stale-recovery.qnt:initiallyFutureCannotRecoverAfterClockAdvanceTest",
+        "formal/dialcache-stale-recovery.qnt:futureFrameIsNeverFreshOrRetained"
       ],
       "requiredGenerated": [
         {
@@ -8485,6 +8486,7 @@
       "quintProperties": [
         "formal/dialcache-envelope-vectors.qnt:rawEscapeIsLossless",
         "formal/dialcache-envelope-vectors.qnt:escapeConsumesExactlyOnePrefix",
+        "formal/dialcache-envelope-vectors.qnt:unknownZeroPrefixPassesThroughUnchanged",
         "formal/dialcache-envelope-vectors.qnt:escapedCompressedMarkerRemainsLiteralTest",
         "formal/dialcache-envelope-vectors.qnt:unknownLegacyZeroPrefixRemainsUntouchedTest",
         "formal/dialcache-envelope-vectors.qnt:corruptCompressionPreservesMarkedBytesTest"
@@ -18249,7 +18251,7 @@
   ],
   "reviewedTestAndDocumentationAudit": {
     "path": "formal/source-audit.json",
-    "sha256": "1b016b0b4d2894f199a72fe5e356982d16344110642e42e9fb6a0862bda0cf38",
+    "sha256": "cd8b7690847bb0e17cf2c73f15ab2899bc9e2c70070eefba6b43f54e1be67f37",
     "sourceFiles": 44,
     "status": "reviewed-applicability-not-execution",
     "limitations": "These rows review Go applicability for the public documentation and ordinary test files in source-audit.json sources, inheriting their C/W/E/B/X classifications. They map subjects to native artifacts without claiming one Go test per TypeScript assertion or turning documentation counts into executed coverage. The same audit hash also binds reviewedGuides for formal and Go documentation; those guide reviews are freshness/scope records, not additional behavioral applicability rows. Per-case Quint and replay evidence is recorded separately.",
@@ -18543,7 +18545,7 @@
       },
       {
         "path": "docs/maintainers.md",
-        "sha256": "d589fe1685ee9d10cd2f3bf96e51e539f1a93b6b887880a53ba13e33c1af1662",
+        "sha256": "149dbfcd060842f03ea660e4641ac96e0a693f8a55c77002a71fdab91b7c511a",
         "entries": 9,
         "contracts": [
           "B01",
@@ -19722,7 +19724,7 @@
           "formal/generate-envelope-vectors.mjs"
         ]
       },
-      "artifactSha256": "87902f4e679b942041ba8c05ff9e7525b643801eb2dd9f706c096ea7bb6c41f8",
+      "artifactSha256": "556212d476413a99b4027d60e5ab5478ecf6bb43fa8d5ad9390e4a24b3e0a099",
       "status": "executable-vector-schedule"
     }
   ]

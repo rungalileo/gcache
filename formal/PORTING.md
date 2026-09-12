@@ -33,7 +33,7 @@ API names, threading model, internal storage, or scheduling implementation.
 | External effects | Hold/release actual policy, Redis read/write, serialization, and decoding operations by their invocation IDs. A held operation cannot finish until its external release or specified failure. |
 | Clock control | Control wall time and elapsed time separately. Advance or shift only the specified clock; follow the profile's timer-delivery rule. Preserve fractional units in the local-clock profile. |
 | Storage inputs | Seed the specified bytes/value/TTL or execute invalidation. The adapter must expose the requested atomic primary snapshot and maintenance result. |
-| Settle | After every command, bring the implementation to quiescence under the `causally-ready-v1` contract: every task spawned by the implementation or the driver has finished or is blocked on a driver-owned gate, a driver-owned timer that is not yet due, or a driver-owned scope gate, and nothing is runnable. This obligation falls on the library as well as the test: it must expose its detached scheduling to the test executor (Go's `Defer` hook drained under `synctest.Wait`, the Node fake-timer microtask queue drained by `advanceTimersByTimeAsync(0)`) so the driver reaches quiescence without guessing turn counts or advancing deadline time. The TypeScript suite includes a no-settle control, [formal-settlement-control.test.ts](../test/formal-settlement-control.test.ts): a driver that skips its drain must fail the observation assertions of every BehaviorDriver-backed smoke history (currently all eight). Each port is expected to carry an equivalent control against its own driver. |
+| Settle | After every command, bring the implementation to quiescence under the `causally-ready-v1` contract: every task spawned by the implementation or the driver has finished or is blocked on a driver-owned gate, a driver-owned timer that is not yet due, or a driver-owned scope gate, and nothing is runnable. This obligation falls on the library as well as the test: it must expose its detached scheduling to the test executor (Go's `Defer` hook drained under `synctest.Wait`, the Node fake-timer microtask queue drained by `advanceTimersByTimeAsync(0)`) so the driver reaches quiescence without guessing turn counts or advancing deadline time. Both ports include a no-settle control: [formal-settlement-control.test.ts](../test/formal-settlement-control.test.ts) skips the TypeScript drain, and [settlement_control_replay_test.go](../go/settlement_control_replay_test.go) reports the Go observation held before the drain; each must fail the observation assertions of every behavior-driver-backed smoke history (currently all eight). A third port carries an equivalent control against its own driver. |
 | Observe | Read actual caller outcomes, source/effect counts, event order, timestamps, values and error categories after the step. Collect observations independently of expected model state. |
 | Cleanup | Drain or release test-owned work, restore clock/fault hooks, and isolate the next history. Unfinished work must not silently leak into another history. |
 
@@ -57,13 +57,16 @@ timeouts fail the test. The coordinator performs no cache operations.
 | Request | Purpose |
 | --- | --- |
 | `profiles` | Discover supported profiles/actions and settlement contract |
-| `prepare` with `profile`, `path`, optional JSON-text `raw` | Validate the entire history; return a session ID, initialization fixture/setup, action names and step count |
+| `prepare` with `profile`, `path`, optional JSON-text `raw` | Validate the entire history; return a session ID, initialization fixture/setup, the `observation` definition every record of the session must satisfy, action names and step count |
 | `observe` with `session`, `index`, `settlement`, `observed`, `environment` | Assert the actual observation for this step; return the next external commands or final completion |
 | `discard` with `session` | Release an unfinished coordinator session after a failed or canceled native run |
 
 After `prepare`, create the native fixture, execute setup and report observation
 index zero. Execute the returned `inputs`, settle authorized work and report the
-next index. The environment carries the driver's actual `wallMs` clock in epoch
+next index. Validate each record locally against the `$defs` definition that
+`prepare` named before sending it, as the Go transport does; a shape defect is
+then attributed to the driver without a coordinator round trip, and the
+coordinator's own check remains the last line. The environment carries the driver's actual `wallMs` clock in epoch
 milliseconds; behavior, effects and core drivers start it at
 `2026-09-08T12:00:00.000Z` (`1788868800000` ms) and move it only through clock
 commands, as the [observation contract](#observation-contract) describes.
@@ -403,21 +406,15 @@ its gate; it no longer produces evidence.
 
 The `causally-ready-v1` settlement contract is defined in prose, in the
 [trace and observation contract](#trace-and-observation-contract) and the
-`Settle` row above; no machine-checkable definition exists. Its only executable
-control is the TypeScript no-settle test. The Go port has no equivalent control
-yet, so a third port writes its own against its own driver.
+`Settle` row above; no machine-checkable definition exists. Its executable
+controls are the TypeScript and Go no-settle tests, each written against its
+own driver, so a third port writes its own the same way.
 
 Node 24 is required as test tooling: the coordinator and the witness evaluator
 are Node scripts that a port's test run spawns, and the completion checker and
 report adapters run on Node as well. The port's library itself needs no Node
-dependency, as the Go module shows.
-
-The Go transport validates every command the coordinator returns against
-`$defs/command` but does not validate its own observations locally, so the
-coordinator's schema check is the first to reject a malformed record. A port may
-validate each observation against `$defs/behaviorObservation`,
-`coreObservation` or `localClockObservation` before sending it; that attributes
-a shape defect to the driver without a coordinator round trip.
+dependency, as the Go module shows. This is an accepted design: one shared
+coordinator keeps the predictions and the assertion logic in one place.
 
 ## New-port acceptance
 

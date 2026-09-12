@@ -339,6 +339,7 @@ type behaviorDriver struct {
 	fallbackFailed                      bool
 	discardWrites, discardInvalidations bool
 	skipSettle                          bool
+	unsettled                           obj
 }
 
 func emptyBehaviorObservation(fixture obj) obj {
@@ -365,9 +366,11 @@ func newBehaviorDriver(t *testing.T, fixture obj) *behaviorDriver {
 }
 
 // newUnsettledBehaviorDriver is a harness control only: the returned driver
-// skips the end-of-apply drain that implements the causally-ready-v1
-// settlement contract, so a control test can prove the replays depend on it.
-// Conformance replays must never use it.
+// reports the observation it held before the end-of-apply drain that
+// implements the causally-ready-v1 settlement contract, so a control test can
+// prove the replays depend on it. It still drains after that snapshot, so
+// every command starts from a settled driver and the control measures early
+// observation alone. Conformance replays must never use it.
 func newUnsettledBehaviorDriver(t *testing.T, fixture obj) *behaviorDriver {
 	d := newBehaviorDriver(t, fixture)
 	d.skipSettle = true
@@ -500,6 +503,9 @@ func (d *behaviorDriver) hold(effect string, index int) error {
 func (d *behaviorDriver) observation() obj {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.skipSettle && d.unsettled != nil {
+		return bm(bclone(d.unsettled))
+	}
 	return bm(bclone(d.observed))
 }
 func (d *behaviorDriver) observedEffectCount(effect string) int {
@@ -812,12 +818,17 @@ func (d *behaviorDriver) apply(input obj) error {
 	default:
 		return fmt.Errorf("unknown behavior input %s", bjson(input))
 	}
-	// Drain ready executor work while unresolved external gates remain held:
-	// the causally-ready-v1 settlement step. Only the no-settle harness control
-	// skips it, to prove the replays depend on it.
-	if !d.skipSettle {
-		d.clock.drain()
+	// The no-settle harness control records what an unsettled port would
+	// report: the observation before the drain. It drains afterwards so the
+	// next command finds its gates registered and no failure is a harness error.
+	if d.skipSettle {
+		d.mu.Lock()
+		d.unsettled = bm(bclone(d.observed))
+		d.mu.Unlock()
 	}
+	// Drain ready executor work while unresolved external gates remain held:
+	// the causally-ready-v1 settlement step.
+	d.clock.drain()
 	return d.assertPublicationCausality()
 }
 func (d *behaviorDriver) close() {

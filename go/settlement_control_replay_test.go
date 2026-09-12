@@ -2,6 +2,7 @@ package dialcache
 
 import (
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -11,18 +12,24 @@ import (
 // the Go counterpart of test/formal-settlement-control.test.ts. It replays the
 // committed smoke history of every behaviorDriver-backed profile through the
 // shared coordinator twice: once with the settling driver, which must pass,
-// and once with a driver that skips its end-of-apply drain, which must be
-// caught by the coordinator's observation assertions. If it were not, the
-// contract would be unenforced and a port could pass without ever settling.
-// The core and local-clock profiles use other drivers and are not covered.
+// and once with a driver that reports the observation it held before its
+// end-of-apply drain, which must be caught by the coordinator's observation
+// assertions. If it were not, the contract would be unenforced and a port
+// could pass without ever settling. The unsettled driver drains after its
+// snapshot, so every command starts settled and a failure can only be an
+// observation mismatch, never a missing gate. The test also runs on one
+// scheduler thread so the goroutines a command starts cannot run before that
+// snapshot; detection then does not depend on scheduling, which is what makes
+// the floor below a pin rather than a probability. The core and local-clock
+// profiles use other drivers and are not covered.
 //
 // The file name ends in _replay_test.go so measure-go-semantics.mjs keeps this
 // control out of the ordinary mutation cohort: it is evidence about the
 // harness, not about the cache, and must earn no detection credit.
 var settlementControlProfiles = []string{"independent", "layers", "admission", "scope", "recovery", "policy", "shadow", "effects"}
 
-// Pinned with the TypeScript control: without the drain, all eight smoke
-// histories fail an observation comparison. Lower it only with a written
+// Pinned with the TypeScript control: observed before the drain, all eight
+// smoke histories fail an observation comparison. Lower it only with a written
 // reason, together with the TypeScript floor; it must stay at least one.
 const settlementControlMinimumDetections = 8
 
@@ -50,6 +57,7 @@ func replaySettlementControl(t *testing.T, coordinator *replayCoordinator, profi
 
 func TestHarnessControlNoSettle(t *testing.T) {
 	requireRegistry(t)
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
 	coordinator := newReplayCoordinator(t)
 	detected := []string{}
 	undetected := []string{}

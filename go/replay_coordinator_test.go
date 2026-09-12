@@ -24,6 +24,25 @@ import (
 
 const replaySettlement = "causally-ready-v1"
 
+// Observation definitions a prepare result may name. Every observation the
+// driver reports is validated against the named definition before it is sent.
+var replayObservationDefinitions = map[string]bool{"behaviorObservation": true, "coreObservation": true, "localClockObservation": true}
+
+func readReplaySchema() (obj, error) {
+	raw, err := os.ReadFile("../formal/replay/protocol.schema.json")
+	if err != nil {
+		return nil, err
+	}
+	var schema obj
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return nil, err
+	}
+	if err := validateReplaySchema(schema); err != nil {
+		return nil, err
+	}
+	return schema, nil
+}
+
 // Start outside a synctest bubble. The watchdog observes real process time;
 // request/reply IO never consumes a virtual deadline or releases a cache gate.
 type replayCoordinator struct {
@@ -56,16 +75,11 @@ func newReplayCoordinator(t *testing.T) *replayCoordinator {
 func startReplayCoordinator(t *testing.T, command *exec.Cmd, timeout time.Duration, expectProcessFailure bool) *replayCoordinator {
 	t.Helper()
 	c := &replayCoordinator{command: command}
-	schema, err := os.ReadFile("../formal/replay/protocol.schema.json")
+	schema, err := readReplaySchema()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(schema, &c.schema); err != nil {
-		t.Fatal(err)
-	}
-	if err := validateReplaySchema(c.schema); err != nil {
-		t.Fatal(err)
-	}
+	c.schema = schema
 
 	c.input, err = c.command.StdinPipe()
 	if err != nil {
@@ -175,8 +189,11 @@ func (c *replayCoordinator) prepare(profile, path string, raw []byte) (obj, erro
 	if err != nil {
 		return nil, err
 	}
-	if behaviorKeys(result) != "actions,fixture,session,settlement,setup,steps" || result["settlement"] != replaySettlement || bs(result["session"]) == "" || !replayIndex(result["steps"], 2) {
+	if behaviorKeys(result) != "actions,fixture,observation,session,settlement,setup,steps" || result["settlement"] != replaySettlement || bs(result["session"]) == "" || !replayIndex(result["steps"], 2) {
 		return nil, fmt.Errorf("malformed replay preparation")
+	}
+	if definition := bs(result["observation"]); !replayObservationDefinitions[definition] || bm(c.schema["$defs"])[definition] == nil {
+		return nil, fmt.Errorf("malformed replay observation definition %q", definition)
 	}
 	if _, ok := result["fixture"].(map[string]any); !ok {
 		return nil, fmt.Errorf("malformed replay fixture")
@@ -219,7 +236,13 @@ func (c *replayCoordinator) execute(prepared obj, apply func(obj) error, observa
 				return err
 			}
 		}
-		result, err := c.call(obj{"op": "observe", "session": session, "index": index, "settlement": replaySettlement, "observed": observation(), "environment": obj{"wallMs": wallMS()}})
+		// A malformed record is a driver defect. Attribute it here, before the
+		// coordinator sees it, so no round trip or session state is spent on it.
+		observed := observation()
+		if err := replayObservationError(observed, bs(prepared["observation"]), bm(c.schema["$defs"])); err != nil {
+			return err
+		}
+		result, err := c.call(obj{"op": "observe", "session": session, "index": index, "settlement": replaySettlement, "observed": observed, "environment": obj{"wallMs": wallMS()}})
 		if err != nil {
 			return err
 		}
@@ -245,6 +268,30 @@ func (c *replayCoordinator) execute(prepared obj, apply func(obj) error, observa
 func replayIndex(value any, minimum int64) bool {
 	n, ok := value.(float64)
 	return ok && n >= float64(minimum) && n <= 9007199254740991 && n == float64(int64(n))
+}
+
+// replayObservationError validates one driver observation against the $defs
+// definition the prepare result named. It checks the wire encoding, so Go
+// integers, typed slices and nested maps are judged exactly as the coordinator
+// decodes them. The diagnostic never carries expected/actual comparison
+// markers: a shape defect is infrastructure evidence, not a mutation detection.
+func replayObservationError(observed any, definition string, definitions obj) error {
+	target, ok := definitions[definition].(map[string]any)
+	if !ok || !replayObservationDefinitions[definition] {
+		return fmt.Errorf("unknown replay observation definition %q", definition)
+	}
+	raw, err := json.Marshal(observed)
+	if err != nil {
+		return fmt.Errorf("driver produced an unencodable %s observation: %w", definition, err)
+	}
+	var decoded any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return fmt.Errorf("driver produced an unencodable %s observation: %w", definition, err)
+	}
+	if !matchesReplaySchema(decoded, target, definitions) {
+		return fmt.Errorf("driver produced a malformed %s observation: %s", definition, raw)
+	}
+	return nil
 }
 
 func (c *replayCoordinator) replayCommands(inputs []any) bool {
@@ -498,12 +545,106 @@ func TestReplayCoordinatorRejectsPrematureCompletionAndEmptyCommands(t *testing.
 			program := "require('readline').createInterface({input:process.stdin}).on('line', line => { const request=JSON.parse(line); process.stdout.write(JSON.stringify({version:1,id:request.id,ok:true,result:" + result + "})+'\\n'); });"
 			coordinator := startReplayCoordinator(t, exec.Command("node", "-e", program), time.Second, false)
 			applied := 0
-			err := coordinator.execute(obj{"session": "1", "setup": []any{}, "steps": float64(2)}, func(obj) error { applied++; return nil }, func() obj { return obj{} }, func() int64 { return 0 })
+			// A well-formed core observation passes the local shape check, so the
+			// coordinator's malformed reply is what execution must reject.
+			err := coordinator.execute(obj{"session": "1", "setup": []any{}, "steps": float64(2), "observation": "coreObservation"}, func(obj) error { applied++; return nil }, healthyCoreObservation, func() int64 { return 0 })
 			if err == nil || applied != 0 {
 				t.Fatalf("malformed reply advanced execution: err=%v, commands=%d", err, applied)
 			}
 		})
 	}
+}
+
+// healthyCoreObservation is the flat all-zero record $defs/coreObservation accepts.
+func healthyCoreObservation() obj {
+	observed := obj{}
+	for _, field := range strings.Fields("sourceVersion lastResult outsideLoaderCalls requestLoaderCalls localLoaderCalls coalescedLoaderCalls remoteLoaderCalls redisReads redisWrites") {
+		observed[field] = int64(0)
+	}
+	return observed
+}
+
+func TestReplayTransportValidatesObservationsLocally(t *testing.T) {
+	schema, err := readReplaySchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	definitions := bm(schema["$defs"])
+	behavior := emptyBehaviorObservation(obj{"observe": []any{}})
+	local := emptyBehaviorObservation(obj{})
+	for definition, observed := range map[string]obj{"behaviorObservation": behavior, "coreObservation": healthyCoreObservation(), "localClockObservation": local} {
+		if err := replayObservationError(observed, definition, definitions); err != nil {
+			t.Fatalf("well-formed %s rejected: %v", definition, err)
+		}
+	}
+	with := func(base obj, field string, value any) obj {
+		changed := bm(bclone(base))
+		changed[field] = value
+		return changed
+	}
+	without := func(base obj, field string) obj {
+		changed := bm(bclone(base))
+		delete(changed, field)
+		return changed
+	}
+	for name, control := range map[string]struct {
+		definition string
+		observed   any
+	}{
+		"string counter":         {"behaviorObservation", with(behavior, "loaders", "1")},
+		"pending call value":     {"behaviorObservation", with(behavior, "calls", []any{obj{"status": "value"}})},
+		"invented event":         {"behaviorObservation", with(behavior, "events", []any{obj{"event": "invented"}})},
+		"unknown field":          {"behaviorObservation", with(behavior, "extra", int64(1))},
+		"missing list":           {"behaviorObservation", without(behavior, "maintenance")},
+		"negative counter":       {"coreObservation", with(healthyCoreObservation(), "redisReads", int64(-1))},
+		"missing counter":        {"coreObservation", without(healthyCoreObservation(), "redisWrites")},
+		"fractional counter":     {"coreObservation", with(healthyCoreObservation(), "redisReads", 0.5)},
+		"structured local call":  {"localClockObservation", with(local, "calls", []any{obj{"status": "pending"}})},
+		"events on local clock":  {"localClockObservation", with(local, "events", []any{})},
+		"non-object observation": {"behaviorObservation", []any{}},
+		"nil observation":        {"coreObservation", nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := replayObservationError(control.observed, control.definition, definitions)
+			if err == nil {
+				t.Fatalf("malformed %s accepted: %s", control.definition, bjson(control.observed))
+			}
+			if !strings.HasPrefix(err.Error(), "driver produced a malformed "+control.definition+" observation: ") {
+				t.Fatalf("shape defect lacks the driver attribution: %v", err)
+			}
+			if matched, _ := regexp.MatchString(`expected:[\s\S]*actual:`, err.Error()); matched {
+				t.Fatalf("shape defect acquired comparison markers: %v", err)
+			}
+		})
+	}
+	for _, definition := range []string{"", "invented", "observedEvent", "command"} {
+		if err := replayObservationError(behavior, definition, definitions); err == nil || !strings.Contains(err.Error(), "unknown replay observation definition") {
+			t.Fatalf("definition %q accepted: %v", definition, err)
+		}
+	}
+
+	t.Run("rejected before any request reaches the coordinator", func(t *testing.T) {
+		// The stand-in exits nonzero if an observe request ever arrives, which
+		// the transport's cleanup reports as a process failure.
+		program := "require('readline').createInterface({input:process.stdin}).on('line', line => { const request=JSON.parse(line); if (request.op === 'observe') process.exit(3); process.stdout.write(JSON.stringify({version:1,id:request.id,ok:true,result:{complete:true,steps:2}})+'\\n'); });"
+		coordinator := startReplayCoordinator(t, exec.Command("node", "-e", program), time.Second, false)
+		applied := 0
+		prepared := obj{"session": "1", "setup": []any{obj{"op": "bumpSource"}}, "steps": float64(2), "observation": "coreObservation"}
+		err := coordinator.execute(prepared, func(obj) error { applied++; return nil }, func() obj { return with(healthyCoreObservation(), "redisReads", "many") }, func() int64 { return 0 })
+		if err == nil || !strings.Contains(err.Error(), "driver produced a malformed coreObservation observation") {
+			t.Fatalf("malformed observation was not attributed to the driver: %v", err)
+		}
+		if applied != 1 {
+			t.Fatalf("setup must run before the first observation: applied=%d", applied)
+		}
+	})
+	t.Run("prepare rejects an unknown observation definition", func(t *testing.T) {
+		program := "require('readline').createInterface({input:process.stdin}).on('line', line => { const request=JSON.parse(line); process.stdout.write(JSON.stringify({version:1,id:request.id,ok:true,result:{session:'1',settlement:'causally-ready-v1',observation:'observedEvent',fixture:{},setup:[],actions:['init','outsideCall'],steps:2}})+'\\n'); });"
+		coordinator := startReplayCoordinator(t, exec.Command("node", "-e", program), time.Second, false)
+		if _, err := coordinator.prepare("core", "control.itf.json", nil); err == nil || !strings.Contains(err.Error(), "malformed replay observation definition") {
+			t.Fatalf("unknown observation definition accepted: %v", err)
+		}
+	})
 }
 
 func TestReplayCoordinatorBoundsFramesBeforeBuffering(t *testing.T) {

@@ -140,7 +140,7 @@
             },
             "observed": {
               "type": "object",
-              "description": "The driver's complete current observation, encoded per profile: $defs/behaviorObservation for every feature profile and for effects, $defs/coreObservation for core, $defs/localClockObservation for local-clock. The coordinator validates it against the session profile's definition before any comparison and reports a violation as 'Malformed replay observation: <definition> at <path>', so a shape error is an infrastructure failure, never an observation mismatch."
+              "description": "The driver's complete current observation, encoded per profile: $defs/behaviorObservation for every feature profile and for effects, $defs/coreObservation for core, $defs/localClockObservation for local-clock. The prepare result names the session's definition in `observation`; ports should validate each record against that definition locally before sending it, so a shape defect is attributed to the driver without a coordinator round trip. The coordinator validates it again before any comparison and reports a violation as 'Malformed replay observation: <definition> at <path>', so a shape error is an infrastructure failure, never an observation mismatch."
             },
             "environment": {
               "type": "object",
@@ -222,6 +222,14 @@
                     "settlement": {
                       "const": "causally-ready-v1"
                     },
+                    "observation": {
+                      "enum": [
+                        "behaviorObservation",
+                        "coreObservation",
+                        "localClockObservation"
+                      ],
+                      "description": "The $defs definition every observation of this session must satisfy: behaviorObservation for feature profiles and effects, coreObservation for core, localClockObservation for local-clock. Ports validate each observed record against it locally before sending."
+                    },
                     "fixture": {
                       "$ref": "#/$defs/fixture"
                     },
@@ -245,6 +253,7 @@
                   "required": [
                     "session",
                     "settlement",
+                    "observation",
                     "fixture",
                     "setup",
                     "actions",

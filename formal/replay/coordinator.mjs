@@ -34,8 +34,10 @@ export class ReplayCoordinator {
       const { trace } = binding;
       const session = String(++this.#nextSession);
       this.#sessions.set(session, { binding, trace, index: 0 });
+      // `observation` names the $defs definition the driver's records must
+      // satisfy, so a port can validate them locally before each round trip.
       return {
-        session, settlement, fixture: binding.fixture, setup: binding.setup,
+        session, settlement, observation: binding.observation, fixture: binding.fixture, setup: binding.setup,
         actions: trace.steps.map(step => step.action), steps: trace.steps.length,
       };
     }

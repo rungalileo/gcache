@@ -338,6 +338,7 @@ type behaviorDriver struct {
 	sourceByInvocation                  map[int]int
 	fallbackFailed                      bool
 	discardWrites, discardInvalidations bool
+	skipSettle                          bool
 }
 
 func emptyBehaviorObservation(fixture obj) obj {
@@ -360,6 +361,16 @@ func newBehaviorDriver(t *testing.T, fixture obj) *behaviorDriver {
 		d.effects[key] = map[int]*behaviorGate{}
 	}
 	d.instance("default")
+	return d
+}
+
+// newUnsettledBehaviorDriver is a harness control only: the returned driver
+// skips the end-of-apply drain that implements the causally-ready-v1
+// settlement contract, so a control test can prove the replays depend on it.
+// Conformance replays must never use it.
+func newUnsettledBehaviorDriver(t *testing.T, fixture obj) *behaviorDriver {
+	d := newBehaviorDriver(t, fixture)
+	d.skipSettle = true
 	return d
 }
 func (d *behaviorDriver) increment(field string) int {
@@ -801,7 +812,12 @@ func (d *behaviorDriver) apply(input obj) error {
 	default:
 		return fmt.Errorf("unknown behavior input %s", bjson(input))
 	}
-	d.clock.drain()
+	// Drain ready executor work while unresolved external gates remain held:
+	// the causally-ready-v1 settlement step. Only the no-settle harness control
+	// skips it, to prove the replays depend on it.
+	if !d.skipSettle {
+		d.clock.drain()
+	}
 	return d.assertPublicationCausality()
 }
 func (d *behaviorDriver) close() {

@@ -5,6 +5,7 @@ import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { readExecution, root, validateExecution } from './execution.mjs';
+import { resolveConcurrency, runPool, spawnBuffered } from './quint-pool.mjs';
 
 const recipePath = 'formal/fixture-recipes.json';
 const lockPath = 'formal/generated-fixtures.lock.json';
@@ -123,16 +124,16 @@ const metadata = (action, choice) => ({ 'mbt::actionTaken': action, 'mbt::nondet
   choice: choice === -1 ? { tag: 'None', value: { '#tup': [] } } : { tag: 'Some', value: integer(choice) },
 } });
 
-function execute(args) {
-  const run = spawnSync('quint', args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+async function execute(args) {
+  const run = await spawnBuffered('quint', args, { cwd: root });
   if (run.error) throw run.error;
   if (run.status !== 0) fail(`Quint ${args[0]} failed:\n${run.stdout}\n${run.stderr}`);
 }
-function exportModel(model, requests, directory, settings) {
+async function exportModel(model, requests, directory, settings) {
   const source = read(model), name = /^module\s+(\w+)\s*\{/.exec(source)?.[1];
   if (!name) fail('Unsupported Quint module');
   const parsedPath = resolve(directory, 'parsed.json'), mapPath = resolve(directory, 'source-map.json');
-  execute(['parse', model, `--out=${parsedPath}`, `--source-map=${mapPath}`]);
+  await execute(['parse', model, `--out=${parsedPath}`, `--source-map=${mapPath}`]);
   const parsed = JSON.parse(readFileSync(parsedPath, 'utf8')), sourceMap = JSON.parse(readFileSync(mapPath, 'utf8'));
   if (parsed.errors.length) fail('Quint parse errors');
   const declarations = new Map(parsed.modules.find(module => module.name === name).declarations.map(d => [d.name, d]));
@@ -154,7 +155,7 @@ function exportModel(model, requests, directory, settings) {
     if (!scheduled.includes(regression)) fail(`Fixture run is not a scheduled public-action replay: ${regression}`);
     request.run = regression;
   }
-  if (named.length) execute(['test', input, `--backend=${settings.backend}`, '--max-samples=1', `--seed=${settings.seed}`,
+  if (named.length) await execute(['test', input, `--backend=${settings.backend}`, '--max-samples=1', `--seed=${settings.seed}`,
     `--match=^(${[...new Set(named.map(r => r.run))].join('|')})$`, `--out-itf=${directory}/{test}.itf.json`]);
   for (const [i, request] of requests.entries()) {
     if (request.recipe.regression) continue;
@@ -179,7 +180,7 @@ function exportModel(model, requests, directory, settings) {
     request.run = `fixtureHistory${i}`;
     const end = source.lastIndexOf('}');
     writeFileSync(input, source.slice(0, end) + '\n' + additions.join('\n') + '\n' + source.slice(end));
-    execute(['run', input, `--backend=${settings.backend}`, '--n-threads=1', '--max-samples=1',
+    await execute(['run', input, `--backend=${settings.backend}`, '--n-threads=1', '--max-samples=1',
       `--seed=${settings.seed}`, '--init=fixtureInit', '--step=fixtureStep', `--max-steps=${calls.length - 1}`,
       '--n-traces=1', `--out-itf=${directory}/${request.run}.itf.json`]);
   }
@@ -210,7 +211,7 @@ export function verifyFixtures(book = validateRecipes(json(recipePath))) {
   if (!isDeepStrictEqual(lock.artifacts, expected)) fail('Generated fixture content changed; regenerate and review');
   return { artifacts: book.artifacts.length, histories: book.artifacts.reduce((n, a) => n + a.recipes.length, 0) };
 }
-export function generateFixtures(mode) {
+export async function generateFixtures(mode, { concurrency = resolveConcurrency() } = {}) {
   const execution = readExecution(); validateExecution(execution);
   const book = validateRecipes(json(recipePath), execution);
   if (mode === '--verify') return verifyFixtures(book);
@@ -223,12 +224,14 @@ export function generateFixtures(mode) {
     if (!groups.has(model)) groups.set(model, []);
     groups.get(model).push({ artifact, recipe, projection: book.projections[recipe.projection] });
   }
-  for (const [model, requests] of groups) {
+  // Each model exports into its own build directory, so models run side by
+  // side; the artifacts below are assembled in recipe order from the results.
+  await runPool([...groups].map(([model, requests]) => async () => {
     const directory = resolve(root, '.formal-traces/fixture-build', basename(model, '.qnt'));
     rmSync(directory, { recursive: true, force: true }); mkdirSync(directory, { recursive: true });
-    exportModel(model, requests, directory, execution.settings);
+    await exportModel(model, requests, directory, execution.settings);
     console.log(`Quint fixtures: ${basename(model)} (${requests.length} histories)`);
-  }
+  }), { concurrency });
   const requests = [...groups.values()].flat(), outputs = new Map();
   for (const artifact of book.artifacts) {
     const entries = artifact.recipes.map(recipe => {
@@ -257,5 +260,5 @@ export function generateFixtures(mode) {
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv.length !== 3) fail('Usage: node formal/generated-fixtures.mjs --write|--check|--verify');
-  console.log(generateFixtures(process.argv[2]));
+  console.log(await generateFixtures(process.argv[2]));
 }

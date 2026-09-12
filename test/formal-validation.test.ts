@@ -250,9 +250,18 @@ describe("full formal workflow shape", () => {
   let jobs: Record<string, Job>;
 
   beforeEach(async () => {
-    // yaml is not a project dependency; pnpm exposes it only inside the store,
-    // so resolve it from vitest's own dependency tree instead of a bare import.
-    const yamlPath = createRequire(createRequire(import.meta.url).resolve("vitest/package.json")).resolve("yaml");
+    // yaml is not a project dependency and vitest does not declare it: it is in
+    // the lockfile only transitively (testcontainers via docker-compose, and
+    // vite's optional peer), and pnpm hoists every transitive package into
+    // node_modules/.pnpm/node_modules, which a require rooted at vitest's real
+    // store path walks up into while a bare import from this file cannot.
+    // Name the remedy if a dependency bump ever drops it from the tree.
+    let yamlPath: string;
+    try {
+      yamlPath = createRequire(createRequire(import.meta.url).resolve("vitest/package.json")).resolve("yaml");
+    } catch {
+      throw new Error("The workflow shape tests parse YAML; add yaml as a devDependency now that no other package brings it in.");
+    }
     const { parse } = await import(pathToFileURL(yamlPath).href) as { parse(text: string): { jobs: Record<string, Job> } };
     jobs = parse(readFileSync(new URL("../.github/workflows/formal-full.yaml", import.meta.url), "utf8")).jobs;
   });

@@ -235,8 +235,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # Long-retention summary: completion/context reports and the symbolic and
-      # exploration reports, without the multi-hundred-megabyte trace corpus.
+      # Long-retention summary: completion/context reports and the model check,
+      # symbolic and exploration reports, without the multi-hundred-megabyte
+      # trace corpus.
       # Each download tolerates a missing artifact from a job that failed early.
       - name: Collect TypeScript completion evidence
         if: always()

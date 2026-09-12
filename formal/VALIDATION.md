@@ -31,11 +31,11 @@ aggregate requires all of them.
 A behavior, model, or replay change requires full validation of its current
 inputs before merge. The default PR workflow runs faster checks; it does not
 enforce this full-validation requirement. The manual full workflow can target a
-PR branch. Its model check and symbolic jobs run separately from corpus generation. Its weekly
-run validates the selected `main` revision and includes exploration; a manual
-run can enable the `exploration` option. The aggregate gate requires exploration
-when selected or scheduled. Each PR body should identify the revision and
-completed local or hosted validation.
+PR branch. Its model check and symbolic jobs run separately from corpus
+generation. Its weekly run validates the selected `main` revision and includes
+exploration; a manual run can enable the `exploration` option. The aggregate
+gate requires exploration when selected or scheduled. Each PR body should
+identify the revision and completed local or hosted validation.
 
 ## Reading a completion report
 

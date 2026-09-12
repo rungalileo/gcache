@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "README.md",
-      "sha256": "514162b3e3409389fcd6b5e387a602604b7baea230b0f9743d6d331a3be83d9f",
+      "sha256": "17cd061cde252e466ba94fced8615d3bc7d2a6b88cced14fe62c3572dc86c173",
       "entries": [
         {"line":1,"title":"DialCache","contracts":["B01"]},
         {"line":24,"title":"Install","contracts":["B01"]},
@@ -152,17 +152,17 @@
     },
     {
       "path": "docs/maintainers.md",
-      "sha256": "2fc4bc6aa99545572fcff75c44479ee52148030ec33886801e74ee545d7404ee",
+      "sha256": "d589fe1685ee9d10cd2f3bf96e51e539f1a93b6b887880a53ba13e33c1af1662",
       "entries": [
         {"line":1,"title":"Maintainer guide","contracts":["B01"]},
         {"line":8,"title":"Validation","contracts":["B01"]},
-        {"line":57,"title":"Maintaining the reference","contracts":["E05","B01"]},
-        {"line":79,"title":"Run the documentation site","contracts":["B01"]},
-        {"line":106,"title":"Publish to GitHub Pages","contracts":["B01"]},
-        {"line":122,"title":"Cache-path benchmark","contracts":["X02"]},
-        {"line":144,"title":"Redis write benchmark","contracts":["X02"]},
-        {"line":167,"title":"Stale-on-error benchmark","contracts":["X02"]},
-        {"line":195,"title":"Releasing","contracts":["B01","E05"]}
+        {"line":59,"title":"Maintaining the reference","contracts":["E05","B01"]},
+        {"line":81,"title":"Run the documentation site","contracts":["B01"]},
+        {"line":108,"title":"Publish to GitHub Pages","contracts":["B01"]},
+        {"line":124,"title":"Cache-path benchmark","contracts":["X02"]},
+        {"line":146,"title":"Redis write benchmark","contracts":["X02"]},
+        {"line":169,"title":"Stale-on-error benchmark","contracts":["X02"]},
+        {"line":197,"title":"Releasing","contracts":["B01","E05"]}
       ]
     },
     {
@@ -1005,7 +1005,7 @@
   "reviewedGuides": [
     {
       "path": "formal/AUTHORING.md",
-      "sha256": "e6261de1e6fae314b3d86b206063de75737dd803418f4c295fa0a03de8ae6220",
+      "sha256": "edd548ae9f2d610332b3ba6c2cb7322875d126b87d7818df7bbba4852f4ca174",
       "entries": [
         {"line":1,"title":"Reading and extending the DialCache models"},
         {"line":16,"title":"Reading a model"},
@@ -1014,8 +1014,10 @@
         {"line":148,"title":"Give reviewers focused context"},
         {"line":163,"title":"Exporting a deterministic regression"},
         {"line":199,"title":"Maintaining case and witness evidence"},
-        {"line":240,"title":"Reproducible committed fixtures"},
-        {"line":250,"title":"Refactoring and execution"}
+        {"line":247,"title":"Reproducible committed fixtures"},
+        {"line":257,"title":"Refactoring and execution"},
+        {"line":282,"title":"Challenging every model"},
+        {"line":307,"title":"Exported runs are exactly the public-only runs"}
       ],
       "review": {
         "kind": "tooling-guide",
@@ -1151,7 +1153,7 @@
     },
     {
       "path": "formal/CONTRACTS.md",
-      "sha256": "0976670c3f5bfe46059f7d8b1bda2d8f27f9d466f2a2a9b96ae4de89c577c056",
+      "sha256": "c7add8b75ef29e5b8618b78263a4ff3dc326bd550d8f03d0407d17c968061350",
       "entries": [
         {"line":1,"title":"Portable contract inventory"},
         {"line":11,"title":"Where the boundary lies"},
@@ -1270,13 +1272,13 @@
     },
     {
       "path": "formal/GO-PARITY.md",
-      "sha256": "ef91eae01b3c7e532291b8db0a75088749d3af16e29327b48c4e5fe67fff62c3",
+      "sha256": "c899593fd14effb0b331d43b74ce955d0f20c8a86e62ad1cfb99118a652ef7c5",
       "entries": [
         {"line":1,"title":"Go parity acceptance"},
-        {"line":49,"title":"Required evidence"},
-        {"line":107,"title":"Reading and updating the ledger"},
-        {"line":151,"title":"Native clock precision"},
-        {"line":184,"title":"Current configuration and observability bindings"}
+        {"line":51,"title":"Required evidence"},
+        {"line":109,"title":"Reading and updating the ledger"},
+        {"line":153,"title":"Native clock precision"},
+        {"line":186,"title":"Current configuration and observability bindings"}
       ],
       "review": {
         "kind": "tooling-guide",
@@ -1285,15 +1287,18 @@
     },
     {
       "path": "formal/PORTING.md",
-      "sha256": "df8798d90e22d14e9c749be689cb43ee1d6dd8f91fba56b5258c90623dfd1f12",
+      "sha256": "6411b088fabea7c412a4fd1e934d1073ae916022d395029d1582b598509b4f75",
       "entries": [
         {"line":1,"title":"Implementing another DialCache port"},
         {"line":14,"title":"What a port supplies"},
-        {"line":44,"title":"Shared coordinator protocol"},
-        {"line":77,"title":"Trace and observation contract"},
-        {"line":139,"title":"Generated fixtures and fast local tests"},
-        {"line":174,"title":"Complete corpus and reusable acceptance checks"},
-        {"line":274,"title":"New-port acceptance"}
+        {"line":45,"title":"Shared coordinator protocol"},
+        {"line":81,"title":"Trace and observation contract"},
+        {"line":143,"title":"Observation contract"},
+        {"line":219,"title":"Generated fixtures and fast local tests"},
+        {"line":254,"title":"Complete corpus and reusable acceptance checks"},
+        {"line":357,"title":"Witness evidence"},
+        {"line":400,"title":"Current limitations for a third port"},
+        {"line":420,"title":"New-port acceptance"}
       ],
       "review": {
         "kind": "tooling-guide",
@@ -1341,14 +1346,14 @@
     },
     {
       "path": "formal/README.md",
-      "sha256": "9ce879015c1295b975f4cfded6a0dfdedcabb56e2e332e4d1a9e0ec9a09ce4b8",
+      "sha256": "0301cadcb106ccda0c340e8c233a3e1a7d29710934e2812a5b0e0b8bd1ee86be",
       "entries": [
         {"line":1,"title":"Executable DialCache specification"},
         {"line":7,"title":"Start with your task"},
         {"line":23,"title":"How the specification connects to code"},
         {"line":43,"title":"Models and composition profiles"},
         {"line":89,"title":"Generating and replaying behavior"},
-        {"line":149,"title":"Evidence and scope"}
+        {"line":165,"title":"Evidence and scope"}
       ],
       "review": {
         "kind": "tooling-guide",
@@ -1357,16 +1362,16 @@
     },
     {
       "path": "formal/SEMANTIC-COVERAGE.md",
-      "sha256": "bd810a0bd2ce52d1f221114ae2d0cc1cfa9380c8da020e937c3221ea896b37cf",
+      "sha256": "11a124c67c87660db30ad13697de8573fc269fcf9cd5ffca92893dc081761377",
       "entries": [
         {"line":1,"title":"Measuring semantic coverage"},
         {"line":5,"title":"Evidence inventory"},
         {"line":47,"title":"Model assurance"},
-        {"line":80,"title":"Generated boundary evidence"},
-        {"line":88,"title":"Behavioral mutation comparison"},
-        {"line":102,"title":"Recorded measurements"},
-        {"line":108,"title":"Reproduction and CI"},
-        {"line":137,"title":"Model properties and cross-language execution"}
+        {"line":88,"title":"Generated boundary evidence"},
+        {"line":96,"title":"Behavioral mutation comparison"},
+        {"line":110,"title":"Recorded measurements"},
+        {"line":116,"title":"Reproduction and CI"},
+        {"line":145,"title":"Model properties and cross-language execution"}
       ],
       "review": {
         "kind": "coverage-guide",
@@ -1480,7 +1485,7 @@
     },
     {
       "path": "formal/TEST-MAP.md",
-      "sha256": "5d92707add8aae9151cf584cb0aac33f7af07b14441225b0f436d7f66fb32335",
+      "sha256": "998bc945136167fc301a909644dd1ac2ea608f857d255c3b03c06c99eb4c47a1",
       "entries": [
         {"line":1,"title":"Formal contract and implementation evidence map"},
         {"line":18,"title":"Behavioral map"},
@@ -1496,15 +1501,15 @@
     },
     {
       "path": "formal/VALIDATION.md",
-      "sha256": "7f1e4ae07dd89bbd65775147d6d8032f5d028589278f431d348f6f6e6005607b",
+      "sha256": "133ee9fea163ecdbf7c956889e1120f1f3f1fec53bbf06a10f7f1979cbf373e1",
       "entries": [
         {"line":1,"title":"Validation and evidence"},
         {"line":7,"title":"Choosing a run"},
-        {"line":28,"title":"Reading a completion report"},
-        {"line":46,"title":"Mutation evidence"},
-        {"line":60,"title":"Exploratory runs"},
-        {"line":90,"title":"A retained sampling regression"},
-        {"line":109,"title":"Historical results"}
+        {"line":33,"title":"Reading a completion report"},
+        {"line":51,"title":"Mutation evidence"},
+        {"line":89,"title":"Exploratory runs"},
+        {"line":119,"title":"A retained sampling regression"},
+        {"line":140,"title":"Historical results"}
       ],
       "review": {
         "kind": "tooling-guide",
@@ -1528,7 +1533,7 @@
     },
     {
       "path": "go/README.md",
-      "sha256": "754e92d0b7788be4cf1127384a4e0f15b108732fda2a47695b5a2a394ac37d3f",
+      "sha256": "edd4465e8a87513485d1d04511fb19bcb05a86d0816fa975c9798f39f4878e3b",
       "entries": [
         {"line":1,"title":"DialCache for Go"},
         {"line":19,"title":"Use"},

@@ -8,13 +8,13 @@
     "counts": "Inventory counts establish accounting completeness only; they are not semantic coverage percentages or proof of parity."
   },
   "inputs": {
-    "semanticCasesSha256": "2e18fcb7d8344cff80d4c9ef2a2291dd4e04474a5b4e05ea65869c57f5a30af7",
-    "executionSha256": "fa0e1f076b05d63943b45ee49e5c3e67dfc0b5988aef75449fdd05e7fa7f9ed3",
-    "sourceAuditSha256": "bebecb2fa792de04ee004b1582b50b0ce432f5bf11c917f3eb1812e2416e43fa",
-    "quintCaseAuditSha256": "be457d451c8530c8297507ad9f4b8cc7a1ee7270684ca088fc929aa7808156a4",
+    "semanticCasesSha256": "b1d1c63aa3ec2688e82b6507d6909c975a010246d645bbce00e517facae0e399",
+    "executionSha256": "b353c5c74425824b6af14a0ff496aee8486769027112568a265c422646ed14b0",
+    "sourceAuditSha256": "1b016b0b4d2894f199a72fe5e356982d16344110642e42e9fb6a0862bda0cf38",
+    "quintCaseAuditSha256": "da394be0bbf216ed3949418c2c2e4b8f3d88d989d512c84006b7c1f286824324",
     "featureCoverageSha256": "2e59570c657a6393d5f1bf2f33e27e3825c84a15ed54f902543327fcc08439a0",
     "coverageWitnessesSha256": "8fc8ab123150fdec059f5b75f84172d39af80d08d7a4211fa88c63c5a3f2874b",
-    "profilesSha256": "6dffed03ebb8e916731bd2f34f81cd7cb6f1905a21ccc83b185c77f234b7455c"
+    "profilesSha256": "49095970f95113fec3e6e75dd8fed9118aaa73a05329e7dcf202c703e9d1bf70"
   },
   "inventory": {
     "behavioralCases": 240,
@@ -45,7 +45,7 @@
     "casesWithQuintGeneratedVectors": 22,
     "withoutModelDrivenReplay": [],
     "quintModels": 32,
-    "scheduledInvariants": 214,
+    "scheduledInvariants": 215,
     "scheduledRegressions": 401,
     "quintGeneratedProtocolVectors": 1343,
     "quintGeneratedInvalidationVectors": 288,
@@ -119,13 +119,12 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/effects-authority-witnesses.ts",
-        "test/formal-effects-authority-witnesses.test.ts",
-        "test/fixtures/effects-authority-witnesses.json",
-        "test/formal-effects.test.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/effects.mjs",
+        "formal/replay/witnesses/effects-authority.mjs"
       ]
     },
     {
@@ -148,11 +147,12 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/runtime-boundary-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/scope.mjs",
+        "formal/replay/witnesses/runtime.mjs"
       ]
     },
     {
@@ -195,10 +195,14 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/recovery.mjs",
+        "formal/replay/witnesses/policy.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/recovery-shadow.mjs"
       ]
     },
     {
@@ -239,11 +243,12 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/runtime-boundary-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/policy.mjs",
+        "formal/replay/witnesses/runtime.mjs"
       ]
     },
     {
@@ -263,13 +268,15 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/shadow-diagnostics-witnesses.ts",
-        "test/formal-shadow-diagnostics-witnesses.test.ts",
-        "test/formal/public-prefix-witnesses.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/itf.ts",
-        "test/formal/behavior-driver.ts",
-        "formal/replay-inputs.mjs"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/shadow.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/recovery-shadow.mjs",
+        "formal/replay/witnesses/shadow-diagnostics.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     },
     {
@@ -288,10 +295,11 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/admission.mjs"
       ]
     },
     {
@@ -318,11 +326,12 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/runtime-boundary-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/layers.mjs",
+        "formal/replay/witnesses/runtime.mjs"
       ]
     },
     {
@@ -341,10 +350,11 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/independent.mjs"
       ]
     },
     {
@@ -383,15 +393,14 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/recovery-read-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/recovery-read-witnesses.ts",
-        "test/formal/recovery-admission-witnesses.ts",
-        "test/formal-recovery-shadow-witnesses.test.ts",
-        "test/formal/public-prefix-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/recovery-read.mjs",
+        "formal/replay/witnesses/recovery-admission.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     },
     {
@@ -408,14 +417,13 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/local-failure-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/local-failure-witnesses.ts",
-        "test/formal/public-prefix-witnesses.ts",
-        "test/formal-public-prefix-witnesses.test.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/local-failure.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     },
     {
@@ -453,13 +461,12 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/runtime-boundaries-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/runtime-boundary-witnesses.ts",
-        "test/formal-runtime-boundary-witnesses.test.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/runtime-boundaries.mjs"
       ]
     },
     {
@@ -494,14 +501,13 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/shadow-layers-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/shadow-layers-witnesses.ts",
-        "test/formal-shadow-layers-witnesses.test.ts",
-        "test/formal/public-prefix-witnesses.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/shadow-layers.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     },
     {
@@ -518,10 +524,11 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal-local-clock.test.ts",
-        "test/formal/local-clock-profile.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/local-clock.mjs"
       ]
     },
     {
@@ -541,14 +548,13 @@
       ],
       "status": "executable-profile-schedule",
       "witnessSources": [
-        "test/formal/source-budgets-profile.ts",
-        "test/formal/feature-profile.ts",
-        "test/formal/behavior-driver.ts",
-        "test/formal/itf.ts",
-        "formal/replay-inputs.mjs",
-        "test/formal/source-budgets-witnesses.ts",
-        "test/formal/public-prefix-witnesses.ts",
-        "test/formal-public-prefix-witnesses.test.ts"
+        "formal/witnesses.mjs",
+        "formal/replay/witnesses/index.mjs",
+        "formal/replay/witnesses/trace.mjs",
+        "formal/replay/witnesses/evidence.mjs",
+        "formal/replay/witnesses/labels.mjs",
+        "formal/replay/witnesses/source-budgets.mjs",
+        "formal/replay/witnesses/public-prefix.mjs"
       ]
     }
   ],
@@ -12165,7 +12171,8 @@
         "formal/dialcache-core.qnt:localHitWarmsRequestAndSkipsRemoteTest",
         "formal/dialcache-runtime-boundaries-conformance.qnt:runtimeLocalTtlAddsEarlierLayerToRemoteFixtureTest",
         "formal/dialcache-runtime-boundaries-conformance.qnt:earlierLocalHitStopsRemoteTraversal",
-        "formal/dialcache-conformance.qnt:localValueSurvivesSourceChangeTest"
+        "formal/dialcache-conformance.qnt:localValueSurvivesSourceChangeTest",
+        "formal/dialcache-conformance.qnt:servedLayerValueMatchesCache"
       ],
       "requiredGenerated": [
         {
@@ -18242,14 +18249,14 @@
   ],
   "reviewedTestAndDocumentationAudit": {
     "path": "formal/source-audit.json",
-    "sha256": "bebecb2fa792de04ee004b1582b50b0ce432f5bf11c917f3eb1812e2416e43fa",
+    "sha256": "1b016b0b4d2894f199a72fe5e356982d16344110642e42e9fb6a0862bda0cf38",
     "sourceFiles": 44,
     "status": "reviewed-applicability-not-execution",
     "limitations": "These rows review Go applicability for the public documentation and ordinary test files in source-audit.json sources, inheriting their C/W/E/B/X classifications. They map subjects to native artifacts without claiming one Go test per TypeScript assertion or turning documentation counts into executed coverage. The same audit hash also binds reviewedGuides for formal and Go documentation; those guide reviews are freshness/scope records, not additional behavioral applicability rows. Per-case Quint and replay evidence is recorded separately.",
     "sources": [
       {
         "path": "README.md",
-        "sha256": "514162b3e3409389fcd6b5e387a602604b7baea230b0f9743d6d331a3be83d9f",
+        "sha256": "17cd061cde252e466ba94fced8615d3bc7d2a6b88cced14fe62c3572dc86c173",
         "entries": 6,
         "contracts": [
           "B01",
@@ -18536,7 +18543,7 @@
       },
       {
         "path": "docs/maintainers.md",
-        "sha256": "2fc4bc6aa99545572fcff75c44479ee52148030ec33886801e74ee545d7404ee",
+        "sha256": "d589fe1685ee9d10cd2f3bf96e51e539f1a93b6b887880a53ba13e33c1af1662",
         "entries": 9,
         "contracts": [
           "B01",
@@ -19652,211 +19659,6 @@
     }
   ],
   "scopedQuintAudit": "formal/quint-case-audit.json",
-  "lastLocalValidation": {
-    "baseRevision": "757a34b6c8cf9c045dc950972fe7c551b5c96b95",
-    "dirtyWorktree": true,
-    "identity": "The Go replay and mutation reports identify the precision-fix dirty source snapshot through the execution-input manifest and report hashes. The integration report separately records the later cluster-startup fixture fix. TypeScript replay and mutation reports retain their earlier source snapshot: TypeScript production, Quint models, shared corpus and replay inputs are unchanged. Each report retains its own base revision; CI repeats both implementations and both measurements on the committed PR revision.",
-    "generatedHistories": 4000,
-    "requiredWitnesses": 276,
-    "fixedScenarios": 238,
-    "protocolVectors": 134,
-    "invalidationVectorsPerEngine": 49,
-    "goIntegrationLeaves": 155,
-    "typescriptMutationDetections": {
-      "generated": 12,
-      "portable": 13,
-      "total": 13
-    },
-    "goMutationDetections": {
-      "generated": 12,
-      "portable": 13,
-      "total": 13,
-      "ordinary": 5
-    },
-    "reports": [
-      {
-        "path": ".formal-traces/ts-replay.json",
-        "sha256": "24e348576fbe32aa518062cc03255229db46e2e998a1f46c90b133a74d636903",
-        "baseRevision": "baa6f2dd9b4a05ad97d11f7d62cf0e784ce8ccb1"
-      },
-      {
-        "path": ".formal-traces/go-replay.jsonl",
-        "sha256": "cf5362777e6cf416f342603cf6dd269a6f701221d3cb8feac874d92895b66319",
-        "baseRevision": "757a34b6c8cf9c045dc950972fe7c551b5c96b95"
-      },
-      {
-        "path": ".formal-traces/go-replay-inputs.json",
-        "sha256": "e802b6707907a7e0b640a9825bbb251e3a0c52d27fcd9c6fb6c89aaf7e35e44d",
-        "baseRevision": "757a34b6c8cf9c045dc950972fe7c551b5c96b95"
-      },
-      {
-        "path": ".formal-traces/semantic/report.json",
-        "sha256": "8f99d7627f9d67434c6a7cb36311c0271387dd9aaec8ef895a4a3e9260e4d6c0",
-        "baseRevision": "baa6f2dd9b4a05ad97d11f7d62cf0e784ce8ccb1"
-      },
-      {
-        "path": ".formal-traces/go-semantic/report.json",
-        "sha256": "2661676546971f0ff5da6757b271184dfc2a5598e55db58e285878d7a610502e",
-        "baseRevision": "757a34b6c8cf9c045dc950972fe7c551b5c96b95"
-      },
-      {
-        "path": ".formal-traces/go-integration-cluster-readiness.jsonl",
-        "sha256": "68ecc11b9d1989eaf245ee3ecedf21f983fb18c679558063bcd1a32832740801",
-        "baseRevision": "c29a09b54e6ee9c08c985a51d14b03bd6d4d25aa"
-      }
-    ],
-    "limits": [
-      "Finite histories and fault catalogs do not prove universal refinement or arbitrary scheduling.",
-      "Two local-storage failure cases retain model-only portable injection coverage; native bindings and their available failure modes are documented.",
-      "JSON string interoperability uses Unicode scalars. Go rejects unsupported lone UTF-16 surrogate escapes; custom codecs can define another value domain.",
-      "Native Prometheus external histogram reuse requires an explicit accurate construction schema.",
-      "Watermark availability and external clock/progress assumptions remain deployment responsibilities."
-    ],
-    "typescriptEvidenceBaseRevision": "baa6f2dd9b4a05ad97d11f7d62cf0e784ce8ccb1",
-    "nativeClockPrecisionLeaves": 21
-  },
-  "validationPolicy": "Case statuses describe executable evidence, not a completed run. Current-revision assurance requires fresh model, generated replay, witness, mutation and native CI reports. lastLocalValidation below is historical and applies only to its recorded source fingerprints; it does not validate subsequently expanded cases.",
-  "historicalProfileEvidence": {
-    "status": "historical-only",
-    "scope": "These previous profile report/corpus identities belong to their recorded prior validation snapshots. They do not validate the current model versions, new regression schedules or expanded vector artifacts.",
-    "profiles": [
-      {
-        "id": "core",
-        "version": 1,
-        "model": "formal/dialcache-conformance.qnt",
-        "smoke": "formal/conformance-smoke.itf.json",
-        "plannedTraces": 32,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "ffea88a9ce595d2834832682381685646b23e0b41299231fd575fd87adadd250",
-        "traces": 32,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": null,
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      },
-      {
-        "id": "effects",
-        "version": 1,
-        "model": "formal/dialcache-effects-conformance.qnt",
-        "smoke": "formal/effects-smoke.itf.json",
-        "plannedTraces": 512,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "a30dda980545b43a49913abe666e6f828a454e098ce4242c15bfff851a0bc8d6",
-        "traces": 512,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": ".formal-traces/go-parity-witnesses/effects.json",
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      },
-      {
-        "id": "scope",
-        "version": 1,
-        "model": "formal/dialcache-scope-conformance.qnt",
-        "smoke": "formal/scope-smoke.itf.json",
-        "plannedTraces": 256,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "81b18fe663115d4ae56dda65250cf5c32870550a0a10e268c0cde1665ad438cc",
-        "traces": 256,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": ".formal-traces/go-parity-witnesses/scope.json",
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      },
-      {
-        "id": "recovery",
-        "version": 1,
-        "model": "formal/dialcache-recovery-conformance.qnt",
-        "smoke": "formal/recovery-smoke.itf.json",
-        "plannedTraces": 512,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "11e1514abeffd8b1fb2cfea743097a6be813049b9607c44e0658bbcbfbde067e",
-        "traces": 512,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": ".formal-traces/go-parity-witnesses/recovery.json",
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      },
-      {
-        "id": "policy",
-        "version": 2,
-        "model": "formal/dialcache-policy-conformance.qnt",
-        "smoke": "formal/policy-smoke.itf.json",
-        "plannedTraces": 512,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "7905e01aca383f49db394f454a3ca75e87ce955593f11afa08958dee7881cae7",
-        "traces": 512,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": ".formal-traces/go-parity-witnesses/policy.json",
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      },
-      {
-        "id": "shadow",
-        "version": 2,
-        "model": "formal/dialcache-shadow-conformance.qnt",
-        "smoke": "formal/shadow-smoke.itf.json",
-        "plannedTraces": 1024,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "cb70784f91edafb2217bfeafec83b6eaf2408c142796ff28c329eb1fd98ae244",
-        "traces": 1024,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": ".formal-traces/go-parity-witnesses/shadow.json",
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      },
-      {
-        "id": "admission",
-        "version": 1,
-        "model": "formal/dialcache-admission-conformance.qnt",
-        "smoke": "formal/admission-smoke.itf.json",
-        "plannedTraces": 128,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "8a0b351d2c26e4f8f089ac344abe0a74813fd9d9d110aac4719932618613e44c",
-        "traces": 128,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": ".formal-traces/go-parity-witnesses/admission.json",
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      },
-      {
-        "id": "layers",
-        "version": 1,
-        "model": "formal/dialcache-layers-conformance.qnt",
-        "smoke": "formal/layers-smoke.itf.json",
-        "plannedTraces": 512,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "4c23d4bbcb7a51e7abe5c3e89664e06d7460c202111e888755355bf5b13aecaf",
-        "traces": 512,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": ".formal-traces/go-parity-witnesses/layers.json",
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      },
-      {
-        "id": "independent",
-        "version": 1,
-        "model": "formal/dialcache-independent-conformance.qnt",
-        "smoke": "formal/independent-smoke.itf.json",
-        "plannedTraces": 512,
-        "status": "passed-shared-corpus",
-        "typescriptReport": ".formal-traces/ts-replay.json",
-        "goReport": ".formal-traces/go-replay.jsonl",
-        "corpusSha256": "a3a8b5dab8ce300428c5d6aa3e4ca0465b6819f7eff269fe9386fff053874545",
-        "traces": 512,
-        "corpusHashEncoding": "SHA256 over sorted trace basenames, NUL, exact bytes, NUL",
-        "witnessEvidence": ".formal-traces/go-parity-witnesses/independent.json",
-        "goInputManifest": ".formal-traces/go-replay-inputs.json"
-      }
-    ]
-  },
   "vectorExports": [
     {
       "model": "formal/dialcache-frame-vectors.qnt",

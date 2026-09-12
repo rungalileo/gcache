@@ -292,7 +292,7 @@ func replayObservationError(observed any, definition string, definitions obj) er
 	// expected/actual markers the mutation lane reads as comparison evidence.
 	if !matchesReplaySchema(decoded, target, definitions) {
 		keys, _ := decoded.(map[string]any)
-		return fmt.Errorf("driver produced a malformed %s observation with keys [%s]", definition, behaviorKeys(keys))
+		return fmt.Errorf("driver produced a malformed %s observation: keys [%s]", definition, behaviorKeys(keys))
 	}
 	return nil
 }

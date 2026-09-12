@@ -136,7 +136,8 @@
         "sourceSuccessDoesNotDecodeCandidate",
         "recoveredStaleHasNoSharedPublication",
         "readFailureNeverRetains",
-        "readFailureNeverAttemptsRecovery"
+        "readFailureNeverAttemptsRecovery",
+        "futureFrameIsNeverFreshOrRetained"
       ],
       "regressions": [
         "servedValueCanAgeTest",
@@ -1183,7 +1184,8 @@
         "readDoesNotConsultNewWritePolicy",
         "escapeConsumesExactlyOnePrefix",
         "successfulReadRespectsMarkerAndLimit",
-        "compressionUsesByteThresholdAndStrictShrink"
+        "compressionUsesByteThresholdAndStrictShrink",
+        "unknownZeroPrefixPassesThroughUnchanged"
       ],
       "regressions": [
         "allEnvelopeVectorsTest",
@@ -1862,6 +1864,34 @@
       "invariant": "registeredWorkIsNotAbandoned",
       "before": "registered: if (x.registered == id) -1 else x.registered,",
       "after": "registered: x.registered,"
+    },
+    {
+      "id": "stale-recovery-future-candidate",
+      "contract": "C40",
+      "source": "formal/cache-rules.qnt",
+      "model": "formal/dialcache-stale-recovery.qnt",
+      "invariant": "futureFrameIsNeverFreshOrRetained",
+      "before": "created <= observed and observed - created < ceiling",
+      "after": "observed - created < ceiling",
+      "measures": "Repeats the recovery-future-candidate fault against stale-recovery: the model keeps no future check of its own on the initial-read path, so a shared age rule that stops rejecting future stamps must be caught by this model's read receipt."
+    },
+    {
+      "id": "envelope-strips-unknown-zero-prefix",
+      "contract": "W06",
+      "source": "formal/dialcache-envelope-vectors.qnt",
+      "model": "formal/dialcache-envelope-vectors.qnt",
+      "invariant": "unknownZeroPrefixPassesThroughUnchanged",
+      "before": "if (raw.length() > 1 and raw.nth(1) <= 2)",
+      "after": "if (raw.length() > 1)"
+    },
+    {
+      "id": "source-budgets-accepts-at-deadline-equality",
+      "contract": "C25",
+      "source": "formal/dialcache-source-budgets-conformance.qnt",
+      "model": "formal/dialcache-source-budgets-conformance.qnt",
+      "invariant": "acceptedSourceRespectsItsOwnStart",
+      "before": "not(sourceAcceptsAt(source.started, now, source.budget))",
+      "after": "source.budget >= 0 and now > source.started + source.budget"
     }
   ]
 }

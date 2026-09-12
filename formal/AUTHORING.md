@@ -312,6 +312,6 @@ state assignment, or reaches such a fixture through a helper action is
 state-patching. `execution.mjs` classifies each run from the declaration bodies
 and requires the `replayRegressions` list to equal the public-only runs
 exactly, naming any unexported public run or exported patching run. Generation
-then binds each exported history to the driver contract, so a choice outside an
-action's declared domain fails `run-models.mjs generate` rather than a later
-native replay.
+then binds every history it produces, sampled and exported alike, to the driver
+contract, so a choice outside an action's declared domain fails
+`run-models.mjs generate` rather than a later native replay.

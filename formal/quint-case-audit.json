@@ -3511,6 +3511,18 @@
       "reference": "formal/dialcache-shadow-conformance.qnt:c0AtExactFreshnessBoundaryRefillsTest",
       "kind": "regression",
       "scope": "A public C1 confirmation completes using retained bytes at age 60000 ms. A subsequent job reacquires the same stored bytes as C0 at exact freshness age 60000 ms, does not decode them, and fills once from the accepted caller source. This checks C0 reacquisition rather than changing the prior job's retained decision."
+    },
+    {
+      "case": "C40.future-rejected",
+      "reference": "formal/dialcache-stale-recovery.qnt:futureFrameIsNeverFreshOrRetained",
+      "kind": "invariant",
+      "scope": "Receipt of the initial read: the frame stamp and the observing clock are recorded at the read, and a frame stamped after that clock is classified neither fresh nor retained, with the inequality restated on the recorded pair. The model keeps no future check of its own on this path, so the receipt is what catches a shared age rule that stops rejecting future stamps."
+    },
+    {
+      "case": "W06.envelope-markers",
+      "reference": "formal/dialcache-envelope-vectors.qnt:unknownZeroPrefixPassesThroughUnchanged",
+      "kind": "invariant",
+      "scope": "A binary payload whose leading zero is followed by nothing or by a byte above 2 is legacy raw data: the read outcome is passthrough with every byte returned. Complements the one-prefix unescape invariant; together they cover every zero-prefixed vector input."
     }
   ],
   "definitions": [

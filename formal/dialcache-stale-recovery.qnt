@@ -16,6 +16,11 @@ module dialcache_stale_recovery {
     RecoveryIdle | ClassifierDenied | CandidateChecking |
     CandidateLoading | RecoveryServed | RecoveryMissed
   type FinalOutcome = PendingOutcome | ServedFresh | ServedSource | ServedStale | RejectedSource
+  // Recorded when the initial read classifies the frame: the frame stamp and
+  // the observing clock. `now` keeps moving afterwards, so the receipt keeps
+  // the pair the read compared. The classification itself stays in
+  // `initialRead`, which no later transition rewrites.
+  type ReadReceipt = { recorded: bool, frameCreatedAt: int, now: int }
 
   pure val FRESH_AGE = 2
   pure val MAX_RECOVERY_AGE = 5
@@ -42,15 +47,17 @@ module dialcache_stale_recovery {
     processLocalWrites: int,
     requestLocalWrites: int,
     shadowJobs: int,
-    finalOutcome: FinalOutcome
+    finalOutcome: FinalOutcome,
+    readReceipt: ReadReceipt
   }
 
   var s: State
 
   // Transition predicates. Retention requires F <= age < M; a later recovery
-  // check only requires a nonfuture candidate younger than M.
+  // check only requires a nonfuture candidate younger than M. The shared age
+  // rules reject a future stamp; this model does not repeat that check.
   val initialFrameUsable =
-    s.framePresent and s.frameValid and not(s.frameFenced) and s.frameCreatedAt <= s.now
+    s.framePresent and s.frameValid and not(s.frameFenced)
   val freshAtInitialRead =
     s.readHealthy and initialFrameUsable and freshAgeAllowed(s.frameCreatedAt, s.now, FRESH_AGE)
   val candidateAtInitialRead =
@@ -81,7 +88,8 @@ module dialcache_stale_recovery {
     processLocalWrites: 0,
     requestLocalWrites: 0,
     shadowJobs: 0,
-    finalOutcome: PendingOutcome
+    finalOutcome: PendingOutcome,
+    readReceipt: { recorded: false, frameCreatedAt: 0, now: 0 }
   }
 
   // Environment transitions
@@ -159,6 +167,7 @@ module dialcache_stale_recovery {
         RetainedCandidate
       else
         PlainMiss,
+      readReceipt: { recorded: true, frameCreatedAt: s.frameCreatedAt, now: s.now },
       candidateRetained: candidateAtInitialRead,
       candidateCreatedAt: if (candidateAtInitialRead) s.frameCreatedAt else s.candidateCreatedAt,
       finalOutcome: if (freshAtInitialRead) ServedFresh else s.finalOutcome,
@@ -303,6 +312,15 @@ module dialcache_stale_recovery {
 
   val readFailureNeverAttemptsRecovery =
     s.initialRead != ReadFailed or s.recoveryState == RecoveryIdle
+
+  // Receipt of the read decision: a frame stamped after the observing clock is
+  // neither fresh nor retained. The inequality is restated on the recorded
+  // pair instead of reusing the shared age rules, so a rule that stops
+  // rejecting future stamps is caught here.
+  val futureFrameIsNeverFreshOrRetained =
+    not(s.readReceipt.recorded) or s.readReceipt.frameCreatedAt <= s.readReceipt.now or
+      (s.initialRead != FreshHit and s.initialRead != RetainedCandidate and
+       not(s.candidateRetained) and s.finalOutcome != ServedFresh)
 
   // Deterministic regressions
   run servedValueCanAgeTest = init

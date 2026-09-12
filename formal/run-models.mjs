@@ -29,7 +29,8 @@ export function executionPlan(mode, manifest = readExecution(), seed = process.e
         `--max-samples=${generation.maxSamples}`, `--max-steps=${generation.maxSteps}`, `--n-traces=${generation.traces}`,
         `--out-itf=${generation.outputDirectory}/trace_{seq}.itf.json`, `--verbosity=${settings.verbosity}`,
         '--invariants', ...model.invariants], outputDirectory: generation.outputDirectory, expectedTraces: generation.traces,
-        ...(model.replayRegressions === undefined ? {} : { explicitInputs: true }) });
+        ...(model.replayRegressions === undefined ? {} : { explicitInputs: true }),
+        ...(model.profile === undefined ? {} : { profile: model.profile }) });
       if (model.replayRegressions?.length) {
         const outputDirectory = `.formal-traces/regressions/${model.profile}`;
         commands.push({ command: 'quint', args: ['test', model.path,
@@ -47,10 +48,11 @@ export function executionPlan(mode, manifest = readExecution(), seed = process.e
   return commands;
 }
 
-// Exported regression histories bind to the driver contract at generation
-// time, so an out-of-domain choice or unknown action fails here, not during a
-// later native replay. Binding reads only the trace; no driver executes.
-export function bindExportedTrace(profile, text, path) {
+// Sampled and exported histories both bind to the driver contract at
+// generation time, so an out-of-domain choice or unknown action fails here,
+// not during a later native replay. Binding reads only the trace; no driver
+// executes.
+export function bindGeneratedTrace(profile, text, path) {
   bindTrace(profile, JSON.parse(text), path);
 }
 
@@ -76,11 +78,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         const files = readdirSync(resolve(root, job.outputDirectory)).filter(name => name.endsWith('.itf.json'));
         if (files.length !== job.expectedTraces) throw new Error(`Expected ${job.expectedTraces} traces in ${job.outputDirectory}; generated ${files.length}`);
         if (job.expectedFiles && JSON.stringify([...files].sort()) !== JSON.stringify([...job.expectedFiles].sort())) throw new Error(`Regression trace inventory differs in ${job.outputDirectory}`);
-        if (job.explicitInputs) for (const name of files) {
+        if (job.explicitInputs || job.profile) for (const name of files) {
           const path = resolve(root, job.outputDirectory, name);
-          const normalized = JSON.stringify(normalizeReplayInputs(JSON.parse(readFileSync(path, 'utf8')))) + '\n';
-          writeFileSync(path, normalized);
-          if (job.profile) bindExportedTrace(job.profile, normalized, `${job.outputDirectory}/${name}`);
+          let text = readFileSync(path, 'utf8');
+          if (job.explicitInputs) {
+            text = JSON.stringify(normalizeReplayInputs(JSON.parse(text))) + '\n';
+            writeFileSync(path, text);
+          }
+          if (job.profile) bindGeneratedTrace(job.profile, text, `${job.outputDirectory}/${name}`);
         }
       }
     }

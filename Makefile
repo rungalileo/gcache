@@ -5,7 +5,7 @@
 
 NODE ?= node
 
-.PHONY: help check check-ts check-go docs audit smoke formal formal-generate formal-ts formal-go fixtures-check mutations mutations-ts mutations-go integration integration-ts integration-go package-floor ci explore model-check
+.PHONY: help check check-ts check-go docs audit smoke formal formal-check formal-generate formal-ts formal-go fixtures-check mutations mutations-ts mutations-go integration integration-ts integration-go package-floor ci explore model-check
 
-help check check-ts check-go docs audit smoke formal formal-generate formal-ts formal-go fixtures-check mutations mutations-ts mutations-go integration integration-ts integration-go package-floor ci explore model-check:
+help check check-ts check-go docs audit smoke formal formal-check formal-generate formal-ts formal-go fixtures-check mutations mutations-ts mutations-go integration integration-ts integration-go package-floor ci explore model-check:
 	$(NODE) formal/validation.mjs $@

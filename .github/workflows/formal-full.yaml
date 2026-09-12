@@ -43,22 +43,50 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # The single producer: model checks, corpus generation, fixture recomputation
-  # and the shared witness evidence. Both port replays and both mutation
-  # measurements depend only on this job's artifact and run in parallel.
-  generate:
+  # Evidence about the Quint models themselves: typechecks, bounded runs, the
+  # public regressions and the model mutation challenges. Nothing downstream
+  # reads its output, so it runs beside generation and only the aggregate waits.
+  check-models:
     # Scheduled workflows run the default branch; keep the intended main scope explicit.
     if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # Run 34660598461 took 13 minutes (8.5 on model checks, 2.5 on generation,
-    # 1 on fixtures, under a minute on witnesses); run 34666226055 took 23.
-    timeout-minutes: 45
+    # Run 34660598461 spent about 8.5 minutes on this work; a 2x slower runner needs 17.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
         with:
           quint: "true"
-      - name: Check models, regenerate artifacts and evaluate shared witness evidence
+      - name: Check every scheduled Quint model, regression and challenge
+        run: make formal-check
+      - name: Preserve model check evidence and counterexamples
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: model-check-evidence
+          path: |
+            .formal-traces/verification/
+            .formal-traces/model-properties/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The single producer for every downstream lane: corpus generation, fixture
+  # recomputation and the shared witness evidence. Both port replays and both
+  # mutation measurements depend only on this job's artifact and run in parallel.
+  generate:
+    # Scheduled workflows run the default branch; keep the intended main scope explicit.
+    if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Run 34660598461 spent 2.5 minutes on generation, 1 on fixtures and under a
+    # minute on witnesses; a 2x slower runner needs about 9, plus setup.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+        with:
+          quint: "true"
+      - name: Regenerate artifacts and evaluate shared witness evidence
         run: make formal-generate
       - name: Preserve formal corpus, witness evidence and counterexamples
         if: always()
@@ -202,13 +230,14 @@ jobs:
 
   # A failed or skipped dependency cannot turn smoke evidence into full acceptance.
   formal-full:
-    needs: [generate, typescript-parity, symbolic, typescript-mutations, go-parity, go-mutations, exploration]
+    needs: [check-models, generate, typescript-parity, symbolic, typescript-mutations, go-parity, go-mutations, exploration]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # Long-retention summary: completion/context reports and the symbolic and
-      # exploration reports, without the multi-hundred-megabyte trace corpus.
+      # Long-retention summary: completion/context reports and the model check,
+      # symbolic and exploration reports, without the multi-hundred-megabyte
+      # trace corpus.
       # Each download tolerates a missing artifact from a job that failed early.
       - name: Collect TypeScript completion evidence
         if: always()
@@ -224,6 +253,13 @@ jobs:
         with:
           name: go-parity-evidence
           path: formal-summary/go
+      - name: Collect model check report
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: model-check-evidence
+          path: formal-summary/model-check
       - name: Collect symbolic verification report
         if: always()
         continue-on-error: true
@@ -249,13 +285,15 @@ jobs:
             formal-summary/go/go-completion.json
             formal-summary/go/go-context.json
             formal-summary/go/go-replay-summary.json
+            formal-summary/model-check/model-properties/report.json
             formal-summary/symbolic/report.json
             formal-summary/exploration/*/report.json
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 90
-      - name: Require the generated corpus, both port replays and both mutation measurements
+      - name: Require the model check, the generated corpus, both port replays and both mutation measurements
         env:
+          CHECK_MODELS_RESULT: ${{ needs.check-models.result }}
           GENERATE_RESULT: ${{ needs.generate.result }}
           TYPESCRIPT_RESULT: ${{ needs.typescript-parity.result }}
           TYPESCRIPT_MUTATIONS_RESULT: ${{ needs.typescript-mutations.result }}
@@ -265,6 +303,7 @@ jobs:
           EXPLORATION_RESULT: ${{ needs.exploration.result }}
           EXPLORATION_REQUIRED: ${{ github.event_name == 'schedule' || inputs.exploration == true }}
         run: |
+          test "$CHECK_MODELS_RESULT" = success
           test "$GENERATE_RESULT" = success
           test "$TYPESCRIPT_RESULT" = success
           test "$TYPESCRIPT_MUTATIONS_RESULT" = success

@@ -1,6 +1,8 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 type Step = {
@@ -113,15 +115,34 @@ process.exit(Number(process.argv[3] ?? 0));\n`);
     expect(plan.filter(step => step.args?.[0] === "formal/run-models.mjs" && step.args[1] === "generate")).toHaveLength(1);
     expect(plan.filter(step => step.args?.[0] === "formal/witnesses.mjs")).toHaveLength(1);
     expect(plan.some(step => step.args?.[0] === "formal/generate-artifacts.mjs")).toBe(false);
-    expect(plan[0]!.remove).toEqual([".formal-traces/ts-completion.json", ".formal-traces/go-completion.json"]);
-    // The aggregate is exactly the three lanes in order, so a CI job running
+    expect(plan[0]!.args).toEqual(["formal/run-models.mjs", "check"]);
+    expect(plan[1]!.remove).toEqual([".formal-traces/ts-completion.json", ".formal-traces/go-completion.json"]);
+    // The aggregate is exactly the four lanes in order, so a CI job running
     // one lane executes the same steps as the local sequential run.
-    expect(plan).toEqual(["formal-generate", "formal-ts", "formal-go"].flatMap(target => validationPlan(target, { directory })));
+    expect(plan).toEqual(["formal-check", "formal-generate", "formal-ts", "formal-go"].flatMap(target => validationPlan(target, { directory })));
+  });
+
+  it("keeps the model check as its own lane that produces nothing the port lanes consume", () => {
+    // The check (typechecks, bounded runs, regressions and challenges) is
+    // evidence about Quint; generation is the only producer downstream reads.
+    expect(validationPlan("formal-check", { directory })).toEqual([
+      { label: "Check every scheduled Quint model", command: process.execPath, args: ["formal/run-models.mjs", "check"] },
+    ]);
+    const generate = validationPlan("formal-generate", { directory });
+    expect(generate.some(step => step.args?.[0] === "formal/run-models.mjs" && step.args[1] === "check")).toBe(false);
+    expect(generate.some(step => step.args?.[0] === "formal/check-model-properties.mjs")).toBe(false);
+    for (const target of ["formal-ts", "formal-go", "mutations"]) {
+      expect(validationPlan(target, { directory }).some(step => step.args?.[0] === "formal/run-models.mjs")).toBe(false);
+    }
+    // ci keeps requiring the check through the aggregate; nothing else adds a second one.
+    expect(validationPlan("ci", { directory }).filter(step => step.args?.[0] === "formal/run-models.mjs" && step.args[1] === "check")).toHaveLength(1);
   });
 
   it("ends generation with the shared witness evaluation and starts each replay lane from a prepared context", () => {
     const generate = validationPlan("formal-generate", { directory });
     expect(generate.at(-1)!.args).toEqual(["formal/witnesses.mjs", "evaluate", "--profile", "all"]);
+    expect(generate.map(step => step.args?.slice(0, 2))).toEqual([undefined, ["formal/run-models.mjs", "generate"],
+      ["formal/generated-fixtures.mjs", "--check"], ["formal/witnesses.mjs", "evaluate"]]);
     expect(generate.some(step => step.args?.[0] === "formal/conformance.mjs")).toBe(false);
     expect(generate.some(step => step.command === "corepack" || step.command === "go")).toBe(false);
     const ts = validationPlan("formal-ts", { directory });
@@ -149,7 +170,7 @@ process.exit(Number(process.argv[3] ?? 0));\n`);
 
   it("requires Quint only for generation and recomputation, not for replay or mutation lanes", () => {
     fakeTool("quint", 'console.error("quint: not installed"); process.exit(1)');
-    for (const target of ["formal-generate", "formal", "fixtures-check", "explore", "ci"]) {
+    for (const target of ["formal-check", "formal-generate", "formal", "fixtures-check", "explore", "ci"]) {
       expect(() => checkPrerequisites(target, { directory, environment, nodeVersion: "v24.20.0" })).toThrow(/Cannot run quint/);
     }
     for (const target of ["formal-ts", "formal-go", "mutations-ts", "mutations-go", "mutations"]) {
@@ -177,7 +198,7 @@ process.exit(Number(process.argv[3] ?? 0));\n`);
     for (const target of ["model-check", "ci"]) {
       expect(() => checkPrerequisites(target, { directory, environment, nodeVersion: "v24.20.0" })).toThrow(/requires Java 21/);
     }
-    for (const target of ["check-ts", "formal", "formal-generate", "formal-ts", "explore"]) {
+    for (const target of ["check-ts", "formal", "formal-check", "formal-generate", "formal-ts", "explore"]) {
       expect(() => checkPrerequisites(target, { directory, environment, nodeVersion: "v24.20.0" })).not.toThrow();
       expect(validationPlan(target, { directory }).some(step => step.args?.[0] === "formal/check-symbolic-models.mjs")).toBe(false);
     }
@@ -189,7 +210,7 @@ process.exit(Number(process.argv[3] ?? 0));\n`);
     for (const target of ["model-check", "ci"]) {
       expect(() => checkPrerequisites(target, { directory, environment, nodeVersion: "v24.20.0" })).toThrow(/requires tar to unpack the pinned Apalache archive/);
     }
-    for (const target of ["check-ts", "formal", "formal-generate", "formal-ts", "explore"]) {
+    for (const target of ["check-ts", "formal", "formal-check", "formal-generate", "formal-ts", "explore"]) {
       expect(() => checkPrerequisites(target, { directory, environment, nodeVersion: "v24.20.0" })).not.toThrow();
     }
   });
@@ -218,5 +239,52 @@ else {
     fakeTool("corepack", 'console.log("10.33.0")');
     fakeTool("go", 'console.log("go version go1.26.0 test/test")');
     expect(() => checkPrerequisites("check-go", { directory, environment, nodeVersion: "v24.20.0" })).toThrow(/Go 1.27.1/);
+  });
+});
+
+describe("full formal workflow shape", () => {
+  type Step = { name?: string; run?: string; uses?: string; env?: Record<string, string>; with?: Record<string, string> };
+  type Job = { needs?: string | string[]; steps: Step[] };
+  const lanes = ["typescript-parity", "go-parity", "typescript-mutations", "go-mutations"];
+  const needsOf = (job: Job) => (job.needs === undefined ? [] : [job.needs].flat());
+  let jobs: Record<string, Job>;
+
+  beforeEach(async () => {
+    // yaml is not a project dependency and vitest does not declare it: it is in
+    // the lockfile only transitively (testcontainers via docker-compose, and
+    // vite's optional peer), and pnpm hoists every transitive package into
+    // node_modules/.pnpm/node_modules, which a require rooted at vitest's real
+    // store path walks up into while a bare import from this file cannot.
+    // Name the remedy if a dependency bump ever drops it from the tree.
+    let yamlPath: string;
+    try {
+      yamlPath = createRequire(createRequire(import.meta.url).resolve("vitest/package.json")).resolve("yaml");
+    } catch {
+      throw new Error("The workflow shape tests parse YAML; add yaml as a devDependency now that no other package brings it in.");
+    }
+    const { parse } = await import(pathToFileURL(yamlPath).href) as { parse(text: string): { jobs: Record<string, Job> } };
+    jobs = parse(readFileSync(new URL("../.github/workflows/formal-full.yaml", import.meta.url), "utf8")).jobs;
+  });
+
+  it("runs the model check beside generation so the port and mutation lanes wait only for the corpus", () => {
+    expect(needsOf(jobs["check-models"]!)).toEqual([]);
+    expect(needsOf(jobs.generate!)).toEqual([]);
+    expect(jobs["check-models"]!.steps.map(step => step.run).filter(Boolean)).toEqual(["make formal-check"]);
+    expect(jobs.generate!.steps.map(step => step.run).filter(Boolean)).toEqual(["make formal-generate"]);
+    for (const lane of lanes) expect(needsOf(jobs[lane]!), lane).toEqual(["generate"]);
+  });
+
+  it("requires the model check in the aggregate and retains its report in the long-lived summary", () => {
+    const aggregate = jobs["formal-full"]!;
+    expect(needsOf(aggregate)).toEqual(expect.arrayContaining(["check-models", "generate", ...lanes]));
+    const gate = aggregate.steps.find(step => step.run?.includes("_RESULT"))!;
+    expect(gate.env).toMatchObject({ CHECK_MODELS_RESULT: "${{ needs.check-models.result }}" });
+    expect(gate.run).toMatch(/test "\$CHECK_MODELS_RESULT" = success/);
+    const evidence = jobs["check-models"]!.steps.find(step => step.uses?.startsWith("actions/upload-artifact"))!.with!;
+    expect(evidence.name).toBe("model-check-evidence");
+    expect(evidence.path!.trim().split("\n").map(line => line.trim())).toEqual([".formal-traces/verification/", ".formal-traces/model-properties/"]);
+    expect(aggregate.steps.some(step => step.uses?.startsWith("actions/download-artifact") && step.with?.name === "model-check-evidence")).toBe(true);
+    const summary = aggregate.steps.find(step => step.uses?.startsWith("actions/upload-artifact"))!.with!;
+    expect(summary.path).toContain("formal-summary/model-check/model-properties/report.json");
   });
 });

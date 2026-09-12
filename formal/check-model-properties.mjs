@@ -53,7 +53,10 @@ export async function measureModelProperties({ only, concurrency = resolveConcur
   const save = () => writeFileSync(resolve(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   save();
   async function execute(args) {
-    const result = await spawnBuffered('quint', args, { cwd: root, timeoutMs: 60_000 });
+    // Bounds a hung evaluator, not a slow runner: a single bounded run took up
+    // to 35 s on the slow hosted runner of run 34666226055 before this pool
+    // shared its cores with three siblings.
+    const result = await spawnBuffered('quint', args, { cwd: root, timeoutMs: 180_000 });
     if (result.error || result.signal) throw new Error(`Quint execution failed: ${result.error ?? result.signal}`);
     return result;
   }

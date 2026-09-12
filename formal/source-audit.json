@@ -1287,7 +1287,7 @@
     },
     {
       "path": "formal/PORTING.md",
-      "sha256": "8d4a591a9158597022a76752ec762936f9c89ca36af305c5ffe054cca4201b27",
+      "sha256": "637fc70f08e0996a72fc0c04e2fd42f5a4388246bc84b44a8964d3e2f654d3dd",
       "entries": [
         {"line":1,"title":"Implementing another DialCache port"},
         {"line":14,"title":"What a port supplies"},
@@ -1296,9 +1296,9 @@
         {"line":146,"title":"Observation contract"},
         {"line":222,"title":"Generated fixtures and fast local tests"},
         {"line":257,"title":"Complete corpus and reusable acceptance checks"},
-        {"line":362,"title":"Witness evidence"},
-        {"line":405,"title":"Current limitations for a third port"},
-        {"line":419,"title":"New-port acceptance"}
+        {"line":365,"title":"Witness evidence"},
+        {"line":408,"title":"Current limitations for a third port"},
+        {"line":422,"title":"New-port acceptance"}
       ],
       "review": {
         "kind": "tooling-guide",
@@ -1346,14 +1346,14 @@
     },
     {
       "path": "formal/README.md",
-      "sha256": "61dff24cd4a843b683f8079355bd1b104bd7d4d0ca334a03f48a99761ec61f79",
+      "sha256": "4931e0c49ffbfe9de2e5efb009d12ad8732a67b11f8f68482bc747a554447bc3",
       "entries": [
         {"line":1,"title":"Executable DialCache specification"},
         {"line":7,"title":"Start with your task"},
         {"line":23,"title":"How the specification connects to code"},
         {"line":43,"title":"Models and composition profiles"},
         {"line":89,"title":"Generating and replaying behavior"},
-        {"line":168,"title":"Evidence and scope"}
+        {"line":171,"title":"Evidence and scope"}
       ],
       "review": {
         "kind": "tooling-guide",
@@ -1501,15 +1501,15 @@
     },
     {
       "path": "formal/VALIDATION.md",
-      "sha256": "5184594ed952e2b7dc56616e2c7a70975b5341e0ce5caee9b39a2a37177be4aa",
+      "sha256": "a01e0b546bdc2a1a2b13b5573898cafb01b6b19791f670f088b8be4d4c123bb1",
       "entries": [
         {"line":1,"title":"Validation and evidence"},
         {"line":7,"title":"Choosing a run"},
-        {"line":36,"title":"Reading a completion report"},
-        {"line":54,"title":"Mutation evidence"},
-        {"line":95,"title":"Exploratory runs"},
-        {"line":125,"title":"A retained sampling regression"},
-        {"line":146,"title":"Historical results"}
+        {"line":50,"title":"Reading a completion report"},
+        {"line":68,"title":"Mutation evidence"},
+        {"line":111,"title":"Exploratory runs"},
+        {"line":141,"title":"A retained sampling regression"},
+        {"line":162,"title":"Historical results"}
       ],
       "review": {
         "kind": "tooling-guide",

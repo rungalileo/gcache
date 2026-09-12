@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readExecution, validateExecution } from './execution.mjs';
+import { printGroup, resolveConcurrency, runPool, seconds, spawnBuffered } from './quint-pool.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 export function validatePropertyResult(result, exitCode, expectation) {
@@ -33,7 +33,7 @@ export function selectChallenges(manifest, only) {
   return selected;
 }
 
-export function measureModelProperties({ only } = {}) {
+export async function measureModelProperties({ only, concurrency = resolveConcurrency() } = {}) {
   const output = resolve(root, '.formal-traces/model-properties');
   const manifest = readExecution();
   // A complete measurement validates the whole manifest first; a filtered run
@@ -52,14 +52,50 @@ export function measureModelProperties({ only } = {}) {
     catalog: manifest.challenges.length, challenges: [] };
   const save = () => writeFileSync(resolve(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   save();
-  const workspace = mkdtempSync(resolve(tmpdir(), 'dialcache-model-properties-'));
-  function execute(args) {
-    const result = spawnSync('quint', args, { cwd: root, encoding: 'utf8', timeout: 60_000, maxBuffer: 8 * 1024 * 1024 });
+  async function execute(args) {
+    const result = await spawnBuffered('quint', args, { cwd: root, timeoutMs: 60_000 });
     if (result.error || result.signal) throw new Error(`Quint execution failed: ${result.error ?? result.signal}`);
     return result;
   }
+  // Each challenge measures in its own copy of every Quint source, so challenges
+  // run side by side and no mutation can leak into another baseline. The report
+  // fingerprints every Quint dependency. Both runs of a challenge share the copy
+  // and restore the unmodified sources first.
+  async function measure(challenge, entry) {
+    const source = sources.get(challenge.source);
+    const workspace = mkdtempSync(resolve(tmpdir(), 'dialcache-model-properties-'));
+    const lines = [];
+    let detail = '';
+    try {
+      for (const label of ['baseline', 'mutant']) {
+        mkdirSync(resolve(workspace, 'formal'), { recursive: true });
+        for (const [path, text] of sources) writeFileSync(resolve(workspace, path), text);
+        if (label === 'mutant') writeFileSync(resolve(workspace, challenge.source), source.replace(challenge.before, challenge.after));
+        const model = resolve(workspace, challenge.model);
+        const prefix = resolve(output, `${challenge.id}-${label}`);
+        const compile = await execute(['typecheck', model]);
+        detail = compile.stdout + compile.stderr;
+        writeFileSync(`${prefix}-typecheck.log`, detail);
+        if (compile.status !== 0) throw new Error(`${challenge.id}/${label}: model must typecheck before measurement`);
+        rmSync(`${prefix}.json`, { force: true });
+        const run = await execute(['run', model, ...options, '--invariants', challenge.invariant, `--out=${prefix}.json`]);
+        detail = run.stdout + run.stderr;
+        writeFileSync(`${prefix}.log`, detail);
+        const result = JSON.parse(readFileSync(`${prefix}.json`, 'utf8'));
+        validatePropertyResult(result, run.status, label);
+        entry[label] = label === 'baseline' ? 'passed' : 'detected';
+        if (label === 'mutant') entry.counterexampleStates = result.trace.length;
+        save();
+        lines.push(`${label}: typecheck ${seconds(compile.durationMs)}; run ${result.status} after ${result.trace.length} states, ${seconds(run.durationMs)}\n`);
+      }
+      printGroup(`${challenge.id}: compiling fault violates ${challenge.invariant}`, ...lines);
+    } catch (error) {
+      printGroup(`${challenge.id}: measurement failed`, ...lines, detail, `${error}\n`);
+      throw error;
+    } finally { rmSync(workspace, { recursive: true, force: true }); }
+  }
   try {
-    const version = execute(['--version']);
+    const version = await execute(['--version']);
     if (version.status !== 0) throw new Error('Cannot read Quint version');
     report.quintVersion = version.stdout.trim();
     for (const challenge of challenges) {
@@ -67,31 +103,12 @@ export function measureModelProperties({ only } = {}) {
       if (source === undefined || source.split(challenge.before).length !== 2) {
         throw new Error(`${challenge.id}: mutation anchor must match exactly once`);
       }
-      const entry = { ...challenge, baseline: 'pending', mutant: 'pending' };
-      report.challenges.push(entry);
-      save();
-      for (const label of ['baseline', 'mutant']) {
-        // Restore imported modules before each run; no mutation can leak into
-        // another baseline. The report fingerprints every Quint dependency.
-        mkdirSync(resolve(workspace, 'formal'), { recursive: true });
-        for (const [path, text] of sources) writeFileSync(resolve(workspace, path), text);
-        if (label === 'mutant') writeFileSync(resolve(workspace, challenge.source), source.replace(challenge.before, challenge.after));
-        const model = resolve(workspace, challenge.model);
-        const prefix = resolve(output, `${challenge.id}-${label}`);
-        const compile = execute(['typecheck', model]);
-        writeFileSync(`${prefix}-typecheck.log`, compile.stdout + compile.stderr);
-        if (compile.status !== 0) throw new Error(`${challenge.id}/${label}: model must typecheck before measurement`);
-        rmSync(`${prefix}.json`, { force: true });
-        const run = execute(['run', model, ...options, '--invariants', challenge.invariant, `--out=${prefix}.json`]);
-        writeFileSync(`${prefix}.log`, run.stdout + run.stderr);
-        const result = JSON.parse(readFileSync(`${prefix}.json`, 'utf8'));
-        validatePropertyResult(result, run.status, label);
-        entry[label] = label === 'baseline' ? 'passed' : 'detected';
-        if (label === 'mutant') entry.counterexampleStates = result.trace.length;
-        save();
-      }
-      console.log(`${challenge.id}: compiling fault violates ${challenge.invariant}`);
     }
+    // Entries hold catalog order from the start; completions fill them in place,
+    // so the saved report never depends on which challenge finished first.
+    for (const challenge of challenges) report.challenges.push({ ...challenge, baseline: 'pending', mutant: 'pending' });
+    save();
+    await runPool(challenges.map((challenge, index) => () => measure(challenge, report.challenges[index])), { concurrency });
     report.complete = only === undefined;
     save();
     return report;
@@ -99,11 +116,11 @@ export function measureModelProperties({ only } = {}) {
     report.error = String(error);
     save();
     throw error;
-  } finally { rmSync(workspace, { recursive: true, force: true }); }
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [option, ...extra] = process.argv.slice(2);
   if (extra.length || (option !== undefined && !option.startsWith('--only='))) throw new Error('Usage: node formal/check-model-properties.mjs [--only=id,id]');
-  measureModelProperties({ only: option?.slice('--only='.length) });
+  await measureModelProperties({ only: option?.slice('--only='.length) });
 }

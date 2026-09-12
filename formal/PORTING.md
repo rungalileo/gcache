@@ -269,11 +269,14 @@ make integration   # Real-server interoperability; requires Docker.
 
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs all local lanes in order,
 including symbolic checks and the exact Node 22.15.0 package floor.
-`make formal-generate` produces the full corpus and the shared witness evidence;
-`make formal-ts` and `make formal-go` each prepare and complete one port's run
-against them. The parity and mutation lanes depend only on the generated corpus
-and shared witness evidence and run in parallel in hosted CI, whose aggregate
-requires all of them. These are the same entry points used by hosted CI.
+`make formal-check` runs the Quint evidence lane (every scheduled model, its
+public regressions and the model mutation challenges); the aggregate requires
+it, but the port lanes do not wait for it. `make formal-generate` produces the
+full corpus and the shared witness evidence; `make formal-ts` and
+`make formal-go` each prepare and complete one port's run against them. The
+parity and mutation lanes depend only on the generated corpus and shared witness
+evidence and run in parallel in hosted CI, whose aggregate requires all of them.
+These are the same entry points used by hosted CI.
 The manual/weekly full workflow performs the complete formal, symbolic and mutation
 checks; PR CI keeps native/race/smoke/audit and real-server integration checks,
 with conditional artifact recomputation. Behavior/model changes require full

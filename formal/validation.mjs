@@ -8,7 +8,7 @@ const replayTests = ['test/formal-conformance.test.ts', 'test/formal-effects.tes
   'test/formal-local-clock.test.ts', 'test/formal-behavior.test.ts', 'test/formal-protocol-vectors.test.ts'];
 const aggregateTargets = {
   check: ['check-ts', 'check-go', 'docs', 'audit'],
-  formal: ['formal-generate', 'formal-ts', 'formal-go'],
+  formal: ['formal-check', 'formal-generate', 'formal-ts', 'formal-go'],
   mutations: ['mutations-ts', 'mutations-go'],
   integration: ['integration-ts', 'integration-go'],
   ci: ['check', 'package-floor', 'formal', 'model-check', 'integration', 'mutations'],
@@ -20,8 +20,9 @@ export const targetDescriptions = {
   docs: 'Build the documentation site',
   audit: 'Check source, behavior, feature, Go and generated-fixture freshness inventories',
   smoke: 'Replay committed Quint-derived fixtures in TypeScript and Go; no full completion claim',
-  formal: 'Generate the complete Quint corpus and shared witness evidence, then complete TypeScript and Go replay',
-  'formal-generate': 'Check models, generate/recompute artifacts and evaluate shared witness evidence over the complete corpus',
+  formal: 'Check every scheduled Quint model, generate the complete corpus and shared witness evidence, then complete TypeScript and Go replay',
+  'formal-check': 'Typecheck and run every scheduled Quint model, its public regressions and the model mutation challenges',
+  'formal-generate': 'Generate/recompute artifacts and evaluate shared witness evidence over the complete corpus',
   'formal-ts': 'Complete prepared TypeScript replay of the generated corpus',
   'formal-go': 'Complete prepared Go replay of the generated corpus with race detection',
   'fixtures-check': 'Recompute every committed model-derived artifact with pinned Quint',
@@ -103,10 +104,14 @@ export function validationPlan(target, { directory = root, environment = process
     'fixtures-check': [node('Recompute all committed Quint artifacts', 'formal/generate-artifacts.mjs', '--check')],
     explore: [node('Explore and replay an isolated alternate-seed corpus', 'formal/explore.mjs')],
     'model-check': [node('Symbolically verify the scheduled finite rules', 'formal/check-symbolic-models.mjs')],
+    // The model check is evidence about the Quint models (typechecks, bounded
+    // runs, regressions and the mutation challenges). Nothing downstream reads
+    // its output, so it is a sibling of generation rather than a prefix of it.
+    'formal-check': [node('Check every scheduled Quint model', 'formal/run-models.mjs', 'check')],
     // Generation is the single shared producer: the corpus, wire artifacts and
     // witness evidence depend only on the models. Both ports' replays and both
     // mutation measurements read that output and can run in parallel off it.
-    'formal-generate': [invalidate('ts', 'go'), node('Check every scheduled Quint model', 'formal/run-models.mjs', 'check'),
+    'formal-generate': [invalidate('ts', 'go'),
       node('Generate complete corpus and recompute wire artifacts', 'formal/run-models.mjs', 'generate'),
       node('Recompute committed Quint smoke and witness fixtures', 'formal/generated-fixtures.mjs', '--check'), witnesses],
     'formal-ts': [invalidate('ts'), node('Prepare TypeScript execution context', 'formal/conformance.mjs', 'prepare', 'typescript', reportPath('ts', 'context')),
@@ -144,7 +149,7 @@ export function checkPrerequisites(target, { directory = root, environment = pro
     const version = probe('go', ['version'], { directory, environment });
     if (!/^go version go1\.27\.1\s/.test(version)) throw new Error(`Validation requires Go 1.27.1; found ${version}. Put the pinned Go toolchain on PATH.`);
   }
-  if (targets.some(name => ['formal-generate', 'fixtures-check', 'explore', 'model-check'].includes(name))) {
+  if (targets.some(name => ['formal-check', 'formal-generate', 'fixtures-check', 'explore', 'model-check'].includes(name))) {
     const requiredQuint = JSON.parse(readFileSync(resolve(directory, 'formal/generated-fixtures.lock.json'), 'utf8')).quintVersion;
     const version = probe('quint', ['--version'], { directory, environment });
     if (version !== requiredQuint) throw new Error(`Expected Quint ${requiredQuint}; found ${version}. Install the pinned Quint CLI before recomputing artifacts.`);
@@ -304,7 +309,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (extra.length) throw new Error('Use node formal/validation.mjs <target>; run make help for targets.');
   if (target === 'help') {
     console.log(Object.entries(targetDescriptions).map(([name, description]) => `make ${name.padEnd(17)} ${description}`).join('\n'));
-    console.log('\nPrerequisites: frozen pnpm install; Node 24, pinned pnpm; Go 1.27.1 / Quint 0.32.0 / Docker where required; Java 21 and tar for model-check and ci.');
+    console.log('\nPrerequisites: frozen pnpm install; Node 24, pinned pnpm; Go 1.27.1 / Docker where required; Quint 0.32.0 for formal-check, formal-generate, fixtures-check, explore and model-check; Java 21 and tar for model-check and ci.');
+    console.log('formal-check is the Quint evidence lane (models, regressions, challenges); the port and mutation lanes read only the formal-generate output and do not wait for it.');
     console.log('Full local CI: make ci NODE22_BIN=/absolute/path/to/node22/bin/node (exact 22.15.0).');
   } else {
     try { await runTarget(target); }

@@ -96,7 +96,7 @@ function run(label, cohort, baseline) {
     // JSON reporter. Complete each cohort so detection has recorded evidence.
     '--coverage.enabled=false', '--reporter=json', '--reporter=./formal/semantic-reporter.mjs', `--outputFile=${json}`], {
     cwd: workspace, env: { ...env, DIALCACHE_PROTOCOL_CORPUS: cohort === 'generated' ? 'generated' : 'fixed', DIALCACHE_SEMANTIC_RUN_META: meta },
-    encoding: 'utf8', timeout: 180_000, maxBuffer: 32 * 1024 * 1024,
+    encoding: 'utf8', timeout: 540_000, maxBuffer: 32 * 1024 * 1024,
   });
   writeFileSync(resolve(output, `${label}-${cohort}.log`), (result.stdout ?? '') + (result.stderr ?? ''));
   if (result.error || result.signal) throw new Error(`${label}/${cohort}: runner failed: ${result.error ?? result.signal}`);
@@ -131,7 +131,7 @@ try {
   // The shared language-neutral evaluator produces the baseline witness
   // evidence over the unmodified corpus; the TypeScript suite only checks the gate.
   const evaluated = spawnSync(process.execPath, [resolve(root, 'formal/witnesses.mjs'), 'evaluate', '--profile', 'all', '--out', resolve(output, 'witnesses')],
-    { cwd: root, env, encoding: 'utf8', timeout: 180_000 });
+    { cwd: root, env, encoding: 'utf8', timeout: 540_000 });
   if (evaluated.error || evaluated.status !== 0) throw new Error(`baseline witness evaluation failed: ${evaluated.error ?? evaluated.stderr}`);
   const witnesses = JSON.parse(read('formal/coverage-witnesses.json'));
   report.reachedWitnesses = {};

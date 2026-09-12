@@ -70,8 +70,11 @@ challenges over 62 distinct faults, with no waivers. Its report distinguishes
 those two counts and marks a filtered `--only` run as partial; only the complete
 run is evidence.
 
-The weekly full workflow budgets `typescript-mutations` at 35 minutes and
-`go-mutations` at 40 minutes (a September 2026 run took 17 and 22.5 minutes).
+The weekly full workflow budgets `typescript-mutations` at 60 minutes and
+`go-mutations` at 75 minutes. A September 2026 run took 17 and 25 minutes; a
+second run the next day was 1.8 times slower on every phase, so each budget
+assumes a 2x slower runner. The Go mutation runner bounds each `go test`
+invocation at 8 minutes to catch a hung mutant, not to pace a slow runner.
 Its `formal-full` aggregate job retains a small `formal-summary` artifact for 90
 days: both completion and context reports, the Go replay summary, the symbolic
 `report.json` and, on scheduled or exploration runs, each exploration

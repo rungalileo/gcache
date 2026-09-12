@@ -21,7 +21,10 @@ jobs:
   exploration:
     if: (github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.exploration)
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # Run 34660598461 took 28 minutes. Hosted runners vary by about 2x between
+    # runs (run 34666226055 was 1.8x slower on every Quint phase), so every
+    # budget in this workflow leaves that headroom.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
@@ -47,9 +50,9 @@ jobs:
     # Scheduled workflows run the default branch; keep the intended main scope explicit.
     if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # Run 34660598461 spent 8.5 minutes on model checks, 2.5 on generation,
-    # 1 on fixtures and under a minute on witness evaluation.
-    timeout-minutes: 25
+    # Run 34660598461 took 13 minutes (8.5 on model checks, 2.5 on generation,
+    # 1 on fixtures, under a minute on witnesses); run 34666226055 took 23.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
@@ -71,7 +74,7 @@ jobs:
     needs: generate
     runs-on: ubuntu-latest
     # Run 34660598461 replayed the TypeScript corpus in 32 seconds.
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
@@ -119,8 +122,8 @@ jobs:
   typescript-mutations:
     needs: generate
     runs-on: ubuntu-latest
-    # Run 34660598461 took 17 minutes; leave headroom for corpus growth.
-    timeout-minutes: 35
+    # Run 34660598461 took 17 minutes; a 2x slower runner needs 34.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
@@ -144,7 +147,7 @@ jobs:
     needs: generate
     runs-on: ubuntu-latest
     # Run 34660598461 replayed the Go corpus with race detection in 4.5 minutes.
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
@@ -173,8 +176,9 @@ jobs:
   go-mutations:
     needs: generate
     runs-on: ubuntu-latest
-    # Run 34660598461 took 23 minutes; leave headroom for corpus growth.
-    timeout-minutes: 40
+    # Run 34660598461 took 25 minutes; a 2x slower runner needs 50, and one
+    # hung cohort adds its 8-minute test bound before the lane fails.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation

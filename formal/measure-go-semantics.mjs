@@ -128,7 +128,11 @@ export function measureGoSemantics() {
   save(); rmSync(resolve(output, 'report.md'), { force: true });
   const workspace = mkdtempSync(resolve(tmpdir(), 'dialcache-go-semantic-'));
   const go = process.env.GO_BIN ?? 'go';
-  const timeout = 180_000;
+  // Bounds a hung mutant, not a slow runner: hosted runners vary by about
+  // 2x between runs (run 34660598461 replayed the generated cohort in 104 s;
+  // run 34666226055 had not finished it after 150 s). One timeout aborts the
+  // whole measurement, so a generous bound costs at most one wait.
+  const timeout = 540_000;
   try {
     // Copies preserve repo-relative witness definition paths while mutations
     // remain completely outside the shared checkout. No git resets or writes
@@ -183,7 +187,7 @@ export function measureGoSemantics() {
       if (result.error || result.signal || result.status !== 0) throw new Error(`${label}: noncompiling mutant/baseline, not detection; see compile log`);
     };
     const run = (label, cohort, baseline) => {
-      const result = spawnSync(go, ['test', '-json', '-count=1', '-timeout=150s', '-run', `^(${cohorts[cohort].join('|')})$`, '.'], {
+      const result = spawnSync(go, ['test', '-json', '-count=1', '-timeout=480s', '-run', `^(${cohorts[cohort].join('|')})$`, '.'], {
         cwd: moduleDirectory, env: { ...env, DIALCACHE_PROTOCOL_CORPUS: cohort === 'generated' ? 'generated' : 'fixed' }, encoding: 'utf8', timeout, maxBuffer: 128 * 1024 * 1024,
       });
       writeFileSync(resolve(output, `${label}-${cohort}.jsonl`), result.stdout ?? '');

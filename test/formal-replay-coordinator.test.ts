@@ -191,6 +191,24 @@ describe("observation encoding contract", () => {
     expect(failureOf(() => session.observe(0, observed()))).toMatch(/Unknown replay session/);
   });
 
+  it("names each session's observation definition in the prepare result so ports can validate locally", () => {
+    const definitions: Record<string, string> = { core: "coreObservation", "local-clock": "localClockObservation" };
+    let prepared: Record<string, unknown> = {};
+    for (const profile of Object.keys(profileActions())) {
+      const binding = bindTrace(profile, smoke(profile), profile);
+      prepared = new ReplayCoordinator().dispatch({ version: 1, id: 1, op: "prepare", profile, path: smokeTracePath(profile) });
+      expect(prepared.observation).toBe(definitions[profile] ?? "behaviorObservation");
+      expect(prepared.observation).toBe(binding.observation);
+      expect(Object.hasOwn(schema.$defs as object, prepared.observation as string)).toBe(true);
+    }
+    const response = (result: unknown) => ({ version: 1, id: 1, ok: true, result });
+    expect(() => assertSchema(response(prepared), "response")).not.toThrow();
+    const { observation: _named, ...unnamed } = prepared;
+    expect(() => assertSchema(response(unnamed), "response")).toThrow(/^Malformed replay response/);
+    expect(() => assertSchema(response({ ...prepared, observation: "invented" }), "response")).toThrow(/^Malformed replay response/);
+    expect(() => assertSchema(response({ ...prepared, observation: "observedEvent" }), "response")).toThrow(/^Malformed replay response/);
+  });
+
   it("accepts every declared empty observation and names the definition in schema failures", () => {
     for (const profile of Object.keys(profileActions())) {
       const binding = bindTrace(profile, smoke(profile), profile);
@@ -228,7 +246,7 @@ describe("observation encoding contract", () => {
     // A fixture without a policy is neither the empty core fixture nor a behavior fixture.
     expect(() => assertSchema({ tracked: true }, "fixture")).toThrow(/Malformed replay fixture/);
     const response = (candidate: unknown) => ({ version: 1, id: 1, ok: true, result: {
-      session: "1", settlement, fixture: candidate, setup: [], actions: ["beginCall"], steps: 2 } });
+      session: "1", settlement, observation: "behaviorObservation", fixture: candidate, setup: [], actions: ["beginCall"], steps: 2 } });
     expect(() => assertSchema(response(fixture), "response")).not.toThrow();
     expect(() => assertSchema(response({ ...fixture, recovery: "maybe" }), "response")).toThrow(/^Malformed replay response/);
     // Every profile's prepared fixture crosses the response schema.

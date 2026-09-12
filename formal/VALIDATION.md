@@ -27,11 +27,12 @@ aggregate requires all of them.
 Within a lane, `run-models.mjs`, `check-model-properties.mjs` and
 `generated-fixtures.mjs` run independent Quint processes concurrently so a
 multi-core runner is not left idle; each process keeps the single Quint thread
-that `execution.json` pins. `QUINT_JOBS` sets how many processes run at once
-(the default is the machine's available parallelism). Results do not depend on
-that number: every process has its own seed, inputs and output paths, so the
-corpus, the fixtures and the challenge report are identical for any worker
-count.
+that `execution.json` pins. `QUINT_JOBS` sets how many processes run at once;
+the default is the machine's available parallelism, capped at one process per
+2 GiB of memory because a Quint process that generates a full trace corpus
+peaks near 1.7 GiB. Results do not depend on that number: every process has
+its own seed, inputs and output paths, so the corpus, the fixtures and the
+challenge report are identical for any worker count.
 
 A behavior, model, or replay change requires full validation of its current
 inputs before merge. The default PR workflow runs faster checks; it does not

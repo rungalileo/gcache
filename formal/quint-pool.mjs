@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { availableParallelism } from 'node:os';
+import { availableParallelism, totalmem } from 'node:os';
 
 // Process-level concurrency for the formal scripts that spawn Quint.
 //
@@ -9,7 +9,10 @@ import { availableParallelism } from 'node:os';
 //   only from running independent processes side by side; each process owns its
 //   seed, inputs and output paths, so a result never depends on the worker count.
 // - Worker count: QUINT_JOBS when set (a positive integer), otherwise
-//   os.availableParallelism(), never below one. QUINT_JOBS=1 is the sequential path.
+//   os.availableParallelism() capped at one worker per 2 GiB of memory, never
+//   below one. The Quint CLI holds a whole trace corpus before writing it, so a
+//   1024-trace generation process peaks near 1.7 GiB; a core count alone would
+//   over-commit memory on a many-core laptop. QUINT_JOBS=1 is the sequential path.
 // - runPool returns results indexed by task, not by finish time, so a report
 //   assembled from them is deterministic.
 // - A command's stdout and stderr are buffered and printed as one `::group::`
@@ -17,9 +20,10 @@ import { availableParallelism } from 'node:os';
 // - Fail fast: after the first failed task no further task starts; tasks already
 //   in flight run to completion (they are never killed) and still print their
 //   groups; the pool then rethrows the first failure.
-export function resolveConcurrency(env = process.env, available = availableParallelism()) {
+export const memoryPerWorker = 2 * 2 ** 30;
+export function resolveConcurrency(env = process.env, available = availableParallelism(), memory = totalmem()) {
   const raw = env.QUINT_JOBS;
-  if (raw === undefined) return Math.max(1, available);
+  if (raw === undefined) return Math.max(1, Math.min(available, Math.floor(memory / memoryPerWorker)));
   const value = Number(raw);
   if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value < 1) {
     throw new Error(`QUINT_JOBS must be a positive integer; got ${JSON.stringify(raw)}`);

@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 type Buffered = { status: number | null; signal: string | null; error?: Error & { code?: string }; stdout: string; stderr: string; durationMs: number };
-const { resolveConcurrency, runPool, spawnBuffered, formatGroup, executionChains, CommandFailure } = {
+const { resolveConcurrency, runPool, spawnBuffered, formatGroup, executionChains, executionPlan, CommandFailure } = {
   ...await import(new URL("../formal/quint-pool.mjs", import.meta.url).href),
   ...await import(new URL("../formal/run-models.mjs", import.meta.url).href),
 } as {
-  resolveConcurrency(env: Record<string, string | undefined>, available?: number): number;
+  resolveConcurrency(env: Record<string, string | undefined>, available?: number, memory?: number): number;
   runPool<T>(tasks: Array<() => Promise<T> | T>, options?: { concurrency?: number }): Promise<T[]>;
   spawnBuffered(command: string, args: string[], options?: { cwd?: string; timeoutMs?: number }): Promise<Buffered>;
   formatGroup(title: string, ...texts: string[]): string;
   executionChains(commands: Array<{ command: string; args: string[] }>): Array<Array<{ command: string; args: string[] }>>;
+  executionPlan(mode: "check" | "generate"): Array<{ command: string; args: string[] }>;
   CommandFailure: new (message: string, result: { status?: number | null; signal?: string | null }) => Error & { status?: number | null };
 };
 
@@ -30,6 +31,15 @@ describe("Quint process pool", () => {
     for (const invalid of ["0", "-2", "1.5", "abc", "", " 4", "4 ", "0x10", "1e3"]) {
       expect(() => resolveConcurrency({ QUINT_JOBS: invalid }, 16), JSON.stringify(invalid)).toThrow(/QUINT_JOBS must be a positive integer/);
     }
+  });
+
+  it("caps the default worker count at one per 2 GiB of memory and leaves QUINT_JOBS uncapped", () => {
+    const GiB = 2 ** 30;
+    expect(resolveConcurrency({}, 12, 16 * GiB)).toBe(8);
+    expect(resolveConcurrency({}, 4, 16 * GiB)).toBe(4);
+    expect(resolveConcurrency({}, 18, 64 * GiB)).toBe(18);
+    expect(resolveConcurrency({}, 8, 1 * GiB)).toBe(1);
+    expect(resolveConcurrency({ QUINT_JOBS: "12" }, 12, 16 * GiB)).toBe(12);
   });
 
   it("returns results indexed by task even when later tasks finish first", async () => {
@@ -109,6 +119,24 @@ describe("Quint process pool", () => {
   it("prints a command's log as one closed group block", () => {
     expect(formatGroup("quint run model", "line one\n", "line two")).toBe("::group::quint run model\nline one\nline two\n::endgroup::");
     expect(formatGroup("quint typecheck model", "", undefined as unknown as string)).toBe("::group::quint typecheck model\n::endgroup::");
+  });
+
+  it("puts every job of the real plans into exactly one per-model chain, in plan order, without the challenge run", () => {
+    for (const mode of ["check", "generate"] as const) {
+      const plan = executionPlan(mode);
+      const chains = executionChains(plan);
+      const chained = chains.flat();
+      const challengeRuns = plan.filter(job => job.command === "node" && job.args[0] === "formal/check-model-properties.mjs");
+      expect(challengeRuns.length).toBe(mode === "check" ? 1 : 0);
+      expect(chained.length).toBe(plan.length - challengeRuns.length);
+      expect(new Set(chained).size).toBe(chained.length);
+      expect(chained.filter(job => challengeRuns.includes(job))).toEqual([]);
+      for (const chain of chains) {
+        expect(new Set(chain.map(job => job.command === "quint" ? job.args[1] : job.args.join(" "))).size).toBe(1);
+        const positions = chain.map(job => plan.indexOf(job));
+        expect(positions).toEqual([...positions].sort((a, b) => a - b));
+      }
+    }
   });
 
   it("chains a model's jobs in plan order, isolates node exports and leaves the challenge run out", () => {

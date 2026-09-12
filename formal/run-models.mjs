@@ -131,7 +131,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     catch (error) {
       if (!(error instanceof CommandFailure)) throw error;
       console.error(error.message);
-      process.exit(error.status ?? 1);
+      // Set the exit code rather than calling process.exit: a piped stdout is
+      // asynchronous on macOS and an immediate exit drops the buffered log
+      // groups that explain the failure.
+      process.exitCode = error.status ?? 1;
     }
   }
 }

@@ -40,19 +40,24 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  corpus:
+  # The single producer: model checks, corpus generation, fixture recomputation
+  # and the shared witness evidence. Both port replays and both mutation
+  # measurements depend only on this job's artifact and run in parallel.
+  generate:
     # Scheduled workflows run the default branch; keep the intended main scope explicit.
     if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Run 34660598461 spent 8.5 minutes on model checks, 2.5 on generation,
+    # 1 on fixtures and under a minute on witness evaluation.
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: ./.github/actions/setup-validation
         with:
           quint: "true"
-      - name: Check models, regenerate artifacts and require full TypeScript replay
-        run: make formal-corpus
-      - name: Preserve formal corpus, completion and counterexamples
+      - name: Check models, regenerate artifacts and evaluate shared witness evidence
+        run: make formal-generate
+      - name: Preserve formal corpus, witness evidence and counterexamples
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -61,6 +66,21 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
+
+  typescript-parity:
+    needs: generate
+    runs-on: ubuntu-latest
+    # Run 34660598461 replayed the TypeScript corpus in 32 seconds.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: ./.github/actions/setup-validation
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-traces
+          path: .formal-traces
+      - name: Require TypeScript replay of the complete corpus
+        run: make formal-ts
       # Small companion to the full corpus so the aggregate can retain the
       # TypeScript completion without downloading every generated history.
       - name: Preserve TypeScript completion evidence
@@ -97,9 +117,9 @@ jobs:
           retention-days: 14
 
   typescript-mutations:
-    needs: corpus
+    needs: generate
     runs-on: ubuntu-latest
-    # Run 34646653122 took 17 minutes; leave headroom for corpus growth.
+    # Run 34660598461 took 17 minutes; leave headroom for corpus growth.
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -121,8 +141,9 @@ jobs:
           retention-days: 14
 
   go-parity:
-    needs: corpus
+    needs: generate
     runs-on: ubuntu-latest
+    # Run 34660598461 replayed the Go corpus with race detection in 4.5 minutes.
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -150,9 +171,9 @@ jobs:
           retention-days: 14
 
   go-mutations:
-    needs: [corpus, go-parity]
+    needs: generate
     runs-on: ubuntu-latest
-    # Run 34646653122 took 22.5 minutes; leave headroom for corpus growth.
+    # Run 34660598461 took 23 minutes; leave headroom for corpus growth.
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -162,10 +183,6 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: formal-traces
-          path: .formal-traces
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: go-parity-evidence
           path: .formal-traces
       - name: Require Go assertion-based fault detection
         run: make mutations-go
@@ -181,7 +198,7 @@ jobs:
 
   # A failed or skipped dependency cannot turn smoke evidence into full acceptance.
   formal-full:
-    needs: [corpus, symbolic, typescript-mutations, go-parity, go-mutations, exploration]
+    needs: [generate, typescript-parity, symbolic, typescript-mutations, go-parity, go-mutations, exploration]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -233,18 +250,20 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 90
-      - name: Require the complete corpus, both ports and both mutation measurements
+      - name: Require the generated corpus, both port replays and both mutation measurements
         env:
-          CORPUS_RESULT: ${{ needs.corpus.result }}
-          TYPESCRIPT_RESULT: ${{ needs.typescript-mutations.result }}
+          GENERATE_RESULT: ${{ needs.generate.result }}
+          TYPESCRIPT_RESULT: ${{ needs.typescript-parity.result }}
+          TYPESCRIPT_MUTATIONS_RESULT: ${{ needs.typescript-mutations.result }}
           GO_RESULT: ${{ needs.go-parity.result }}
           GO_MUTATIONS_RESULT: ${{ needs.go-mutations.result }}
           SYMBOLIC_RESULT: ${{ needs.symbolic.result }}
           EXPLORATION_RESULT: ${{ needs.exploration.result }}
           EXPLORATION_REQUIRED: ${{ github.event_name == 'schedule' || inputs.exploration == true }}
         run: |
-          test "$CORPUS_RESULT" = success
+          test "$GENERATE_RESULT" = success
           test "$TYPESCRIPT_RESULT" = success
+          test "$TYPESCRIPT_MUTATIONS_RESULT" = success
           test "$GO_RESULT" = success
           test "$GO_MUTATIONS_RESULT" = success
           test "$SYMBOLIC_RESULT" = success

@@ -119,9 +119,12 @@ make explore       # Fresh recorded seed in an isolated source snapshot.
 make ci NODE22_BIN=/absolute/path/to/node22/bin/node
 ```
 
-`make formal-corpus` runs Rust model checks, generation, TS completion and the
-shared witness evaluation; `make formal-go` resumes with Go against that exact
-corpus. `make mutations-ts` and `make mutations-go` split the fault campaigns.
+`make formal-generate` runs Rust model checks, generation, fixture recomputation
+and the shared witness evaluation; `make formal-ts` and `make formal-go` then
+complete each port's replay against that exact corpus. `make mutations-ts` and
+`make mutations-go` split the fault campaigns. The parity and mutation lanes
+depend only on the generated corpus and shared witness evidence, so hosted CI
+runs all four in parallel; the aggregate requires every one of them.
 `make fixtures-check` recomputes committed artifacts; after an intentional model
 edit, update them with `node formal/generate-artifacts.mjs --write` first.
 `make ci` includes the separate symbolic checks after `make formal`, as well as

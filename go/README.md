@@ -178,20 +178,23 @@ once, then:
 
 ```sh
 make check-go      # Native checks, committed cases/smoke and race detection.
-make formal        # Rust model/corpus checks and prepared TS replay, then Go replay.
+make formal        # Rust model/corpus checks, then prepared TS and Go replay.
 make model-check   # Separate finite symbolic checks.
-make mutations-go  # Requires current full TS and Go completion reports.
+make mutations-go  # Go fault catalog over the generated corpus and witness evidence.
 make integration-go
 ```
 
 `make check` runs both languages' fast checks.
 `make ci NODE22_BIN=/path/to/node22/bin/node` runs all local lanes in order,
-including symbolic checks and the exact Node 22.15.0 packed-package floor. For a
-full run resumed after `make formal-corpus`, use `make formal-go`; it requires
-the completed TS report, then prepares Go with the shared witness evidence bound
-as an input.
+including symbolic checks and the exact Node 22.15.0 packed-package floor. After
+`make formal-generate`, `make formal-go` prepares Go with the shared witness
+evidence bound as an input and replays the corpus; it does not depend on the
+TypeScript replay. The Go parity and mutation lanes depend only on the generated
+corpus and shared witness evidence and run in parallel with the TypeScript lanes
+in hosted CI, whose aggregate requires all of them.
 Reports and traces are kept in `.formal-traces/`. Source, corpus or witness
-changes invalidate completion reports; mutation targets reject stale evidence.
+changes invalidate completion reports; mutation reports record the exact
+source, corpus and witness fingerprints they measured.
 
 The same targets run in CI. PRs retain native/race/smoke/audit and real-server
 integration checks; model/generator changes trigger fixture recomputation.

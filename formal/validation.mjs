@@ -8,7 +8,7 @@ const replayTests = ['test/formal-conformance.test.ts', 'test/formal-effects.tes
   'test/formal-local-clock.test.ts', 'test/formal-behavior.test.ts', 'test/formal-protocol-vectors.test.ts'];
 const aggregateTargets = {
   check: ['check-ts', 'check-go', 'docs', 'audit'],
-  formal: ['formal-corpus', 'formal-go'],
+  formal: ['formal-generate', 'formal-ts', 'formal-go'],
   mutations: ['mutations-ts', 'mutations-go'],
   integration: ['integration-ts', 'integration-go'],
   ci: ['check', 'package-floor', 'formal', 'model-check', 'integration', 'mutations'],
@@ -20,15 +20,16 @@ export const targetDescriptions = {
   docs: 'Build the documentation site',
   audit: 'Check source, behavior, feature, Go and generated-fixture freshness inventories',
   smoke: 'Replay committed Quint-derived fixtures in TypeScript and Go; no full completion claim',
-  formal: 'Complete Quint checks and corpus, then prepared TypeScript and Go replay',
-  'formal-corpus': 'Check models, generate/recompute artifacts, complete TypeScript replay and evaluate shared witness evidence',
-  'formal-go': 'Require current TypeScript completion, then complete Go replay with race detection',
+  formal: 'Generate the complete Quint corpus and shared witness evidence, then complete TypeScript and Go replay',
+  'formal-generate': 'Check models, generate/recompute artifacts and evaluate shared witness evidence over the complete corpus',
+  'formal-ts': 'Complete prepared TypeScript replay of the generated corpus',
+  'formal-go': 'Complete prepared Go replay of the generated corpus with race detection',
   'fixtures-check': 'Recompute every committed model-derived artifact with pinned Quint',
   explore: 'Explore a new recorded seed and replay both ports in an isolated source snapshot',
   'model-check': 'Symbolically verify the scheduled finite rules with pinned Quint/Apalache (Java 21)',
-  mutations: 'Require both current completions, then measure TypeScript and Go semantic mutations',
-  'mutations-ts': 'Require current TypeScript completion, then measure its semantic mutations',
-  'mutations-go': 'Require both current completions, then measure Go semantic mutations',
+  mutations: 'Measure TypeScript and Go semantic mutations over the generated corpus and shared witness evidence',
+  'mutations-ts': 'Measure TypeScript semantic mutations over the generated corpus',
+  'mutations-go': 'Measure Go semantic mutations over the generated corpus and shared witness evidence',
   integration: 'Run real TypeScript and Go Redis/Valkey/Cluster integration checks',
   'integration-ts': 'Run TypeScript real integration checks',
   'integration-go': 'Run Go real integration and interoperability checks with race detection',
@@ -102,25 +103,28 @@ export function validationPlan(target, { directory = root, environment = process
     'fixtures-check': [node('Recompute all committed Quint artifacts', 'formal/generate-artifacts.mjs', '--check')],
     explore: [node('Explore and replay an isolated alternate-seed corpus', 'formal/explore.mjs')],
     'model-check': [node('Symbolically verify the scheduled finite rules', 'formal/check-symbolic-models.mjs')],
-    'formal-corpus': [invalidate('ts', 'go'), node('Check every scheduled Quint model', 'formal/run-models.mjs', 'check'),
+    // Generation is the single shared producer: the corpus, wire artifacts and
+    // witness evidence depend only on the models. Both ports' replays and both
+    // mutation measurements read that output and can run in parallel off it.
+    'formal-generate': [invalidate('ts', 'go'), node('Check every scheduled Quint model', 'formal/run-models.mjs', 'check'),
       node('Generate complete corpus and recompute wire artifacts', 'formal/run-models.mjs', 'generate'),
-      node('Recompute committed Quint smoke and witness fixtures', 'formal/generated-fixtures.mjs', '--check'),
-      node('Prepare TypeScript execution context', 'formal/conformance.mjs', 'prepare', 'typescript', reportPath('ts', 'context')),
-      tsReplay(true), witnesses, { ...node('Adapt TypeScript native assertion report', 'formal/conformance-adapters.mjs', 'typescript', reportPath('ts', 'replay'), reportPath('ts', 'context')), stdoutFile: reportPath('ts', 'completion') },
+      node('Recompute committed Quint smoke and witness fixtures', 'formal/generated-fixtures.mjs', '--check'), witnesses],
+    'formal-ts': [invalidate('ts'), node('Prepare TypeScript execution context', 'formal/conformance.mjs', 'prepare', 'typescript', reportPath('ts', 'context')),
+      tsReplay(true), { ...node('Adapt TypeScript native assertion report', 'formal/conformance-adapters.mjs', 'typescript', reportPath('ts', 'replay'), reportPath('ts', 'context')), stdoutFile: reportPath('ts', 'completion') },
       completion('ts')],
-    'formal-go': [completion('ts'), invalidate('go'), node('Check Go parity inventory', 'formal/check-go-parity.mjs'),
+    'formal-go': [invalidate('go'), node('Check Go parity inventory', 'formal/check-go-parity.mjs'),
       node('Prepare Go execution context', 'formal/conformance.mjs', 'prepare', 'go', reportPath('go', 'context')), nativeGo(true),
       { ...node('Check complete Go native report', 'formal/check-go-replay.mjs'), stdoutFile: '.formal-traces/go-replay-summary.json' },
       { ...node('Adapt Go native assertion report', 'formal/conformance-adapters.mjs', 'go', '.formal-traces/go-replay.jsonl', reportPath('go', 'context')), stdoutFile: reportPath('go', 'completion') }, completion('go')],
-    'mutations-ts': [completion('ts'), node('Measure TypeScript semantic mutations', 'formal/measure-semantics.mjs')],
-    'mutations-go': [completion('ts'), completion('go'), node('Measure Go semantic mutations', 'formal/measure-go-semantics.mjs')],
+    'mutations-ts': [node('Measure TypeScript semantic mutations', 'formal/measure-semantics.mjs')],
+    'mutations-go': [node('Measure Go semantic mutations', 'formal/measure-go-semantics.mjs')],
     'integration-ts': [pnpm('Run TypeScript Redis/Valkey/Cluster integrations', 'test:integration')],
     'integration-go': [{ ...go('Run Go Redis/Valkey/Cluster and TypeScript interoperability', 'test', '-race', '-tags', 'integration', '-count=1', '-run', '^TestRedisIntegration$', '-json', './...'), stdoutFile: '.formal-traces/go-integration.jsonl' }],
     'package-floor': [{ label: 'Require a built package for floor checks', requireFile: 'dist/index.js', failureHint: 'Build first with make check-ts, or run make ci with NODE22_BIN set.' },
       { label: 'Check Node 22.15 zstd round trip and output ceiling', command: node22, args: ['--eval', floorSmoke], env: { PATH: floorEnvironment(environment, node22).PATH } },
       { label: 'Check packed package on Node 22.15', command: node22, args: ['scripts/test-package.mjs'], env: { PATH: floorEnvironment(environment, node22).PATH } }],
   };
-  return [...(target === 'mutations' ? [completion('ts'), completion('go')] : []), ...expandTargets(target).flatMap(name => plans[name])];
+  return expandTargets(target).flatMap(name => plans[name]);
 }
 
 function probe(command, args, { directory, environment }) {
@@ -140,7 +144,7 @@ export function checkPrerequisites(target, { directory = root, environment = pro
     const version = probe('go', ['version'], { directory, environment });
     if (!/^go version go1\.27\.1\s/.test(version)) throw new Error(`Validation requires Go 1.27.1; found ${version}. Put the pinned Go toolchain on PATH.`);
   }
-  if (targets.some(name => ['formal-corpus', 'fixtures-check', 'explore', 'model-check'].includes(name))) {
+  if (targets.some(name => ['formal-generate', 'fixtures-check', 'explore', 'model-check'].includes(name))) {
     const requiredQuint = JSON.parse(readFileSync(resolve(directory, 'formal/generated-fixtures.lock.json'), 'utf8')).quintVersion;
     const version = probe('quint', ['--version'], { directory, environment });
     if (version !== requiredQuint) throw new Error(`Expected Quint ${requiredQuint}; found ${version}. Install the pinned Quint CLI before recomputing artifacts.`);

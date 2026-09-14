@@ -733,21 +733,37 @@ async def test_local_promotion_bypasses_the_envelope_expiry_guard(
         return {"session_id": "fresh"}
 
     with gcache.enable():
-        # Populate both layers, then read once so the local copy is definitely present.
+        # Populate both layers, then DROP the local copy, so the next read must reach Redis.
         await gcache.aput(key, {"session_id": "cached"})
-        assert await gcache.aget(key, fallback) == {"session_id": "cached"}
-        assert calls == 0, "the put populated both layers, so nothing should have fallen back"
+        (await _local_ttl_cache(gcache, key)).clear()
 
-        # Now make the STORED envelope already expired, leaving Redis's own TTL alone. This is
-        # the disagreement the guard exists for -- a writer that set a longer Redis TTL, or a
-        # clock that moved.
+        # This read is a remote hit, and the local entry it leaves behind arrived by
+        # PROMOTION. That matters: reading straight after the aput would leave a local entry
+        # the put wrote, and this test's whole subject is what promotion stores. Asserted
+        # rather than assumed, because a local hit here would look identical from outside.
+        assert not await _local_ttl_cache(gcache, key), "local layer must be empty before the promoting read"
+        assert await gcache.aget(key, fallback) == {"session_id": "cached"}
+        assert calls == 0, "the remote layer still held the entry, so nothing should have fallen back"
+        assert await _local_ttl_cache(gcache, key), "the remote hit should have promoted the entry into the local layer"
+
+        # Now make the STORED envelope already expired while leaving Redis's own TTL alone.
+        # This is the disagreement the guard exists for -- a writer that set a longer Redis
+        # TTL, or a clock that moved.
+        #
+        # keepttl=True is load-bearing, not tidiness: a bare SET clears the key's TTL, which
+        # would make the key persistent and let every assertion below pass for the wrong
+        # reason -- the disagreement being staged is envelope-vs-Redis-TTL, and dropping the
+        # Redis TTL removes one side of it.
+        ttl_before = redis_server.ttl(key.urn)
+        assert ttl_before > 0, "the entry should carry a Redis TTL to preserve"
         raw = redis_server.get(key.urn)
         assert raw is not None
         envelope = json.loads(raw)
         envelope["expiresAtMs"] = envelope["createdAtMs"] - 1_000
-        redis_server.set(key.urn, json.dumps(envelope))
+        redis_server.set(key.urn, json.dumps(envelope), keepttl=True)
+        assert redis_server.ttl(key.urn) > 0, "the rewrite must preserve Redis's TTL, not persist the key"
 
-        # With the local copy still present: served, despite the envelope being expired.
+        # With the promoted local copy still present: served, despite the envelope being expired.
         assert await gcache.aget(key, fallback) == {"session_id": "cached"}
         assert calls == 0, "the local layer served an entry whose envelope had expired"
 

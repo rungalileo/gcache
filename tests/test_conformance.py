@@ -42,6 +42,25 @@ def test_the_vector_file_is_where_every_suite_expects_it() -> None:
         if v["expect"] == "accept":
             assert "decoded" in v, f"{v['name']} is an accept case with no expected decode"
 
+        # The asymmetry invariant is checked HERE, unconditionally, rather than inside the
+        # per-vector branch that handles "this client accepts what another rejects". A
+        # reviewer caught why that mattered: in the branch, the check only ran when the
+        # reading client happened to be on the accepting side, so a vector whose rejectedBy
+        # names THIS client could omit acceptedBy and asymmetryIsSafe entirely and still
+        # pass. And with no asymmetry vectors currently in the file, neither branch ran at
+        # all -- the invariant was unexercised. Global and unconditional is the only placement
+        # where every vector is subject to it regardless of which side each client is on.
+        if "rejectedBy" in v or "acceptedBy" in v:
+            assert v.get("rejectedBy"), f"{v['name']}: acceptedBy without rejectedBy"
+            assert v.get("acceptedBy"), f"{v['name']}: rejectedBy without acceptedBy"
+            assert v.get("asymmetryIsSafe"), f"{v['name']}: an asymmetry must justify its direction"
+            assert v["expect"] == "reject", f"{v['name']}: an asymmetry is expressed on a reject vector"
+            overlap = set(v["rejectedBy"]) & set(v["acceptedBy"])
+            assert not overlap, f"{v['name']}: a client cannot both accept and reject: {overlap}"
+            known = {"python", "typescript", "go"}
+            unknown = (set(v["rejectedBy"]) | set(v["acceptedBy"])) - known
+            assert not unknown, f"{v['name']}: unknown client(s) {unknown}"
+
 
 def _applies_to_python(vector: dict) -> bool:
     """Whether this vector's stated expectation is Python's.
@@ -126,16 +145,31 @@ def test_an_empty_prefix_is_unreachable_through_the_public_api() -> None:
     # The empty-prefix row above is a divergence gcache now forbids rather than documents, so
     # the rejection and the record must not drift apart: if someone re-enables urn_prefix=""
     # the vector file's reason becomes a lie.
-    import inspect
-
-    from gcache.gcache import GCache
+    #
+    # This used to assert `inspect.getsource(GCache.__init__)` contained the raise, and a
+    # reviewer was right to call that out: a source-text check stays green if the CONDITION
+    # is changed and the text left behind, so it would not have caught the regression it
+    # exists to catch. It was written that way because the singleton check came first, which
+    # made the branch unreachable in-process while the conftest fixture holds an instance.
+    # GCache.__init__ now validates pure config BEFORE the singleton check, so the real path
+    # is reachable and this asserts behaviour.
+    from gcache import GCache, GCacheConfig
+    from gcache.exceptions import EmptyUrnPrefixNotSupported
+    from tests.conftest import FakeCacheConfigProvider
 
     case = next(c for c in _DATA["keyRendering"]["cases"] if c["name"] == "empty-prefix")
     assert not case["agree"], "the empty-prefix case is recorded as divergent"
-    src = inspect.getsource(GCache.__init__)
-    assert "raise EmptyUrnPrefixNotSupported()" in src, (
-        "the vector file says this configuration is rejected at construction; it is not"
-    )
+
+    with pytest.raises(EmptyUrnPrefixNotSupported):
+        GCache(GCacheConfig(cache_config_provider=FakeCacheConfigProvider(), urn_prefix=""))
+
+    # It must beat GCacheAlreadyInstantiated, which is what the ordering above buys: the
+    # caller learns their config is invalid rather than that another instance exists.
+    from gcache.exceptions import GCacheAlreadyInstantiated
+
+    assert not issubclass(EmptyUrnPrefixNotSupported, GCacheAlreadyInstantiated)
+    # And it is a ValueError, so an existing construction guard still catches it.
+    assert issubclass(EmptyUrnPrefixNotSupported, ValueError)
 
 
 def test_the_watermark_and_envelope_parsers_really_do_differ() -> None:

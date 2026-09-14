@@ -84,6 +84,17 @@ class DecodedValue:
     expires_at_ms: int | None = None
 
 
+class EnvelopeEncodeError(ValueError):
+    """Raised when a value cannot be framed into a readable envelope.
+
+    Distinct from EnvelopeDecodeError, which callers convert to a cache MISS. An encode
+    failure is not a miss -- there is nothing stored to miss on. It means the write was
+    refused, which is the correct outcome when the alternative is storing an entry no client
+    can read. CacheController already treats a raising write as an error and leaves the
+    keyspace untouched, and the caller still gets its value from the fallback.
+    """
+
+
 class EnvelopeDecodeError(Exception):
     """Raised when a stored value matches no known envelope."""
 
@@ -102,11 +113,30 @@ def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes
         encoding = "utf8"
         body = payload
 
+    # The WRITER has to honour the same bound as the reader, or it produces entries it cannot
+    # read back. Tightening decode() to the safe-integer range without this left a
+    # self-inflicted permanent miss reachable from configuration alone: a large enough
+    # ttl_sec drives created_at_ms + ttl_sec*1000 past 2^53, the write succeeds, and every
+    # subsequent read -- in any of the three clients -- rejects it as out of range. The entry
+    # is then rewritten on each read and rejected again, forever.
+    #
+    # Raising rather than clamping. A clamped expiry silently means something different from
+    # what the caller configured, and gcache swallows write errors by design (the caller
+    # still gets its value from the fallback), so refusing to store an unreadable entry costs
+    # nothing and stores nothing wrong. Same posture as Envelope.JSON without a serializer.
+    expires_at_ms = created_at_ms + ttl_sec * 1000
+    for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
+        if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):
+            raise EnvelopeEncodeError(
+                f"{field} would be {value}, outside the safe-integer range that all three "
+                f"clients can read (created_at_ms={created_at_ms}, ttl_sec={ttl_sec})"
+            )
+
     return json.dumps(
         {
             "version": ENVELOPE_VERSION,
             "createdAtMs": created_at_ms,
-            "expiresAtMs": created_at_ms + ttl_sec * 1000,
+            "expiresAtMs": expires_at_ms,
             "encoding": encoding,
             "payload": body,
         },

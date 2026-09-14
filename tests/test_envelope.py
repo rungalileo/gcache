@@ -1468,3 +1468,87 @@ def test_only_the_owning_gcache_releases_the_singleton_flag(gcache: GCache) -> N
 
     with pytest.raises(GCacheAlreadyInstantiated):
         GCache(GCacheConfig(cache_config_provider=FakeCacheConfigProvider()))
+
+
+def test_the_writer_refuses_to_frame_an_unreadable_expiry() -> None:
+    # Tightening decode() to the safe-integer range without tightening encode_json left a
+    # self-inflicted permanent miss reachable from CONFIGURATION alone: a large enough
+    # ttl_sec drives created_at_ms + ttl_sec*1000 past 2^53, the write succeeds, and every
+    # later read -- Python, TypeScript or Go -- rejects it as out of range. The entry is then
+    # rewritten on each read and rejected again, for as long as the config stands.
+    #
+    # I only fixed the reader. A reviewer found the writer, and mutation-checking is what
+    # proved this test was missing: deleting the writer bound left the whole suite green.
+    #
+    # Raising rather than clamping. A clamped expiry silently means something other than what
+    # the caller configured, and gcache swallows write errors by design -- the caller still
+    # gets its value from the fallback -- so refusing stores nothing wrong.
+    from gcache._internal.envelope import EnvelopeEncodeError, encode_json
+
+    now = 1757308800123
+
+    # The boundary is legal, so the bound is pinned exactly rather than approximately.
+    ok = encode_json(created_at_ms=now, ttl_sec=(2**53 - 1 - now) // 1000, payload='{"a":1}')
+    assert json.loads(ok)["expiresAtMs"] <= 2**53 - 1
+
+    # A ttl that pushes the derived expiry past it is refused.
+    with pytest.raises(EnvelopeEncodeError, match="expiresAtMs"):
+        encode_json(created_at_ms=now, ttl_sec=9007199254740, payload='{"a":1}')
+
+    # And an out-of-range created_at is refused on its own, not only via the expiry -- the
+    # writer checks both fields, as the reader does.
+    with pytest.raises(EnvelopeEncodeError, match="createdAtMs"):
+        encode_json(created_at_ms=2**53, ttl_sec=60, payload='{"a":1}')
+
+    # EnvelopeEncodeError is NOT an EnvelopeDecodeError: a refused write is not a miss, since
+    # there is nothing stored to miss on. Conflating them would have CacheController treat it
+    # as a degraded read and try to heal an entry that does not exist.
+    from gcache._internal.envelope import EnvelopeDecodeError
+
+    assert not issubclass(EnvelopeEncodeError, EnvelopeDecodeError)
+    assert issubclass(EnvelopeEncodeError, ValueError)
+
+
+@pytest.mark.asyncio
+async def test_a_refused_write_reaches_redis_with_nothing() -> None:
+    # The consequence that matters, driven through the real write path rather than the
+    # helper: a refused frame must not reach Redis. Storing it is the failure mode -- an
+    # entry every client rejects, rewritten on each read and rejected again.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.envelope import EnvelopeEncodeError
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    fake = MagicMock(setex=AsyncMock(), set=AsyncMock(), get=AsyncMock(return_value=None))
+    cache = object.__new__(RedisCache)
+
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(GCacheMetrics, "SIZE_HISTOGRAM", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        # The TTL arrives through the resolved config, which is how a real misconfiguration
+        # would reach it -- a ramp/TTL provider handing out a nonsense ttl_sec, not a caller
+        # passing one in.
+        huge = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: 9007199254740}, ramp={CacheLayer.REMOTE: 100})
+        legal = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: 60}, ramp={CacheLayer.REMOTE: 100})
+
+        # The specific type, not a bare Exception -- if put() started failing for an
+        # unrelated reason this assertion would otherwise still pass.
+        with patch.object(RedisCache, "_resolve_config", AsyncMock(return_value=huge)):
+            with pytest.raises(EnvelopeEncodeError):
+                await RedisCache.put(cache, key, {"a": 1})
+
+        # And a legal ttl on the same path DOES reach Redis, so the test above is about the
+        # bound rather than about put() being broken.
+        with patch.object(RedisCache, "_resolve_config", AsyncMock(return_value=legal)):
+            await RedisCache.put(cache, key, {"a": 1})
+
+    assert fake.setex.await_count == 1, "only the legal write may reach Redis"

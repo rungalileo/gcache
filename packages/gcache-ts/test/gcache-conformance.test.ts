@@ -106,10 +106,31 @@ describe("cross-language envelope conformance", () => {
     // quietly.
     expect(data.vectors.length).toBeGreaterThanOrEqual(14);
     expect(data.envelopeVersion).toBe(1);
+    const known = new Set(["python", "typescript", "go"]);
     for (const v of data.vectors) {
       expect(v.expect === "accept" || v.expect === "reject").toBe(true);
       expect(v.why, `${v.name} must record why it exists`).toBeTruthy();
       if (v.expect === "accept") expect(v.decoded, `${v.name} accept case needs a decode`).toBeDefined();
+
+      // The asymmetry invariant is checked HERE, unconditionally, not inside the per-vector
+      // branch that handles "TS accepts what another client rejects". In the branch it only
+      // ran when TS happened to be on the accepting side, so a vector whose rejectedBy names
+      // typescript could omit acceptedBy and asymmetryIsSafe and still pass. And with no
+      // asymmetry vectors in the file, neither branch ran at all -- the invariant was
+      // unexercised. Global and unconditional is the only placement where every vector is
+      // subject to it regardless of which side each client is on. Python enforces the same
+      // set in tests/test_conformance.py.
+      if (v.rejectedBy !== undefined || v.acceptedBy !== undefined) {
+        expect(v.rejectedBy, `${v.name}: acceptedBy without rejectedBy`).toBeTruthy();
+        expect(v.acceptedBy, `${v.name}: rejectedBy without acceptedBy`).toBeTruthy();
+        expect(v.asymmetryIsSafe, `${v.name}: an asymmetry must justify its direction`).toBeTruthy();
+        expect(v.expect, `${v.name}: an asymmetry is expressed on a reject vector`).toBe("reject");
+        const overlap = (v.rejectedBy ?? []).filter((c) => (v.acceptedBy ?? []).includes(c));
+        expect(overlap, `${v.name}: a client cannot both accept and reject`).toEqual([]);
+        for (const c of [...(v.rejectedBy ?? []), ...(v.acceptedBy ?? [])]) {
+          expect(known.has(c), `${v.name}: unknown client ${c}`).toBe(true);
+        }
+      }
     }
   });
 
@@ -149,9 +170,10 @@ describe("cross-language envelope conformance", () => {
       if (vector.expect === "reject" && vector.rejectedBy !== undefined && !vector.rejectedBy.includes("typescript")) {
         // TS is on the accepting side of a deliberate asymmetry. Asserted rather than
         // skipped: a skip would let TS silently start rejecting too, making the recorded
-        // asymmetry a lie.
+        // asymmetry a lie. The metadata's own well-formedness is validated globally above,
+        // not here -- here it only ran when TS was on this side, which is the gap a reviewer
+        // found.
         expect(vector.acceptedBy, `${vector.name}: rejectedBy needs acceptedBy`).toContain("typescript");
-        expect(vector.asymmetryIsSafe, `${vector.name}: an asymmetry must justify its direction`).toBeTruthy();
         expect(fallbackCalls, `${vector.name} must be a hit in TS`).toBe(0);
         return;
       }

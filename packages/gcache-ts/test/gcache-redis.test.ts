@@ -406,6 +406,40 @@ describe("GCache Redis TTL layer", () => {
     expect(logger.warn).toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
   });
 
+  it("refuses to write an envelope it could not read back", async () => {
+    // Given a TTL large enough that now + ttlSec*1000 exceeds MAX_SAFE_INTEGER.
+    //
+    // Tightening parseEnvelope to Number.isSafeInteger without tightening the WRITER left a
+    // self-inflicted permanent miss reachable from configuration alone: the write succeeded,
+    // and every later read here, in Python, or in Go rejected the entry as out of range —
+    // rewritten on each read and rejected again, for as long as the config stood. A reviewer
+    // found it; mutation-checking proved this test was missing, because deleting the writer
+    // bound left the whole suite green.
+    const redis = new FakeRedis();
+    const useCase = "RedisUnsafeExpiryWrite";
+    const redisKey = keyFor("123", useCase).urn;
+    vi.setSystemTime(Date.parse("2026-05-12T17:00:00.000Z"));
+    const gcache = new GCache({ redis: { client: redis }, logger: { debug: vi.fn(), warn: vi.fn(), error: vi.fn() } });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase,
+      id: ([userId]: [string]) => userId,
+      defaultConfig: new GCacheKeyConfig({
+        ttlSec: { [CacheLayer.LOCAL]: 0, [CacheLayer.REMOTE]: 9_007_199_254_740 },
+        ramp: { [CacheLayer.LOCAL]: 0, [CacheLayer.REMOTE]: 100 },
+      }),
+    })(async (userId: string) => ({ userId, calls: ++calls }));
+
+    // When the value is computed and gcache tries to store it.
+    const value = await gcache.enable(async () => await getUser("123"));
+
+    // Then the caller still gets its value — a cache must not be able to fail a request —
+    // and nothing was written, rather than an unreadable entry being stored.
+    expect(value).toEqual({ userId: "123", calls: 1 });
+    expect(redis.values.has(redisKey), "a refused frame must not reach Redis").toBe(false);
+  });
+
   it("rejects a fractional timestamp rather than comparing it", async () => {
     // Given Redis holds an envelope whose expiresAtMs is fractional, and a clock at exactly
     // the floor of it.

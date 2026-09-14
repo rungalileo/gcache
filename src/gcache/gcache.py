@@ -82,14 +82,18 @@ class GCache:
         :raises EmptyUrnPrefixNotSupported: If urn_prefix is "" -- an empty prefix cannot
             interoperate, since Python renders ``kt:id`` where TypeScript renders ``:kt:id``.
         """
-        if _GLOBAL_GCACHE_STATE.gcache_instantiated:
-            raise GCacheAlreadyInstantiated()
-
-        # VALIDATE EVERYTHING BEFORE TOUCHING GLOBAL STATE. These assignments used to sit
-        # above the Redis checks, so a RedisConfigConflict left the new urn_prefix and logger
-        # published while no GCache existed -- the next construction inherited a namespace
-        # from an attempt that failed. __del__ clears only gcache_instantiated, so nothing
-        # ever put them back.
+        # PURE CONFIG VALIDATION FIRST, before the singleton check. Two reasons, and the
+        # second is the one that caught me out.
+        #
+        # It does not depend on global state, and the resulting error is the more actionable
+        # one: a caller holding an invalid config learns that, rather than learning another
+        # instance exists when both are true.
+        #
+        # And it is what makes the rejection testable at RUNTIME. With the singleton check
+        # first, a live GCache made this branch unreachable in-process, so the test asserted
+        # that `inspect.getsource` contained the raise -- which stays green if the condition
+        # itself is changed and the text is left behind. A reviewer caught that; the test was
+        # checking the source, not the behaviour.
         if config.urn_prefix == "":
             # An empty prefix is not merely unusual, it cannot interoperate: Python renders
             # "kt:id" and TypeScript ":kt:id". See EmptyUrnPrefixNotSupported. An earlier
@@ -100,6 +104,15 @@ class GCache:
 
         if config.redis_config is not None and config.redis_client_factory is not None:
             raise RedisConfigConflict()
+
+        if _GLOBAL_GCACHE_STATE.gcache_instantiated:
+            raise GCacheAlreadyInstantiated()
+
+        # VALIDATE BEFORE TOUCHING GLOBAL STATE. The assignments below used to sit above the
+        # Redis checks, so a RedisConfigConflict left the new urn_prefix and logger published
+        # while no GCache existed -- the next construction inherited a namespace from an
+        # attempt that failed. __del__ clears only gcache_instantiated, so nothing ever put
+        # them back.
 
         if config.urn_prefix is not None:
             _GLOBAL_GCACHE_STATE.urn_prefix = config.urn_prefix

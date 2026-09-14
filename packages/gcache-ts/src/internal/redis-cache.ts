@@ -150,10 +150,33 @@ export class RedisCache {
       this.recordMetric((metrics) => metrics.observeSerialization({ ...labelsFor(key, CacheLayer.REMOTE), operation: "dump" }, elapsedSeconds(start)));
     }
     this.recordMetric((metrics) => metrics.observeSize(labelsFor(key, CacheLayer.REMOTE), payloadSize(payload)));
+    // The WRITER has to honour the same bound as the reader, or it produces entries it
+    // cannot read back. Tightening parseEnvelope to Number.isSafeInteger without this left a
+    // self-inflicted permanent miss reachable from configuration alone: a large enough
+    // ttlSec drives now + ttlSec*1000 past MAX_SAFE_INTEGER, the write succeeds, and every
+    // later read -- here, in Python, in Go -- rejects it as out of range. The entry is then
+    // rewritten on each read and rejected again, forever.
+    //
+    // Throwing rather than clamping: a clamped expiry silently means something other than
+    // what the caller configured, and a refused write stores nothing wrong. gcache's read
+    // path already treats a failed remote write as an error and serves the fallback value,
+    // so the caller is unaffected. Python raises EnvelopeEncodeError for the same case.
+    const expiresAtMs = now + ttlSec * 1000;
+    for (const [field, value] of [
+      ["createdAtMs", now],
+      ["expiresAtMs", expiresAtMs],
+    ] as const) {
+      if (!Number.isSafeInteger(value)) {
+        throw new Error(
+          `gcache: ${field} would be ${value}, outside the safe-integer range that all three clients can read ` +
+            `(createdAtMs=${now}, ttlSec=${ttlSec})`,
+        );
+      }
+    }
     const envelope: RedisValueEnvelope = {
       version: ENVELOPE_VERSION,
       createdAtMs: now,
-      expiresAtMs: now + ttlSec * 1000,
+      expiresAtMs,
       encoding: Buffer.isBuffer(payload) ? "base64" : "utf8",
       payload: Buffer.isBuffer(payload) ? payload.toString("base64") : payload,
     };

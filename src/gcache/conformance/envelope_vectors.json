@@ -16,7 +16,16 @@
     "expect=accept means decode succeeds AND yields `decoded`. expect=reject means the reader",
     "must treat the value as a MISS -- an exception both clients convert to 'miss', never a",
     "partial or defaulted value. A reject case with a plausible-looking payload is deliberate:",
-    "a reader that ignores the invalid field and returns the payload anyway must fail here."
+    "expect=accept means decode succeeds AND yields `decoded`. expect=reject means the reader",
+    "must treat the value as a MISS -- an exception both clients convert to 'miss', never a",
+    "partial or defaulted value. A reject case with a plausible-looking payload is deliberate:",
+    "a reader that ignores the invalid field and returns the payload anyway must fail here.",
+    "",
+    "A vector may carry `rejectedBy`/`acceptedBy` when the clients DELIBERATELY differ. That is",
+    "not a divergence bug: it means one client cannot represent the value faithfully and",
+    "rejecting it there produces a miss-and-rewrite, which is strictly better than two clients",
+    "serving the same bytes as different numbers. `asymmetryIsSafe` must say why the direction",
+    "is the safe one. A suite only asserts the cases that apply to its own client."
   ],
   "envelopeVersion": 1,
   "vectors": [
@@ -25,14 +34,22 @@
       "why": "The shape both writers emit. If this fails nothing else matters.",
       "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
       "expect": "accept",
-      "decoded": { "createdAtMs": 1757308800123, "expiresAtMs": 1757308860123, "payload": "{\"a\":1}" }
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payload": "{\"a\":1}"
+      }
     },
     {
       "name": "whole-number-float-timestamps",
       "why": "1757308800123.0 IS a whole number of milliseconds. Rejecting every float would be over-strict, and this vector is what keeps the is_integer/isInteger check from degenerating into that.",
       "envelope": "{\"version\":1,\"createdAtMs\":1757308800123.0,\"expiresAtMs\":1757308860123.0,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
       "expect": "accept",
-      "decoded": { "createdAtMs": 1757308800123, "expiresAtMs": 1757308860123, "payload": "{\"a\":1}" }
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payload": "{\"a\":1}"
+      }
     },
     {
       "name": "fractional-expires",
@@ -81,7 +98,11 @@
       "why": "The bytes path. Python base64s a bytes payload where Go never does, so this is the one encoding both must agree on.",
       "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"eyJhIjoxfQ==\"}",
       "expect": "accept",
-      "decoded": { "createdAtMs": 1757308800123, "expiresAtMs": 1757308860123, "payloadBase64": "eyJhIjoxfQ==" }
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payloadBase64": "eyJhIjoxfQ=="
+      }
     },
     {
       "name": "unknown-encoding",
@@ -106,6 +127,31 @@
       "why": "Garbage in the keyspace must be a miss, never an exception that escapes the read path -- a cache must not be able to fail a request.",
       "envelope": "{not json",
       "expect": "reject"
+    },
+    {
+      "name": "created-above-2-53",
+      "why": "The silent-disagreement case, and the reason isInteger was not enough. JSON.parse rounds 9007199254740993 to 9007199254740992, which IS integral -- so TS accepted it while Python read the exact value and Go decoded it inside int64. All three then ACCEPT and disagree about the number, with the watermark comparison resolving differently on either side of 2^53 and no error anywhere. Worse than a miss.",
+      "envelope": "{\"version\":1,\"createdAtMs\":9007199254740993,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject",
+      "rejectedBy": [
+        "typescript"
+      ],
+      "acceptedBy": [
+        "python",
+        "go"
+      ],
+      "asymmetryIsSafe": "TS is stricter here on purpose. It rejects exactly the range it cannot represent faithfully, so the entry misses and is rewritten in a form all three agree about -- rather than being served with two different values. Python and Go accept up to int64, which libs/go/gcache/envelope.go already documents as the safe direction. No legitimate writer reaches it: real timestamps are ~1.7e12 and 2^53 ms is year 287396."
+    },
+    {
+      "name": "created-at-max-safe-integer",
+      "why": "The boundary itself, so the safe-integer check cannot drift into rejecting the largest faithfully-representable value. 9007199254740991 is Number.MAX_SAFE_INTEGER and every client reads it exactly.",
+      "envelope": "{\"version\":1,\"createdAtMs\":9007199254740991,\"expiresAtMs\":9007199254740991,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 9007199254740991,
+        "expiresAtMs": 9007199254740991,
+        "payload": "{\"a\":1}"
+      }
     }
   ],
   "keyRendering": {

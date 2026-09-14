@@ -33,6 +33,12 @@ dynamic = ["dependencies"]
 [project.optional-dependencies]
 protobuf = ["protobuf>=5.0.0,<8.0.0"]
 
+# The conformance vectors ship as package data so a consumer in ANOTHER repo can read them
+# from an installed gcache instead of mirroring them. orbit's Go conformance suite is that
+# consumer. Poetry does not pick up non-Python files under src/ on its own.
+[tool.poetry]
+include = [{ path = "src/gcache/conformance/*.json", format = ["sdist", "wheel"] }]
+
 [project.urls]
 homepage = "https://github.com/rungalileo/gcache"
 repository = "https://github.com/rungalileo/gcache"

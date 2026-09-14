@@ -159,6 +159,29 @@ This enables:
 - **Gradual rollout** — Start at 10%, monitor metrics, increase to 100%
 - **Per-use-case tuning** — Different TTLs and ramp percentages for different use cases
 
+### ⚠️ Breaking: `urn_prefix=""` now raises
+
+`GCacheConfig(urn_prefix="")` raises `EmptyUrnPrefixNotSupported` (also a `ValueError`, so an
+existing `except ValueError` around construction still catches it).
+
+**If you pass it today, your keys are not what you think.** It used to be silently ignored, so
+the previous prefix stayed in force — `"urn"` by default. The error tells you that; it does not
+change the keys you were actually getting.
+
+**Migration:** omit `urn_prefix` to keep the default `"urn"`, or pass a non-empty prefix. There
+is no configuration that reproduces the old behaviour, because the old behaviour was "use the
+previous value", not "use no prefix".
+
+**Why rejected rather than made to work:** an empty prefix cannot interoperate. Python's
+`render_prefix` omits an empty component and yields `kt:id`; `gcache-ts` joins unconditionally
+and yields `:kt:id`. Value keys *and* `#watermark` keys diverge, so neither client sees the
+other's entries or invalidations, with no error at write time.
+
+That is a different problem from the percent-encoding mismatch below, which is an encoding
+defect with a fix — align the two clients and every non-empty prefix interoperates. An empty
+one still would not, because that divergence is structural. It is the one case that survives
+the fix, which is why it gets an error instead of a caveat.
+
 ## The `@cached` Decorator
 
 The decorator handles both sync and async functions automatically.

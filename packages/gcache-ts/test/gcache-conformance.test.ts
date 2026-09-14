@@ -27,7 +27,10 @@ import {
 // reverting the call site left every parser test green.
 
 const here = dirname(fileURLToPath(import.meta.url));
-const vectorsPath = join(here, "..", "..", "..", "conformance", "envelope_vectors.json");
+// The vectors live INSIDE the Python package (src/gcache/conformance) rather than at the
+// repo root, because they ship as package data so a consumer in another repo can read them
+// from an installed gcache instead of mirroring them. This path is the only cost of that.
+const vectorsPath = join(here, "..", "..", "..", "src", "gcache", "conformance", "envelope_vectors.json");
 
 interface Vector {
   readonly name: string;
@@ -35,6 +38,12 @@ interface Vector {
   readonly envelope: string;
   readonly expect: "accept" | "reject";
   readonly decoded?: { createdAtMs: number; expiresAtMs: number; payload?: string; payloadBase64?: string };
+  // Present only when the clients DELIBERATELY differ: one cannot represent the value
+  // faithfully, so rejecting it there is a miss-and-rewrite rather than two clients serving
+  // the same bytes as different numbers.
+  readonly rejectedBy?: readonly string[];
+  readonly acceptedBy?: readonly string[];
+  readonly asymmetryIsSafe?: string;
 }
 
 interface KeyCase {
@@ -136,6 +145,16 @@ describe("cross-language envelope conformance", () => {
 
       // When it is read.
       const value = await gcache.enable(async () => await read("vec"));
+
+      if (vector.expect === "reject" && vector.rejectedBy !== undefined && !vector.rejectedBy.includes("typescript")) {
+        // TS is on the accepting side of a deliberate asymmetry. Asserted rather than
+        // skipped: a skip would let TS silently start rejecting too, making the recorded
+        // asymmetry a lie.
+        expect(vector.acceptedBy, `${vector.name}: rejectedBy needs acceptedBy`).toContain("typescript");
+        expect(vector.asymmetryIsSafe, `${vector.name}: an asymmetry must justify its direction`).toBeTruthy();
+        expect(fallbackCalls, `${vector.name} must be a hit in TS`).toBe(0);
+        return;
+      }
 
       if (vector.expect === "reject") {
         // Then it is a MISS -- the fallback ran -- rather than an exception escaping the read

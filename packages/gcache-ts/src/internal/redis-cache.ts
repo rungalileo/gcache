@@ -269,16 +269,32 @@ export class RedisCache {
     if (
       parsed.version !== ENVELOPE_VERSION ||
       typeof parsed.createdAtMs !== "number" ||
-      // isInteger, not just isFinite. A fractional timestamp is out of spec -- every writer
-      // emits whole milliseconds -- and both readers compare it against a THRESHOLD, so a
-      // sub-millisecond difference flips a boolean rather than shifting an answer slightly.
-      // expiresAtMs=1000.9 at Date.now()===1000 is a hit here and expired in a Python reader
-      // that rounds. Rejecting is the only outcome where the two clients agree; the entry
-      // then misses, gets rewritten with integers, and heals. Python rejects it in
-      // _internal/envelope.py for the same reason.
-      !Number.isInteger(parsed.createdAtMs) ||
+      // isSafeInteger, not isFinite and not isInteger.
+      //
+      // isFinite was wrong because a FRACTIONAL timestamp is out of spec -- every writer
+      // emits whole milliseconds -- and all three readers compare it against a THRESHOLD,
+      // so a sub-millisecond difference flips a boolean rather than shifting an answer:
+      // expiresAtMs=1000.9 at Date.now()===1000 was a hit here and expired in a reader that
+      // rounds. Same bytes, opposite answers.
+      //
+      // isInteger was still wrong, and worse, because it inspects the value AFTER JSON.parse
+      // has already rounded it. 9007199254740993 parses to 9007199254740992 here, which is
+      // integral, so it passed -- while Python's arbitrary-precision int reads the exact
+      // 9007199254740993 and Go decodes it inside int64. All three then ACCEPT and silently
+      // disagree about the number, which is strictly worse than one of them missing: the
+      // watermark comparison (watermarkMs >= createdAtMs) resolves differently on either
+      // side of 2^53 with no error anywhere.
+      //
+      // isSafeInteger rejects exactly the range this reader cannot represent faithfully, so
+      // the entry misses here and is rewritten in a form all three agree about. It leaves TS
+      // STRICTER than Go and Python, which both accept up to int64 -- and that asymmetry is
+      // the safe direction, the one libs/go/gcache/envelope.go already relies on: an
+      // out-of-domain entry makes a reader miss and rewrite rather than serve a value
+      // another reader reads differently. Real timestamps are ~1.7e12; 2^53 ms is year
+      // 287396, so nothing legitimate is excluded.
+      !Number.isSafeInteger(parsed.createdAtMs) ||
       typeof parsed.expiresAtMs !== "number" ||
-      !Number.isInteger(parsed.expiresAtMs) ||
+      !Number.isSafeInteger(parsed.expiresAtMs) ||
       (parsed.encoding !== "utf8" && parsed.encoding !== "base64") ||
       typeof parsed.payload !== "string"
     ) {

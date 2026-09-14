@@ -8,23 +8,26 @@ both. Two escaped that way and were found in review rather than by a test.
 """
 
 import base64
-import json
 import pathlib
 
 import pytest
 
 from gcache._internal.envelope import ENVELOPE_VERSION, EnvelopeDecodeError, decode
+from gcache.conformance import load_vectors, vectors_path
 
-_VECTORS_PATH = pathlib.Path(__file__).parent.parent / "conformance" / "envelope_vectors.json"
-_DATA = json.loads(_VECTORS_PATH.read_text())
+# Read through the package accessor, not a repo-relative path. That is how the OTHER repo's
+# consumer reads it (orbit's Go conformance suite, via an installed gcache), so exercising
+# the same entry point here means a packaging mistake -- a missing poetry include, say --
+# fails this suite instead of only failing across the repo boundary where nobody sees it.
+_DATA = load_vectors()
 _VECTORS = _DATA["vectors"]
 
 
-def test_the_vector_file_is_where_both_suites_expect_it() -> None:
-    # A missing or moved file must fail loudly here rather than making both suites vacuously
+def test_the_vector_file_is_where_every_suite_expects_it() -> None:
+    # A missing or moved file must fail loudly here rather than making the suites vacuously
     # green by parametrizing over an empty list -- which is exactly how a shared-fixture
     # suite dies quietly.
-    assert _VECTORS_PATH.exists(), f"shared vectors missing at {_VECTORS_PATH}"
+    assert pathlib.Path(vectors_path()).exists(), f"shared vectors missing at {vectors_path()}"
     assert len(_VECTORS) >= 14, f"expected the full vector set, got {len(_VECTORS)}"
     assert _DATA["envelopeVersion"] == ENVELOPE_VERSION, (
         "the vector file's envelopeVersion must track ENVELOPE_VERSION, or every "
@@ -38,9 +41,34 @@ def test_the_vector_file_is_where_both_suites_expect_it() -> None:
             assert "decoded" in v, f"{v['name']} is an accept case with no expected decode"
 
 
+def _applies_to_python(vector: dict) -> bool:
+    """Whether this vector's stated expectation is Python's.
+
+    Most vectors apply to every client. A few record a DELIBERATE asymmetry -- one client
+    cannot represent the value faithfully, so rejecting it there yields a miss-and-rewrite
+    rather than two clients serving the same bytes as different numbers. Those carry
+    ``rejectedBy``/``acceptedBy``, and a suite must not assert another client's answer.
+    """
+    rejected_by = vector.get("rejectedBy")
+    if rejected_by is None:
+        return True
+    assert vector.get("acceptedBy"), f"{vector['name']}: rejectedBy needs acceptedBy"
+    assert vector.get("asymmetryIsSafe"), f"{vector['name']}: an asymmetry must justify its direction"
+    return "python" in rejected_by
+
+
 @pytest.mark.parametrize("vector", _VECTORS, ids=lambda v: v["name"])
 def test_envelope_vector(vector: dict) -> None:
     raw = vector["envelope"].encode("utf-8")
+
+    if vector["expect"] == "reject" and not _applies_to_python(vector):
+        # Python is on the accepting side of a deliberate asymmetry. Assert that it really
+        # does accept, rather than skipping -- a skip here would let Python silently start
+        # rejecting too, which would make the recorded asymmetry a lie.
+        assert "python" in vector["acceptedBy"], vector["name"]
+        got = decode(raw, allow_pickle=False)
+        assert got.created_at_ms is not None
+        return
 
     if vector["expect"] == "reject":
         # EnvelopeDecodeError specifically, not "any exception": every failure mode has to

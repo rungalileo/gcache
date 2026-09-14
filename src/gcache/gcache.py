@@ -166,6 +166,7 @@ class GCache:
         self._event_loop_thread_pool: EventLoopThreadPool = EventLoopThreadPool("gcache thread pool")
 
         _GLOBAL_GCACHE_STATE.gcache_instantiated = True
+        _GLOBAL_GCACHE_STATE.gcache_owner_id = id(self)
 
         self.config = config
 
@@ -192,8 +193,20 @@ class GCache:
             # __init__ raised before construction completed. Nothing was published under this
             # object's name, so there is nothing to undo and the flag is not ours to clear.
             return
+
+        # Stopping the pool is always right -- it is this object's own resource.
         pool.stop()
+
+        # Clearing the flag is only right if this object still OWNS it. Having a pool proves
+        # __init__ completed; it does not prove we are still the registered live instance. A
+        # GCache whose __del__ is invoked directly, or which is finalized after another has
+        # taken over, would otherwise release a flag belonging to a different object and let
+        # a third be built alongside the live one -- two GCaches racing one urn_prefix and
+        # one logger, which is the exact condition the singleton exists to prevent.
+        if _GLOBAL_GCACHE_STATE.gcache_owner_id != id(self):
+            return
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
+        _GLOBAL_GCACHE_STATE.gcache_owner_id = None
 
     def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]], func_name: str = "") -> Any:
         if isinstance(threading.current_thread(), EventLoopThread):

@@ -1419,3 +1419,38 @@ def test_a_failed_construction_does_not_release_the_live_instance(gcache: GCache
     assert _GLOBAL_GCACHE_STATE.gcache_instantiated, (
         "finalizing a never-initialized object must not clear the flag either"
     )
+
+
+def test_only_the_owning_gcache_releases_the_singleton_flag(gcache: GCache) -> None:
+    # Having a thread pool proves __init__ COMPLETED. It does not prove this object is still
+    # the registered live instance, and the destructor was treating the two as the same
+    # thing. A GCache whose __del__ is invoked directly, or which is finalized after another
+    # has taken over, would release a flag belonging to a different object -- letting a third
+    # be built alongside the live one, two GCaches racing one urn_prefix and one logger,
+    # which is the exact condition the singleton exists to prevent.
+    #
+    # Mutation-checked: dropping the owner-id comparison lets the flag go False here.
+    from gcache._internal.state import _GLOBAL_GCACHE_STATE
+    from gcache.exceptions import GCacheAlreadyInstantiated
+
+    assert _GLOBAL_GCACHE_STATE.gcache_instantiated
+    assert _GLOBAL_GCACHE_STATE.gcache_owner_id == id(gcache), (
+        "the live instance must be the recorded owner, or the guard below tests nothing"
+    )
+
+    # A fully-built impostor: it has a pool, so the pre-existing `pool is None` guard lets it
+    # through, but it is not the owner.
+    from gcache._internal.event_loop_thread import EventLoopThreadPool
+
+    impostor = object.__new__(GCache)
+    impostor._event_loop_thread_pool = EventLoopThreadPool("impostor pool")
+    impostor.__del__()
+
+    assert _GLOBAL_GCACHE_STATE.gcache_instantiated, "a non-owning GCache must not release the live instance's flag"
+    assert _GLOBAL_GCACHE_STATE.gcache_owner_id == id(gcache), "ownership must be unchanged"
+    # And the singleton is still enforced, which is the consequence that actually matters.
+    from gcache import GCacheConfig
+    from tests.conftest import FakeCacheConfigProvider
+
+    with pytest.raises(GCacheAlreadyInstantiated):
+        GCache(GCacheConfig(cache_config_provider=FakeCacheConfigProvider()))

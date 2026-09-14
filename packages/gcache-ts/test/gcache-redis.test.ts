@@ -406,6 +406,61 @@ describe("GCache Redis TTL layer", () => {
     expect(logger.warn).toHaveBeenCalledWith("Error getting value from Redis cache", expect.any(Error));
   });
 
+  it("rejects a fractional timestamp rather than comparing it", async () => {
+    // Given Redis holds an envelope whose expiresAtMs is fractional, and a clock at exactly
+    // the floor of it.
+    //
+    // This reader used to accept it -- parseEnvelope checked Number.isFinite -- and compare
+    // it directly, which is a cross-client disagreement rather than a small imprecision.
+    // Both readers compare against a THRESHOLD, so a sub-millisecond difference flips a
+    // boolean:
+    //
+    //   expiresAtMs = 1000.9, now = 1000
+    //     here:               1000.9 <= 1000   -> false, HIT
+    //     Python, rounding:   1000   <= 1000   -> true,  expired, MISS
+    //
+    // Same bytes, opposite answers. Rounding here to match would only move the
+    // disagreement, so both clients now reject a non-integral timestamp: the entry misses,
+    // is rewritten with integers, and heals. Python does it in _internal/envelope.py.
+    const redis = new FakeRedis();
+    const redisKey = keyFor("123", "RedisFractionalTimestamp").urn;
+    const now = Date.parse("2026-05-12T17:00:00.000Z");
+    vi.setSystemTime(now);
+    redis.values.set(redisKey, {
+      expiresAtMs: now + 60_000,
+      value: JSON.stringify({
+        version: 1,
+        createdAtMs: now - 1_000,
+        // Fractional, and ABOVE `now` only by its fraction -- so a reader that keeps the
+        // fraction hits and a reader that floors expires. This is the exact boundary.
+        expiresAtMs: now + 0.9,
+        encoding: "utf8",
+        payload: JSON.stringify({ userId: "123", source: "stale" }),
+      }),
+    });
+    const gcache = new GCache({ redis: { client: redis } });
+    let calls = 0;
+    const getUser = gcache.cached({
+      keyType: "user_id",
+      useCase: "RedisFractionalTimestamp",
+      id: ([userId]: [string]) => userId,
+      defaultConfig: new GCacheKeyConfig({
+        ttlSec: { [CacheLayer.LOCAL]: 0, [CacheLayer.REMOTE]: 60 },
+        ramp: { [CacheLayer.LOCAL]: 0, [CacheLayer.REMOTE]: 100 },
+      }),
+    })(async (userId: string) => ({ userId, source: `fallback-${++calls}` }));
+
+    // When the entry is read.
+    const value = await gcache.enable(async () => await getUser("123"));
+
+    // Then it is a miss rather than a hit on the stale payload, and it heals: the rewritten
+    // envelope carries integral timestamps that both clients agree about.
+    expect(value).toEqual({ userId: "123", source: "fallback-1" });
+    const rewritten = JSON.parse(redis.raw(redisKey)) as RedisValueEnvelope;
+    expect(Number.isInteger(rewritten.createdAtMs)).toBe(true);
+    expect(Number.isInteger(rewritten.expiresAtMs)).toBe(true);
+  });
+
   it("does not delete a value it merely cannot parse", async () => {
     // Given Redis holds a pickle-framed value, which is what the Python client writes under
     // its default envelope and this reader can never parse.

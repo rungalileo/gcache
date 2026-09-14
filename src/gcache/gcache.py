@@ -23,6 +23,7 @@ from gcache.config import (
     Serializer,
 )
 from gcache.exceptions import (
+    EmptyUrnPrefixNotSupported,
     EnvelopeMismatchWithRegisteredUseCase,
     GCacheAlreadyInstantiated,
     GCacheError,
@@ -78,16 +79,28 @@ class GCache:
                       and cache config provider.
         :raises GCacheAlreadyInstantiated: If a GCache instance already exists.
         :raises RedisConfigConflict: If both redis_config and redis_client_factory are provided.
+        :raises EmptyUrnPrefixNotSupported: If urn_prefix is "" -- an empty prefix cannot
+            interoperate, since Python renders ``kt:id`` where TypeScript renders ``:kt:id``.
         """
         if _GLOBAL_GCACHE_STATE.gcache_instantiated:
             raise GCacheAlreadyInstantiated()
 
-        # `is not None`, not truthiness: urn_prefix="" is an explicit request for NO
-        # namespace, and render_prefix already handles that case (config.py:216). Gating on
-        # truthiness silently kept the previous global -- the "urn" default, or a prior
-        # GCache's prefix, since __del__ clears only gcache_instantiated and leaves
-        # urn_prefix behind. Every key and every #watermark then carried a namespace the
-        # caller had just asked to drop, with no error.
+        # VALIDATE EVERYTHING BEFORE TOUCHING GLOBAL STATE. These assignments used to sit
+        # above the Redis checks, so a RedisConfigConflict left the new urn_prefix and logger
+        # published while no GCache existed -- the next construction inherited a namespace
+        # from an attempt that failed. __del__ clears only gcache_instantiated, so nothing
+        # ever put them back.
+        if config.urn_prefix == "":
+            # An empty prefix is not merely unusual, it cannot interoperate: Python renders
+            # "kt:id" and TypeScript ":kt:id". See EmptyUrnPrefixNotSupported. An earlier
+            # revision of this branch "fixed" the silent-ignore by honouring "", which
+            # enabled a configuration that silently breaks the cross-language keyspace this
+            # work exists to establish. Rejecting is the fix; honouring it was not.
+            raise EmptyUrnPrefixNotSupported()
+
+        if config.redis_config is not None and config.redis_client_factory is not None:
+            raise RedisConfigConflict()
+
         if config.urn_prefix is not None:
             _GLOBAL_GCACHE_STATE.urn_prefix = config.urn_prefix
 
@@ -100,10 +113,8 @@ class GCache:
             metrics_prefix=config.metrics_prefix,
         )
 
-        # Validate and determine Redis cache layer
-        if config.redis_config is not None and config.redis_client_factory is not None:
-            raise RedisConfigConflict()
-
+        # Determine the Redis cache layer. The conflict check moved above, before any global
+        # state is published; leaving a second copy here would be dead code.
         if config.redis_config is not None:
             # redis_config provided: create RedisCache with factory from config
             redis_cache = CacheController(
@@ -159,7 +170,29 @@ class GCache:
         self.config = config
 
     def __del__(self) -> None:
-        self._event_loop_thread_pool.stop()
+        """Tear down only what __init__ actually built.
+
+        ``gcache_instantiated`` is set on the LAST line of __init__, so any earlier raise --
+        GCacheAlreadyInstantiated, EmptyUrnPrefixNotSupported, RedisConfigConflict -- still
+        gets this object finalized, with no ``_event_loop_thread_pool`` attribute. The
+        unguarded ``.stop()`` raised AttributeError here, which appears twice in every test
+        run as a PytestUnraisableExceptionWarning.
+
+        The noise was the smaller half. The AttributeError is also the only reason the next
+        line was not reached, and that line clears a flag this instance does not own: a
+        failed construction would otherwise mark the LIVE GCache as uninstantiated, letting a
+        third be built alongside it. So the guard is load-bearing, not cosmetic -- and the
+        ownership check is what makes it safe rather than merely quiet.
+
+        Pre-existing, but in scope here because this branch adds two new early raises and so
+        widens the path that reaches it.
+        """
+        pool = getattr(self, "_event_loop_thread_pool", None)
+        if pool is None:
+            # __init__ raised before construction completed. Nothing was published under this
+            # object's name, so there is nothing to undo and the flag is not ours to clear.
+            return
+        pool.stop()
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
 
     def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]], func_name: str = "") -> Any:

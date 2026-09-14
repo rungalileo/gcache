@@ -206,6 +206,22 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                     raise EnvelopeDecodeError(f"{field} exceeds a double, got {value!r}") from exc
                 if not math.isfinite(as_double):
                     raise EnvelopeDecodeError(f"{field} must be finite, got {value!r}")
+                # Integral, not just numeric. A fractional timestamp is out of spec -- every
+                # writer emits integer milliseconds (Python's encode_json, Go, and
+                # TypeScript's Date.now()) -- and rounding it cannot make the clients agree,
+                # only make them disagree differently.
+                #
+                # This branch previously floored. The magnitude of that divergence is under
+                # 1ms, which sounds ignorable and is not: both readers compare the value
+                # against a THRESHOLD, so a sub-millisecond difference flips a boolean.
+                # expiresAtMs=1000.9 at now=1000 is expired in Python (floor -> 1000 <= 1000)
+                # and a hit in TypeScript (1000.9 <= 1000 is false). Same bytes, opposite
+                # answers. Rejecting is the only outcome where the two agree, and it costs
+                # nothing real: the entry becomes a degraded read, gets rewritten with
+                # integers, and heals. packages/gcache-ts/src/internal/redis-cache.ts
+                # rejects it too, in parseEnvelope, for the same reason.
+                if not as_double.is_integer():
+                    raise EnvelopeDecodeError(f"{field} must be a whole number of milliseconds, got {value!r}")
                 # Also bounded to int64, which is stricter than the TypeScript reader's
                 # Number.isFinite. Double-representability is not enough: 1e300 passed the
                 # check above and kept an exact 301-digit int, and no real watermark can
@@ -231,27 +247,17 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                 payload = base64.b64decode(normalized + "=" * (-len(normalized) % 4), validate=True)
             elif encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")
-            # floor, not int(). The envelope schema says integer milliseconds, so a
-            # fractional timestamp is out of spec -- but the TypeScript reader keeps the raw
-            # number and compares it directly (redis-cache.ts:115,119), so the two clients
-            # can reach different expiry and staleness answers for the same bytes. The
-            # divergence is under 1ms, which is why the fix is a rounding direction rather
-            # than widening DecodedValue to int | float: preserving the float would ripple
-            # into the watermark comparison AND into encode_json on write-back, which would
-            # emit a fractional timestamp where Go and TypeScript both write integers --
-            # trading a sub-millisecond read difference for a new write divergence.
-            #
-            # int() truncates toward zero, so it rounded a negative timestamp UP (later) and
-            # a positive one DOWN (earlier) -- the one genuinely arbitrary part. floor is
-            # unconditionally downward, which fails safe in both fields: an earlier
-            # expires_at expires sooner, and an earlier created_at is matched stale by a
-            # watermark more readily. Both err toward a miss, never toward serving something
-            # a writer meant to invalidate.
+            # int(), and it cannot lose anything: the validation above rejected any
+            # non-integral value, so these are whole numbers already and the call only
+            # narrows float to int for DecodedValue's type. An earlier revision floored here
+            # instead, to make the rounding direction consistent by sign -- that was the
+            # wrong fix, because consistent rounding still disagrees with a reader that does
+            # not round. See the is_integer() check above.
             return DecodedValue(
-                created_at_ms=math.floor(created_at_ms),
+                created_at_ms=int(created_at_ms),
                 payload=payload,
                 is_json=True,
-                expires_at_ms=math.floor(expires_at_ms),
+                expires_at_ms=int(expires_at_ms),
             )
         except EnvelopeDecodeError:
             raise

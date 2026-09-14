@@ -102,3 +102,30 @@ class EnvelopeMismatchWithRegisteredUseCase(GCacheError):
             f"use case {use_case!r} is registered with {declared}, but this key declares {given}. "
             "They render the same Redis key, so the two framings would overwrite each other."
         )
+
+
+class EmptyUrnPrefixNotSupported(GCacheError, ValueError):
+    """Raised when ``GCacheConfig(urn_prefix="")`` is given.
+
+    An empty prefix cannot interoperate. Python's ``render_prefix`` omits the prefix
+    entirely and yields ``kt:i``, while the TypeScript client joins unconditionally
+    (``key.ts`` ``joinUrnComponents``) and yields ``:kt:i`` -- so value keys AND
+    ``#watermark`` keys diverge, and neither client sees the other's entries or
+    invalidations. There is no error at write time; the two just silently stop sharing a
+    keyspace, which is the one failure this envelope work exists to prevent.
+
+    Rejecting rather than supporting it, and rather than restoring the previous behaviour of
+    silently ignoring it: anyone passing "" today has been running with the previous prefix
+    ("urn" by default) and does not know it. An error says their configuration never did what
+    they asked.
+
+    Subclasses ValueError as well, so a caller already guarding construction with
+    ``except ValueError`` keeps catching it.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            'urn_prefix="" is not supported: an empty prefix renders as "kt:id" in Python but '
+            '":kt:id" in the TypeScript client, so the two cannot share a keyspace. Pass a '
+            "non-empty prefix, or omit urn_prefix to keep the default."
+        )

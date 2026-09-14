@@ -1198,70 +1198,104 @@ async def test_a_pickle_key_on_a_text_mode_client_warns_once() -> None:
         assert await RedisCache.get(cache2, pickle_key, fallback) == {"v": "fresh"}
 
 
-def test_an_explicit_empty_urn_prefix_drops_the_namespace() -> None:
-    # GCache.__init__ gated the assignment on truthiness, so urn_prefix="" -- an explicit
-    # request for NO namespace -- never assigned and the previous global survived. __del__
-    # clears only gcache_instantiated, so "previous" is the "urn" default on a first
-    # construction and a prior GCache's prefix afterwards. Every key and every #watermark
-    # then carried a namespace the caller had just asked to drop, with no error anywhere.
+def test_an_empty_urn_prefix_is_rejected_because_it_cannot_interoperate() -> None:
+    # This test asserted the OPPOSITE an hour ago, and the reversal is the point.
     #
-    # render_prefix (config.py:216) already handled an empty prefix correctly, which is what
-    # makes this an assignment bug rather than a design gap: the feature was reachable, the
-    # setter just refused to set it.
+    # The original bug was real: GCache.__init__ gated the assignment on truthiness, so
+    # urn_prefix="" was silently ignored and the previous global survived. My first fix
+    # honoured "" instead -- and that enabled a configuration that silently breaks the
+    # cross-language keyspace this whole branch exists to establish:
+    #
+    #   Python  render_prefix omits an empty prefix        -> "kt:id"
+    #   TS      joinUrnComponents joins unconditionally    -> ":kt:id"
+    #
+    # (packages/gcache-ts/src/key.ts: ["", "kt", "id"].join(":")). Value keys AND #watermark
+    # keys diverge, so neither client sees the other's entries or invalidations, with no
+    # error at write time. "Silently ignored" was bad; "silently unshareable" is worse.
+    #
+    # So reject it. Nobody can be depending on the behaviour: anyone passing "" today has
+    # been running with the previous prefix and does not know it.
+    import inspect
+
+    from gcache.exceptions import EmptyUrnPrefixNotSupported
+    from gcache.gcache import GCache
+
+    # Asserted against the source because GCacheAlreadyInstantiated forbids a second
+    # in-process GCache and the conftest fixture already holds one.
+    src = inspect.getsource(GCache.__init__)
+    assert 'if config.urn_prefix == "":' in src, "an empty prefix must be rejected, not honoured"
+    assert "raise EmptyUrnPrefixNotSupported()" in src
+
+    # It is a ValueError too, so an existing `except ValueError` around construction still
+    # catches it.
+    assert issubclass(EmptyUrnPrefixNotSupported, ValueError)
+    assert "TypeScript" in str(EmptyUrnPrefixNotSupported()), "the message must say why, not just no"
+
+
+def test_the_typescript_client_really_does_render_a_leading_colon() -> None:
+    # The claim the rejection rests on, checked against the TS source rather than assumed --
+    # if joinUrnComponents skipped an empty component there would be nothing to reject.
+    import pathlib
+
+    key_ts = pathlib.Path(__file__).parent.parent / "packages" / "gcache-ts" / "src" / "key.ts"
+    src = key_ts.read_text()
+    assert 'components.map(encodeComponent).join(":")' in src, (
+        "TS joins urn components unconditionally, which is why an empty prefix yields ':kt:id' "
+        "where Python yields 'kt:id'. If this line changed, re-derive the rejection."
+    )
+    # And the Python half, so the divergence is pinned from both sides in one place.
     from gcache._internal.state import _GLOBAL_GCACHE_STATE
     from gcache.config import render_prefix
 
     original = _GLOBAL_GCACHE_STATE.urn_prefix
     try:
-        _GLOBAL_GCACHE_STATE.urn_prefix = "urn:galileo:stale"
-        assert render_prefix("kt", "i", tracked=False) == "urn:galileo:stale:kt:i"
-
-        # What GCache.__init__ now does. Asserted through the one line under test rather
-        # than by constructing a GCache, because GCacheAlreadyInstantiated makes a second
-        # instance in-process impossible and the conftest fixture already holds one.
-        config_urn_prefix = ""
-        if config_urn_prefix is not None:
-            _GLOBAL_GCACHE_STATE.urn_prefix = config_urn_prefix
-
-        assert _GLOBAL_GCACHE_STATE.urn_prefix == "", "an explicit empty prefix must replace the old one"
-        assert render_prefix("kt", "i", tracked=False) == "kt:i", "no namespace means no leading colon either"
-        assert render_prefix("kt", "i", tracked=True) == "{kt:i}"
+        _GLOBAL_GCACHE_STATE.urn_prefix = ""
+        assert render_prefix("kt", "i", tracked=False) == "kt:i"
+        assert ["", "kt", "i"] and ":".join(["", "kt", "i"]) == ":kt:i", "what TS would produce"
     finally:
         _GLOBAL_GCACHE_STATE.urn_prefix = original
 
 
-def test_the_gcache_constructor_assigns_an_empty_prefix() -> None:
-    # The test above pins render_prefix; this one pins that __init__ actually reaches it,
-    # which is the half that was broken. Reading the source is the only way to assert it
-    # without a second GCache instance, since GCacheAlreadyInstantiated forbids one.
+def test_global_state_is_not_published_before_validation() -> None:
+    # The urn_prefix and logger assignments used to sit ABOVE the Redis checks, so a
+    # RedisConfigConflict left them published while no GCache existed -- and __del__ clears
+    # only gcache_instantiated, so nothing put them back. The next construction inherited a
+    # namespace from an attempt that failed.
     import inspect
 
     from gcache.gcache import GCache
 
     src = inspect.getsource(GCache.__init__)
-    assert "if config.urn_prefix is not None:" in src, (
-        "truthiness gating silently ignores urn_prefix='' -- see test_an_explicit_empty_urn_prefix_drops_the_namespace"
-    )
-    assert "if config.urn_prefix:\n" not in src
+    conflict = src.index("raise RedisConfigConflict()")
+    publish = src.index("_GLOBAL_GCACHE_STATE.urn_prefix = config.urn_prefix")
+    assert conflict < publish, "validate before mutating global state, not after"
+    # And only once -- the later copy became dead code when the check moved up.
+    assert src.count("raise RedisConfigConflict()") == 1
 
 
 @pytest.mark.parametrize(
-    ("created", "expires"),
-    [(1757308800123.9, 1757308860123.9), (-1000.9, -900.9), (0.5, 60000.5)],
+    ("field", "created", "expires"),
+    [
+        ("expiresAtMs", 1757308800123, 1757308860123.9),
+        ("createdAtMs", 1757308800123.9, 1757308860123),
+        ("createdAtMs", -1000.9, 900),
+        ("createdAtMs", 0.5, 60000),
+    ],
 )
-def test_a_fractional_timestamp_rounds_down_in_both_fields(created: float, expires: float) -> None:
-    # The envelope schema says integer milliseconds, so a fractional value is out of spec --
-    # but the TypeScript reader keeps the raw number and compares it directly
-    # (redis-cache.ts:115,119), so the two clients could reach different expiry and
-    # staleness answers for the same bytes.
+def test_a_fractional_timestamp_is_rejected_rather_than_rounded(field: str, created: float, expires: float) -> None:
+    # An earlier revision floored these, to make the rounding direction consistent by sign.
+    # That was the wrong fix, and the reason is worth keeping: BOTH readers compare the value
+    # against a threshold, so a sub-millisecond difference flips a boolean rather than
+    # shifting an answer slightly.
     #
-    # int() truncated toward ZERO, which rounded a negative timestamp up (later) and a
-    # positive one down (earlier). That sign dependence was the arbitrary part. floor is
-    # unconditionally downward, which fails safe in both fields: an earlier expires_at
-    # expires sooner, and an earlier created_at is matched stale by a watermark more
-    # readily. Both err toward a miss, never toward serving something a writer invalidated.
-    import math
-
+    #   expiresAtMs=1000.9 at now=1000
+    #     Python, floored:  1000 <= 1000      -> expired, miss
+    #     TypeScript:       1000.9 <= 1000    -> false, HIT
+    #
+    # Same bytes, opposite answers. Consistent rounding still disagrees with a reader that
+    # does not round, so rejecting is the only outcome where the clients agree -- and it
+    # costs nothing: the entry is a degraded read, gets rewritten with integers, and heals.
+    # redis-cache.ts parseEnvelope now uses Number.isInteger for the same reason.
     raw = json.dumps(
         {
             "version": ENVELOPE_VERSION,
@@ -1271,13 +1305,27 @@ def test_a_fractional_timestamp_rounds_down_in_both_fields(created: float, expir
             "payload": '{"a":1}',
         }
     ).encode()
+    with pytest.raises(EnvelopeDecodeError, match="whole number of milliseconds"):
+        decode(raw, allow_pickle=False)
+
+
+def test_a_whole_number_float_timestamp_is_still_accepted() -> None:
+    # 1757308800123.0 is what json.loads gives for a value written as 1757308800123.0, and it
+    # IS a whole number of milliseconds -- so the rejection must not catch it. Without this
+    # the test above passes on a check that rejects every float.
+    raw = json.dumps(
+        {
+            "version": ENVELOPE_VERSION,
+            "createdAtMs": 1757308800123.0,
+            "expiresAtMs": 1757308860123.0,
+            "encoding": "utf8",
+            "payload": '{"a":1}',
+        }
+    ).encode()
     got = decode(raw, allow_pickle=False)
-    assert got.created_at_ms == math.floor(created)
-    assert got.expires_at_ms == math.floor(expires)
-    # The direction, stated as the property rather than as three literals: never later than
-    # the value on the wire. int() violated this for the negative case.
-    assert got.created_at_ms <= created
-    assert got.expires_at_ms <= expires
+    assert got.created_at_ms == 1757308800123
+    assert got.expires_at_ms == 1757308860123
+    assert isinstance(got.created_at_ms, int), "DecodedValue must still carry ints"
 
 
 def test_a_stateful_serializer_can_declare_its_own_wire_identity() -> None:
@@ -1323,3 +1371,51 @@ def test_a_stateful_serializer_can_declare_its_own_wire_identity() -> None:
     # And a Versioned is never interchangeable with a Stateless, despite both defaulting
     # through the same code path.
     assert _serializer_identity(Versioned(1)) != _serializer_identity(Stateless())
+
+
+def test_a_failed_construction_does_not_release_the_live_instance(gcache: GCache) -> None:
+    # gcache_instantiated is set on the LAST line of __init__, so any earlier raise still
+    # gets the half-built object finalized. __del__ then called
+    # self._event_loop_thread_pool.stop() on an attribute that does not exist.
+    #
+    # The AttributeError was the visible half (twice per test run, as a
+    # PytestUnraisableExceptionWarning). The invisible half is worse: that exception was the
+    # only reason __del__'s NEXT line was not reached, and that line clears a flag this
+    # object does not own. Guard the .stop() naively and a failed construction starts marking
+    # the LIVE GCache as uninstantiated, letting a third be built alongside it -- two GCaches
+    # racing one global urn_prefix and one instantiation flag.
+    #
+    # The `gcache` fixture is the live instance, so a second construction is guaranteed to
+    # take the early-raise path.
+    import gc
+
+    from gcache import GCacheConfig
+    from gcache._internal.state import _GLOBAL_GCACHE_STATE
+    from gcache.exceptions import GCacheAlreadyInstantiated
+    from tests.conftest import FakeCacheConfigProvider
+
+    assert _GLOBAL_GCACHE_STATE.gcache_instantiated, "the fixture's instance must be live"
+
+    with pytest.raises(GCacheAlreadyInstantiated):
+        GCacheConfig(cache_config_provider=FakeCacheConfigProvider()) and GCache(
+            GCacheConfig(cache_config_provider=FakeCacheConfigProvider())
+        )
+    gc.collect()  # force the half-built object's __del__ to run now, not at interpreter exit
+
+    assert _GLOBAL_GCACHE_STATE.gcache_instantiated, "a failed construction must not release the live instance's flag"
+    # And the live instance still works -- the flag is not the only thing __del__ could have
+    # torn down.
+    with pytest.raises(GCacheAlreadyInstantiated):
+        GCache(GCacheConfig(cache_config_provider=FakeCacheConfigProvider()))
+
+    # The assertion above does NOT catch the bug that was actually in the code, and that is
+    # worth stating rather than discovering later. Mutation-checked both ways: reverting
+    # __del__ to the bare `self._event_loop_thread_pool.stop()` leaves everything above
+    # GREEN, because the AttributeError is what aborted __del__ before it reached the flag.
+    # So the two failure modes need two assertions -- one for the raise, one for the
+    # ownership -- and neither substitutes for the other.
+    bare = object.__new__(GCache)
+    bare.__del__()  # must return, not raise AttributeError on a missing thread pool
+    assert _GLOBAL_GCACHE_STATE.gcache_instantiated, (
+        "finalizing a never-initialized object must not clear the flag either"
+    )

@@ -269,9 +269,16 @@ export class RedisCache {
     if (
       parsed.version !== ENVELOPE_VERSION ||
       typeof parsed.createdAtMs !== "number" ||
-      !Number.isFinite(parsed.createdAtMs) ||
+      // isInteger, not just isFinite. A fractional timestamp is out of spec -- every writer
+      // emits whole milliseconds -- and both readers compare it against a THRESHOLD, so a
+      // sub-millisecond difference flips a boolean rather than shifting an answer slightly.
+      // expiresAtMs=1000.9 at Date.now()===1000 is a hit here and expired in a Python reader
+      // that rounds. Rejecting is the only outcome where the two clients agree; the entry
+      // then misses, gets rewritten with integers, and heals. Python rejects it in
+      // _internal/envelope.py for the same reason.
+      !Number.isInteger(parsed.createdAtMs) ||
       typeof parsed.expiresAtMs !== "number" ||
-      !Number.isFinite(parsed.expiresAtMs) ||
+      !Number.isInteger(parsed.expiresAtMs) ||
       (parsed.encoding !== "utf8" && parsed.encoding !== "base64") ||
       typeof parsed.payload !== "string"
     ) {

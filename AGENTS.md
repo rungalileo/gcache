@@ -123,6 +123,48 @@ suite asserts its own client's column against what it actually renders, plus tha
 partition matches the recorded strings -- so the file cannot claim an agreement its own values
 contradict. More than one group requires a `reason`.
 
+## Releasing
+
+Two independent release paths, both manual `workflow_dispatch`.
+
+**Python** — `release.yaml`. python-semantic-release reads Conventional Commit titles, bumps
+`pyproject.toml:project.version`, writes CHANGELOG.md, tags `vX.Y.Z`, and publishes to PyPI.
+
+**Go** — `go-release.yaml`, input e.g. `v0.1.0`. A Go release is a **git tag and nothing
+else**: no registry, no artifact, no publish step. Consumers fetch through
+`proxy.golang.org`.
+
+```
+git tag           go/v0.1.0        <- what the workflow creates
+consumer go.mod   github.com/rungalileo/gcache/go v0.1.0
+```
+
+The `go/` prefix is only how git stores a subdirectory module's tag; consumers write the bare
+version and Go maps between them. Pass `v0.1.0`, not `go/v0.1.0` — the workflow adds the
+prefix and rejects input that already has it.
+
+**A published Go version is permanent.** `proxy.golang.org` caches module versions immutably,
+so a broken `go/v0.1.0` cannot be re-tagged — you burn the version and ship `go/v0.1.1`. The
+workflow therefore validates *before* tagging: version format, tag collision, gofmt, vet,
+`go test`, and the full three-client conformance suite. It is the only irreversible action in
+this repo.
+
+**Do not tag by hand.** A bare `v0.1.0` already exists from the Python package's history
+(`0bc6951`, 2025-02-24), so a mistyped tag attaches silently to the wrong thing. The workflow
+guards both forms.
+
+**Why not one version for all three.** Lockstep versioning is a real argument for a monorepo,
+and it is declined here for a concrete reason: Go requires a major-version suffix in the
+module path from v2, so sharing the namespace would make a future Python 3.0.0 force a
+breaking import-path change (`/v2/go` → `/v3/go`) on Go consumers for reasons unrelated to Go.
+The thing lockstep is *for* — knowing two clients agree on the wire — is covered mechanically
+by `envelopeVersion` in the shared corpus, which a package version cannot do because it cannot
+fail a test.
+
+Do not wire the Go module into python-semantic-release. It emits bare `v{version}` from
+`pyproject.toml` and has no concept of a second module; making it produce `go/` tags means
+`tag_format` changes that would break the Python tags.
+
 ## Common Gotchas
 
 - GCache is singleton - second instantiation raises `GCacheAlreadyInstantiated`

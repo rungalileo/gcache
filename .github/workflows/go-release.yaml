@@ -1,0 +1,172 @@
+name: Go Module Release
+
+# A Go release is a git tag and NOTHING ELSE -- no registry, no build artifact, no publish
+# step. Consumers fetch from the VCS through proxy.golang.org. That is simpler than the PyPI
+# flow, with one sharp edge:
+#
+#   A PUBLISHED VERSION IS EFFECTIVELY PERMANENT. proxy.golang.org caches module versions
+#   immutably, so a broken go/v0.1.0 cannot be re-tagged away -- you burn the version and
+#   ship go/v0.1.1.
+#
+# So everything validates BEFORE the tag is created, not after. This is the only irreversible
+# step in the repo.
+#
+# Manual dispatch, matching release.yaml: this repo has no automated release trigger on
+# purpose.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Module version, e.g. v0.1.0 (the git tag becomes go/v0.1.0)"
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
+
+      # ---------------------------------------------------------------------
+      # 1. Validate the input before anything else touches the repo.
+      # ---------------------------------------------------------------------
+      - name: Validate the version and check for tag collisions
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::version must look like v0.1.0, got '$VERSION'"
+            exit 1
+          fi
+
+          # The module lives in go/, so Go requires a go/-prefixed tag. Consumers still
+          # write the bare version in go.mod; Go maps between them.
+          if git rev-parse -q --verify "refs/tags/go/$VERSION" >/dev/null; then
+            echo "::error::tag go/$VERSION already exists. proxy.golang.org caches versions"
+            echo "::error::immutably, so this one cannot be replaced -- pick the next patch."
+            exit 1
+          fi
+
+          # A BARE tag of the same name is the mistake this repo's history makes easy:
+          # v0.1.0 already exists from the Python package (0bc6951, 2025-02-24). Creating one
+          # would attach to entirely the wrong thing.
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::notice::bare tag $VERSION exists (Python package history). That is"
+            echo "::notice::expected and irrelevant -- this release creates go/$VERSION."
+          fi
+
+          echo "will create tag: go/$VERSION"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # ---------------------------------------------------------------------
+      # 2. The module must build and its own tests must pass. A release tag that
+      #    does not build is the one failure the proxy makes permanent.
+      # ---------------------------------------------------------------------
+      - name: gofmt, vet, test
+        run: |
+          set -euo pipefail
+          cd go
+          test -z "$(gofmt -l .)" || (echo "::error::unformatted files" && gofmt -l . && exit 1)
+          go vet ./...
+          go test ./...
+
+      # ---------------------------------------------------------------------
+      # 3. The gate that actually matters. A Go release that disagrees with the
+      #    Python client on the wire is the defect this repo has spent the most
+      #    effort on -- five cross-language claims went silently false in one
+      #    afternoon before the implementations were co-located.
+      # ---------------------------------------------------------------------
+      - name: Cross-language conformance, all three clients
+        run: |
+          set -euo pipefail
+          pipx install poetry==${{ vars.POETRY_V2_VERSION }}
+          pipx install invoke
+          poetry install --with dev,test --no-root
+          pnpm install --frozen-lockfile
+          inv test-conformance
+
+      # ---------------------------------------------------------------------
+      # 4. Tag. Annotated and signed with the same automation key release.yaml
+      #    uses -- never bypass signing.
+      # ---------------------------------------------------------------------
+      - name: Create and push the signed tag
+        env:
+          VERSION: ${{ inputs.version }}
+          SSH_PUBLIC: ${{ secrets.GALILEO_AUTOMATION_SSH_PUBLIC_KEY }}
+          SSH_PRIVATE: ${{ secrets.GALILEO_AUTOMATION_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE" > ~/.ssh/signing_key
+          printf '%s\n' "$SSH_PUBLIC" > ~/.ssh/signing_key.pub
+          chmod 600 ~/.ssh/signing_key
+
+          git config user.name  "galileo-automation"
+          git config user.email "ci@rungalileo.io"
+          git config gpg.format ssh
+          git config user.signingkey ~/.ssh/signing_key
+
+          git tag -s "go/$VERSION" -m "gcache Go client $VERSION"
+          git push origin "go/$VERSION"
+
+      # ---------------------------------------------------------------------
+      # 5. Confirm the proxy serves it, which also warms the cache so a consumer's
+      #    first fetch is not the one that populates it.
+      # ---------------------------------------------------------------------
+      - name: Verify the module proxy resolves the new version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          cd "$(mktemp -d)"
+          go mod init release-check
+          for attempt in 1 2 3 4 5; do
+            if GOPROXY=proxy.golang.org GOFLAGS=-mod=mod \
+               go get "github.com/rungalileo/gcache/go@$VERSION"; then
+              echo "proxy resolved github.com/rungalileo/gcache/go@$VERSION"
+              exit 0
+            fi
+            echo "attempt $attempt: not yet indexed, waiting"
+            sleep 15
+          done
+          # Not a release failure: the tag is pushed and valid, the proxy is just slow to
+          # index. Say so precisely rather than failing a release that succeeded.
+          echo "::warning::tag go/$VERSION pushed, but the proxy had not indexed it after"
+          echo "::warning::5 attempts. Re-run 'go get github.com/rungalileo/gcache/go@$VERSION'"
+          echo "::warning::to confirm; no re-release is needed."

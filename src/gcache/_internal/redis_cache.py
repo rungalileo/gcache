@@ -215,8 +215,16 @@ class RedisCache(CacheInterface):
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
 
-        if key.envelope != Envelope.JSON:
-            self._warn_once_if_text_mode(key)
+        # Every key, not only pickle-declared ones. Gating this on the declared envelope
+        # suppressed the warning in the case that needs it MOST: a JSON-declared key whose
+        # stored value is still a legacy pickle. That is not an edge case, it is the
+        # designed migration path -- decode() sniffs the leading byte precisely so a key can
+        # switch envelopes with no flag day, which means a JSON key is EXPECTED to meet
+        # pickle values for a while. In text mode client.get raises UnicodeDecodeError on
+        # those bytes before anything here runs, so the operator got gcache_error_counter
+        # with no explanation and the one diagnostic that would have explained it was
+        # skipped on envelope grounds.
+        self._warn_once_if_text_mode(key)
 
         watermark_ms = None
         if key.invalidation_tracking:
@@ -471,10 +479,14 @@ class RedisCache(CacheInterface):
             return
         self._warned_text_mode_pickle = True
         _GLOBAL_GCACHE_STATE.logger.warning(
-            "Redis client for use_case=%s was built with decode_responses=True, but this key "
-            "uses %s. redis-py will raise UnicodeDecodeError on the pickle blob before gcache "
-            "sees it, and the entry will not heal. decode_responses=True is safe only when "
-            "every use case sharing this client uses Envelope.JSON.",
+            "Redis client was built with decode_responses=True (first seen on use_case=%s, "
+            "envelope=%s). redis-py raises UnicodeDecodeError on any PICKLE value before "
+            "gcache sees it, and such an entry never heals. That covers two cases, not one: "
+            "a key declaring Envelope.PICKLE, and a key declaring Envelope.JSON whose stored "
+            "value is still a legacy pickle -- which is the normal state part-way through an "
+            "envelope migration, since reads sniff the framing rather than trusting the "
+            "declaration. decode_responses=True is safe only when no pickle value can be "
+            "encountered on this client at all.",
             key.use_case,
             key.envelope,
         )

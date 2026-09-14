@@ -183,8 +183,11 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
     # out of client.get -- raised inside redis-py, before any guard here -- and does NOT
     # heal, because a rewrite would fail the same way on the next read. Accepting a str
     # made JSON work under the option, which is precisely what made that reachable.
-    # decode_responses=True is safe only when every use case on the client is
-    # Envelope.JSON. RedisCache._warn_once_if_text_mode says so at runtime.
+    # And "every use case is Envelope.JSON" is NOT the sufficient condition it looks like:
+    # this function sniffs the framing rather than trusting the declaration, so a JSON key is
+    # expected to meet legacy pickle values mid-migration, and those reads fail at the client
+    # too. The real condition is that no pickle value can be reached on that client at all.
+    # RedisCache._warn_once_if_text_mode warns on the first read of ANY key for that reason.
     if isinstance(data, str):
         data = data.encode("utf-8")
 

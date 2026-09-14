@@ -1188,13 +1188,58 @@ async def test_a_pickle_key_on_a_text_mode_client_warns_once() -> None:
     ):
         await RedisCache.get(cache, pickle_key, fallback)
         await RedisCache.get(cache, pickle_key, fallback)
-        # A JSON key on the same client is the supported configuration and must stay quiet.
-        cache._warned_text_mode_pickle = False
-        await RedisCache.get(cache, json_key, fallback)
 
     warnings = [c for c in logger.warning.call_args_list if "decode_responses=True" in str(c)]
     assert len(warnings) == 1, f"expected exactly one warning across two pickle reads, got {len(warnings)}"
-    assert "pickle_uc" in str(warnings[0]), "the warning must name the offending use case"
+    assert "pickle_uc" in str(warnings[0]), "the warning must name the use case it was first seen on"
+
+    # A JSON-declared key on a text-mode client must ALSO warn. This assertion used to be the
+    # opposite -- it asserted silence, on the reasoning that an all-JSON process is the
+    # supported configuration. A reviewer showed that suppressed the warning in the case that
+    # needs it most: reads SNIFF the framing rather than trusting the declaration (that is
+    # what makes a no-flag-day migration possible), so a JSON key is EXPECTED to meet legacy
+    # pickle values for a while. In text mode client.get raises UnicodeDecodeError on those
+    # bytes before any gcache guard runs, so the operator saw gcache_error_counter move with
+    # nothing to explain it. The gate is the client's mode, not the key's envelope.
+    fake2 = text_mode_client()
+    cache2 = object.__new__(RedisCache)
+    cache2._warned_text_mode_pickle = False
+    logger2 = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake2)),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch("gcache._internal.redis_cache._GLOBAL_GCACHE_STATE.logger", logger2),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        await RedisCache.get(cache2, json_key, fallback)
+    json_warnings = [c for c in logger2.warning.call_args_list if "decode_responses=True" in str(c)]
+    assert len(json_warnings) == 1, "a JSON key on a text-mode client must warn too"
+    # And the message must explain the migration case, not just the declared-pickle one --
+    # otherwise an operator reads it as "not my problem, my use cases are all JSON".
+    assert "migration" in str(json_warnings[0]), "the warning must name the legacy-pickle case"
+
+    # A NON-text-mode client stays silent for both, so the gate is the client mode and not
+    # simply "always warn".
+    quiet = MagicMock(get=AsyncMock(return_value=None), setex=AsyncMock(), set=AsyncMock())
+    quiet.connection_pool.connection_kwargs = {}
+    cache3 = object.__new__(RedisCache)
+    cache3._warned_text_mode_pickle = False
+    logger3 = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: quiet)),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch("gcache._internal.redis_cache._GLOBAL_GCACHE_STATE.logger", logger3),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        await RedisCache.get(cache3, pickle_key, fallback)
+        await RedisCache.get(cache3, json_key, fallback)
+    assert not [c for c in logger3.warning.call_args_list if "decode_responses=True" in str(c)], (
+        "a byte-mode client must not warn at all"
+    )
 
     # A client whose factory returns something without a connection_pool must not break a
     # read: a diagnostic that can fail a request is worse than the thing it reports.

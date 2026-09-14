@@ -527,7 +527,7 @@ gcache = GCache(
 
 **Important:** Custom factories must use thread-local storage. Each thread needs its own client.
 
-#### ⚠️ `decode_responses=True` is only safe under an all-JSON process
+#### ⚠️ `decode_responses=True` is unsafe if any pickle value can be reached
 
 Reachable two ways — `RedisConfig.redis_py_options` and a custom factory — and it is a
 process-wide decision, because one `GCache` uses one client for **every** use case.
@@ -539,9 +539,20 @@ the fallback re-runs, and the entry is **not** rewritten — so every read of ev
 `Envelope.PICKLE` use case in that process fails for its full TTL. It does not self-heal,
 because a rewrite would fail identically on the next read.
 
-So turn it on only when every use case sharing the client is `Envelope.JSON`. gcache logs a
-warning (once per `RedisCache`) the first time a pickle-envelope key is read through a
-text-mode client, but it cannot fix the configuration for you.
+**"All my use cases are `Envelope.JSON`" is not sufficient**, and an earlier version of this
+section wrongly said it was. Reads **sniff** the framing rather than trusting the declaration
+— that is exactly what makes a no-flag-day migration possible — so a JSON-declared key is
+*expected* to meet legacy pickle values for as long as any remain in the keyspace. Those reads
+fail at the client, before gcache sees a byte, and never heal.
+
+So the real condition is stronger: turn it on only when **no pickle value can be reached on
+that client at all** — every use case on it is `Envelope.JSON` *and* no pre-migration pickle
+entries survive for those keys. In practice that means after a full TTL has elapsed since the
+last pickle writer stopped.
+
+gcache logs a warning once per `RedisCache`, on the first read of any kind through a text-mode
+client — deliberately not gated on the key's declared envelope, since the declaration is the
+thing that cannot be trusted here. It cannot fix the configuration for you.
 
 This is new as of the envelope work. Before `decode()` accepted a `str`, the option broke
 JSON reads too, so nobody could turn it on — making the JSON path work is what made the

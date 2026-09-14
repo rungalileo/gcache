@@ -51,6 +51,15 @@ ENVELOPE_VERSION = 1
 
 # Envelope timestamps are int64 milliseconds, matching the Go client. See decode().
 _INT64_MAX = 2**63 - 1
+# The largest integer a JSON number survives a round trip through. JavaScript has only
+# doubles, so JSON.parse rounds anything above this -- 9007199254740993 becomes
+# ...992 -- and Go's decodeEnvelope reads the field into a float64 and does the same.
+# Python's json.loads gives an exact int, so Python was the ONLY client reading these
+# values correctly, and the three then compared different numbers against the same
+# threshold with no error anywhere. Envelope timestamps are bounded here so all three
+# agree; see the comment at the bound for why the WATERMARK deliberately is not.
+_MAX_SAFE_INTEGER = 2**53 - 1
+_MIN_SAFE_INTEGER = -(2**53 - 1)
 _INT64_MIN = -(2**63)
 
 # Every pickle protocol >= 2 blob starts with the PROTO opcode (0x80). JSON objects start
@@ -229,12 +238,27 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                 # became permanent and immune to invalidation, which is the one thing the
                 # watermark exists to prevent. Same bound the Go client applies.
                 #
-                # Nothing legitimate is excluded: int64 milliseconds runs to year ~292
-                # million, and all three writers stamp Date.now()-scale values. Being
-                # stricter than TypeScript is the safe direction -- an entry it writes and
-                # we reject is a miss that gets rewritten, not one served forever.
-                if not (_INT64_MIN <= value <= _INT64_MAX):
-                    raise EnvelopeDecodeError(f"{field} is outside int64, got {value!r}")
+                # Nothing legitimate is excluded: 2^53 milliseconds runs to year ~287396,
+                # and all three writers stamp Date.now()-scale values.
+                #
+                # The bound is the SAFE-INTEGER range, not int64, and the difference is not
+                # cosmetic. JavaScript has only doubles, so JSON.parse rounds above 2^53 --
+                # 9007199254740993 reads as ...992 -- and Go's decodeEnvelope takes the
+                # field into a float64 and rounds identically. Python's json.loads returns
+                # an exact int. So in the 2^53..int64 band every client ACCEPTED and then
+                # compared a different number against the staleness threshold, silently.
+                # That is worse than any of them missing: a miss heals on the next read, a
+                # disagreement does not announce itself at all. All three now stop at 2^53.
+                #
+                # The WATERMARK keeps the int64 bound on purpose, and the asymmetry is
+                # measured rather than inherited. _parse_watermark reaches its value through
+                # float(), not json.loads, so Python rounds there exactly as Go and
+                # JavaScript do -- 9007199254740993 -> ...992 in both languages. Python and
+                # Go already AGREE on the watermark above 2^53; tightening it would
+                # introduce a divergence instead of closing one. The two fields differ
+                # because they reach Python through two different parsers.
+                if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):
+                    raise EnvelopeDecodeError(f"{field} is outside the safe-integer range, got {value!r}")
             encoding = envelope.get("encoding")
             if encoding == "base64":
                 # Normalize before decoding. Node's Buffer.from(x, "base64") accepts both

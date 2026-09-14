@@ -561,14 +561,23 @@ def test_decode_rejects_a_non_finite_timestamp(field: str) -> None:
 
 
 def test_decode_accepts_a_large_in_range_integer_timestamp() -> None:
-    # A timestamp far beyond any real one is fine while it fits int64 -- the bound is the
-    # range the Go client can hold, not plausibility.
+    # A timestamp far beyond any real one is fine while it stays inside the SAFE-INTEGER
+    # range. This test used to use 2**62 and assert int64, and the bound was tightened
+    # deliberately -- not loosened by accident, which is what a reader will assume if this
+    # comment does not say otherwise.
+    #
+    # int64 was too loose because JavaScript has only doubles: JSON.parse rounds above 2^53
+    # (9007199254740993 reads as ...992), and Go's decodeEnvelope takes the field into a
+    # float64 and rounds identically, while Python's json.loads returns the exact int. In
+    # the 2^53..int64 band all three clients ACCEPTED and then compared different numbers
+    # against the same threshold, silently. A miss heals on the next read; a disagreement
+    # never announces itself.
     #
     # The guard must still never call math.isfinite on the int directly: it raises
     # OverflowError on a very large one, escaping decode's contract of raising only
-    # EnvelopeDecodeError. That is why the float() conversion comes first and the int64
+    # EnvelopeDecodeError. That is why the float() conversion comes first and the range
     # comparison is done on the original int.
-    big = 2**62  # ~year 146 million, and comfortably inside int64
+    big = 2**52  # ~year 144000, and comfortably inside the safe-integer range
     raw = json.dumps(
         {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}
     ).encode()
@@ -582,25 +591,30 @@ def test_decode_accepts_a_large_in_range_integer_timestamp() -> None:
         decode(huge)
 
 
-def test_decode_rejects_a_timestamp_outside_int64() -> None:
-    # Double-representability was not a tight enough bound. 1e300 passed the finiteness
-    # check and kept an exact 301-digit int, and no real watermark can satisfy
-    # `watermark_ms >= created_at_ms` against that -- so the entry was permanent and immune
-    # to invalidation, the one thing the watermark exists to prevent. int64 is the bound
-    # the Go client applies, and nothing legitimate is excluded: int64 milliseconds runs to
-    # year ~292 million.
+def test_decode_rejects_a_timestamp_outside_the_safe_integer_range() -> None:
+    # Double-representability was not a tight enough bound, and neither was int64.
     #
-    # Stricter than the TypeScript reader, which accepts anything finite. That asymmetry is
-    # the safe direction: an entry it writes and we reject is a miss that gets rewritten,
-    # not one served forever.
-    for value in ("1e300", "-1e300", "9223372036854775808"):
+    # 1e300 passed the finiteness check and kept an exact 301-digit int, and no real
+    # watermark can satisfy `watermark_ms >= created_at_ms` against that -- so the entry was
+    # permanent and immune to invalidation, the one thing the watermark exists to prevent.
+    # int64 fixed that and left a subtler hole: in the 2^53..int64 band every client
+    # accepted, but JavaScript and Go both reach the field through a double and round it,
+    # while Python's json.loads is exact. Three clients, three reads of the same bytes, no
+    # error anywhere.
+    #
+    # 2^53-1 is where all three agree, and nothing legitimate is excluded -- that is year
+    # ~287396, and every writer stamps Date.now()-scale values. The previous version of this
+    # test asserted 2**63-1 was LEGAL; the change is deliberate.
+    for value in ("1e300", "-1e300", "9223372036854775808", "9007199254740992"):
         raw = f'{{"version":1,"createdAtMs":{value},"expiresAtMs":1,"encoding":"utf8","payload":"x"}}'.encode()
         with pytest.raises(EnvelopeDecodeError):
             decode(raw)
 
-    # The boundary itself is legal.
-    edge = f'{{"version":1,"createdAtMs":{2**63 - 1},"expiresAtMs":1,"encoding":"utf8","payload":"x"}}'.encode()
-    assert decode(edge).created_at_ms == 2**63 - 1
+    # The boundary itself is legal, in both signs -- so the bound is pinned exactly rather
+    # than approximately. Making the comparison exclusive fails here.
+    for edge_value in (2**53 - 1, -(2**53 - 1)):
+        edge = f'{{"version":1,"createdAtMs":{edge_value},"expiresAtMs":1,"encoding":"utf8","payload":"x"}}'.encode()
+        assert decode(edge).created_at_ms == edge_value
 
 
 def test_decode_rejects_an_integer_timestamp_past_a_double() -> None:

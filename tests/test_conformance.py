@@ -8,7 +8,9 @@ both. Two escaped that way and were found in review rather than by a test.
 """
 
 import base64
+import json
 import pathlib
+from typing import Any
 
 import pytest
 
@@ -134,3 +136,47 @@ def test_an_empty_prefix_is_unreachable_through_the_public_api() -> None:
     assert "raise EmptyUrnPrefixNotSupported()" in src, (
         "the vector file says this configuration is rejected at construction; it is not"
     )
+
+
+def test_the_watermark_and_envelope_parsers_really_do_differ() -> None:
+    # The vector file records an asymmetry -- envelope timestamps stop at 2^53, the watermark
+    # keeps an int64 bound -- and justifies it with measured Python values. If those
+    # measurements stop holding, the justification becomes a story rather than a reason, so
+    # execute them rather than trusting the prose.
+    #
+    # The split is real and easy to miss: json.loads returns an exact int at any magnitude,
+    # float() returns a double and rounds above 2^53. Go reaches BOTH fields through a
+    # float64, so Python's watermark already agrees with Go there and its envelope did not.
+    # That is why tightening the watermark would introduce a divergence instead of closing
+    # one -- the opposite of the obvious move.
+    from gcache._internal.redis_cache import _parse_watermark
+    from gcache.config import GCacheKey
+
+    key = GCacheKey(key_type="kt", id="i", use_case="u", invalidation_tracking=True)
+    noop: Any = lambda _reason: None  # noqa: E731 - a recorder that records nothing
+
+    # Rounds, exactly as Go and JavaScript do. Asserted as equality to the ROUNDED value, not
+    # merely "differs", so a parser change that rounds differently also fails.
+    assert _parse_watermark(b"9007199254740993", key, noop) == 9007199254740992
+    assert _parse_watermark(b"9007199254740995", key, noop) == 9007199254740996
+    # And is exact at and below the boundary, so the test is about 2^53 and not about float()
+    # being lossy everywhere.
+    assert _parse_watermark(b"9007199254740991", key, noop) == 9007199254740991
+    assert _parse_watermark(b"1757308800123", key, noop) == 1757308800123
+
+    # The envelope side rejects what the watermark rounds -- the two halves of the asymmetry,
+    # pinned together so neither can drift alone.
+    raw = json.dumps(
+        {
+            "version": ENVELOPE_VERSION,
+            "createdAtMs": 9007199254740993,
+            "expiresAtMs": 9007199254740993,
+            "encoding": "utf8",
+            "payload": '{"a":1}',
+        }
+    ).encode()
+    with pytest.raises(EnvelopeDecodeError, match="safe-integer"):
+        decode(raw, allow_pickle=False)
+
+    # The file must still say so, or the code and the record drift apart silently.
+    assert "watermarkVsEnvelope" in _DATA, "the vector file must document why the bounds differ"

@@ -130,21 +130,13 @@
     },
     {
       "name": "created-above-2-53",
-      "why": "The silent-disagreement case, and the reason isInteger was not enough. JSON.parse rounds 9007199254740993 to 9007199254740992, which IS integral -- so TS accepted it while Python read the exact value and Go decoded it inside int64. All three then ACCEPT and disagree about the number, with the watermark comparison resolving differently on either side of 2^53 and no error anywhere. Worse than a miss.",
+      "why": "The silent-disagreement case, and the reason isInteger was not enough. JSON.parse rounds 9007199254740993 to 9007199254740992, and Go's decodeEnvelope takes the field into a float64 and rounds identically; Python's json.loads returns the exact int. So in the 2^53..int64 band every client ACCEPTED and then compared a different number against the staleness threshold, with no error anywhere. Worse than a miss: a miss heals on the next read, a disagreement never announces itself. All three now stop at 2^53. This vector was briefly recorded as a deliberate asymmetry (rejected only by TypeScript) and that was wrong within the hour -- Go tightened, and the record was stale before anyone read it. Uniform beats documented.",
       "envelope": "{\"version\":1,\"createdAtMs\":9007199254740993,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
-      "expect": "reject",
-      "rejectedBy": [
-        "typescript"
-      ],
-      "acceptedBy": [
-        "python",
-        "go"
-      ],
-      "asymmetryIsSafe": "TS is stricter here on purpose. It rejects exactly the range it cannot represent faithfully, so the entry misses and is rewritten in a form all three agree about -- rather than being served with two different values. Python and Go accept up to int64, which libs/go/gcache/envelope.go already documents as the safe direction. No legitimate writer reaches it: real timestamps are ~1.7e12 and 2^53 ms is year 287396."
+      "expect": "reject"
     },
     {
       "name": "created-at-max-safe-integer",
-      "why": "The boundary itself, so the safe-integer check cannot drift into rejecting the largest faithfully-representable value. 9007199254740991 is Number.MAX_SAFE_INTEGER and every client reads it exactly.",
+      "why": "The boundary itself, so the safe-integer bound cannot drift into rejecting the largest faithfully-representable value. 9007199254740991 is Number.MAX_SAFE_INTEGER and every client reads it exactly. Mutation-checked in Go too: making the boundary exclusive rejects this vector.",
       "envelope": "{\"version\":1,\"createdAtMs\":9007199254740991,\"expiresAtMs\":9007199254740991,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
       "expect": "accept",
       "decoded": {
@@ -195,6 +187,34 @@
         "agree": false,
         "reason": "Structural, not an encoding choice: Python omits an empty component, TS joins it. Survives the encoding fix, so gcache rejects this configuration at construction (EmptyUrnPrefixNotSupported) rather than documenting it."
       }
+    ]
+  },
+  "watermarkVsEnvelope": {
+    "$comment": [
+      "Why the watermark keeps an int64 bound while envelope timestamps stop at 2^53.",
+      "",
+      "Not an oversight, and not inherited -- measured. The two fields reach Python through",
+      "DIFFERENT parsers:",
+      "",
+      "  envelope   json.loads  -> an exact Python int at any magnitude",
+      "  watermark  float()     -> a float64, so it rounds above 2^53, exactly as Go and",
+      "                            JavaScript do",
+      "",
+      "Measured in Python at this revision:",
+      "",
+      "  9007199254740993  envelope 9007199254740993   watermark 9007199254740992",
+      "  9007199254740995  envelope 9007199254740995   watermark 9007199254740996",
+      "  9007199254740991  envelope 9007199254740991   watermark 9007199254740991",
+      "",
+      "The watermark values are identical to Go's. So above 2^53 Python and Go ALREADY agree",
+      "on the watermark and disagreed only on the envelope. Tightening the watermark would",
+      "introduce a divergence rather than close one.",
+      "",
+      "Consequence to know before anyone 'fixes' this: within Python, above 2^53, a rounded",
+      "watermark is compared against an exact created_at, so `watermark_ms >= created_at_ms`",
+      "can be off by one millisecond. Unreachable in practice -- 2^53 ms is year 287396 -- and",
+      "now doubly so, since the envelope side rejects those values outright. Do not align the",
+      "two parsers without re-measuring Go first."
     ]
   }
 }

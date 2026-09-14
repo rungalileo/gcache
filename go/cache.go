@@ -34,8 +34,9 @@ const watermarkTTL = 4 * time.Hour
 const maxEntryTTL = watermarkTTL
 
 // defaultTimeout bounds every Redis call. Short on purpose: a cache must degrade to a miss
-// long before it threatens the caller's own deadline (orbit AGENTS.md #11), and it matches
-// the 300ms the ingest service already uses for Redis.
+// long before it threatens the caller's own deadline, and it matches the 300ms that
+// Galileo's ingest service already uses for Redis. (The rule was written down in orbit's
+// AGENTS.md; the reason travels, the citation does not.)
 const defaultTimeout = 300 * time.Millisecond
 
 // Result classifies a lookup, for metrics.

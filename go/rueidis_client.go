@@ -55,8 +55,8 @@ type RueidisOptions struct {
 	// Password, if the endpoint requires AUTH.
 	//
 	// STATIC credentials only. There is no CredentialProvider hook here, so a deployment
-	// using ElastiCache IAM auth (GALILEO_REDIS_USE_ELASTICACHE_IAM, which Python honours
-	// via ElastiCacheIAMProvider in setgalileo's RedisConfig) is NOT supported: IAM issues
+	// using ElastiCache IAM auth (GALILEO_REDIS_USE_ELASTICACHE_IAM, which Galileo's Python
+	// Redis config honours via an ElastiCacheIAMProvider) is NOT supported: IAM issues
 	// a short-lived token, ~15 minutes, so a value read once at construction would expire
 	// under a long-lived client. Supporting it means a rueidis AuthCredentialsFn plus an
 	// AWS sigv4 signer, which is a dependency this package deliberately does not carry.
@@ -66,8 +66,8 @@ type RueidisOptions struct {
 	// unauthenticated client and fail at connect with an opaque auth error. gcachectl and
 	// the live test both do this; a service adopting this client needs the same check.
 	Password string
-	// Protocol follows the convention shared with libs/python setgalileo RedisConfig:
-	// "rediss" anywhere in the string enables TLS.
+	// Protocol follows the Galileo-wide convention: "rediss" anywhere in the string
+	// enables TLS.
 	//
 	// Cluster mode needs nothing here -- see NewRueidisClient.
 	Protocol string
@@ -136,8 +136,9 @@ func NewRueidisClient(o RueidisOptions) (Client, func(), error) {
 	return &rueidisClient{c: c, cacheEnabled: !o.DisableClientSideCache, addr: addr}, c.Close, nil
 }
 
-// span opens a CLIENT-kind span for one Redis round trip (orbit CLAUDE.md #12: every
-// network hop is instrumented). Redis speaks its own wire protocol, so no HTTP
+// span opens a CLIENT-kind span for one Redis round trip, following the Galileo
+// convention that every network hop is instrumented. Redis speaks its own wire protocol,
+// so no HTTP
 // auto-instrumentation reaches it and there is no Go OTel instrumentor for rueidis.
 //
 // Like tracing.StartSpan, this is a no-op without an active parent: cache reads run on

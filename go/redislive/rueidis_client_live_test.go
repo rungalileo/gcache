@@ -27,10 +27,12 @@ import (
 // require a running Redis -- `bazel test //libs/go/gcache/...` would then fail on any machine
 // without one. //libs/go/gcache:gcache_test stays hermetic; this target is the live one.
 //
-// It hard-fails rather than skips when Redis is down, matching the repo's other
-// live-dependency suites: GALILEO_REDIS_HOST is set for tests in .bazelrc and CI runs
-// `make run-dependencies` before Bazel, so an outage is a real failure, and a silent skip
-// would restore the coverage gap this file exists to close.
+// It hard-fails rather than skips when Redis is down. A silent skip would restore the
+// coverage gap this file exists to close, and "the live test passed" would mean nothing.
+//
+// This is a pure Go test, so it cannot use the redislite fixture the Python suite starts.
+// It reads GALILEO_REDIS_HOST/PORT and defaults to localhost:6379; the go workflow
+// supplies a Redis service container for exactly this reason.
 //
 // Every key is namespaced per run and deleted afterwards -- never FLUSHDB, since api test
 // shards share db 0.
@@ -68,7 +70,7 @@ func liveClient(t *testing.T) (rueidis.Client, func()) {
 	}
 	c, err := rueidis.NewClient(opt)
 	if err != nil {
-		t.Fatalf("redis at %s:%s is required for this test (make run-dependencies): %v", host, port, err)
+		t.Fatalf("redis at %s:%s is required for this test: %v", host, port, err)
 	}
 	return c, c.Close
 }
@@ -84,9 +86,9 @@ func liveAdapter(t *testing.T, disableCSC bool) (gcache.Client, string) {
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		// Two patterns, matching redis_fixtures.py: an invalidation-tracked key is wrapped
-		// in a hash tag, so it starts with "{" and prefix+"*" never sees it. Missing those
-		// left a 4h watermark in the shared db on every run.
+		// Two patterns, matching the urn_prefix fixture in tests/test_cross_language.py: an
+		// invalidation-tracked key is wrapped in a hash tag, so it starts with "{" and
+		// prefix+"*" never sees it. Missing those left a 4h watermark behind on every run.
 		//
 		// SCAN, not KEYS: KEYS walks the whole keyspace and blocks the server, and the api
 		// test shards share db 0 with this suite.

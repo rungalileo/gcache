@@ -260,7 +260,7 @@ func parseWatermark(raw []byte) (int64, error) {
 // fitsInt64 reports whether a FINITE float64 converts to int64 with a defined result.
 //
 // A bare int64(f) is implementation-defined when f does not fit, and the two architectures
-// orbit builds for disagree at OPPOSITE ends: arm64 saturates to MaxInt64, amd64 yields
+// this library is built for disagree at OPPOSITE ends: arm64 saturates to MaxInt64, amd64 yields
 // the indefinite value MinInt64. Verified by running this package under both. Left to the
 // hardware, one stored value answers hit on a developer's Mac and miss in production.
 //

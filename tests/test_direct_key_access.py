@@ -194,8 +194,12 @@ async def test_aput_survives_a_config_that_omits_the_local_layer(
 async def test_aput_writes_redis_even_when_the_local_layer_raises(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # CacheChain.put promises both layers are attempted and the FIRST error is re-raised.
-    # Without this, deleting the except/raise left the suite green -- neither half pinned.
+    # CacheChain.put writes the SHARED layer first, then the local one, and re-raises the
+    # first error. So a local failure still leaves the shared entry written (asserted below),
+    # while a shared failure skips local entirely (asserted in the second half). This comment
+    # used to claim both layers are always attempted; 593a289 reversed the order and the
+    # comment was not updated with it. Both halves are needed -- deleting either the
+    # except/raise or the skip-on-shared-failure leaves the other half green.
     cache_config_provider.configs["both_uc"] = GCacheKeyConfig.enabled(60)
     chain = gcache._cache  # CacheChain over two CacheControllers
     local, remote = chain.wrapped, chain.fallback_cache

@@ -137,6 +137,15 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
     # repo (services/api's AssistantService builds its client that way). The pickle branch
     # is unreachable from a str by construction -- a pickle blob is not valid UTF-8, so
     # redis-py could not have handed one back as str in the first place.
+    #
+    # That last sentence is also the constraint, so do not read this as making the option
+    # safe in general: one GCache uses one client for every use case, and decode_responses
+    # applies to every reply. A pickle use case sharing that client gets UnicodeDecodeError
+    # out of client.get -- raised inside redis-py, before any guard here -- and does NOT
+    # heal, because a rewrite would fail the same way on the next read. Accepting a str
+    # made JSON work under the option, which is precisely what made that reachable.
+    # decode_responses=True is safe only when every use case on the client is
+    # Envelope.JSON. RedisCache._warn_once_if_text_mode says so at runtime.
     if isinstance(data, str):
         data = data.encode("utf-8")
 

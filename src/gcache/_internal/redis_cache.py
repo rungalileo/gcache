@@ -73,7 +73,7 @@ suppression state we cannot read.
 """
 
 
-def _parse_watermark(raw: bytes | str | None, key: GCacheKey) -> int | None:
+def _parse_watermark(raw: bytes | str | None, key: GCacheKey, record_degraded: Callable[[str], None]) -> int | None:
     """Convert a stored watermark to an int, failing CLOSED.
 
     Three things used to go wrong here, all of them raising out of RedisCache.get, which is
@@ -93,6 +93,14 @@ def _parse_watermark(raw: bytes | str | None, key: GCacheKey) -> int | None:
     Unreadable fails closed -- see _WATERMARK_SUPPRESS_ALL. Out-of-range clamps, matching
     Go's clampToInt64: a watermark is a suppression instruction rather than data about the
     entry, so saturating gives the same answer the exact value would.
+
+    ``record_degraded`` is passed in rather than inferred from the return value, because the
+    return value cannot carry the distinction: a legitimate watermark above the int64
+    maximum clamps to exactly the _WATERMARK_SUPPRESS_ALL sentinel. Suppression is also the
+    one corruption path that neither heals nor expires quickly -- _exec_fallback skips the
+    rewrite (the sentinel is never below now), so the entity's hit rate sits at zero until
+    the watermark key's own 4-hour TTL runs out. A log line is not enough for a condition
+    with that blast radius, and a shared keyspace makes a foreign writer able to cause it.
     """
     if raw is None:
         return None
@@ -100,6 +108,7 @@ def _parse_watermark(raw: bytes | str | None, key: GCacheKey) -> int | None:
         as_float = float(raw)
     except (TypeError, ValueError):
         _GLOBAL_GCACHE_STATE.logger.warning("Unreadable watermark for %s; suppressing the entry", key.urn)
+        record_degraded("unreadable_watermark")
         return _WATERMARK_SUPPRESS_ALL
     # EVERY non-finite value, not just NaN. Guarding on isnan alone treated the three
     # non-finite inputs three ways: nan and inf suppressed, but -inf clamped to the int64
@@ -111,6 +120,7 @@ def _parse_watermark(raw: bytes | str | None, key: GCacheKey) -> int | None:
     # -- -1e300 means "an extremely old watermark", which is a real instruction, not garbage.
     if not math.isfinite(as_float):
         _GLOBAL_GCACHE_STATE.logger.warning("Non-finite watermark %r for %s; suppressing the entry", as_float, key.urn)
+        record_degraded("non_finite_watermark")
         return _WATERMARK_SUPPRESS_ALL
     if as_float >= _INT64_MAX:
         return _INT64_MAX
@@ -139,6 +149,8 @@ class RedisCache(CacheInterface):
         """
         super().__init__(cache_config_provider)
         self._client_factory = client_factory
+        # One-shot latch for the decode_responses warning; see _warn_once_if_text_mode.
+        self._warned_text_mode_pickle = False
         # Thread-local storage is required because async redis-py clients maintain
         # internal state (connection pool, pending requests) bound to a specific event loop.
         # Since gcache runs sync cached functions in EventLoopThread workers (each with its
@@ -203,11 +215,14 @@ class RedisCache(CacheInterface):
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
 
+        if key.envelope != Envelope.JSON:
+            self._warn_once_if_text_mode(key)
+
         watermark_ms = None
         if key.invalidation_tracking:
             vals = await self.client.mget(key.urn, key.prefix + "#watermark")
             raw = vals[0]
-            watermark_ms = _parse_watermark(vals[1], key)
+            watermark_ms = _parse_watermark(vals[1], key, lambda reason: self._record_degraded_read(key, reason))
         else:
             raw = await self.client.get(key.urn)
         if raw is not None:
@@ -343,6 +358,52 @@ class RedisCache(CacheInterface):
 
     async def delete(self, key: GCacheKey) -> bool:
         return (await self.client.delete(key.urn)) > 0
+
+    def _warn_once_if_text_mode(self, key: GCacheKey) -> None:
+        """Warn when a pickle use case shares a text-mode client with a JSON one.
+
+        ``decode_responses=True`` makes redis-py decode every reply as UTF-8. A pickle blob
+        starts 0x80, which is not a valid UTF-8 start byte, so ``client.get`` raises
+        UnicodeDecodeError *inside redis-py* -- before any guard in this class. The error
+        escapes RedisCache.get, CacheController logs it and re-runs the fallback, and the
+        entry is never rewritten: every read of every Envelope.PICKLE use case in that
+        process fails for its full TTL.
+
+        This is a new hazard rather than a latent one. Until decode() learned to accept a
+        str, the option broke JSON reads too, so nobody could turn it on. Making the JSON
+        path work is what made the pickle path reachable, and one GCache uses one client for
+        every use case -- so the two cannot be configured apart.
+
+        A warning rather than a repair, because there is nothing to repair: a rewrite would
+        succeed and the next read would fail identically, since the client itself cannot
+        return pickle bytes. The fix is the caller's configuration, so say so once, loudly.
+        Everything here is best-effort and swallowed -- a custom client_factory may return a
+        cluster client or a wrapper with no connection_pool, and a diagnostic must never be
+        the thing that fails a request.
+        """
+        if self._warned_text_mode_pickle:
+            return
+        try:
+            # getattr rather than attribute access: RedisCluster has no connection_pool at
+            # all (mypy catches that), and a custom factory may return a wrapper with
+            # neither it nor connection_kwargs.
+            pool = getattr(self.client, "connection_pool", None)
+            decode_responses = getattr(pool, "connection_kwargs", {}).get("decode_responses")
+        except Exception:  # noqa: BLE001 - a diagnostic must not be able to fail a read
+            self._warned_text_mode_pickle = True
+            return
+        if not decode_responses:
+            self._warned_text_mode_pickle = True
+            return
+        self._warned_text_mode_pickle = True
+        _GLOBAL_GCACHE_STATE.logger.warning(
+            "Redis client for use_case=%s was built with decode_responses=True, but this key "
+            "uses %s. redis-py will raise UnicodeDecodeError on the pickle blob before gcache "
+            "sees it, and the entry will not heal. decode_responses=True is safe only when "
+            "every use case sharing this client uses Envelope.JSON.",
+            key.use_case,
+            key.envelope,
+        )
 
     def _record_degraded_read(self, key: GCacheKey, reason: str) -> None:
         """Count a read that found an entry it could not use.

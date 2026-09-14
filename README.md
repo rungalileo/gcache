@@ -351,7 +351,7 @@ with gcache.enable():
 Both honour `enable()` and the use case's ramp, exactly as the decorator does — a write
 outside an `enable()` block, or for a use case ramped to 0, does nothing.
 
-Three things to know:
+Four things to know:
 
 - **`envelope` and `serializer` are not part of the key.** `key_type`, `id`, `args` and
   `use_case` are, so getting one of those wrong just means the two participants never see
@@ -359,9 +359,12 @@ Three things to know:
   incompatible framing, each overwrites the other, and neither can read what it finds. Within
   one process the library now catches it — a direct key whose envelope contradicts a
   `@cached` declaration on the same `use_case` raises — but across languages it cannot.
-- **`aput` raises on a cache-layer failure**, unlike a read. That matches `adelete` and
-  `ainvalidate`. "Prime" reads as best-effort, so a caller on a request path should decide
-  what to do with a Redis timeout rather than let it propagate.
+- **`aput` raises on a cache-layer failure; `aget` does not.** `aput` matches `adelete` and
+  `ainvalidate` in propagating, so a caller on a request path decides what to do with a Redis
+  timeout rather than having "prime" silently read as best-effort. `aget` is the opposite and
+  deliberately so: it catches `GCacheError`, logs, increments `gcache_error_counter` and reads
+  through uncached, because a cache must not be able to fail a request. Plan error handling
+  around both — a `try` that wraps only the read is wrapping the half that cannot raise.
 - **A prime is sampled by the ramp, like a read.** `_should_cache` calls `random()` per
   invocation, per layer, so a use case at ramp 50 drops about half its primes and `aput`
   still returns normally. On a read that costs one uncached call; on a prime it throws away
@@ -464,6 +467,26 @@ gcache = GCache(
 ```
 
 **Important:** Custom factories must use thread-local storage. Each thread needs its own client.
+
+#### ⚠️ `decode_responses=True` is only safe under an all-JSON process
+
+Reachable two ways — `RedisConfig.redis_py_options` and a custom factory — and it is a
+process-wide decision, because one `GCache` uses one client for **every** use case.
+
+The option makes redis-py decode every reply as UTF-8. A pickle blob starts `0x80`, which is
+not a valid UTF-8 start byte, so `client.get` raises `UnicodeDecodeError` **inside redis-py**,
+before gcache sees the value. That error escapes the read path: `gcache_error_counter` moves,
+the fallback re-runs, and the entry is **not** rewritten — so every read of every
+`Envelope.PICKLE` use case in that process fails for its full TTL. It does not self-heal,
+because a rewrite would fail identically on the next read.
+
+So turn it on only when every use case sharing the client is `Envelope.JSON`. gcache logs a
+warning (once per `RedisCache`) the first time a pickle-envelope key is read through a
+text-mode client, but it cannot fix the configuration for you.
+
+This is new as of the envelope work. Before `decode()` accepted a `str`, the option broke
+JSON reads too, so nobody could turn it on — making the JSON path work is what made the
+pickle path reachable.
 
 ## Invalidation
 

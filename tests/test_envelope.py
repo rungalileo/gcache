@@ -16,6 +16,7 @@ from gcache._internal.envelope import (
 )
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.redis_cache import RedisValue
+from gcache.config import GCacheKey
 from tests.conftest import FakeCacheConfigProvider
 
 
@@ -930,7 +931,7 @@ def test_parse_watermark_never_raises_and_fails_closed(raw: bytes | None, expect
     from gcache.config import GCacheKey
 
     key = GCacheKey(key_type="kt", id="i", use_case="u", invalidation_tracking=True)
-    assert _parse_watermark(raw, key) == expected
+    assert _parse_watermark(raw, key, lambda _reason: None) == expected
 
 
 def test_an_unreadable_watermark_suppresses_rather_than_serving() -> None:
@@ -1018,16 +1019,16 @@ def test_every_non_finite_watermark_suppresses_in_both_languages() -> None:
     logging.disable(logging.WARNING)
     try:
         for raw in (b"nan", b"inf", b"-inf", b"1e400", b"abc", b""):
-            parsed = _parse_watermark(raw, key)
+            parsed = _parse_watermark(raw, key, lambda _reason: None)
             # None is a distinct outcome meaning "no watermark stored", and none of these
             # may produce it -- that would SERVE the entry, same as the minimum would.
             assert parsed is not None, f"{raw!r} must not read as 'no watermark'"
             assert parsed >= created_at_ms, f"{raw!r} must suppress"
 
         # Finite out-of-range keeps its meaning rather than being treated as garbage.
-        old_watermark = _parse_watermark(b"-1e300", key)
+        old_watermark = _parse_watermark(b"-1e300", key, lambda _reason: None)
         assert old_watermark is not None and old_watermark < created_at_ms, "a very old watermark stays old"
-        high = _parse_watermark(b"1e300", key)
+        high = _parse_watermark(b"1e300", key, lambda _reason: None)
         assert high is not None and high >= created_at_ms
     finally:
         logging.disable(logging.NOTSET)
@@ -1053,3 +1054,145 @@ def test_decode_handles_a_str_from_decode_responses(as_str: bool) -> None:
 
     assert decoded.payload == '{"v":1}'
     assert decoded.created_at_ms == 1757308800123
+
+
+@pytest.mark.asyncio
+async def test_a_suppressing_watermark_records_a_degraded_read() -> None:
+    # Suppression is the one corruption path that neither heals nor expires quickly:
+    # _exec_fallback re-puts only when watermark_ms < now, and _WATERMARK_SUPPRESS_ALL never
+    # is, so the entity's hit rate sits at zero until the watermark key's own 4h TTL runs
+    # out. A log line was the only record of that. gcache_degraded_read_counter exists so an
+    # operator can separate keyspace corruption from an ordinary miss, and a shared keyspace
+    # makes a foreign writer able to cause this one.
+    #
+    # Driven through RedisCache.get rather than _parse_watermark, because the parser can be
+    # correct and not wired in -- that exact mistake is what test_get_does_not_raise_on_a_
+    # malformed_watermark exists to catch. The recorder is passed into the parser rather than
+    # inferred from its return value: a legitimate watermark above the int64 maximum clamps
+    # to the identical _WATERMARK_SUPPRESS_ALL sentinel, so the return value cannot carry the
+    # distinction. That clamping case is asserted below to keep the two apart.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        invalidation_tracking=True,
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    stored = encode_json(created_at_ms=1757308800123, ttl_sec=3600, payload='{"v":1}')
+
+    async def fallback() -> dict:
+        return {"v": "fresh"}
+
+    expected = {
+        b"abc": "unreadable_watermark",
+        b"": "unreadable_watermark",
+        b"nan": "non_finite_watermark",
+        b"inf": "non_finite_watermark",
+        b"-inf": "non_finite_watermark",
+        b"1e400": "non_finite_watermark",
+    }
+    for bad, reason in expected.items():
+        fake = MagicMock(mget=AsyncMock(return_value=[stored, bad]), setex=AsyncMock(), set=AsyncMock())
+        cache = object.__new__(RedisCache)
+        recorder = MagicMock()
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", recorder),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            await RedisCache.get(cache, key, fallback)
+        reasons = [c.args[-1] for c in recorder.call_args_list]
+        assert reason in reasons, f"watermark {bad!r} recorded {reasons}, expected {reason!r}"
+
+    # A finite out-of-range watermark clamps to the SAME sentinel but is a real instruction,
+    # not corruption, so it must not be counted. Without this the test would pass on a
+    # recorder that fires unconditionally.
+    fake = MagicMock(mget=AsyncMock(return_value=[stored, b"1e300"]), setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    recorder = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", recorder),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        await RedisCache.get(cache, key, fallback)
+    clamped = [c.args[-1] for c in recorder.call_args_list]
+    assert "unreadable_watermark" not in clamped and "non_finite_watermark" not in clamped, (
+        f"a finite out-of-range watermark is an instruction, not corruption; got {clamped}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_pickle_key_on_a_text_mode_client_warns_once() -> None:
+    # decode_responses=True makes redis-py decode every reply as UTF-8. A pickle blob starts
+    # 0x80, not a valid UTF-8 start byte, so client.get raises UnicodeDecodeError INSIDE
+    # redis-py -- before any guard in RedisCache. It escapes get(), CacheController logs and
+    # re-runs the fallback, and the entry is never rewritten, so every read of every
+    # Envelope.PICKLE use case in the process fails for its full TTL and does not heal.
+    #
+    # This became reachable in this PR, which is why it is guarded here rather than being a
+    # pre-existing wart: until decode() accepted a str the option broke JSON reads too, so
+    # nobody could turn it on. One GCache uses one client for every use case, so the two
+    # envelopes cannot be configured apart.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.redis_cache import RedisCache
+
+    def text_mode_client() -> MagicMock:
+        c = MagicMock(get=AsyncMock(return_value=None), setex=AsyncMock(), set=AsyncMock())
+        c.connection_pool.connection_kwargs = {"decode_responses": True}
+        return c
+
+    async def fallback() -> dict:
+        return {"v": "fresh"}
+
+    pickle_key = GCacheKey(key_type="kt", id="i", use_case="pickle_uc")
+    json_key = GCacheKey(key_type="kt", id="i", use_case="json_uc", envelope=Envelope.JSON, serializer=JsonSerializer())
+
+    fake = text_mode_client()
+    cache = object.__new__(RedisCache)
+    cache._warned_text_mode_pickle = False
+    logger = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch("gcache._internal.redis_cache._GLOBAL_GCACHE_STATE.logger", logger),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        await RedisCache.get(cache, pickle_key, fallback)
+        await RedisCache.get(cache, pickle_key, fallback)
+        # A JSON key on the same client is the supported configuration and must stay quiet.
+        cache._warned_text_mode_pickle = False
+        await RedisCache.get(cache, json_key, fallback)
+
+    warnings = [c for c in logger.warning.call_args_list if "decode_responses=True" in str(c)]
+    assert len(warnings) == 1, f"expected exactly one warning across two pickle reads, got {len(warnings)}"
+    assert "pickle_uc" in str(warnings[0]), "the warning must name the offending use case"
+
+    # A client whose factory returns something without a connection_pool must not break a
+    # read: a diagnostic that can fail a request is worse than the thing it reports.
+    odd = MagicMock(get=AsyncMock(return_value=None), setex=AsyncMock(), set=AsyncMock())
+    del odd.connection_pool
+    cache2 = object.__new__(RedisCache)
+    cache2._warned_text_mode_pickle = False
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: odd)),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        assert await RedisCache.get(cache2, pickle_key, fallback) == {"v": "fresh"}

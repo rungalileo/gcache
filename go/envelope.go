@@ -21,6 +21,19 @@ const envelopeVersion = 1
 // is what makes sniffing a stored value safe rather than a guess.
 const picklePROTO = 0x80
 
+// ErrPickleEnvelope is LOAD-BEARING for the age invariant, not merely a courtesy.
+//
+// Cache.Get proves that a tracked entry older than watermarkTTL is unreachable rather than
+// unchecked: serving requires now < expiresAtMs AND expiresAtMs-createdAtMs <= watermarkTTL,
+// and substituting gives now-createdAtMs < watermarkTTL. That substitution only holds for a
+// value that HAS an expiresAtMs -- a pickle entry has none, so neither guard applies to it.
+// This refusal is what keeps such an entry from ever reaching those guards.
+//
+// So if this client is ever taught to read pickle -- plausible now that it sits beside the
+// Python implementation that writes it -- the proof lapses and Go needs the explicit
+// age-based guard Python carries (reason "age_exceeds_watermark"). The existing tests would
+// NOT catch that: they only feed JSON.
+//
 // ErrPickleEnvelope is returned when a value was written by a Python caller using the
 // default pickle envelope. Go cannot read those (by design -- see the package docs), so
 // callers should treat it as a miss and let the value be rewritten in the JSON envelope.

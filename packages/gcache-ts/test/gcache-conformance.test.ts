@@ -53,7 +53,8 @@ interface KeyCase {
   readonly id: string;
   readonly python: string;
   readonly typescript: string;
-  readonly agree: boolean;
+  readonly go: string;
+  readonly agreeingClients: readonly (readonly string[])[];
   readonly reason?: string;
 }
 
@@ -210,10 +211,26 @@ describe("cross-language envelope conformance", () => {
         urnPrefix: c.urnPrefix,
       }).prefix;
       expect(rendered, `${c.name}: TS renders ${rendered}, file says ${c.typescript}`).toBe(c.typescript);
-      // And the agreement flag must match reality, so the file cannot quietly claim parity
-      // it does not have.
-      expect((c.python === c.typescript) === c.agree, `${c.name}: agree flag contradicts the renderings`).toBe(true);
-      if (!c.agree) expect(c.reason, `${c.name} must explain a divergence`).toBeTruthy();
+
+      // The partition must match what the recorded strings actually say, so the file cannot
+      // claim an agreement its own values contradict. This replaced a two-way `agree: bool`,
+      // which could not express the real situation once Go arrived: Go and Python agree,
+      // TypeScript does not, and a boolean has no way to say so.
+      const byRendering = new Map<string, string[]>();
+      for (const client of ["go", "python", "typescript"] as const) {
+        const v = c[client];
+        byRendering.set(v, [...(byRendering.get(v) ?? []), client]);
+      }
+      const expected = [...byRendering.values()]
+        .map((g) => [...g].sort())
+        .sort((a, b) => a[0]!.localeCompare(b[0]!));
+      expect(
+        c.agreeingClients.map((g) => [...g]),
+        `${c.name}: agreeingClients contradicts the recorded renderings`,
+      ).toEqual(expected);
+      if (c.agreeingClients.length > 1) {
+        expect(c.reason, `${c.name} must explain a divergence`).toBeTruthy();
+      }
     }
   });
 });

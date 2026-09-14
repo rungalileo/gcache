@@ -149,13 +149,22 @@
   "keyRendering": {
     "$comment": [
       "Key grammar, which is where the OTHER divergence lives. These are not decode vectors;",
-      "they record what each client renders today so a change to either is visible here.",
+      "they record what each client renders today so a change to any of them is visible here.",
       "TS percent-encodes every component via encodeURIComponent (key.ts joinUrnComponents);",
-      "Python interpolates raw. That is a known defect with a follow-up.",
+      "Python and Go interpolate raw. That is a known defect with a follow-up.",
+      "",
+      "`agreeingClients` partitions the clients by what they ACTUALLY render, replacing an",
+      "earlier two-way `agree: bool`. A boolean could not express 2-of-3, which is the real",
+      "situation: Go and Python agree, TypeScript does not. Each suite asserts (a) its own",
+      "client's column against what it really renders, and (b) that the partition matches the",
+      "recorded strings -- so the file cannot claim an agreement its own values contradict.",
+      "A case with more than one group must carry a `reason`.",
       "",
       "The empty-prefix row is different in kind: it is the one case that SURVIVES fixing the",
-      "encoding, because the divergence is structural -- Python omits the component, TS joins",
-      "it. That is why gcache now raises EmptyUrnPrefixNotSupported instead of documenting it."
+      "encoding, because the divergence is structural -- Python and Go omit an empty component,",
+      "TS joins it. That is why gcache raises EmptyUrnPrefixNotSupported at construction, and",
+      "why Go's New() refuses an empty URNPrefix too. Note the Go RENDERER will happily produce",
+      "'kt:i'; it is the client constructor that refuses, so this row records the renderer."
     ],
     "cases": [
       {
@@ -165,7 +174,14 @@
         "id": "i",
         "python": "urn:kt:i",
         "typescript": "urn:kt:i",
-        "agree": true
+        "go": "urn:kt:i",
+        "agreeingClients": [
+          [
+            "go",
+            "python",
+            "typescript"
+          ]
+        ]
       },
       {
         "name": "namespaced-prefix",
@@ -174,8 +190,17 @@
         "id": "i",
         "python": "urn:galileo:test:kt:i",
         "typescript": "urn%3Agalileo%3Atest:kt:i",
-        "agree": false,
-        "reason": "TS percent-encodes the prefix. A namespaced prefix is the normal case and contains colons, so this is the common path, not an edge case. Known defect, follow-up filed against the encoding."
+        "reason": "TS percent-encodes the prefix. A namespaced prefix is the normal case and contains colons, so this is the common path, not an edge case. Known defect, follow-up filed against the encoding.",
+        "go": "urn:galileo:test:kt:i",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ],
+          [
+            "typescript"
+          ]
+        ]
       },
       {
         "name": "empty-prefix",
@@ -184,8 +209,17 @@
         "id": "i",
         "python": "kt:i",
         "typescript": ":kt:i",
-        "agree": false,
-        "reason": "Structural, not an encoding choice: Python omits an empty component, TS joins it. Survives the encoding fix, so gcache rejects this configuration at construction (EmptyUrnPrefixNotSupported) rather than documenting it."
+        "reason": "Structural, not an encoding choice: Python omits an empty component, TS joins it. Survives the encoding fix, so gcache rejects this configuration at construction (EmptyUrnPrefixNotSupported) rather than documenting it.",
+        "go": "kt:i",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ],
+          [
+            "typescript"
+          ]
+        ]
       }
     ]
   },

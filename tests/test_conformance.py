@@ -130,12 +130,20 @@ def test_the_key_rendering_divergences_are_still_what_the_file_says() -> None:
             assert rendered == case["python"], (
                 f"{case['name']}: Python renders {rendered!r}, file says {case['python']!r}"
             )
-            # And the agreement flag must match reality, so the file cannot quietly claim
-            # parity it does not have.
-            assert (case["python"] == case["typescript"]) == case["agree"], (
-                f"{case['name']}: agree={case['agree']} contradicts the recorded renderings"
+
+            # The partition must match what the recorded strings actually say, so the file
+            # cannot claim an agreement its own values contradict. This replaced a two-way
+            # `agree: bool`, which could not express the real situation once Go arrived:
+            # Go and Python agree, TypeScript does not, and a boolean has no way to say so.
+            actual: dict[str, list[str]] = {}
+            for client in ("go", "python", "typescript"):
+                actual.setdefault(case[client], []).append(client)
+            expected = sorted((sorted(v) for v in actual.values()), key=lambda g: g[0])
+            assert case["agreeingClients"] == expected, (
+                f"{case['name']}: agreeingClients={case['agreeingClients']} contradicts the "
+                f"recorded renderings, which group as {expected}"
             )
-            if not case["agree"]:
+            if len(case["agreeingClients"]) > 1:
                 assert case.get("reason"), f"{case['name']} must explain a divergence"
     finally:
         _GLOBAL_GCACHE_STATE.urn_prefix = original
@@ -158,7 +166,11 @@ def test_an_empty_prefix_is_unreachable_through_the_public_api() -> None:
     from tests.conftest import FakeCacheConfigProvider
 
     case = next(c for c in _DATA["keyRendering"]["cases"] if c["name"] == "empty-prefix")
-    assert not case["agree"], "the empty-prefix case is recorded as divergent"
+    assert len(case["agreeingClients"]) > 1, "the empty-prefix case is recorded as divergent"
+    # Specifically: Python and Go omit the empty component, TypeScript joins it. This is the
+    # divergence that survives fixing the percent-encoding, which is why it is an error here
+    # rather than a documented caveat.
+    assert ["go", "python"] in case["agreeingClients"]
 
     with pytest.raises(EmptyUrnPrefixNotSupported):
         GCache(GCacheConfig(cache_config_provider=FakeCacheConfigProvider(), urn_prefix=""))

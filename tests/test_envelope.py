@@ -1552,3 +1552,134 @@ async def test_a_refused_write_reaches_redis_with_nothing() -> None:
             await RedisCache.put(cache, key, {"a": 1})
 
     assert fake.setex.await_count == 1, "only the legal write may reach Redis"
+
+
+@pytest.mark.asyncio
+async def test_a_tracked_entry_outliving_the_watermark_is_distrusted() -> None:
+    # A value must never outlive the watermark that invalidated it. If it does, the watermark
+    # expires at WATERMARK_TTL_SECONDS, the value stops looking stale, and the invalidated
+    # entry RESURRECTS -- silently, for the rest of its own TTL.
+    #
+    # This was a cross-language gap Python was on the wrong side of, and Go's own comment
+    # named it: "Python's gcache has no equivalent ceiling, so it can write an entry that
+    # outlives the watermark invalidating it". Go had both halves -- reject over-long TTLs at
+    # construction, and distrust such an entry on read. Python had neither, so the two
+    # clients answered differently for one key: Go a miss, Python a hit on something an
+    # invalidation should have removed.
+    #
+    # The READ guard matters more than the write cap, because the write cap only binds
+    # entries this process writes. The keyspace is shared: an older Python entry, or any
+    # client configured with a longer TTL for the same key type, is caught only here.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import WATERMARK_TTL_SECONDS
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        invalidation_tracking=True,
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    now = int(time.time() * 1000)
+
+    async def fallback() -> dict:
+        return {"v": "fresh"}
+
+    # Declares a lifetime one second beyond the watermark's -- unexpired, so only the
+    # lifetime guard can catch it.
+    too_long = encode_json(created_at_ms=now, ttl_sec=WATERMARK_TTL_SECONDS + 1, payload='{"v":1}')
+    fake = MagicMock(mget=AsyncMock(return_value=[too_long, None]), setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    recorder = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", recorder),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        result = await RedisCache.get(cache, key, fallback)
+    assert result == {"v": "fresh"}, "a distrusted entry must be a miss"
+    assert "lifetime_exceeds_watermark" in [c.args[-1] for c in recorder.call_args_list]
+
+    # Exactly at the watermark TTL is fine -- the bound is pinned, not approximate.
+    at_bound = encode_json(created_at_ms=now, ttl_sec=WATERMARK_TTL_SECONDS, payload='{"v":1}')
+    fake = MagicMock(mget=AsyncMock(return_value=[at_bound, None]), setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    recorder = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", recorder),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        result = await RedisCache.get(cache, key, fallback)
+    assert result == {"v": 1}, "an entry at exactly the watermark TTL must still be served"
+    assert "lifetime_exceeds_watermark" not in [c.args[-1] for c in recorder.call_args_list]
+
+    # And an UNTRACKED key with the same over-long lifetime is served: it has no watermark to
+    # outlive, so the guard must not fire. Without this the test would pass on a guard that
+    # ignores invalidation_tracking.
+    untracked = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
+    fake = MagicMock(get=AsyncMock(return_value=too_long), setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        assert await RedisCache.get(cache, untracked, fallback) == {"v": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_tracked_write_longer_than_the_watermark_is_refused() -> None:
+    # The write half of the same invariant. Go rejects this at construction (maxEntryTTL);
+    # Python's TTL arrives from a runtime config provider, so the write is the first point
+    # that knows it.
+    #
+    # Raising rather than capping: a cap silently gives the caller a shorter TTL than
+    # configured AND hides the misconfiguration from the read guard, so it would never
+    # surface anywhere.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import WATERMARK_TTL_SECONDS
+    from gcache._internal.redis_cache import RedisCache
+    from gcache.exceptions import TrackedTTLExceedsWatermark
+
+    tracked = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        invalidation_tracking=True,
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    untracked = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
+    fake = MagicMock(setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    over = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: WATERMARK_TTL_SECONDS + 1}, ramp={CacheLayer.REMOTE: 100})
+    at = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: WATERMARK_TTL_SECONDS}, ramp={CacheLayer.REMOTE: 100})
+
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(GCacheMetrics, "SIZE_HISTOGRAM", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        with patch.object(RedisCache, "_resolve_config", AsyncMock(return_value=over)):
+            with pytest.raises(TrackedTTLExceedsWatermark):
+                await RedisCache.put(cache, tracked, {"v": 1})
+            # An UNTRACKED key with the same TTL is fine -- no watermark to outlive.
+            await RedisCache.put(cache, untracked, {"v": 1})
+        # And exactly at the bound is allowed for a tracked key.
+        with patch.object(RedisCache, "_resolve_config", AsyncMock(return_value=at)):
+            await RedisCache.put(cache, tracked, {"v": 1})
+
+    assert fake.setex.await_count == 2, "only the refused tracked write must be blocked"

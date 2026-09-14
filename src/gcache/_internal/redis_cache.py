@@ -17,7 +17,7 @@ from gcache._internal.envelope import _INT64_MAX, _INT64_MIN, DecodedValue, Enve
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.config import CacheConfigProvider, CacheLayer, Envelope, GCacheKey, RedisConfig, render_prefix
-from gcache.exceptions import MissingKeyConfig
+from gcache.exceptions import MissingKeyConfig, TrackedTTLExceedsWatermark
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,6 +277,36 @@ class RedisCache(CacheInterface):
             # zero indefinitely. That is an operational requirement, not a tolerance --
             # clocks must agree within the shortest TTL of any JSON use case. The
             # envelope_expired degraded-read reason is the alarm for it.
+            # Distrust a TRACKED entry declaring a lifetime longer than the watermark's.
+            #
+            # A value must never outlive the watermark that invalidated it. If it does, the
+            # watermark expires at WATERMARK_TTL_SECONDS, the value stops looking stale, and
+            # the invalidated entry RESURRECTS -- the one thing the watermark exists to
+            # prevent, and silent when it happens.
+            #
+            # This is a cross-language gap Python was on the wrong side of. Go has had both
+            # halves: it rejects an over-long TTL at construction (maxEntryTTL) and distrusts
+            # such an entry on read (ResultDistrusted). Its own comment named Python as the
+            # client that "can write an entry that outlives the watermark invalidating it".
+            # Python had neither, so the two answered differently for the same bytes: Go a
+            # miss, Python a hit on something an invalidation should have removed.
+            #
+            # Enforced on READ as well as write because the write cap only binds entries
+            # this process writes. The keyspace is shared -- an older Python entry, or any
+            # client configured with a longer TTL for the same key type, is only caught here.
+            if (
+                key.invalidation_tracking
+                and deserialized_value.expires_at_ms is not None
+                and deserialized_value.created_at_ms is not None
+                and deserialized_value.expires_at_ms - deserialized_value.created_at_ms > WATERMARK_TTL_SECONDS * 1000
+            ):
+                _GLOBAL_GCACHE_STATE.logger.warning(
+                    "Cache value for %s declares a lifetime longer than the watermark TTL; distrusting it",
+                    key.urn,
+                )
+                self._record_degraded_read(key, "lifetime_exceeds_watermark")
+                return await self._exec_fallback(key, watermark_ms, fallback)
+
             if deserialized_value.expires_at_ms is not None and deserialized_value.expires_at_ms <= time.time() * 1000:
                 _GLOBAL_GCACHE_STATE.logger.warning(
                     "Cache value for %s is past its envelope expiry; treating as miss", key.urn
@@ -326,6 +356,17 @@ class RedisCache(CacheInterface):
         ttl = config.ttl_sec.get(self.layer(), None)
         if ttl is None:
             raise MissingKeyConfig(key.use_case)
+
+        # Refuse a TRACKED write whose TTL outlives the watermark that would invalidate it.
+        # Go rejects the equivalent at construction (maxEntryTTL); Python's TTL arrives from
+        # a runtime config provider, so the write is the first point that knows it.
+        #
+        # Raising rather than capping. A cap silently gives the caller a shorter TTL than
+        # they configured, and the read guard above would not fire on the capped value, so
+        # the misconfiguration would never surface. gcache swallows write errors by design --
+        # the caller still gets its value -- so refusing is visible without being fatal.
+        if key.invalidation_tracking and ttl > WATERMARK_TTL_SECONDS:
+            raise TrackedTTLExceedsWatermark(key.use_case, ttl, WATERMARK_TTL_SECONDS)
 
         start_time = time.monotonic()
         serialized_value = value if key.serializer is None else await key.serializer.dump(value)

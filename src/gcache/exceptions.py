@@ -137,3 +137,32 @@ class EmptyUrnPrefixNotSupported(GCacheError, ValueError):
             '":kt:id" in the TypeScript client, so the two cannot share a keyspace. Pass a '
             "non-empty prefix, or omit urn_prefix to keep the default."
         )
+
+
+class TrackedTTLExceedsWatermark(GCacheError, ValueError):
+    """Raised when a tracked key's TTL would outlive the watermark that invalidates it.
+
+    Invalidation works by writing a watermark that marks every older entry stale. The
+    watermark lives ``WATERMARK_TTL_SECONDS`` (4 hours). If the entry outlives it, the
+    watermark expires, the entry stops looking stale, and an invalidated value RESURRECTS --
+    silently, and for the rest of its own TTL.
+
+    Go rejects the equivalent at construction (``maxEntryTTL``) and additionally distrusts
+    such an entry on read. Python had neither guard, which Go's own comment called out by
+    name, so the two clients answered differently for one key: Go a miss, Python a hit on
+    something an invalidation should have removed. Both halves now exist here too.
+
+    Raised rather than capping the TTL: a cap silently gives the caller less than they
+    configured and hides the misconfiguration from the read guard as well. gcache swallows
+    write errors by design, so the caller still gets its value from the fallback.
+
+    Only tracked keys are affected. A key without ``invalidation_tracking`` has no watermark
+    to outlive and may use any TTL.
+    """
+
+    def __init__(self, use_case: str, ttl_sec: int, watermark_ttl_sec: int) -> None:
+        super().__init__(
+            f"use case {use_case!r} tracks invalidation but declares ttl_sec={ttl_sec}, which "
+            f"outlives the {watermark_ttl_sec}s watermark. The entry would resurrect after an "
+            f"invalidation. Shorten the TTL, or turn off invalidation_tracking for this key."
+        )

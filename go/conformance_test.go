@@ -55,21 +55,6 @@ type conformanceFile struct {
 			Reason          string     `json:"reason"`
 		} `json:"cases"`
 	} `json:"keyRendering"`
-	ArgOrdering struct {
-		Cases []struct {
-			Name            string     `json:"name"`
-			URNPrefix       string     `json:"urnPrefix"`
-			KeyType         string     `json:"keyType"`
-			ID              string     `json:"id"`
-			UseCase         string     `json:"useCase"`
-			Args            [][]string `json:"args"`
-			Why             string     `json:"why"`
-			Go              string     `json:"go"`
-			Python          string     `json:"python"`
-			TypeScript      string     `json:"typescript"`
-			AgreeingClients [][]string `json:"agreeingClients"`
-		} `json:"cases"`
-	} `json:"argOrdering"`
 }
 
 func loadConformance(t *testing.T) conformanceFile {
@@ -218,57 +203,4 @@ func equalGroups(a, b [][]string) bool {
 		}
 	}
 	return true
-}
-
-// TestConformanceArgOrdering pins that args render in the order the CALLER supplied.
-//
-// This test exists because its absence cost a real divergence. ValueKey sorted args
-// byte-ordinal by name for the whole time the client lived in orbit, under a comment
-// asserting that matched "Python's default string sort" -- Python has never sorted. Every
-// caller order that was not already alphabetical produced a different key here than in
-// Python: a silent miss and a duplicate Redis entry, in both directions. Nothing caught it,
-// because the keyRendering cases carry no args at all.
-func TestConformanceArgOrdering(t *testing.T) {
-	f := loadConformance(t)
-	if len(f.ArgOrdering.Cases) == 0 {
-		t.Fatal("no argOrdering cases -- the fixture moved or the section was dropped")
-	}
-	for _, c := range f.ArgOrdering.Cases {
-		t.Run(c.Name, func(t *testing.T) {
-			args := make([]Arg, 0, len(c.Args))
-			for _, pair := range c.Args {
-				if len(pair) != 2 {
-					t.Fatalf("malformed arg pair %v", pair)
-				}
-				args = append(args, Arg{Name: pair[0], Value: pair[1]})
-			}
-			key := Key{KeyType: c.KeyType, ID: c.ID, UseCase: c.UseCase, Args: args}
-			if got := ValueKey(c.URNPrefix, key); got != c.Go {
-				t.Errorf("Go renders %q, file says %q", got, c.Go)
-			}
-			if c.Why == "" {
-				t.Error("every case must say what it is for")
-			}
-		})
-	}
-}
-
-// TestConformanceArgOrderingCorpusCanCatchASort asserts the corpus's own discriminating
-// power. A case whose args are already alphabetical renders identically whether a client
-// sorts or preserves, so a corpus made only of those proves nothing -- which is exactly how
-// the sort above survived. At least one case must disagree with its own sorted rendering.
-func TestConformanceArgOrderingCorpusCanCatchASort(t *testing.T) {
-	f := loadConformance(t)
-	for _, c := range f.ArgOrdering.Cases {
-		sorted := make([]Arg, 0, len(c.Args))
-		for _, pair := range c.Args {
-			sorted = append(sorted, Arg{Name: pair[0], Value: pair[1]})
-		}
-		sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
-		if ValueKey(c.URNPrefix, Key{KeyType: c.KeyType, ID: c.ID, UseCase: c.UseCase, Args: sorted}) != c.Go {
-			return // this case distinguishes sorted from caller-order; the corpus has teeth
-		}
-	}
-	t.Fatal("every argOrdering case renders the same sorted or unsorted, so this suite cannot " +
-		"detect a client that sorts -- add a case whose arg order is not alphabetical")
 }

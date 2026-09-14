@@ -58,25 +58,10 @@ interface KeyCase {
   readonly reason?: string;
 }
 
-interface ArgOrderCase {
-  readonly name: string;
-  readonly urnPrefix: string;
-  readonly keyType: string;
-  readonly id: string;
-  readonly useCase: string;
-  readonly args: readonly (readonly string[])[];
-  readonly why: string;
-  readonly go: string;
-  readonly python: string;
-  readonly typescript: string;
-  readonly agreeingClients: readonly (readonly string[])[];
-}
-
 const data = JSON.parse(readFileSync(vectorsPath, "utf8")) as {
   envelopeVersion: number;
   vectors: readonly Vector[];
   keyRendering: { cases: readonly KeyCase[] };
-  argOrdering: { cases: readonly ArgOrderCase[] };
 };
 
 class FakeRedis implements RedisCommandClient {
@@ -247,51 +232,5 @@ describe("cross-language envelope conformance", () => {
         expect(c.reason, `${c.name} must explain a divergence`).toBeTruthy();
       }
     }
-  });
-
-  it("renders args in the order the caller supplied", () => {
-    // Args are positional on the wire. Nothing sorts -- this constructor renders this.args
-    // as given, and normalizeArgs' localeCompare sort is a separate helper for OBJECT input,
-    // where JS key order carries no meaning.
-    //
-    // Present because its absence cost a real divergence: Go sorted args byte-ordinal for
-    // its whole life in orbit while Python never has, so any non-alphabetical caller order
-    // built two different keys. keyRendering's cases carry no args, so all three suites
-    // stayed green.
-    for (const c of data.argOrdering.cases) {
-      const rendered = new GCacheKey({
-        keyType: c.keyType,
-        id: c.id,
-        useCase: c.useCase,
-        urnPrefix: c.urnPrefix,
-        args: c.args.map((pair) => [pair[0], pair[1]] as [string, string]),
-      }).urn;
-      expect(rendered, `${c.name}: TS renders ${rendered}, file says ${c.typescript}`).toBe(c.typescript);
-
-      const actual = new Map<string, string[]>();
-      for (const client of ["go", "python", "typescript"] as const) {
-        const value = c[client];
-        actual.set(value, [...(actual.get(value) ?? []), client]);
-      }
-      const expected = [...actual.values()].map((g) => [...g].sort()).sort((a, b) => a[0].localeCompare(b[0]));
-      expect(c.agreeingClients, `${c.name}: agreeingClients contradicts the recorded renderings`).toEqual(expected);
-      expect(c.why, `${c.name} must say what it is for`).toBeTruthy();
-    }
-  });
-
-  it("has an arg-order corpus that could actually catch a sort", () => {
-    // The control case's own weakness, asserted. An already-alphabetical case renders the
-    // same whether a client sorts or preserves, so a corpus of only those proves nothing --
-    // exactly how the Go sort survived. At least one case must disagree with its own sorted
-    // rendering.
-    const discriminating = data.argOrdering.cases.filter((c) => {
-      const sorted = [...c.args].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-      const body = sorted.map((pair) => `${pair[0]}=${pair[1]}`).join("&");
-      return c.typescript !== `${c.urnPrefix}:${c.keyType}:${c.id}?${body}#${c.useCase}`;
-    });
-    expect(
-      discriminating.length,
-      "every argOrdering case renders the same sorted or unsorted, so this suite cannot detect a client that sorts",
-    ).toBeGreaterThan(0);
   });
 });

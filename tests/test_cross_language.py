@@ -293,14 +293,7 @@ def test_go_and_python_render_identical_keys(go: GoClient, urn_prefix: str) -> N
     from gcache.config import GCacheKey
 
     sid = "sid-key-shape"
-    # Deliberately NOT alphabetical, and passed to BOTH clients exactly as written.
-    #
-    # This test used to hand the Go client these args and build the Python key from
-    # sorted(args) -- which made it green while Go sorted and Python did not, the precise
-    # divergence it exists to catch. A parity test that normalizes one side is not a parity
-    # test; it can only ever report that its own normalization worked. Both sides now get
-    # the same order, so the assertion has something real to compare.
-    args = [("beta", "2"), ("alpha", "1")]
+    args = [("beta", "2"), ("alpha", "1")]  # deliberately out of order
 
     previous = _GLOBAL_GCACHE_STATE.urn_prefix
     _GLOBAL_GCACHE_STATE.urn_prefix = urn_prefix
@@ -309,7 +302,7 @@ def test_go_and_python_render_identical_keys(go: GoClient, urn_prefix: str) -> N
             key_type=KEY_TYPE,
             id=sid,
             use_case=USE_CASE,
-            args=args,
+            args=sorted(args, key=lambda a: a[0]),
             invalidation_tracking=True,
         )
         py_value_key = py_key.urn

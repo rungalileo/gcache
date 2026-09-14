@@ -1,0 +1,154 @@
+{
+  "$comment": [
+    "Shared conformance vectors for the gcache JSON value envelope.",
+    "",
+    "Read by BOTH tests/test_conformance.py and packages/gcache-ts/test/gcache-conformance.test.ts.",
+    "Neither suite may hardcode these cases: the point is one source of truth, so a reader that",
+    "diverges fails rather than passing against its own mirrored copy.",
+    "",
+    "Why this file exists. Parity between the Python and TypeScript readers used to be asserted",
+    "by hand-mirrored literals in two suites that run in separate CI workflows, so a divergence",
+    "was only ever caught by a human reading both. Two escaped that way and were found in",
+    "review, not by a test: an empty urn_prefix (Python omits the component, TS joins it) and a",
+    "fractional timestamp (TS kept the fraction, Python rounded, and the comparison is against a",
+    "threshold so the boolean flipped). Both are in here now as vectors.",
+    "",
+    "expect=accept means decode succeeds AND yields `decoded`. expect=reject means the reader",
+    "must treat the value as a MISS -- an exception both clients convert to 'miss', never a",
+    "partial or defaulted value. A reject case with a plausible-looking payload is deliberate:",
+    "a reader that ignores the invalid field and returns the payload anyway must fail here."
+  ],
+  "envelopeVersion": 1,
+  "vectors": [
+    {
+      "name": "canonical",
+      "why": "The shape both writers emit. If this fails nothing else matters.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "accept",
+      "decoded": { "createdAtMs": 1757308800123, "expiresAtMs": 1757308860123, "payload": "{\"a\":1}" }
+    },
+    {
+      "name": "whole-number-float-timestamps",
+      "why": "1757308800123.0 IS a whole number of milliseconds. Rejecting every float would be over-strict, and this vector is what keeps the is_integer/isInteger check from degenerating into that.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123.0,\"expiresAtMs\":1757308860123.0,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "accept",
+      "decoded": { "createdAtMs": 1757308800123, "expiresAtMs": 1757308860123, "payload": "{\"a\":1}" }
+    },
+    {
+      "name": "fractional-expires",
+      "why": "Found in review, not by a test. TS kept the fraction and Python rounded; both compare against a threshold, so expiresAtMs=x.9 at now=x is a HIT in one client and EXPIRED in the other. Same bytes, opposite answers -- so both must reject.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123.9,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "fractional-created",
+      "why": "Same divergence on the other field, which feeds `watermark_ms >= createdAtMs` rather than expiry. Both fields need the vector; fixing one and not the other passed a single-field test.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123.9,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "negative-fractional-created",
+      "why": "int() truncates toward zero and floor does not, so the two rounding strategies disagree in OPPOSITE directions for a negative value. That sign dependence is why rounding was the wrong fix at all.",
+      "envelope": "{\"version\":1,\"createdAtMs\":-1000.9,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "version-zero",
+      "why": "Not the current version, so not readable. Pinned because `version` was once checked truthily, which accepted 0.",
+      "envelope": "{\"version\":0,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "version-true",
+      "why": "JSON true is not 1. Python's `version != 1` is False for True because bool is an int subclass, so it was ACCEPTED there and rejected in TS -- a divergence with no symptom until a foreign writer produced one.",
+      "envelope": "{\"version\":true,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "created-at-string",
+      "why": "A timestamp as a string is the most likely shape from a hand-written or foreign entry. Must be a miss, not a coerced number.",
+      "envelope": "{\"version\":1,\"createdAtMs\":\"1757308800123\",\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "expires-beyond-double",
+      "why": "A 401-digit integer literal. JSON.parse maps it to Infinity so TS rejected it, while Python's arbitrary-precision int accepted it happily -- and an entry with an impossible expiry never looks expired AND can never satisfy watermark_ms >= createdAtMs, so no invalidation can ever reach it.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1e400,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "base64-payload",
+      "why": "The bytes path. Python base64s a bytes payload where Go never does, so this is the one encoding both must agree on.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"eyJhIjoxfQ==\"}",
+      "expect": "accept",
+      "decoded": { "createdAtMs": 1757308800123, "expiresAtMs": 1757308860123, "payloadBase64": "eyJhIjoxfQ==" }
+    },
+    {
+      "name": "unknown-encoding",
+      "why": "An encoding neither client implements must miss rather than being read as utf8.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"gzip\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "payload-not-a-string",
+      "why": "The payload is a JSON string carrying serialized bytes, never a nested object. A reader that accepts an object here would re-serialize it differently from the writer.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":{\"a\":1}}",
+      "expect": "reject"
+    },
+    {
+      "name": "missing-expires",
+      "why": "An absent expiry is not an infinite one.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "not-json-at-all",
+      "why": "Garbage in the keyspace must be a miss, never an exception that escapes the read path -- a cache must not be able to fail a request.",
+      "envelope": "{not json",
+      "expect": "reject"
+    }
+  ],
+  "keyRendering": {
+    "$comment": [
+      "Key grammar, which is where the OTHER divergence lives. These are not decode vectors;",
+      "they record what each client renders today so a change to either is visible here.",
+      "TS percent-encodes every component via encodeURIComponent (key.ts joinUrnComponents);",
+      "Python interpolates raw. That is a known defect with a follow-up.",
+      "",
+      "The empty-prefix row is different in kind: it is the one case that SURVIVES fixing the",
+      "encoding, because the divergence is structural -- Python omits the component, TS joins",
+      "it. That is why gcache now raises EmptyUrnPrefixNotSupported instead of documenting it."
+    ],
+    "cases": [
+      {
+        "name": "plain-prefix",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "python": "urn:kt:i",
+        "typescript": "urn:kt:i",
+        "agree": true
+      },
+      {
+        "name": "namespaced-prefix",
+        "urnPrefix": "urn:galileo:test",
+        "keyType": "kt",
+        "id": "i",
+        "python": "urn:galileo:test:kt:i",
+        "typescript": "urn%3Agalileo%3Atest:kt:i",
+        "agree": false,
+        "reason": "TS percent-encodes the prefix. A namespaced prefix is the normal case and contains colons, so this is the common path, not an edge case. Known defect, follow-up filed against the encoding."
+      },
+      {
+        "name": "empty-prefix",
+        "urnPrefix": "",
+        "keyType": "kt",
+        "id": "i",
+        "python": "kt:i",
+        "typescript": ":kt:i",
+        "agree": false,
+        "reason": "Structural, not an encoding choice: Python omits an empty component, TS joins it. Survives the encoding fix, so gcache rejects this configuration at construction (EmptyUrnPrefixNotSupported) rather than documenting it."
+      }
+    ]
+  }
+}

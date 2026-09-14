@@ -57,8 +57,25 @@ tests/
 ## Testing
 
 ```bash
-poetry run pytest tests/
+poetry run pytest tests/          # Python
+pnpm ts:gcache:test               # TypeScript
 ```
+
+### Cross-language conformance vectors
+
+`conformance/envelope_vectors.json` is the single source of truth for envelope wire behaviour
+and key rendering. It is read by BOTH `tests/test_conformance.py` and
+`packages/gcache-ts/test/gcache-conformance.test.ts`.
+
+**Do not copy a case into either suite.** Parity used to be asserted by hand-mirrored literals
+in two suites that run in separate CI workflows, so a divergence was only caught by a human
+reading both — and two escaped that way (an empty `urn_prefix`, and a fractional timestamp)
+and were found in review rather than by a test. A mirrored copy restores exactly that failure
+mode: each suite then passes against its own assumptions.
+
+To add a case, edit the JSON and run both suites. Every vector must carry a `why`, and an
+`expect: "accept"` case must declare what it decodes to. Changing a vector's expectation
+should fail **both** suites; if only one fails, the other is not really reading the file.
 
 ## Common Gotchas
 

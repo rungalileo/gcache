@@ -49,7 +49,7 @@ jobs:
         run: cd go && go vet ./...
 
       - name: go test
-        run: cd go && go test ./... -coverprofile=coverage.out
+        run: cd go && go test -count=1 ./... -coverprofile=coverage.out
 
       - uses: codecov/codecov-action@v4
         if: github.actor != 'dependabot[bot]'

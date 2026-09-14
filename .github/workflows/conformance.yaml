@@ -71,31 +71,68 @@ jobs:
         run: inv test-conformance
 
       # The property that makes the fixture worth having: a changed vector must fail EVERY
-      # suite. If only two fail, the third is not really reading the file. Asserted here
-      # rather than trusted, because it is the one check that cannot be verified by reading.
+      # suite. If only some fail, the ones that passed are not really reading the file.
+      # Asserted here rather than trusted, because it is the one check that cannot be
+      # verified by reading the suites.
+      #
+      # Three things this step learned the hard way, all of which made it report a FALSE
+      # cause before they were fixed:
+      #
+      #   1. `go test` CACHES. The step above runs the same suite against the UNMUTATED
+      #      fixture, so a bare `go test` here returns `ok (cached)` and Go looks like the
+      #      client that is not reading the file. Hence -count=1. This is not hypothetical:
+      #      it is what the first run of this workflow actually reported.
+      #   2. A mutation that silently no-ops (vector renamed, key renamed) makes all three
+      #      suites pass and the step blames the suites. So the mutation asserts it landed.
+      #   3. Discarding each suite's output means knowing only the COUNT that failed, not
+      #      WHICH -- and the count alone cannot distinguish "TS is not reading the file"
+      #      from "TS was cached". So each suite's outcome is named.
       - name: Prove the fixture binds all three clients
         run: |
           set -e
           F=src/gcache/conformance/envelope_vectors.json
           cp "$F" /tmp/vectors.bak
           python3 - <<'PY'
-          import json, pathlib
+          import json, pathlib, sys
           p = pathlib.Path("src/gcache/conformance/envelope_vectors.json")
           d = json.loads(p.read_text())
+          hits = 0
           for v in d["vectors"]:
               if v["name"] == "fractional-expires":
+                  assert v["expect"] == "reject", f'expected reject, found {v["expect"]!r}'
                   v["expect"] = "accept"
                   v["decoded"] = {"createdAtMs": 1757308800123, "expiresAtMs": 1757308860123,
                                   "payload": "{\"a\":1}"}
+                  hits += 1
+          if hits != 1:
+              sys.exit(f"mutation matched {hits} vectors, expected 1 -- "
+                       "the 'fractional-expires' vector was renamed or removed, so this "
+                       "step would have proven nothing")
           p.write_text(json.dumps(d, indent=2))
           PY
           fails=0
-          poetry run pytest tests/test_conformance.py -q >/dev/null 2>&1 || fails=$((fails+1))
-          pnpm ts:gcache:test >/dev/null 2>&1 || fails=$((fails+1))
-          (cd go && go test -run TestConformance ./... >/dev/null 2>&1) || fails=$((fails+1))
+          detected=""
+          missed=""
+          run_suite() {
+            name="$1"; shift
+            if "$@" >"/tmp/$name.log" 2>&1; then
+              missed="$missed $name"
+              echo "::group::$name PASSED on a mutated fixture (tail)"
+              tail -40 "/tmp/$name.log"
+              echo "::endgroup::"
+            else
+              detected="$detected $name"
+              fails=$((fails+1))
+            fi
+          }
+          run_suite python poetry run pytest tests/test_conformance.py -q
+          run_suite typescript pnpm ts:gcache:test
+          run_suite go go -C go test -count=1 -run TestConformance ./...
           cp /tmp/vectors.bak "$F"
+          echo "detected the mutation:$detected"
           if [ "$fails" -ne 3 ]; then
-            echo "::error::a mutated vector failed only $fails of 3 suites; one is not reading the file"
+            echo "::error::mutated vector detected by$detected but NOT by$missed -- \
+          that client is not reading the shared fixture, or its result was cached"
             exit 1
           fi
           echo "all three suites detected the mutated vector"

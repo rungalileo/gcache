@@ -117,6 +117,14 @@ To add a case, edit the JSON and run all three suites. Every vector must carry a
 should fail **all three**; if only two fail, the third is not really reading the file. The
 conformance workflow asserts that property by mutating a vector and requiring three failures.
 
+**Always run the Go suite with `-count=1`** (`inv test-go` and `inv test-conformance` both do).
+Go caches test results, and its cache does not reliably invalidate on a change to the fixture,
+so a mutated vector comes back `ok (cached)` -- the exact green-means-nothing failure this
+corpus exists to prevent, appearing in the check meant to prevent it. The first run of the
+conformance workflow reported "a mutated vector failed only 2 of 3 suites" for precisely this
+reason and blamed the Go suite for not reading the file, which was false. pytest and vitest
+cache transforms, not results, so neither has this hazard; Go is the only one.
+
 `keyRendering.cases` carry an `agreeingClients` partition rather than a boolean, because the
 real situation is 2-of-3: Go and Python render identically, TypeScript percent-encodes. Each
 suite asserts its own client's column against what it actually renders, plus that the

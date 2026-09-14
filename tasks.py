@@ -87,7 +87,7 @@ def test_go(ctx: Context) -> None:
     ctx : Context
         Invoke context.
     """
-    ctx.run("cd go && go test ./... -coverprofile=coverage.out", **COMMON_PARAMS)
+    ctx.run("cd go && go test -count=1 ./... -coverprofile=coverage.out", **COMMON_PARAMS)
 
 
 @task
@@ -154,7 +154,7 @@ def test_conformance(ctx: Context) -> None:
     """
     ctx.run("poetry run pytest tests/test_conformance.py tests/test_cross_language.py -vvv", **COMMON_PARAMS)
     ctx.run("pnpm ts:gcache:test", **COMMON_PARAMS)
-    ctx.run("cd go && go test -run TestConformance ./...", **COMMON_PARAMS)
+    ctx.run("cd go && go test -count=1 -run TestConformance ./...", **COMMON_PARAMS)
 
 
 @task(pre=[test, test_ts, test_go])

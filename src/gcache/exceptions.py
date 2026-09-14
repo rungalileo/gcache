@@ -119,6 +119,14 @@ class EmptyUrnPrefixNotSupported(GCacheError, ValueError):
     ("urn" by default) and does not know it. An error says their configuration never did what
     they asked.
 
+    Why THIS prefix and not every prefix, given that TypeScript interop is broken for all of
+    them today (it percent-encodes components, so ``urn:galileo:test`` renders as
+    ``urn%3Agalileo%3Atest``)? Because that one is an encoding defect with a fix: align the
+    two and every non-empty prefix interoperates. An empty prefix still will not, because the
+    divergence there is structural rather than an encoding choice -- Python omits the
+    component, TypeScript joins it. It is the one case that survives the fix, which is what
+    makes it worth a hard error instead of a README caveat.
+
     Subclasses ValueError as well, so a caller already guarding construction with
     ``except ValueError`` keeps catching it.
     """

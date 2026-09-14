@@ -1,0 +1,183 @@
+package gcache
+
+import (
+	"fmt"
+	"testing"
+)
+
+// The fixtures below are REAL keys scanned out of rc0's Redis (ElastiCache 7.2.4) on
+// 2026-09-08, not keys this package generated. They are the contract: if Go stops
+// reproducing them byte-for-byte its key space has silently diverged from Python's, and
+// every cross-language read becomes a miss with no error raised anywhere.
+const rc0URN = "urn:galileo:o11y-rc0"
+
+func TestValueKeyMatchesProductionKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		urn  string
+		key  Key
+		want string
+	}{
+		{
+			name: "untracked, id contains colons and a slash",
+			urn:  rc0URN,
+			key: Key{
+				KeyType: "tokenomics_response_cache_key",
+				ID:      "tokenomics:v1:response:/v1/team-rollup:071344bd-591a-448d-86ca-5da085f5a8ee:935b7bd3-2d6c-4dc3-b687-8ad459764489:0dc7830f3b70212ec49839b8ea55d6fa3557dad86821cfd77c2f29c7242dc96d",
+				UseCase: "TokenomicsService::response_cache",
+			},
+			want: "urn:galileo:o11y-rc0:tokenomics_response_cache_key:tokenomics:v1:response:/v1/team-rollup:071344bd-591a-448d-86ca-5da085f5a8ee:935b7bd3-2d6c-4dc3-b687-8ad459764489:0dc7830f3b70212ec49839b8ea55d6fa3557dad86821cfd77c2f29c7242dc96d#TokenomicsService::response_cache",
+		},
+		{
+			name: "tracked with args -- args sit OUTSIDE the hash tag",
+			urn:  rc0URN,
+			key: Key{
+				KeyType: "principal_id",
+				ID:      "51809946-0168-4d42-8559-a5e8a85411a5",
+				UseCase: "AuthorizationService::async_get_check_results",
+				Tracked: true,
+				Args: []Arg{
+					{"principal", "092cb6eab2e46a023c656d0c3dcfaa4d"},
+					{"resource_entries", "c9f56a984c40ad1e146ff5ec80f81d63"},
+				},
+			},
+			want: "{urn:galileo:o11y-rc0:principal_id:51809946-0168-4d42-8559-a5e8a85411a5}?principal=092cb6eab2e46a023c656d0c3dcfaa4d&resource_entries=c9f56a984c40ad1e146ff5ec80f81d63#AuthorizationService::async_get_check_results",
+		},
+		{
+			// Supplied out of order: the renderer must sort, or two callers computing the
+			// same logical lookup land on different keys.
+			name: "args are sorted by name, not by supplied order",
+			urn:  rc0URN,
+			key: Key{
+				KeyType: "principal_id",
+				ID:      "51809946-0168-4d42-8559-a5e8a85411a5",
+				UseCase: "AuthorizationService::async_get_check_results",
+				Tracked: true,
+				Args: []Arg{
+					{"resource_entries", "c9f56a984c40ad1e146ff5ec80f81d63"},
+					{"principal", "092cb6eab2e46a023c656d0c3dcfaa4d"},
+				},
+			},
+			want: "{urn:galileo:o11y-rc0:principal_id:51809946-0168-4d42-8559-a5e8a85411a5}?principal=092cb6eab2e46a023c656d0c3dcfaa4d&resource_entries=c9f56a984c40ad1e146ff5ec80f81d63#AuthorizationService::async_get_check_results",
+		},
+		{
+			// Python's urn_prefix defaults to "urn"; an empty prefix must not emit a
+			// leading colon.
+			name: "empty urn prefix",
+			urn:  "",
+			key:  Key{KeyType: "session_id", ID: "abc", UseCase: "uc"},
+			want: "session_id:abc#uc",
+		},
+		{
+			// The `::` in a use case and any punctuation in an id are stored literally.
+			// Percent-encoding here would break Python compatibility outright -- which is
+			// exactly the bug the TypeScript port has.
+			name: "no percent-encoding of any component",
+			urn:  "urn:galileo:acme",
+			key:  Key{KeyType: "log_records_search_run_id", ID: "a b/c?d&e=f", UseCase: "Svc::method"},
+			want: "urn:galileo:acme:log_records_search_run_id:a b/c?d&e=f#Svc::method",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ValueKey(tt.urn, tt.key); got != tt.want {
+				t.Errorf("ValueKey mismatch\n got: %q\nwant: %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValueKeySortIsStableAcrossDuplicateArgNames(t *testing.T) {
+	// Python sorts args with list.sort, which is stable, so two args sharing a name keep
+	// their input order there. sort.Slice is not stable, and pdqsort only preserves input
+	// order by accident on short inputs -- at this size it genuinely reorders, and the two
+	// languages would build different keys for the same call.
+	args := make([]Arg, 0, 16)
+	for i := range 16 {
+		args = append(args, Arg{Name: fmt.Sprintf("k%02d", i%4), Value: fmt.Sprint(i)})
+	}
+	key := Key{KeyType: "session_id", ID: "s-1", UseCase: "u", Args: args}
+
+	got := ValueKey("urn", key)
+
+	// Stable means: within each name, values appear in the order the caller passed them.
+	want := "urn:session_id:s-1?k00=0&k00=4&k00=8&k00=12&k01=1&k01=5&k01=9&k01=13" +
+		"&k02=2&k02=6&k02=10&k02=14&k03=3&k03=7&k03=11&k03=15#u"
+	if got != want {
+		t.Errorf("ValueKey =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestWatermarkKeyMatchesProductionKey(t *testing.T) {
+	got := WatermarkKey(rc0URN, "log_streams_project_id", "f706545c-f9e2-431d-afd1-6dba75820154")
+	want := "{urn:galileo:o11y-rc0:log_streams_project_id:f706545c-f9e2-431d-afd1-6dba75820154}#watermark"
+	if got != want {
+		t.Errorf("WatermarkKey mismatch\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestWatermarkKeyIsBracedEvenForUntrackedKeys(t *testing.T) {
+	// Python's invalidate() always writes the braced form; it just only ever lands on
+	// tracked entries. Mirroring that keeps a Go invalidate visible to a Python reader.
+	if got := WatermarkKey("urn", "kt", "id"); got != "{urn:kt:id}#watermark" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestWatermarkSharesTheHashSlotWithItsValueKey(t *testing.T) {
+	// The whole point of the {...} tag: a tracked value key and its watermark must hash to
+	// the same Redis Cluster slot, or the MGET of the two is rejected in cluster mode.
+	k := Key{KeyType: "session_id", ID: "sid-1", UseCase: "uc", Tracked: true, Args: []Arg{{"a", "1"}}}
+	value := ValueKey("urn:galileo:acme", k)
+	watermark := WatermarkKey("urn:galileo:acme", k.KeyType, k.ID)
+
+	vTag, ok := hashTag(value)
+	if !ok {
+		t.Fatalf("value key %q has no hash tag", value)
+	}
+	wTag, ok := hashTag(watermark)
+	if !ok {
+		t.Fatalf("watermark key %q has no hash tag", watermark)
+	}
+	if vTag != wTag {
+		t.Errorf("hash tags differ: value %q vs watermark %q", vTag, wTag)
+	}
+}
+
+// hashTag extracts the {...} span Redis Cluster hashes on.
+func hashTag(key string) (string, bool) {
+	start := -1
+	for i := 0; i < len(key); i++ {
+		switch key[i] {
+		case '{':
+			if start == -1 {
+				start = i
+			}
+		case '}':
+			if start != -1 && i > start+1 {
+				return key[start+1 : i], true
+			}
+		}
+	}
+	return "", false
+}
+
+func TestValidateRejectsReservedAndEmptyFields(t *testing.T) {
+	tests := map[string]Key{
+		"missing key type":  {ID: "i", UseCase: "u"},
+		"missing id":        {KeyType: "k", UseCase: "u"},
+		"missing use case":  {KeyType: "k", ID: "i"},
+		"reserved use case": {KeyType: "k", ID: "i", UseCase: "watermark"},
+	}
+	for name, k := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := k.Validate(); err == nil {
+				t.Errorf("Validate() = nil, want an error")
+			}
+		})
+	}
+	if err := (Key{KeyType: "k", ID: "i", UseCase: "u"}).Validate(); err != nil {
+		t.Errorf("Validate() on a valid key = %v", err)
+	}
+}

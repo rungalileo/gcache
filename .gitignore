@@ -163,3 +163,7 @@ cython_debug/
 node_modules/
 packages/*/dist/
 packages/*/coverage/
+
+# Go
+go/coverage.out
+go/gcachectl

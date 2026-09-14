@@ -1,14 +1,19 @@
 """Cross-language conformance vectors for the gcache wire protocol.
 
-Shipped as package data, not left in the repo root, so a consumer in ANOTHER repository can
-read the same vectors from an installed gcache rather than mirroring them. orbit is that
-consumer today: ``libs/go/gcache/tests`` drives the Go client, whose envelope reader has to
-agree with this one, and a hand-mirrored copy there would restore exactly the failure mode
-this fixture exists to remove -- two suites each passing against their own assumptions.
+Read by all three implementations in this repo -- ``tests/test_conformance.py``,
+``packages/gcache-ts/test/gcache-conformance.test.ts`` and ``go/conformance_test.go`` -- and
+shipped as package data so a consumer in ANOTHER repository can read the same vectors from an
+installed gcache rather than mirroring them.
 
-It is ~6 KB of JSON on every install. That is the cost; the benefit is that "the three clients
-agree" becomes a thing a test can check across repository boundaries instead of a claim in a
-PR description.
+The package-data decision predates the Go client living here. It was made when orbit held the
+Go implementation and the only way to check three-way agreement was across a repo boundary --
+which turned out not to work: five cross-language claims went silently false in one afternoon,
+because a comment in one repo asserting another repo's behaviour is not something any test can
+execute. The Go client now lives in ``go/`` and reads this file directly.
+
+The shipping stays useful anyway, for two reasons. A downstream service embedding gcache can
+assert its own payloads against the same corpus, and ``vectors_path()`` still exists for a
+non-Python consumer that needs a real file. It is ~6 KB of JSON on every install.
 
 Usage from another repo::
 

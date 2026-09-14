@@ -1,6 +1,26 @@
 name: test
 
-on: push
+# Path-filtered: with three implementations a Go-only change should not pay for a Python
+# run. The cross-language gate is deliberately unfiltered -- see conformance.yaml.
+#
+# pull_request added alongside the filter. This workflow previously triggered on `push`
+# only, so the Python suite never ran on a PR from a fork; scoping a trigger that barely
+# fires would have been worse than not scoping it.
+on:
+  push:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "poetry.lock"
+      - ".github/workflows/test.yaml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "poetry.lock"
+      - ".github/workflows/test.yaml"
 
 jobs:
   test:

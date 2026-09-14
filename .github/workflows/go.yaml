@@ -1,0 +1,58 @@
+name: Go
+
+# Path-filtered, unlike this repo's older workflows. With three implementations, a
+# Python-only change should not pay for a Go build. The cross-language gate is NOT filtered
+# -- see conformance.yaml -- so every PR still exercises all three clients.
+on:
+  push:
+    paths:
+      - "go/**"
+      - ".github/workflows/go.yaml"
+  pull_request:
+    paths:
+      - "go/**"
+      - ".github/workflows/go.yaml"
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+
+    # go/redislive is a PURE GO test and cannot use the redislite instance the Python
+    # fixtures start. It is deliberately not skippable -- a silent skip would restore the
+    # coverage gap it exists to close -- so it needs a real server. It reads
+    # GALILEO_REDIS_HOST/PORT and defaults to localhost:6379.
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      # gofmt is CHECKED, not applied. A CI job that rewrites files would pass while leaving
+      # the repo unformatted for everyone else.
+      - name: gofmt
+        run: cd go && test -z "$(gofmt -l .)" || (echo "unformatted:" && gofmt -l . && exit 1)
+
+      - name: go vet
+        run: cd go && go vet ./...
+
+      - name: go test
+        run: cd go && go test ./... -coverprofile=coverage.out
+
+      - uses: codecov/codecov-action@v4
+        if: github.actor != 'dependabot[bot]'
+        with:
+          files: go/coverage.out
+          flags: gcache-go

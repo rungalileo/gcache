@@ -1,6 +1,6 @@
 """ProtoJsonSerializer: the Python half of the cross-language payload contract.
 
-The Go half is orbit/libs/go/gcache/protocodec/protocodec_test.go and asserts the same
+The Go half is go/protocodec/protocodec_test.go and asserts the same
 properties. Neither suite can see the other, which is precisely how six cross-language
 divergences reached review in the session-identity work -- so these assert the concrete
 wire shape rather than a Python round trip, which would pass no matter what Go does.

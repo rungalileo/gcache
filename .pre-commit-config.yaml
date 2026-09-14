@@ -56,4 +56,25 @@ repos:
   #           "./pyproject.toml",
   #         ]
 
+  # Go. Local hooks on purpose: a mirrored third-party hook pins its own toolchain, which
+  # can then disagree with the version in go/go.mod that CI uses. These shell out to the
+  # developer's own go, same as CI does.
+  #
+  # Note pre-commit was Python-only before this; TypeScript is still uncovered, which is a
+  # pre-existing gap rather than something Go introduced.
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: gofmt
+        entry: bash -c 'cd go && test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)'
+        language: system
+        types: [go]
+        pass_filenames: false
+      - id: go-vet
+        name: go vet
+        entry: bash -c 'cd go && go vet ./...'
+        language: system
+        types: [go]
+        pass_filenames: false
+
 exclude: "CHANGELOG.md"

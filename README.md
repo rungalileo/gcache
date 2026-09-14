@@ -465,7 +465,7 @@ async def get_session(session_id: str) -> session_identity_pb2.SessionIdentity: 
 Requires the extra: `pip install 'gcache[protobuf]'`. Importing gcache without it is fine;
 only constructing `ProtoJsonSerializer` raises.
 
-The Go counterpart is `orbit/libs/go/gcache/protocodec.ProtoJSON`, and the two set the same
+The Go counterpart is `go/protocodec.ProtoJSON` in this repo, and the two set the same
 two non-default options — snake_case field names, and tolerating unknown fields so a rolling
 deploy that adds a field does not make each pod generation reject the other's entries. Both
 are enforced by tests on each side.

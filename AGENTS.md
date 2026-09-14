@@ -25,8 +25,43 @@ src/gcache/
 
 tests/
 ├── conftest.py              # Fixtures (redis_server, gcache, cache_config_provider)
+├── test_conformance.py      # Python half of the shared cross-language corpus
+├── test_cross_language.py   # Go<->Python round trip, drives a locally-built gcachectl
 └── test_*.py                # Test suites
+
+packages/gcache-ts/          # TypeScript port (pnpm workspace member, versioned separately)
+├── src/                     # Mirrors src/gcache/ module-for-module
+└── test/gcache-conformance.test.ts   # TypeScript half of the shared corpus
+
+go/                          # Go client (module github.com/rungalileo/gcache/go)
+├── cache.go                 # Cache[V]: Get/Put/Invalidate, Result, Options
+├── envelope.go              # The cross-language JSON envelope; refuses pickle
+├── key.go                   # Key grammar, ValueKey, WatermarkKey
+├── rueidis_client.go        # Client impl over rueidis, with OTel spans
+├── conformance_test.go      # Go half of the shared corpus
+├── protocodec/              # protojson Codec, kept out of the core import graph
+├── redislive/               # Live-Redis tests, in their own package to keep core hermetic
+└── cmd/gcachectl/           # CLI; also what the Go<->Python suite drives
 ```
+
+**Three implementations, one wire protocol.** Python is the reference and the published
+package; TypeScript and Go are independent ports that must agree with it on the wire. They are
+versioned separately (`gcache-ts` at 0.1.0, `go/` at v0.1.0, Python at 2.x) because a package
+version is the wrong instrument for wire compatibility -- see the conformance section below
+for the one that is.
+
+Commands are the same shape for each:
+
+```bash
+inv test          inv test-ts          inv test-go       inv test-all
+inv type-check    inv typecheck-ts     inv vet-go
+inv test-conformance                   # all three against the shared corpus
+```
+
+These shell out to each language's own tooling -- poetry/pytest, pnpm/tsc, go build/test.
+Deliberately not a build system: three independent ports share no build graph, which is the
+only thing Bazel or Nx exists to exploit. The Go client arrived carrying five BUILD.bazel
+files and they were dropped for that reason.
 
 ## Key Components
 
@@ -63,9 +98,13 @@ pnpm ts:gcache:test               # TypeScript
 
 ### Cross-language conformance vectors
 
-`conformance/envelope_vectors.json` is the single source of truth for envelope wire behaviour
-and key rendering. It is read by BOTH `tests/test_conformance.py` and
-`packages/gcache-ts/test/gcache-conformance.test.ts`.
+`src/gcache/conformance/envelope_vectors.json` is the single source of truth for envelope wire
+behaviour and key rendering. It is read by ALL THREE suites: `tests/test_conformance.py`,
+`packages/gcache-ts/test/gcache-conformance.test.ts` and `go/conformance_test.go`.
+
+Run them together with `inv test-conformance`. CI runs it on **every** PR with no path filter,
+unlike the per-language workflows -- it is the only job that checks the three clients agree,
+and filtering it would recreate the hole that bringing the Go client in-repo closed.
 
 **Do not copy a case into either suite.** Parity used to be asserted by hand-mirrored literals
 in two suites that run in separate CI workflows, so a divergence was only caught by a human
@@ -73,9 +112,16 @@ reading both — and two escaped that way (an empty `urn_prefix`, and a fraction
 and were found in review rather than by a test. A mirrored copy restores exactly that failure
 mode: each suite then passes against its own assumptions.
 
-To add a case, edit the JSON and run both suites. Every vector must carry a `why`, and an
+To add a case, edit the JSON and run all three suites. Every vector must carry a `why`, and an
 `expect: "accept"` case must declare what it decodes to. Changing a vector's expectation
-should fail **both** suites; if only one fails, the other is not really reading the file.
+should fail **all three**; if only two fail, the third is not really reading the file. The
+conformance workflow asserts that property by mutating a vector and requiring three failures.
+
+`keyRendering.cases` carry an `agreeingClients` partition rather than a boolean, because the
+real situation is 2-of-3: Go and Python render identically, TypeScript percent-encodes. Each
+suite asserts its own client's column against what it actually renders, plus that the
+partition matches the recorded strings -- so the file cannot claim an agreement its own values
+contradict. More than one group requires a `reason`.
 
 ## Common Gotchas
 

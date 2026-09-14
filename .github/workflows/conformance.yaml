@@ -1,0 +1,101 @@
+name: Cross-language conformance
+
+# DELIBERATELY UNFILTERED. Every other workflow here is scoped to its own language's paths;
+# this one runs on everything, because it is the only job that asserts the Python, TypeScript
+# and Go clients agree on the wire.
+#
+# Path-filtering it would recreate exactly the hole this repo closed by bringing the Go client
+# in: parity asserted by hand-mirrored literals in suites that ran separately -- and, until
+# recently, in separate repositories, where nothing could run both sides. Five cross-language
+# claims went silently false in a single afternoon under that arrangement.
+#
+# So: a change to any language, or to the shared fixture, runs all three suites.
+on:
+  push:
+  pull_request:
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: |
+          pipx install poetry==${{ vars.POETRY_V2_VERSION }}
+          pipx install invoke
+          poetry install --with dev,test --no-root
+          pnpm install --frozen-lockfile
+
+      # The Go↔Python suite builds gcachectl itself and drives it against the redislite
+      # instance the Python fixtures start, so it needs the Go toolchain present. It SKIPS if
+      # go is missing, which is right for a contributor and wrong here -- hence the guard.
+      - name: Fail if the Go toolchain is missing
+        run: |
+          command -v go >/dev/null || {
+            echo "::error::go not on PATH; the cross-language suite would silently skip"
+            exit 1
+          }
+
+      - name: All three conformance suites
+        run: inv test-conformance
+
+      # The property that makes the fixture worth having: a changed vector must fail EVERY
+      # suite. If only two fail, the third is not really reading the file. Asserted here
+      # rather than trusted, because it is the one check that cannot be verified by reading.
+      - name: Prove the fixture binds all three clients
+        run: |
+          set -e
+          F=src/gcache/conformance/envelope_vectors.json
+          cp "$F" /tmp/vectors.bak
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("src/gcache/conformance/envelope_vectors.json")
+          d = json.loads(p.read_text())
+          for v in d["vectors"]:
+              if v["name"] == "fractional-expires":
+                  v["expect"] = "accept"
+                  v["decoded"] = {"createdAtMs": 1757308800123, "expiresAtMs": 1757308860123,
+                                  "payload": "{\"a\":1}"}
+          p.write_text(json.dumps(d, indent=2))
+          PY
+          fails=0
+          poetry run pytest tests/test_conformance.py -q >/dev/null 2>&1 || fails=$((fails+1))
+          pnpm ts:gcache:test >/dev/null 2>&1 || fails=$((fails+1))
+          (cd go && go test -run TestConformance ./... >/dev/null 2>&1) || fails=$((fails+1))
+          cp /tmp/vectors.bak "$F"
+          if [ "$fails" -ne 3 ]; then
+            echo "::error::a mutated vector failed only $fails of 3 suites; one is not reading the file"
+            exit 1
+          fi
+          echo "all three suites detected the mutated vector"

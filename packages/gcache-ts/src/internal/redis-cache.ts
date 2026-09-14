@@ -311,7 +311,7 @@ export class RedisCache {
       // isSafeInteger rejects exactly the range this reader cannot represent faithfully, so
       // the entry misses here and is rewritten in a form all three agree about. It leaves TS
       // STRICTER than Go and Python, which both accept up to int64 -- and that asymmetry is
-      // the safe direction, the one libs/go/gcache/envelope.go already relies on: an
+      // the safe direction, the one go/envelope.go already relies on: an
       // out-of-domain entry makes a reader miss and rewrite rather than serve a value
       // another reader reads differently. Real timestamps are ~1.7e12; 2^53 ms is year
       // 287396, so nothing legitimate is excluded.

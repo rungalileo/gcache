@@ -17,10 +17,10 @@ import pytest
 from gcache._internal.envelope import ENVELOPE_VERSION, EnvelopeDecodeError, decode
 from gcache.conformance import load_vectors, vectors_path
 
-# Read through the package accessor, not a repo-relative path. That is how the OTHER repo's
-# consumer reads it (orbit's Go conformance suite, via an installed gcache), so exercising
-# the same entry point here means a packaging mistake -- a missing poetry include, say --
-# fails this suite instead of only failing across the repo boundary where nobody sees it.
+# Read through the package accessor, not a repo-relative path. The TypeScript and Go suites
+# both read the file by relative path, so nothing else exercises the packaged form -- and a
+# packaging mistake (a missing poetry include, say) would then only surface downstream, in
+# whatever service installed gcache and could not find the vectors.
 _DATA = load_vectors()
 _VECTORS = _DATA["vectors"]
 

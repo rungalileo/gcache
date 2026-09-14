@@ -27,7 +27,7 @@ class ProtoJsonSerializer(Serializer):
 
     Use instead of a hand-written dataclass whenever another language reads the value:
     the schema then lives in one ``.proto`` rather than being reimplemented per
-    language. Go's counterpart is ``orbit/libs/go/gcache/protocodec``, which sets the
+    language. Go's counterpart is ``go/protocodec`` in this repo, which sets the
     same non-default options; the two must not drift.
 
     Example::

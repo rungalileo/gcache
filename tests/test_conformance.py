@@ -226,3 +226,60 @@ def test_the_watermark_and_envelope_parsers_really_do_differ() -> None:
 
     # The file must still say so, or the code and the record drift apart silently.
     assert "watermarkVsEnvelope" in _DATA, "the vector file must document why the bounds differ"
+
+
+def test_argument_order_is_part_of_the_wire_key() -> None:
+    # Args render in the order the CALLER supplied. Nothing sorts, in any client.
+    #
+    # This exists because a sort in one client is invisible to every prefix-only vector:
+    # keyRendering's cases carry no args at all, so Go sorted args byte-ordinal for its
+    # whole life in orbit -- under a comment asserting that matched "Python's default
+    # string sort", which Python has never done -- and all three suites stayed green.
+    # Any caller order that was not already alphabetical built a different key in Go than
+    # in Python: a silent miss and a duplicate Redis entry, in both directions.
+    from gcache import GCacheKey
+    from gcache._internal.state import _GLOBAL_GCACHE_STATE
+
+    original = _GLOBAL_GCACHE_STATE.urn_prefix
+    try:
+        for case in _DATA["argOrdering"]["cases"]:
+            _GLOBAL_GCACHE_STATE.urn_prefix = case["urnPrefix"]
+            rendered = GCacheKey(
+                key_type=case["keyType"],
+                id=case["id"],
+                use_case=case["useCase"],
+                args=[(name, value) for name, value in case["args"]],
+            ).urn
+            assert rendered == case["python"], (
+                f"{case['name']}: Python renders {rendered!r}, file says {case['python']!r}"
+            )
+
+            actual: dict[str, list[str]] = {}
+            for client in ("go", "python", "typescript"):
+                actual.setdefault(case[client], []).append(client)
+            expected = sorted((sorted(v) for v in actual.values()), key=lambda g: g[0])
+            assert case["agreeingClients"] == expected, (
+                f"{case['name']}: agreeingClients={case['agreeingClients']} contradicts the "
+                f"recorded renderings, which group as {expected}"
+            )
+            assert case.get("why"), f"{case['name']} must say what it is for"
+    finally:
+        _GLOBAL_GCACHE_STATE.urn_prefix = original
+
+
+def test_the_arg_order_corpus_can_actually_catch_a_sort() -> None:
+    # The control case's own weakness, asserted. 'already-alpha' renders identically whether
+    # a client sorts or preserves, so a corpus of only-alphabetical cases proves nothing --
+    # which is precisely how the Go sort survived. At least one case must DISAGREE with its
+    # own sorted-by-name rendering, or this suite cannot detect a sorting client.
+    def sorted_rendering(case: dict[str, Any]) -> str:
+        args = sorted(case["args"], key=lambda pair: pair[0])
+        body = "&".join(f"{name}={value}" for name, value in args)
+        return f"{case['urnPrefix']}:{case['keyType']}:{case['id']}?{body}#{case['useCase']}"
+
+    cases = _DATA["argOrdering"]["cases"]
+    discriminating = [c for c in cases if c["python"] != sorted_rendering(c)]
+    assert discriminating, (
+        "every argOrdering case renders the same sorted or unsorted, so this corpus cannot "
+        "detect a client that sorts -- add a case whose arg order is not alphabetical"
+    )

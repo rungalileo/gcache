@@ -29,7 +29,6 @@ package gcache
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -134,16 +133,25 @@ func ValueKey(urnPrefix string, k Key) string {
 	b.WriteString(prefix(urnPrefix, k))
 
 	if len(k.Args) > 0 {
-		args := make([]Arg, len(k.Args))
-		copy(args, k.Args)
-		// Byte-ordinal by name, matching Python's default string sort. (The TypeScript
-		// port uses localeCompare, which differs for non-ASCII names.)
+		// Args render in the order the caller supplied. Do NOT sort them.
 		//
-		// Stable, because Python's list.sort is: two args sharing a name must render in
-		// input order in both languages or the same call builds a different key in each.
-		sort.SliceStable(args, func(i, j int) bool { return args[i].Name < args[j].Name })
-
-		for i, a := range args {
+		// This used to sort byte-ordinal by name, under a comment claiming that matched
+		// "Python's default string sort". Python does no such sort -- GCacheKey renders
+		// args exactly as given -- so the two clients built DIFFERENT keys for the same
+		// call whenever the caller's order was not already alphabetical:
+		//
+		//   args [(b,2),(a,1)]   python -> urn:kt:i?b=2&a=1#u
+		//                        go     -> urn:kt:i?a=1&b=2#u
+		//
+		// which is a silent miss and a duplicate Redis entry, in both directions. The
+		// TypeScript constructor also preserves order; its localeCompare sort lives in
+		// normalizeArgs, a helper converting an OBJECT to tuples, where JS key order
+		// carries no meaning. Nothing in the wire contract sorts.
+		//
+		// Python is the incumbent with live keys, so Go moves. Pinned by the
+		// arg-order cases in the shared conformance corpus, which had no multi-arg
+		// vector when this diverged -- that absence is why it survived review.
+		for i, a := range k.Args {
 			if i == 0 {
 				b.WriteByte('?')
 			} else {

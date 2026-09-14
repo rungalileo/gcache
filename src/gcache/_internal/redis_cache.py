@@ -315,6 +315,32 @@ class RedisCache(CacheInterface):
                 self._record_degraded_read(key, "lifetime_exceeds_watermark")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
+            if deserialized_value.expires_at_ms is not None and deserialized_value.expires_at_ms <= time.time() * 1000:
+                _GLOBAL_GCACHE_STATE.logger.warning(
+                    "Cache value for %s is past its envelope expiry; treating as miss", key.urn
+                )
+                self._record_degraded_read(key, "envelope_expired")
+                return await self._exec_fallback(key, watermark_ms, fallback)
+
+            # AFTER the expiry guard, deliberately. Placed before it, this stole
+            # envelope_expired's label from the case that label exists for: an entry whose
+            # envelope expiry has passed but whose Redis TTL has not (a writer that called
+            # PERSIST or set a longer TTL). Such an entry can easily be over 4h old as well,
+            # and it was then reported as a watermark problem rather than as the writer clock
+            # skew envelope_expired is the documented alarm for.
+            #
+            # A consequence worth stating: for a JSON envelope this guard is now UNREACHABLE,
+            # and that is correct. Serving requires now < expiresAtMs AND
+            # expiresAtMs - createdAtMs <= watermarkTTL, and substituting the second into the
+            # first gives now - createdAtMs < watermarkTTL -- so an over-age JSON entry has
+            # already been caught by one of the two guards above. (The orbit#2163 reviewer
+            # derived that for the Go client, where it is the whole argument for having no age
+            # check at all.)
+            #
+            # It is reachable, and load-bearing, only on the PICKLE path: expires_at_ms is
+            # None there, so the expiry and declared-lifetime guards both skip it and this is
+            # the sole protection. Go can do without it because it refuses pickle entries
+            # outright (ErrPickleEnvelope); Python reads them by default.
             # The same invariant by AGE rather than declared lifetime, which is what closes
             # the pickle path. expires_at_ms is JSON-only, so the guard above cannot see a
             # legacy pickle entry at all -- and those are exactly the entries written before
@@ -341,13 +367,6 @@ class RedisCache(CacheInterface):
                     key.urn,
                 )
                 self._record_degraded_read(key, "age_exceeds_watermark")
-                return await self._exec_fallback(key, watermark_ms, fallback)
-
-            if deserialized_value.expires_at_ms is not None and deserialized_value.expires_at_ms <= time.time() * 1000:
-                _GLOBAL_GCACHE_STATE.logger.warning(
-                    "Cache value for %s is past its envelope expiry; treating as miss", key.urn
-                )
-                self._record_degraded_read(key, "envelope_expired")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
             # Load payload using custom serializer if present.

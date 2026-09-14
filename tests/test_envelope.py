@@ -1806,3 +1806,72 @@ async def test_a_stale_tracked_pickle_entry_is_distrusted_by_age() -> None:
         patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
     ):
         assert await RedisCache.get(cache, untracked, fallback) == {"v": "cached"}
+
+
+@pytest.mark.asyncio
+async def test_each_degraded_reason_goes_to_the_right_guard() -> None:
+    # The guards overlap, so ORDER decides which reason an operator sees, and the labels are
+    # not interchangeable -- envelope_expired is the documented alarm for writer clock skew,
+    # and reporting it as a watermark problem sends someone to the wrong system.
+    #
+    # Placed before the expiry guard, the age check stole that label: an entry whose envelope
+    # expiry has passed but whose Redis TTL has not (a writer that called PERSIST, or set a
+    # longer TTL) is easily over 4h old too, and reported as age_exceeds_watermark. Caught by
+    # checking the interaction rather than each guard alone, after the orbit#2163 reviewer
+    # proved the age check is implied by the other two for JSON.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import WATERMARK_TTL_SECONDS
+    from gcache._internal.redis_cache import RedisCache, RedisValue
+
+    now = int(time.time() * 1000)
+    json_key = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        invalidation_tracking=True,
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    pickle_key = GCacheKey(key_type="kt", id="i", use_case="u", invalidation_tracking=True)
+
+    async def fb() -> dict:
+        return {"v": "fresh"}
+
+    async def reasons_for(stored: bytes, key: GCacheKey) -> list[str]:
+        fake = MagicMock(mget=AsyncMock(return_value=[stored, None]), setex=AsyncMock(), set=AsyncMock())
+        cache = object.__new__(RedisCache)
+        rec = MagicMock()
+        with (
+            patch.object(RedisCache, "client", property(lambda _s: fake)),
+            patch.object(RedisCache, "_record_degraded_read", rec),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            await RedisCache.get(cache, key, fb)
+        return [c.args[-1] for c in rec.call_args_list]
+
+    # Expired AND over-age: expiry wins, because that is the label's case.
+    expired_and_old = encode_json(created_at_ms=now - 5 * 3600 * 1000, ttl_sec=int(3.5 * 3600), payload='{"v":1}')
+    assert await reasons_for(expired_and_old, json_key) == ["envelope_expired"]
+
+    # Unexpired but declaring too long a life: the declared-lifetime guard, which sits first
+    # because it is about the CONTRACT rather than about this entry's clock.
+    too_long = encode_json(created_at_ms=now, ttl_sec=WATERMARK_TTL_SECONDS + 1, payload='{"v":1}')
+    assert await reasons_for(too_long, json_key) == ["lifetime_exceeds_watermark"]
+
+    # And the age guard is unreachable for JSON -- the two above imply it. Not a gap: serving
+    # needs now < expiresAtMs and expiresAtMs - createdAtMs <= watermarkTTL, which together
+    # give now - createdAtMs < watermarkTTL.
+    for ttl in (60, int(3.5 * 3600), WATERMARK_TTL_SECONDS):
+        for age_h in (0, 1, 5, 9):
+            e = encode_json(created_at_ms=now - age_h * 3600 * 1000, ttl_sec=ttl, payload='{"v":1}')
+            assert "age_exceeds_watermark" not in await reasons_for(e, json_key), (
+                f"age guard should be unreachable for JSON (ttl={ttl}s age={age_h}h)"
+            )
+
+    # PICKLE is where it is load-bearing: no expires_at_ms, so both guards above skip it.
+    old_pickle = pickle.dumps(RedisValue(created_at_ms=now - (WATERMARK_TTL_SECONDS + 60) * 1000, payload={"v": 1}))
+    assert await reasons_for(old_pickle, pickle_key) == ["age_exceeds_watermark"]

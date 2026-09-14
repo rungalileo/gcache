@@ -1683,3 +1683,81 @@ async def test_a_tracked_write_longer_than_the_watermark_is_refused() -> None:
             await RedisCache.put(cache, tracked, {"v": 1})
 
     assert fake.setex.await_count == 2, "only the refused tracked write must be blocked"
+
+
+@pytest.mark.asyncio
+async def test_a_stale_tracked_pickle_entry_is_distrusted_by_age() -> None:
+    # The declared-lifetime guard reads expires_at_ms, which is JSON-only -- so it cannot see
+    # a legacy PICKLE entry at all, and those are exactly the ones written before the write
+    # guard existed, already sitting in Redis with TTLs over 4h. A reviewer caught that the
+    # guard I had just added covered one framing and not the other.
+    #
+    # created_at_ms is carried by both framings (RedisValue has it), and age is the sharper
+    # test: a watermark lives WATERMARK_TTL_SECONDS from when it is WRITTEN, so any watermark
+    # that could have marked an older entry stale has itself expired. The entry is provably
+    # unprotected regardless of what it declared.
+    #
+    # And it is not over-broad -- the thing to verify before putting an age check on a hot
+    # read. An entry can only reach an age of 4h if its TTL exceeds 4h, since Redis evicts it
+    # otherwise. The fresh-pickle case below is what pins that.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import WATERMARK_TTL_SECONDS
+    from gcache._internal.redis_cache import RedisCache, RedisValue
+
+    key = GCacheKey(key_type="kt", id="i", use_case="u", invalidation_tracking=True)
+    now = time.time() * 1000
+
+    async def fallback() -> dict:
+        return {"v": "fresh"}
+
+    def read(created_at_ms: float, k: GCacheKey = key) -> tuple:
+        blob = pickle.dumps(RedisValue(created_at_ms=int(created_at_ms), payload={"v": "cached"}))
+        fake = MagicMock(
+            mget=AsyncMock(return_value=[blob, None]),
+            get=AsyncMock(return_value=blob),
+            setex=AsyncMock(),
+            set=AsyncMock(),
+        )
+        return fake, object.__new__(RedisCache)
+
+    # Older than the watermark TTL -> distrusted, even though it is a pickle entry with no
+    # expires_at_ms for the declared-lifetime guard to inspect.
+    fake, cache = read(now - (WATERMARK_TTL_SECONDS + 60) * 1000)
+    recorder = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", recorder),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        assert await RedisCache.get(cache, key, fallback) == {"v": "fresh"}
+    assert "age_exceeds_watermark" in [c.args[-1] for c in recorder.call_args_list]
+
+    # A FRESH tracked pickle entry is served -- so the guard is about age, not about pickle.
+    fake, cache = read(now - 60_000)
+    recorder = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", recorder),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        assert await RedisCache.get(cache, key, fallback) == {"v": "cached"}
+    assert "age_exceeds_watermark" not in [c.args[-1] for c in recorder.call_args_list]
+
+    # And an UNTRACKED old entry is served -- no watermark to outlive, so nothing to distrust.
+    untracked = GCacheKey(key_type="kt", id="i", use_case="u")
+    fake, cache = read(now - (WATERMARK_TTL_SECONDS + 60) * 1000, untracked)
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        assert await RedisCache.get(cache, untracked, fallback) == {"v": "cached"}

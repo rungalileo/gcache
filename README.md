@@ -159,6 +159,42 @@ This enables:
 - **Gradual rollout** — Start at 10%, monitor metrics, increase to 100%
 - **Per-use-case tuning** — Different TTLs and ramp percentages for different use cases
 
+### ⚠️ Breaking: a tracked key's TTL is now capped at 4 hours
+
+If a use case sets `invalidation_tracking=True` **and** a remote `ttl_sec` above
+`WATERMARK_TTL_SECONDS` (4 hours), writes now raise `TrackedTTLExceedsWatermark` (also a
+`ValueError`). This was previously accepted, and `GCacheKeyConfig` still types `ttl_sec` as a
+plain `int` — the bound is a property of invalidation, not of the type.
+
+**What you will see if you are affected.** `aput`/`put` raise. A `@cached` miss does *not* —
+`CacheController` catches the write error, increments `gcache_error_counter`, and returns the
+fallback value. So the caller keeps working and **the cache silently never populates**: the
+symptom is a use case whose hit rate sits at zero with a rising `gcache_error_counter`, not an
+outage. Check that counter, not your latency.
+
+**Migration:** either lower `ttl_sec` to 4 hours or less, or turn off `invalidation_tracking`
+for that key. An untracked key may use any TTL — it has no watermark to outlive.
+
+**Why not just cap it silently:** a cap gives you a shorter TTL than you configured *and*
+hides the misconfiguration from the read guards below, so it would surface nowhere.
+
+**Reads are guarded too, in two ways**, because a write cap only binds entries this process
+writes and the keyspace is shared:
+
+- a tracked JSON entry whose envelope *declares* a lifetime over 4 hours is a miss
+  (`gcache_degraded_read_counter{reason="lifetime_exceeds_watermark"}`)
+- a tracked entry of **either** framing that is *older* than 4 hours is a miss
+  (`reason="age_exceeds_watermark"`). This is the one that covers legacy pickle entries,
+  which carry no `expiresAtMs` for the first check to read. An entry can only reach that age
+  if its TTL exceeded 4 hours, so a correctly configured key never triggers it.
+
+**The invariant behind all of this:** invalidation marks entries stale by writing a watermark
+that lives 4 hours. An entry outliving its watermark stops looking stale the moment the
+watermark expires, and an invalidated value **resurrects** for the rest of its own TTL —
+silently. Go has enforced both halves from the start (`maxEntryTTL` on write,
+`ResultDistrusted` on read); Python previously enforced neither, so the two clients disagreed
+about the same key.
+
 ### ⚠️ Breaking: `urn_prefix=""` now raises
 
 `GCacheConfig(urn_prefix="")` raises `EmptyUrnPrefixNotSupported` (also a `ValueError`, so an

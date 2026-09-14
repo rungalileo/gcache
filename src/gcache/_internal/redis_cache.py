@@ -307,6 +307,34 @@ class RedisCache(CacheInterface):
                 self._record_degraded_read(key, "lifetime_exceeds_watermark")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
+            # The same invariant by AGE rather than declared lifetime, which is what closes
+            # the pickle path. expires_at_ms is JSON-only, so the guard above cannot see a
+            # legacy pickle entry at all -- and those are exactly the entries written before
+            # the write guard existed, with Redis TTLs already over 4h.
+            #
+            # created_at_ms IS carried by both framings (RedisValue has it too), and age is
+            # the sharper test anyway: a watermark lives WATERMARK_TTL_SECONDS from the
+            # moment it is written, so any watermark that could have marked an entry older
+            # than that stale has itself expired. The entry is then provably unprotected,
+            # whatever it declared.
+            #
+            # Not over-broad, which is the thing to check before adding an age check to a hot
+            # read: an entry can only REACH an age of 4h if its TTL exceeds 4h, because Redis
+            # evicts it otherwise. So this fires on exactly the population the write guard
+            # now refuses to create, and never on a correctly configured key.
+            if (
+                key.invalidation_tracking
+                and deserialized_value.created_at_ms is not None
+                and time.time() * 1000 - deserialized_value.created_at_ms > WATERMARK_TTL_SECONDS * 1000
+            ):
+                _GLOBAL_GCACHE_STATE.logger.warning(
+                    "Cache value for %s is older than the watermark TTL, so no watermark can still "
+                    "vouch for it; distrusting it",
+                    key.urn,
+                )
+                self._record_degraded_read(key, "age_exceeds_watermark")
+                return await self._exec_fallback(key, watermark_ms, fallback)
+
             if deserialized_value.expires_at_ms is not None and deserialized_value.expires_at_ms <= time.time() * 1000:
                 _GLOBAL_GCACHE_STATE.logger.warning(
                     "Cache value for %s is past its envelope expiry; treating as miss", key.urn
@@ -422,7 +450,12 @@ class RedisCache(CacheInterface):
         cluster client or a wrapper with no connection_pool, and a diagnostic must never be
         the thing that fails a request.
         """
-        if self._warned_text_mode_pickle:
+        # getattr, not attribute access. __init__ sets this, but the method's whole contract
+        # is that a diagnostic must never be the thing that fails a request -- and a bare
+        # access raised AttributeError on any RedisCache built without __init__. That is not
+        # only a test artefact: it makes the warning path strictly more fragile than the read
+        # it is warning about, which is backwards.
+        if getattr(self, "_warned_text_mode_pickle", False):
             return
         try:
             # getattr rather than attribute access: RedisCluster has no connection_pool at

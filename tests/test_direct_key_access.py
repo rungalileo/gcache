@@ -5,13 +5,16 @@ not some function's parameters. @cached cannot express that.
 """
 
 import json
-from typing import Any
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
 import redislite
+from cachetools import TTLCache
 
 from gcache import CacheLayer, Envelope, GCache, GCacheKey, GCacheKeyConfig, JsonSerializer
+from gcache._internal.local_cache import LocalCache
+from gcache._internal.wrappers import CacheChain, CacheWrapper
 from tests.conftest import FakeCacheConfigProvider
 
 
@@ -24,6 +27,21 @@ def _key(use_case: str = "direct_uc", **kw: Any) -> GCacheKey:
         serializer=JsonSerializer(),
         **kw,
     )
+
+
+async def _local_ttl_cache(gcache: GCache, key: GCacheKey) -> TTLCache:
+    """The LocalCache's own TTLCache for ``key``.
+
+    Two levels of ``.wrapped`` with a cast, rather than a type-ignore: ``_cache`` is a
+    CacheChain whose ``wrapped`` is the local CacheController, whose ``wrapped`` is the
+    LocalCache. CacheInterface does not declare ``wrapped``, so mypy cannot walk it -- and
+    asserting the concrete types is more useful than silencing the error, since a change to
+    the chain's shape should break this loudly rather than keep type-checking against Any.
+    """
+    chain = cast(CacheChain, gcache._cache)
+    local_controller = cast(CacheWrapper, chain.wrapped)
+    local_cache = cast(LocalCache, local_controller.wrapped)
+    return await local_cache._get_ttl_cache(key)
 
 
 @pytest.fixture
@@ -678,3 +696,70 @@ async def test_a_partial_ramp_drops_some_primes(
         with gcache.enable():
             await gcache.aput(_key(use_case="half_uc"), {"session_id": "abc"})
     assert keys(), "a sample below the ramp writes it"
+
+
+@pytest.mark.asyncio
+async def test_local_promotion_bypasses_the_envelope_expiry_guard(
+    gcache: GCache, cache_config_provider: FakeCacheConfigProvider, redis_server: redislite.Redis
+) -> None:
+    # A remote hit is promoted into LocalCache as the bare decoded payload, so the local entry
+    # gets a FRESH local TTL from promotion time and knows nothing about the envelope's
+    # expiresAtMs. The envelope-expiry guard in RedisCache.get therefore protects the remote
+    # layer and not this process's local copy.
+    #
+    # Demonstrated rather than described: the entry's stored envelope is rewritten to a PAST
+    # expiry, then the SAME key is read twice -- once with the local copy present, once with
+    # it cleared -- and the two answers differ. That difference IS the bypass.
+    #
+    # NOT fixed here, for a structural reason rather than a judgement call:
+    # cachetools.TTLCache has no per-item TTL (__setitem__ takes none), so capping a promoted
+    # entry at the envelope's remaining lifetime means replacing the local cache structure.
+    # That is out of proportion for this PR. It is the same category as the watermark
+    # limitation pinned above -- the local layer reads no remote staleness signal of any kind
+    # -- and the overshoot is bounded by the local TTL, since promotion requires a successful
+    # remote read and the local entry dies at promotion + local_ttl.
+    local_ttl, remote_ttl = 30, 60
+    cache_config_provider.configs["promote_uc"] = GCacheKeyConfig(
+        ttl_sec={CacheLayer.LOCAL: local_ttl, CacheLayer.REMOTE: remote_ttl},
+        ramp={CacheLayer.LOCAL: 100, CacheLayer.REMOTE: 100},
+    )
+    key = _key(use_case="promote_uc")
+
+    calls = 0
+
+    async def fallback() -> dict:
+        nonlocal calls
+        calls += 1
+        return {"session_id": "fresh"}
+
+    with gcache.enable():
+        # Populate both layers, then read once so the local copy is definitely present.
+        await gcache.aput(key, {"session_id": "cached"})
+        assert await gcache.aget(key, fallback) == {"session_id": "cached"}
+        assert calls == 0, "the put populated both layers, so nothing should have fallen back"
+
+        # Now make the STORED envelope already expired, leaving Redis's own TTL alone. This is
+        # the disagreement the guard exists for -- a writer that set a longer Redis TTL, or a
+        # clock that moved.
+        raw = redis_server.get(key.urn)
+        assert raw is not None
+        envelope = json.loads(raw)
+        envelope["expiresAtMs"] = envelope["createdAtMs"] - 1_000
+        redis_server.set(key.urn, json.dumps(envelope))
+
+        # With the local copy still present: served, despite the envelope being expired.
+        assert await gcache.aget(key, fallback) == {"session_id": "cached"}
+        assert calls == 0, "the local layer served an entry whose envelope had expired"
+
+        # Clear ONLY the local layer and read the identical key again. Now the guard is
+        # reached and the same bytes are a miss.
+        (await _local_ttl_cache(gcache, key)).clear()
+        assert await gcache.aget(key, fallback) == {"session_id": "fresh"}
+        assert calls == 1, "with no local copy, the expired envelope must be a miss"
+
+    # And the bound, which is what makes the unfixed behaviour tolerable: the local TTL caps
+    # how long the bypass can last. A local TTL above the remote TTL would widen it past the
+    # entry's own declared lifetime, which is a config-review matter as much as a code one.
+    ttl_cache = await _local_ttl_cache(gcache, key)
+    assert ttl_cache.ttl == local_ttl
+    assert ttl_cache.ttl <= remote_ttl

@@ -24,10 +24,24 @@ Usage from another repo::
         ...
 """
 
+import atexit
 import json
+from contextlib import ExitStack
 from functools import lru_cache
 from importlib import resources
 from typing import Any
+
+# Keeps any file importlib.resources had to EXTRACT alive for the process's lifetime.
+#
+# resources.as_file is a context manager, and for a zip-loaded package it materializes the
+# resource in a temp dir that it DELETES on exit. vectors_path() returns a path string, so
+# without this the path it hands back is already gone by the time the caller -- a Go binary,
+# typically -- opens it. On a normal filesystem install as_file yields the real path and
+# cleans up nothing, which is why this never showed up here: the failure only appears when
+# gcache is installed as a zip, i.e. in the "consumer in another repository" case this
+# accessor exists to serve.
+_EXTRACTED = ExitStack()
+atexit.register(_EXTRACTED.close)
 
 __all__ = ["VECTORS_FILENAME", "load_vectors", "vectors_path"]
 
@@ -54,5 +68,4 @@ def vectors_path() -> str:
     a separate binary that takes a file argument, and it cannot be handed a zip-internal
     resource.
     """
-    with resources.as_file(resources.files(__package__).joinpath(VECTORS_FILENAME)) as p:
-        return str(p)
+    return str(_EXTRACTED.enter_context(resources.as_file(resources.files(__package__).joinpath(VECTORS_FILENAME))))

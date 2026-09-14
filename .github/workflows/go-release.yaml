@@ -39,7 +39,13 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v4
+      # Every third-party action here is pinned to a full commit SHA, not a major tag.
+      # This job is privileged in a way the other workflows are not: it holds the SSH
+      # signing key and can push a signed tag, and a Go module version is PERMANENT once
+      # proxy.golang.org caches it. A moved @v4 would run unreviewed code with both of
+      # those in reach, and the resulting release could not be withdrawn -- only burned
+      # and replaced. The trailing comment records the version each SHA was.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
@@ -76,20 +82,20 @@ jobs:
 
           echo "will create tag: go/$VERSION"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.10"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.33.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
@@ -133,6 +139,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
+
+          # Registered BEFORE the keys exist, deliberately. `set -e` means any later line
+          # can exit this step -- a failed `git tag -s`, a rejected push, a proxy check
+          # that errors -- and a trap installed after the write would never run in exactly
+          # those cases. The EXIT trap fires on success and failure alike, so the key does
+          # not outlive this step and is not present for the proxy-verification step that
+          # follows.
+          cleanup() {
+            rm -f ~/.ssh/signing_key ~/.ssh/signing_key.pub
+            git config --unset user.signingkey || true
+            git config --unset gpg.format || true
+          }
+          trap cleanup EXIT
+
           printf '%s\n' "$SSH_PRIVATE" > ~/.ssh/signing_key
           printf '%s\n' "$SSH_PUBLIC" > ~/.ssh/signing_key.pub
           chmod 600 ~/.ssh/signing_key

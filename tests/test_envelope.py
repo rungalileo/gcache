@@ -1196,3 +1196,130 @@ async def test_a_pickle_key_on_a_text_mode_client_warns_once() -> None:
         patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
     ):
         assert await RedisCache.get(cache2, pickle_key, fallback) == {"v": "fresh"}
+
+
+def test_an_explicit_empty_urn_prefix_drops_the_namespace() -> None:
+    # GCache.__init__ gated the assignment on truthiness, so urn_prefix="" -- an explicit
+    # request for NO namespace -- never assigned and the previous global survived. __del__
+    # clears only gcache_instantiated, so "previous" is the "urn" default on a first
+    # construction and a prior GCache's prefix afterwards. Every key and every #watermark
+    # then carried a namespace the caller had just asked to drop, with no error anywhere.
+    #
+    # render_prefix (config.py:216) already handled an empty prefix correctly, which is what
+    # makes this an assignment bug rather than a design gap: the feature was reachable, the
+    # setter just refused to set it.
+    from gcache._internal.state import _GLOBAL_GCACHE_STATE
+    from gcache.config import render_prefix
+
+    original = _GLOBAL_GCACHE_STATE.urn_prefix
+    try:
+        _GLOBAL_GCACHE_STATE.urn_prefix = "urn:galileo:stale"
+        assert render_prefix("kt", "i", tracked=False) == "urn:galileo:stale:kt:i"
+
+        # What GCache.__init__ now does. Asserted through the one line under test rather
+        # than by constructing a GCache, because GCacheAlreadyInstantiated makes a second
+        # instance in-process impossible and the conftest fixture already holds one.
+        config_urn_prefix = ""
+        if config_urn_prefix is not None:
+            _GLOBAL_GCACHE_STATE.urn_prefix = config_urn_prefix
+
+        assert _GLOBAL_GCACHE_STATE.urn_prefix == "", "an explicit empty prefix must replace the old one"
+        assert render_prefix("kt", "i", tracked=False) == "kt:i", "no namespace means no leading colon either"
+        assert render_prefix("kt", "i", tracked=True) == "{kt:i}"
+    finally:
+        _GLOBAL_GCACHE_STATE.urn_prefix = original
+
+
+def test_the_gcache_constructor_assigns_an_empty_prefix() -> None:
+    # The test above pins render_prefix; this one pins that __init__ actually reaches it,
+    # which is the half that was broken. Reading the source is the only way to assert it
+    # without a second GCache instance, since GCacheAlreadyInstantiated forbids one.
+    import inspect
+
+    from gcache.gcache import GCache
+
+    src = inspect.getsource(GCache.__init__)
+    assert "if config.urn_prefix is not None:" in src, (
+        "truthiness gating silently ignores urn_prefix='' -- see test_an_explicit_empty_urn_prefix_drops_the_namespace"
+    )
+    assert "if config.urn_prefix:\n" not in src
+
+
+@pytest.mark.parametrize(
+    ("created", "expires"),
+    [(1757308800123.9, 1757308860123.9), (-1000.9, -900.9), (0.5, 60000.5)],
+)
+def test_a_fractional_timestamp_rounds_down_in_both_fields(created: float, expires: float) -> None:
+    # The envelope schema says integer milliseconds, so a fractional value is out of spec --
+    # but the TypeScript reader keeps the raw number and compares it directly
+    # (redis-cache.ts:115,119), so the two clients could reach different expiry and
+    # staleness answers for the same bytes.
+    #
+    # int() truncated toward ZERO, which rounded a negative timestamp up (later) and a
+    # positive one down (earlier). That sign dependence was the arbitrary part. floor is
+    # unconditionally downward, which fails safe in both fields: an earlier expires_at
+    # expires sooner, and an earlier created_at is matched stale by a watermark more
+    # readily. Both err toward a miss, never toward serving something a writer invalidated.
+    import math
+
+    raw = json.dumps(
+        {
+            "version": ENVELOPE_VERSION,
+            "createdAtMs": created,
+            "expiresAtMs": expires,
+            "encoding": "utf8",
+            "payload": '{"a":1}',
+        }
+    ).encode()
+    got = decode(raw, allow_pickle=False)
+    assert got.created_at_ms == math.floor(created)
+    assert got.expires_at_ms == math.floor(expires)
+    # The direction, stated as the property rather than as three literals: never later than
+    # the value on the wire. int() violated this for the negative case.
+    assert got.created_at_ms <= created
+    assert got.expires_at_ms <= expires
+
+
+def test_a_stateful_serializer_can_declare_its_own_wire_identity() -> None:
+    # _serializer_identity reduced every non-protobuf serializer to its class, and its
+    # docstring asserted that was "all it has". False for a stateful serializer -- and the
+    # claim was the bug: two instances with different wire formats compared EQUAL, passed
+    # _check_direct_key, shared a urn, and each decoded the other's payload. A miss or a
+    # load failure, with nothing at registration to explain it.
+    #
+    # The decision now belongs to the serializer. The default is still the class, so every
+    # stateless implementation behaves exactly as before.
+    from gcache.gcache import _serializer_identity
+
+    class Stateless(Serializer):
+        async def dump(self, obj: Any) -> str:
+            return json.dumps(obj)
+
+        async def load(self, data: bytes | str) -> Any:
+            return json.loads(data)
+
+    class Versioned(Serializer):
+        def __init__(self, wire_version: int) -> None:
+            self._wire_version = wire_version
+
+        def wire_identity(self) -> Any:
+            return (type(self), self._wire_version)
+
+        async def dump(self, obj: Any) -> str:
+            return json.dumps(obj)
+
+        async def load(self, data: bytes | str) -> Any:
+            return json.loads(data)
+
+    # Default: the class, so two stateless instances stay interchangeable.
+    assert _serializer_identity(Stateless()) == _serializer_identity(Stateless())
+    assert _serializer_identity(JsonSerializer()) == _serializer_identity(JsonSerializer())
+    assert _serializer_identity(None) is None
+
+    # Overridden: different configurations no longer collide...
+    assert _serializer_identity(Versioned(1)) != _serializer_identity(Versioned(2))
+    # ...and identical ones still match, so a legitimate registration is not rejected.
+    assert _serializer_identity(Versioned(1)) == _serializer_identity(Versioned(1))
+    # And a Versioned is never interchangeable with a Stateless, despite both defaulting
+    # through the same code path.
+    assert _serializer_identity(Versioned(1)) != _serializer_identity(Stateless())

@@ -36,19 +36,27 @@ from gcache.exceptions import (
 )
 
 
-def _serializer_identity(serializer: Serializer | None) -> tuple[type | None, str | None]:
+def _serializer_identity(serializer: Serializer | None) -> Any:
     """What makes two serializers interchangeable on the wire.
 
     Type alone is not enough: two ProtoJsonSerializers carrying different messages share a
     type, and reading one's payload as the other yields an empty message with no error,
-    because load() passes ignore_unknown_fields=True. The message's full name is the rest of
-    the identity. Any other Serializer contributes only its type, which is all it has.
+    because load() passes ignore_unknown_fields=True.
+
+    This used to special-case that by reaching for ``_message_type``, and its docstring
+    claimed any other Serializer "contributes only its type, which is all it has". That is
+    false for a stateful serializer, and the claim was the bug: a caller's serializer
+    configured per instance -- a compression level, a schema version, an encoding -- had two
+    instances compare EQUAL, pass _check_direct_key, share a urn, and each decode the
+    other's payload.
+
+    So the decision belongs to the serializer. ``Serializer.wire_identity`` defaults to the
+    class, which keeps every stateless implementation behaving exactly as before, and
+    ProtoJsonSerializer overrides it rather than being reached into from here.
     """
     if serializer is None:
-        return (None, None)
-    message_type = getattr(serializer, "_message_type", None)
-    name = getattr(getattr(message_type, "DESCRIPTOR", None), "full_name", None)
-    return (type(serializer), name)
+        return None
+    return serializer.wire_identity()
 
 
 class GCache:
@@ -74,7 +82,13 @@ class GCache:
         if _GLOBAL_GCACHE_STATE.gcache_instantiated:
             raise GCacheAlreadyInstantiated()
 
-        if config.urn_prefix:
+        # `is not None`, not truthiness: urn_prefix="" is an explicit request for NO
+        # namespace, and render_prefix already handles that case (config.py:216). Gating on
+        # truthiness silently kept the previous global -- the "urn" default, or a prior
+        # GCache's prefix, since __del__ clears only gcache_instantiated and leaves
+        # urn_prefix behind. Every key and every #watermark then carried a namespace the
+        # caller had just asked to drop, with no error.
+        if config.urn_prefix is not None:
             _GLOBAL_GCACHE_STATE.urn_prefix = config.urn_prefix
 
         if config.logger:

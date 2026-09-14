@@ -45,6 +45,15 @@ class ProtoJsonSerializer(Serializer):
         self._parse = Parse
         self._message_type = message_type
 
+    def wire_identity(self) -> Any:
+        """The message's full name, not just this class.
+
+        Two ProtoJsonSerializers carrying different messages share a type, and reading one's
+        payload as the other yields an EMPTY message rather than an error, because load()
+        passes ignore_unknown_fields=True. The full name is what keeps them apart.
+        """
+        return (type(self), self._message_type.DESCRIPTOR.full_name)
+
     async def dump(self, obj: Any) -> str:
         if not isinstance(obj, self._message_type):
             # Otherwise MessageToJson raises an AttributeError naming neither type.

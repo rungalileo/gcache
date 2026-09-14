@@ -153,6 +153,26 @@ class Serializer(ABC):
     async def load(self, data: bytes | str) -> Any:
         pass
 
+    def wire_identity(self) -> Any:
+        """What makes this instance interchangeable with another on the wire.
+
+        Two serializers with equal identities are treated as reading each other's payloads,
+        which is what lets a direct key and a ``@cached`` declaration share one ``use_case``.
+
+        The default is the class, which is correct only for a STATELESS serializer --
+        ``JsonSerializer`` and the like, where every instance produces the same bytes. A
+        serializer configured per instance must override this, or two instances with
+        different wire formats compare equal, share a urn, and each decodes the other's
+        payload: a miss or a load failure with no error at registration to explain it.
+        ``ProtoJsonSerializer`` overrides it with its message's full name for exactly this
+        reason.
+
+        Return anything hashable and stable across processes. Do NOT return something whose
+        repr embeds an object address -- that would make two identical configurations
+        compare unequal and reject a legitimate registration.
+        """
+        return type(self)
+
 
 # The TypeScript JsonSerializer cannot represent `undefined` in JSON, so it writes this
 # sentinel instead (packages/gcache-ts/src/serializer.ts). Python has no `undefined`; the

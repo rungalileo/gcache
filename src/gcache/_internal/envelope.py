@@ -231,11 +231,27 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                 payload = base64.b64decode(normalized + "=" * (-len(normalized) % 4), validate=True)
             elif encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")
+            # floor, not int(). The envelope schema says integer milliseconds, so a
+            # fractional timestamp is out of spec -- but the TypeScript reader keeps the raw
+            # number and compares it directly (redis-cache.ts:115,119), so the two clients
+            # can reach different expiry and staleness answers for the same bytes. The
+            # divergence is under 1ms, which is why the fix is a rounding direction rather
+            # than widening DecodedValue to int | float: preserving the float would ripple
+            # into the watermark comparison AND into encode_json on write-back, which would
+            # emit a fractional timestamp where Go and TypeScript both write integers --
+            # trading a sub-millisecond read difference for a new write divergence.
+            #
+            # int() truncates toward zero, so it rounded a negative timestamp UP (later) and
+            # a positive one DOWN (earlier) -- the one genuinely arbitrary part. floor is
+            # unconditionally downward, which fails safe in both fields: an earlier
+            # expires_at expires sooner, and an earlier created_at is matched stale by a
+            # watermark more readily. Both err toward a miss, never toward serving something
+            # a writer meant to invalidate.
             return DecodedValue(
-                created_at_ms=int(created_at_ms),
+                created_at_ms=math.floor(created_at_ms),
                 payload=payload,
                 is_json=True,
-                expires_at_ms=int(expires_at_ms),
+                expires_at_ms=math.floor(expires_at_ms),
             )
         except EnvelopeDecodeError:
             raise

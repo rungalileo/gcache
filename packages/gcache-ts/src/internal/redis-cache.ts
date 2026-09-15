@@ -292,32 +292,9 @@ export class RedisCache {
     if (
       parsed.version !== ENVELOPE_VERSION ||
       typeof parsed.createdAtMs !== "number" ||
-      // isSafeInteger, not isFinite and not isInteger.
-      //
-      // isFinite was wrong because a FRACTIONAL timestamp is out of spec -- every writer
-      // emits whole milliseconds -- and all three readers compare it against a THRESHOLD,
-      // so a sub-millisecond difference flips a boolean rather than shifting an answer:
-      // expiresAtMs=1000.9 at Date.now()===1000 was a hit here and expired in a reader that
-      // rounds. Same bytes, opposite answers.
-      //
-      // isInteger was still wrong, and worse, because it inspects the value AFTER JSON.parse
-      // has already rounded it. 9007199254740993 parses to 9007199254740992 here, which is
-      // integral, so it passed -- while Python's arbitrary-precision int reads the exact
-      // 9007199254740993 and Go decodes it inside int64. All three then ACCEPT and silently
-      // disagree about the number, which is strictly worse than one of them missing: the
-      // watermark comparison (watermarkMs >= createdAtMs) resolves differently on either
-      // side of 2^53 with no error anywhere.
-      //
-      // isSafeInteger rejects exactly the range this reader cannot represent faithfully, so
-      // the entry misses here and is rewritten in a form all three agree about.
-      //
-      // All THREE readers now share this bound -- Python raises from decode and Go checks
-      // against maxSafeInteger = 1<<53 - 1 (go/envelope.go:289). An earlier version of this
-      // comment said TS was "STRICTER than Go and Python, which both accept up to int64",
-      // which described the state before those two were tightened; left uncorrected it
-      // invites a maintainer to widen this check back to int64 to "match" them. Real
-      // timestamps are ~1.7e12 and 2^53 ms is year 287396, so nothing legitimate is
-      // excluded on any client.
+      // isSafeInteger, not isInteger: isInteger inspects the value AFTER JSON.parse has
+      // rounded it, so 9007199254740993 passed as ...992 while Python read it exactly --
+      // all three ACCEPTED and silently disagreed. All three now stop at 2^53-1.
       !Number.isSafeInteger(parsed.createdAtMs) ||
       typeof parsed.expiresAtMs !== "number" ||
       !Number.isSafeInteger(parsed.expiresAtMs) ||

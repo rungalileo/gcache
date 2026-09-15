@@ -1,18 +1,8 @@
 name: Go Module Release
 
-# A Go release is a git tag and NOTHING ELSE -- no registry, no build artifact, no publish
-# step. Consumers fetch from the VCS through proxy.golang.org. That is simpler than the PyPI
-# flow, with one sharp edge:
-#
-#   A PUBLISHED VERSION IS EFFECTIVELY PERMANENT. proxy.golang.org caches module versions
-#   immutably, so a broken go/v0.1.0 cannot be re-tagged away -- you burn the version and
-#   ship go/v0.1.1.
-#
-# So everything validates BEFORE the tag is created, not after. This is the only irreversible
-# step in the repo.
-#
-# Manual dispatch, matching release.yaml: this repo has no automated release trigger on
-# purpose.
+# A Go release is a git tag and nothing else. proxy.golang.org caches versions IMMUTABLY, so
+# a broken go/v0.1.0 cannot be re-tagged -- it is burned and replaced by go/v0.1.1.
+# Everything therefore validates BEFORE the tag. The only irreversible step in the repo.
 on:
   workflow_dispatch:
     inputs:

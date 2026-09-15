@@ -1,13 +1,8 @@
 """ProtoJsonSerializer: the Python half of the cross-language payload contract.
 
-The Go half is go/protocodec/protocodec_test.go and asserts the same
-properties. Neither suite can see the other, which is precisely how six cross-language
-divergences reached review in the session-identity work -- so these assert the concrete
-wire shape rather than a Python round trip, which would pass no matter what Go does.
-
-descriptor_pb2 is used as the sample message because it ships with the protobuf runtime:
-these tests must not depend on a Galileo schema living in another repository. It also has
-real multi-word fields (``go_package``), which the well-known types mostly lack.
+Asserts the concrete wire shape, not a Python round trip -- Go (go/protocodec/protocodec_test.go)
+can't see this suite. Uses descriptor_pb2 for multi-word fields (``go_package``) that the
+well-known types mostly lack.
 """
 
 import json
@@ -27,10 +22,8 @@ def _options() -> descriptor_pb2.FileOptions:
 
 @pytest.mark.asyncio
 async def test_dump_uses_snake_case_field_names() -> None:
-    # The contract in one assertion. Default is lowerCamelCase on WRITE. Both protojson
-    # readers accept either spelling, so getting this wrong costs two wire forms for one
-    # key rather than a failed read -- and the value's non-protojson readers (cjson in a
-    # Redis Lua script, jq) see raw keys with no field-name mapping.
+    # Default is lowerCamelCase on WRITE. Both protojson readers accept either spelling, but
+    # non-protojson readers (cjson in a Redis Lua script, jq) see raw keys with no mapping.
     payload = await ProtoJsonSerializer(descriptor_pb2.FileOptions).dump(_options())
     assert set(json.loads(payload)) == {"go_package", "java_package"}
 

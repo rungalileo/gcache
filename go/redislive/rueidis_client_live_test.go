@@ -16,33 +16,15 @@ import (
 	"github.com/rungalileo/gcache/go"
 )
 
-// Live-Redis coverage for the rueidis adapter.
-//
-// The adapter is the one part of gcache that cannot be faked: every bug it has had -- a
-// swallowed per-key error, a truncated TTL -- lived in how it translates the Client contract
-// onto real Redis commands, which a fake Client by definition cannot show.
-//
-// These live in their own package on purpose. Gazelle emits one go_test per Go package, so
-// keeping them beside cache_test.go would have made the whole package's hermetic tests
-// require a running Redis -- `bazel test //libs/go/gcache/...` would then fail on any machine
-// without one. //libs/go/gcache:gcache_test stays hermetic; this target is the live one.
-//
-// It hard-fails rather than skips when Redis is down. A silent skip would restore the
-// coverage gap this file exists to close, and "the live test passed" would mean nothing.
-//
-// This is a pure Go test, so it cannot use the redislite fixture the Python suite starts.
-// It reads GALILEO_REDIS_HOST/PORT and defaults to localhost:6379; the go workflow
-// supplies a Redis service container for exactly this reason.
-//
-// Every key is namespaced per run and deleted afterwards -- never FLUSHDB, since api test
-// shards share db 0.
+// Live-Redis coverage for the rueidis adapter: the one part of gcache that cannot be faked,
+// since its bugs (a swallowed per-key error, a truncated TTL) live in how it translates the
+// Client contract onto real Redis commands. Hard-fails rather than skips when Redis is down; keys are namespaced per run and deleted after -- never FLUSHDB, since api test shards share db 0.
 
 func liveClient(t *testing.T) (rueidis.Client, func()) {
 	t.Helper()
-	// This suite builds a static-password client, like the one under test. On an IAM
-	// deployment that would connect unauthenticated and fail with an opaque auth error, so
-	// say which it is. Anything but an explicit false counts as requested, so a typo fails
-	// loudly here rather than turning into a connection mystery.
+	// This suite builds a static-password client. On an IAM deployment that would connect
+	// unauthenticated and fail with an opaque auth error, so fail loudly here instead.
+	// Anything but an explicit false counts as requested, so a typo can't hide as a connection mystery.
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("GALILEO_REDIS_USE_ELASTICACHE_IAM"))) {
 	case "", "0", "f", "false", "n", "no", "off":
 	default:
@@ -61,10 +43,9 @@ func liveClient(t *testing.T) (rueidis.Client, func()) {
 		InitAddress: []string{host + ":" + port},
 		Password:    os.Getenv("GALILEO_REDIS_PASSWORD"),
 	}
-	// Honour GALILEO_REDIS_PROTOCOL, the way gcachectl and the Python half of the suite
-	// both do. Without it this suite dialled plain text and hard-failed on a TLS endpoint
-	// while gcachectl connected, and the rediss branch of NewRueidisClient had no live
-	// coverage at all. Same "rediss anywhere in the string" convention as RueidisOptions.
+	// Honour GALILEO_REDIS_PROTOCOL, as gcachectl and Python both do. Without it this suite
+	// dialled plain text and hard-failed on a TLS endpoint, leaving the rediss branch of
+	// NewRueidisClient with no live coverage. Same "rediss anywhere in the string" convention.
 	if strings.Contains(os.Getenv("GALILEO_REDIS_PROTOCOL"), "rediss") {
 		opt.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}
@@ -86,12 +67,9 @@ func liveAdapter(t *testing.T, disableCSC bool) (gcache.Client, string) {
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		// Two patterns, matching the urn_prefix fixture in tests/test_cross_language.py: an
-		// invalidation-tracked key is wrapped in a hash tag, so it starts with "{" and
-		// prefix+"*" never sees it. Missing those left a 4h watermark behind on every run.
-		//
-		// SCAN, not KEYS: KEYS walks the whole keyspace and blocks the server, and the api
-		// test shards share db 0 with this suite.
+		// Two patterns: a tracked key is wrapped in a hash tag, so it starts with "{" and
+		// prefix+"*" never sees it -- missing that left a 4h watermark behind every run.
+		// SCAN, not KEYS: KEYS walks the whole keyspace and blocks the server.
 		for _, pattern := range []string{prefix + "*", "{" + prefix + "*"} {
 			for cursor := uint64(0); ; {
 				entry, err := raw.Do(ctx, raw.B().Scan().Cursor(cursor).Match(pattern).Count(500).Build()).AsScanEntry()
@@ -234,16 +212,9 @@ func TestRueidisSetExRejectsATTLThatRoundsToZero(t *testing.T) {
 }
 
 func TestRueidisMGetReportsAPerKeyFailureInsteadOfNil(t *testing.T) {
-	// The bug this covers: AsBytes' error was swallowed and the slot left nil. Nil means
-	// "absent", and Cache.Get reads an absent watermark as "never invalidated" -- so a
-	// wrong-type watermark would serve an entry someone had invalidated. Failing the
-	// batch degrades the lookup to a miss instead, which is the safe direction.
-	//
-	// Client-side caching must be ON to reach it, and that is the default. The two paths
-	// differ (verified against Redis 8): plain MGET reports a wrong-type key as a nil
-	// element, indistinguishable from absent, while MGetCache reports it non-nil and lets
-	// AsBytes fail with WRONGTYPE. So the swallow was only reachable on the path every
-	// service actually runs.
+	// The bug this covers: AsBytes' error was swallowed and the slot left nil, which reads
+	// as "absent" and would let an invalidated (wrong-type) watermark be served. Only
+	// reachable with client-side caching ON (the default): plain MGET reports a wrong-type key as nil, but MGetCache lets AsBytes fail with WRONGTYPE.
 	r, prefix := liveAdapter(t, false)
 	ctx := context.Background()
 
@@ -292,31 +263,13 @@ func TestNewRueidisClientReportsAnUnreachableEndpoint(t *testing.T) {
 }
 
 // gapRequiredByInclusiveStaleness separates an Invalidate from the write that follows it.
-//
-// PROTOCOL, not flake, and named so it does not read as a stray sleep someone can delete.
-// isStale is INCLUSIVE (watermarkMs >= createdAtMs), so a value written in the same
-// millisecond as the preceding invalidation is deliberately suppressed -- loosening that
-// would let a write which raced an invalidation survive. Without this gap the re-Put below
-// lands on the watermark's own millisecond and reads as stale: it failed 4 runs in 5.
-//
-// The consumer relies on the same rule for the opposite reason: ingest-service's
-// fetchSessionByIDCached (added by #2165) deliberately does NOT re-prime after dropping a
-// stale entry, because its write would land in the watermark's millisecond and be
-// swallowed.
+// PROTOCOL, not flake: isStale is INCLUSIVE, so without this gap the re-Put below lands on
+// the watermark's own millisecond and reads as stale -- measured, it failed 4 runs in 5.
 const gapRequiredByInclusiveStaleness = 2 * time.Millisecond
 
-// waitForCacheState polls Get until it reports the wanted hit/miss, or fails.
-//
-// Required because of the client-side cache, and only because of it. With CSC on this
-// client holds the value and the absent watermark locally, so ANY write -- its own or
-// another client's -- becomes visible when the RESP3 invalidation push propagates, which
-// is asynchronous. Measured against the live container: 300us to 7.2ms, and a read issued
-// in the same instant as an invalidation served the stale value 6 times in 10.
-//
-// So a single immediate assertion is flaky, and asserting the stale read would pin a race
-// as the contract. Polling keeps the real guarantee testable: cscTTL (30s) is the bound
-// when a push is never delivered, so a deployment whose Redis does not support tracking
-// never converges and this fails.
+// waitForCacheState polls Get until it reports the wanted hit/miss, or fails. Required
+// because RESP3 invalidation pushes are ASYNCHRONOUS: measured, a read issued the same
+// instant as an invalidation served stale 6/10 times (300us-7.2ms); cscTTL bounds a lost push.
 func waitForCacheState(t *testing.T, cache *gcache.Cache[sessionIdentity], key gcache.Key, wantHit bool, what string) {
 	t.Helper()
 	ctx := context.Background()
@@ -338,16 +291,9 @@ func waitForCacheState(t *testing.T, cache *gcache.Cache[sessionIdentity], key g
 }
 
 func TestCacheOverLiveRedisRoundTripsAndInvalidates(t *testing.T) {
-	// The adapter under the real Cache, end to end: the two together are what a service
-	// runs, and the watermark comparison is only meaningful against real key expiry.
-	//
-	// Run for BOTH client-side-cache settings, and invalidate from a SECOND client.
-	//
-	// client_side_cache=true is the one that matters, and it is what every service runs --
-	// DisableClientSideCache defaults to false. It was previously untested here: this test
-	// and gcachectl both disabled it, so nothing in the package invalidated an entry on the
-	// transport production actually uses. The second client is what makes it meaningful;
-	// invalidating through the same connection exercises a different path.
+	// The adapter under the real Cache, end to end, since the watermark comparison is only
+	// meaningful against real key expiry. Runs for BOTH client-side-cache settings and
+	// invalidates from a SECOND client: client_side_cache=true (the default) was previously untested here, since this test and gcachectl both disabled it.
 	for _, csc := range []bool{false, true} {
 		t.Run(fmt.Sprintf("client_side_cache=%v", csc), func(t *testing.T) {
 			r, prefix := liveAdapter(t, !csc)

@@ -12,13 +12,8 @@ from redis.asyncio import Redis, RedisCluster
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.exceptions import JsonEnvelopeRequiresSerializer, UseCaseNameIsReserved
 
-#: Async callable that fetches the actual value on a cache miss.
-#: Public because GCache.aget/get take one: annotating a fallback should not mean
-#: importing from gcache._internal.
-#:
-#: Zero-argument: every caller invokes it as ``fallback()``. ``Callable[..., ...]`` accepted
-#: a function with required parameters and deferred the TypeError to the first cache miss,
-#: which is the worst moment to find out. Bind arguments with functools.partial or a closure.
+#: Async callable that fetches the value on a miss. Zero-argument: ``Callable[..., ...]``
+#: deferred the TypeError to the first cache miss. Bind args with functools.partial.
 Fallback = Callable[[], Awaitable[Any]]
 
 
@@ -174,12 +169,9 @@ class Serializer(ABC):
         return type(self)
 
 
-# The TypeScript JsonSerializer cannot represent `undefined` in JSON, so it writes this
-# sentinel instead (packages/gcache-ts/src/serializer.ts). Python has no `undefined`; the
-# closest value is None, and mapping it keeps a TS-written entry readable here. Without the
-# mapping json.loads raises on the sentinel, that error escapes the EnvelopeDecodeError
-# guard in RedisCache.get, and the entry never self-heals -- every read fails for the full
-# TTL.
+# TypeScript writes this sentinel for `undefined`; mapping it to None keeps a TS-written
+# entry readable. Unmapped, json.loads raises past the EnvelopeDecodeError guard and the
+# entry never self-heals -- every read fails for the full TTL.
 _TS_UNDEFINED_SENTINEL = "__gcache_json_undefined_v1__"
 
 
@@ -208,17 +200,9 @@ class JsonSerializer(Serializer):
             data = data.decode("utf-8")
         if data == _TS_UNDEFINED_SENTINEL:
             return None
-        # Inline on purpose. An earlier revision offloaded a large payload to an executor;
-        # measured on a 5.3 MB payload that moved the maximum event-loop tick delay not at
-        # all -- 0.007s inline against 0.007-0.014s via executor -- because json.loads runs
-        # in C and holds the GIL for its whole run, so the worker thread blocks the loop
-        # thread exactly as an inline call does. It was also actively worse: asyncio runs
-        # getaddrinfo in the default pool, so a multi-megabyte parse there delays DNS for
-        # new connections.
-        #
-        # ProtoJsonSerializer.load offloads and that IS worth it: json_format.Parse is
-        # Python driving upb per field, so it yields between bytecodes. Same harness, 1.18
-        # MB payload: 0.104s inline against 0.014s offloaded.
+        # Inline on purpose: json.loads holds the GIL, so offloading a 5.3 MB payload moved
+        # the max tick delay 0.007s -> 0.007-0.014s and starved getaddrinfo in the default
+        # pool. ProtoJsonSerializer.load DOES offload -- it yields per field (0.104s -> 0.014s).
         return json.loads(data)
 
 
@@ -243,26 +227,16 @@ class GCacheKey:
     key_type: str
     id: str
     use_case: str
-    # SORTED by name and normalized to a tuple in __post_init__, so what you read back is
-    # not always what you passed. Both matter to a caller, and this is where they look:
-    #
-    #   sorted -- because cached() has always sorted before building a key, so sorted args
-    #     are what is already on the wire, and Go's ValueKey sorts too. A constructor that
-    #     preserved input order was the one route to a key Go renders differently.
-    #   tuple  -- the dataclass is frozen, but a list field makes that a lie for the one
-    #     field the urn is built from: key.args.append(...) left the rendered urn, and
-    #     therefore the Redis key and this object's identity, stale.
+    # SORTED and tupled in __post_init__, so what you read back is not what you passed.
+    # Sorted because cached() and Go's ValueKey both do, so it is what is already on the
+    # wire; tupled because key.args.append(...) left the rendered urn stale.
     args: Sequence[tuple[str, str]] = field(default_factory=tuple)
     invalidation_tracking: bool = False
     default_config: GCacheKeyConfig | None = None
     serializer: Serializer | None = None
-    # How the value is framed in Redis. PICKLE (the default) is Python-only; JSON makes the
-    # entry readable by the TypeScript and Go clients. This governs writes; reads sniff the
-    # framing they find, except that a JSON key refuses to unpickle (see envelope.decode).
-    #
-    # Do NOT flip this on a live use case. Both pod generations run during a rolling deploy
-    # and overwrite each other's framing, so the key's hit rate sits near zero for the whole
-    # rollout. Migrate under a new use_case instead.
+    # Framing for WRITES; reads sniff what they find (a JSON key still refuses pickle).
+    # Do NOT flip on a live use case -- both pod generations overwrite each other's framing
+    # during a rolling deploy, pinning the hit rate near zero. Migrate under a new use_case.
     envelope: Envelope = Envelope.PICKLE
     # Cached computed fields (set in __post_init__)
     prefix: str = field(init=False)
@@ -278,14 +252,9 @@ class GCacheKey:
         # decorator path, so coerce here too and let an unrecognized value raise.
         object.__setattr__(self, "envelope", Envelope(self.envelope))
 
-        # JSON framing carries a string payload, so it needs a serializer to produce one.
-        # cached() rejects this pair at decoration time; a key built directly -- for
-        # GCache.aget/aput -- was the one route left open, and it fails per request
-        # instead: the write raises inside RedisCache, gcache swallows it, Redis stays
-        # empty, and only a log line says cross-process sharing never happened.
-        # A GCacheError subclass, not a bare ValueError: every other gcache failure is one,
-        # including the reserved-name check below, so a caller wrapping key construction in
-        # `except GCacheError` would otherwise miss exactly this one.
+        # JSON needs a serializer to produce its string payload. cached() rejects the pair
+        # at decoration; a directly-built key was the route left open, failing per request
+        # with Redis silently empty. GCacheError, so `except GCacheError` catches it.
         if self.envelope is Envelope.JSON and self.serializer is None:
             raise JsonEnvelopeRequiresSerializer(self.key_type, self.id, self.use_case)
 
@@ -297,21 +266,9 @@ class GCacheKey:
         if self.use_case == "watermark":
             raise UseCaseNameIsReserved()
 
-        # Sorted by name, matching what already exists on the wire.
-        #
-        # Two writers produce every real key today and BOTH sort: cached() sorts before it
-        # constructs a key (gcache.py), and Go's ValueKey sorts. This constructor did not,
-        # so the aget/aput path added here was the one route that could build a key Go
-        # renders differently -- same logical args, different order, different Redis entry,
-        # a silent miss in both directions.
-        #
-        # Sorting HERE rather than unsorting Go is the direction that preserves existing
-        # entries: cached() already hands them sorted, so this is idempotent for every key
-        # in production. The reverse was tried and reverted -- removing Go's sort broke
-        # parity with every key cached() had ever written, which go/key_test.go's
-        # production-key fixtures caught immediately.
-        #
-        # Stable, so two args sharing a name keep their input order in every client.
+        # Sorted, matching what is already on the wire: cached() and Go's ValueKey both
+        # sort, so this is idempotent for every existing key. Unsorting Go instead would
+        # break parity with everything cached() ever wrote. Stable, so duplicates hold order.
         object.__setattr__(self, "args", tuple(sorted(self.args, key=lambda pair: pair[0])))
 
         prefix = render_prefix(self.key_type, self.id, tracked=self.invalidation_tracking)
@@ -330,15 +287,9 @@ class GCacheKey:
         # Recorded here and checked at use; see GCache._check_direct_key.
         object.__setattr__(self, "urn_prefix", _GLOBAL_GCACHE_STATE.urn_prefix)
 
-    # Identity IS the rendered urn, which is the Redis key. urn is precomputed in
-    # __post_init__, so this allocates nothing.
-    #
-    # The previous tuple of (key_type, id, use_case, args) omitted invalidation_tracking,
-    # which DOES change the urn -- a tracked key braces its prefix for the cluster hash tag.
-    # So two keys addressing different Redis keys compared equal, and LocalCache (a dict
-    # keyed on GCacheKey) served one for the other, bypassing the watermark entirely. A
-    # decorator declares track_for_invalidation once per use case, so it stayed unreachable
-    # until direct keys let two call sites build the same use case both ways.
+    # Identity IS the rendered urn, i.e. the Redis key. The previous tuple omitted
+    # invalidation_tracking, which braces the prefix -- so two keys addressing different
+    # Redis keys compared equal and LocalCache served one for the other.
     def __hash__(self) -> int:
         return hash(self.urn)
 

@@ -1,10 +1,7 @@
 """Python half of the shared cross-language envelope conformance suite.
 
-Both this file and ``packages/gcache-ts/test/gcache-conformance.test.ts`` read
-``conformance/envelope_vectors.json``. Neither may hardcode a case: one source of truth is
-the entire point, because parity used to be asserted by hand-mirrored literals in two suites
-running in separate CI workflows -- so a divergence was only ever caught by a human reading
-both. Two escaped that way and were found in review rather than by a test.
+Both this file and ``gcache-conformance.test.ts`` read the same ``envelope_vectors.json``,
+so a divergence fails a test here instead of escaping to review as it did twice before.
 """
 
 import base64
@@ -17,10 +14,9 @@ import pytest
 from gcache._internal.envelope import ENVELOPE_VERSION, EnvelopeDecodeError, decode
 from gcache.conformance import load_vectors, vectors_path
 
-# Read through the package accessor, not a repo-relative path. The TypeScript and Go suites
-# both read the file by relative path, so nothing else exercises the packaged form -- and a
-# packaging mistake (a missing poetry include, say) would then only surface downstream, in
-# whatever service installed gcache and could not find the vectors.
+# Read through the package accessor, not a repo-relative path -- TS and Go read it by
+# relative path, so this is the only thing that exercises the packaged form (a missing
+# poetry include would otherwise surface downstream instead of here).
 _DATA = load_vectors()
 _VECTORS = _DATA["vectors"]
 
@@ -30,10 +26,9 @@ def test_the_vector_file_is_where_every_suite_expects_it() -> None:
     # green by parametrizing over an empty list -- which is exactly how a shared-fixture
     # suite dies quietly.
     assert pathlib.Path(vectors_path()).exists(), f"shared vectors missing at {vectors_path()}"
-    # EXACT, not a floor. A floor of 14 with 16 vectors present let two disappear with every
-    # guard still green -- the fixture is the only thing binding the three clients, so a
-    # silently shrinking corpus is the failure it cannot be allowed to have. The expected
-    # count lives in the fixture, so adding a vector is one edit and all three suites check it.
+    # EXACT, not a floor: a floor of 14 let two vectors disappear from 16 with every guard
+    # still green. Count lives in the fixture, so adding a vector is one edit that all
+    # three suites check.
     assert len(_VECTORS) == _DATA["vectorCount"], (
         f"fixture declares vectorCount={_DATA['vectorCount']} but carries {len(_VECTORS)} vectors"
     )
@@ -48,14 +43,9 @@ def test_the_vector_file_is_where_every_suite_expects_it() -> None:
         if v["expect"] == "accept":
             assert "decoded" in v, f"{v['name']} is an accept case with no expected decode"
 
-        # The asymmetry invariant is checked HERE, unconditionally, rather than inside the
-        # per-vector branch that handles "this client accepts what another rejects". A
-        # reviewer caught why that mattered: in the branch, the check only ran when the
-        # reading client happened to be on the accepting side, so a vector whose rejectedBy
-        # names THIS client could omit acceptedBy and asymmetryIsSafe entirely and still
-        # pass. And with no asymmetry vectors currently in the file, neither branch ran at
-        # all -- the invariant was unexercised. Global and unconditional is the only placement
-        # where every vector is subject to it regardless of which side each client is on.
+        # Checked HERE, unconditionally -- inside the per-vector accept/reject branch, a
+        # vector whose rejectedBy names THIS client could skip past it, and with no
+        # asymmetry vectors currently in the file, that branch never ran at all.
         if "rejectedBy" in v or "acceptedBy" in v:
             assert v.get("rejectedBy"), f"{v['name']}: acceptedBy without rejectedBy"
             assert v.get("acceptedBy"), f"{v['name']}: rejectedBy without acceptedBy"
@@ -71,10 +61,8 @@ def test_the_vector_file_is_where_every_suite_expects_it() -> None:
 def _applies_to_python(vector: dict) -> bool:
     """Whether this vector's stated expectation is Python's.
 
-    Most vectors apply to every client. A few record a DELIBERATE asymmetry -- one client
-    cannot represent the value faithfully, so rejecting it there yields a miss-and-rewrite
-    rather than two clients serving the same bytes as different numbers. Those carry
-    ``rejectedBy``/``acceptedBy``, and a suite must not assert another client's answer.
+    A few vectors record a DELIBERATE asymmetry -- one client can't represent the value
+    faithfully, so it rejects rather than serving the same bytes as a different number.
     """
     rejected_by = vector.get("rejectedBy")
     if rejected_by is None:
@@ -137,10 +125,8 @@ def test_the_key_rendering_divergences_are_still_what_the_file_says() -> None:
                 f"{case['name']}: Python renders {rendered!r}, file says {case['python']!r}"
             )
 
-            # The partition must match what the recorded strings actually say, so the file
-            # cannot claim an agreement its own values contradict. This replaced a two-way
-            # `agree: bool`, which could not express the real situation once Go arrived:
-            # Go and Python agree, TypeScript does not, and a boolean has no way to say so.
+            # Partition must match what the recorded strings say, not a `agree: bool` --
+            # a boolean can't express "Go and Python agree, TypeScript doesn't."
             actual: dict[str, list[str]] = {}
             for client in ("go", "python", "typescript"):
                 actual.setdefault(case[client], []).append(client)
@@ -156,17 +142,9 @@ def test_the_key_rendering_divergences_are_still_what_the_file_says() -> None:
 
 
 def test_an_empty_prefix_is_unreachable_through_the_public_api() -> None:
-    # The empty-prefix row above is a divergence gcache now forbids rather than documents, so
-    # the rejection and the record must not drift apart: if someone re-enables urn_prefix=""
-    # the vector file's reason becomes a lie.
-    #
-    # This used to assert `inspect.getsource(GCache.__init__)` contained the raise, and a
-    # reviewer was right to call that out: a source-text check stays green if the CONDITION
-    # is changed and the text left behind, so it would not have caught the regression it
-    # exists to catch. It was written that way because the singleton check came first, which
-    # made the branch unreachable in-process while the conftest fixture holds an instance.
-    # GCache.__init__ now validates pure config BEFORE the singleton check, so the real path
-    # is reachable and this asserts behaviour.
+    # Asserts real behaviour, not `inspect.getsource(GCache.__init__)` for the raise -- a
+    # source-text check stays green even if the CONDITION changes. Reachable because
+    # GCache.__init__ validates config BEFORE the singleton check the conftest fixture holds.
     from gcache import GCache, GCacheConfig
     from gcache.exceptions import EmptyUrnPrefixNotSupported
     from tests.conftest import FakeCacheConfigProvider
@@ -191,16 +169,9 @@ def test_an_empty_prefix_is_unreachable_through_the_public_api() -> None:
 
 
 def test_the_watermark_and_envelope_parsers_really_do_differ() -> None:
-    # The vector file records an asymmetry -- envelope timestamps stop at 2^53, the watermark
-    # keeps an int64 bound -- and justifies it with measured Python values. If those
-    # measurements stop holding, the justification becomes a story rather than a reason, so
-    # execute them rather than trusting the prose.
-    #
-    # The split is real and easy to miss: json.loads returns an exact int at any magnitude,
-    # float() returns a double and rounds above 2^53. Go reaches BOTH fields through a
-    # float64, so Python's watermark already agrees with Go there and its envelope did not.
-    # That is why tightening the watermark would introduce a divergence instead of closing
-    # one -- the opposite of the obvious move.
+    # Vector file records this asymmetry with measured values: json.loads keeps exact ints
+    # at any magnitude, float() rounds above 2^53. Go reaches both fields via float64, so
+    # tightening the watermark would diverge from Go, not converge.
     from gcache._internal.redis_cache import _parse_watermark
     from gcache.config import GCacheKey
 
@@ -235,12 +206,9 @@ def test_the_watermark_and_envelope_parsers_really_do_differ() -> None:
 
 
 def test_argument_order_is_normalized_identically_by_every_client() -> None:
-    # Args sort by name in all three clients, so caller order cannot change the key.
-    #
-    # This exists because its absence cost a real divergence: keyRendering's cases carry no
-    # args at all, so Go sorted while Python's constructor did not, and every suite stayed
-    # green. The sorted rendering is not a new convention -- cached() has always sorted
-    # before constructing a key, so it is what every key in production already looks like.
+    # Args sort by name in all three clients, so caller order cannot change the key. Exists
+    # because keyRendering's cases carry no args, so Go sorted while Python's constructor
+    # didn't, and every suite stayed green.
     from gcache import GCacheKey
     from gcache._internal.state import _GLOBAL_GCACHE_STATE
 
@@ -272,10 +240,9 @@ def test_argument_order_is_normalized_identically_by_every_client() -> None:
 
 
 def test_the_arg_order_corpus_could_detect_a_client_that_stopped_sorting() -> None:
-    # The control case's own weakness, asserted. 'already-alpha' renders the same whether a
-    # client sorts or preserves input order, so a corpus of only alphabetical cases cannot
-    # detect a client that stops sorting -- which is exactly how the Go/Python split
-    # survived. At least one case must differ from its own input-order rendering.
+    # 'already-alpha' renders the same sorted or unsorted, so an all-alphabetical corpus
+    # can't detect a client that stops sorting -- how the Go/Python split survived. At
+    # least one case must differ from its own input-order rendering.
     def input_order_rendering(case: dict[str, Any]) -> str:
         body = "&".join(f"{name}={value}" for name, value in case["args"])
         return f"{case['urnPrefix']}:{case['keyType']}:{case['id']}?{body}#{case['useCase']}"

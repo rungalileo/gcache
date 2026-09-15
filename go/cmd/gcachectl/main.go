@@ -1,13 +1,5 @@
-// Command gcachectl is a thin CLI over the gcache client.
-//
-// It exists so the cross-language integration test can drive the Go side from a Python
-// test process: Python imports gcache directly and shells out to this binary for the Go
-// half, which is the tractable direction in Bazel. It is also handy for poking at a live
-// cache by hand.
-//
-// Configuration comes from the same environment the services use
-// (GALILEO_REDIS_HOST/PORT/PASSWORD/PROTOCOL), so it needs no flags to point at the right
-// Redis in dev, test or a cluster.
+// Command gcachectl is a thin CLI over the gcache client, so the Python cross-language
+// test can drive the Go side. Config from GALILEO_REDIS_HOST/PORT/PASSWORD/PROTOCOL.
 //
 // Usage:
 //
@@ -16,8 +8,8 @@
 //	gcachectl -op invalidate -key-type K -id I [-future-buffer-ms N]
 //	gcachectl -op key        -key-type K -id I -use-case U [-tracked]   # print keys, no I/O
 //
-// `get` prints the raw JSON payload on a hit and exits 0; on a miss it prints nothing and
-// exits 10, so the caller can tell a miss from an error (which exits 1).
+// `get` exits 0 with the payload on a hit, 10 on a miss, 1 on error -- so the caller can
+// tell a miss from a failure.
 package main
 
 import (
@@ -76,10 +68,9 @@ func run(op, urnPrefix, keyType, id, useCase, value, rawArgs string, tracked boo
 		return json.NewEncoder(os.Stdout).Encode(out)
 	}
 
-	// Refuse rather than connect unauthenticated. RueidisOptions carries a static Password
-	// and no credential provider, so on an IAM deployment an empty Password would build an
-	// unauthenticated client and fail at connect with an opaque auth error. Any value other
-	// than an explicit false counts as "requested", so a typo fails closed.
+	// Refuse rather than connect unauthenticated: RueidisOptions has no credential provider,
+	// so on an IAM deployment an empty Password would build an unauthenticated client and
+	// fail with an opaque auth error. Any value but an explicit false fails closed as "requested".
 	if v := os.Getenv("GALILEO_REDIS_USE_ELASTICACHE_IAM"); !isFalsey(v) {
 		return fmt.Errorf(
 			"gcachectl: GALILEO_REDIS_USE_ELASTICACHE_IAM=%q, and this client supports only a "+
@@ -132,13 +123,9 @@ func run(op, urnPrefix, keyType, id, useCase, value, rawArgs string, tracked boo
 	}
 }
 
-// parseArgs turns "a=1,b=2" into key args. Order does not matter -- the key renderer
-// sorts.
-//
-// A pair with no "=" is an error rather than a silent skip. This binary exists to compare
-// key rendering against Python, so dropping a malformed pair would surface as a key
-// MISMATCH -- sending whoever wrote the typo to debug the wire protocol instead of their
-// own flag.
+// parseArgs turns "a=1,b=2" into key args (order doesn't matter -- the key renderer
+// sorts). A pair with no "=" errors rather than silently skips: since this binary compares
+// key rendering against Python, dropping it would surface as a key MISMATCH, not a flag typo.
 func parseArgs(raw string) ([]gcache.Arg, error) {
 	if raw == "" {
 		return nil, nil
@@ -161,10 +148,9 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-// isFalsey reports whether an env var means "off". Empty counts as off; anything else that
-// is not an explicit false counts as ON, so a misspelled value refuses rather than silently
-// disabling the check. The spellings are the ones pydantic accepts for a bool, which is
-// what the Python side parses this same variable with.
+// isFalsey reports whether an env var means "off". Empty counts as off; anything else not
+// an explicit false counts as ON, so a typo refuses rather than silently disabling the
+// check. These are the spellings pydantic accepts for a bool, matching the Python side.
 func isFalsey(v string) bool {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "", "0", "f", "false", "n", "no", "off":

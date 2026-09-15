@@ -1,23 +1,8 @@
 """Cross-language conformance tests for the gcache wire protocol.
 
-The Go client (``go/``) and the Python package (``src/gcache/``) write into the same Redis
-key space so that either language can read the other's entries and either can invalidate
-the other's. Nothing in the type system enforces that -- a one-character drift in key
-construction, or a change to the value envelope, silently splits the key space and every
-cross-language read quietly becomes a miss. These tests are the only thing that catches it.
-
-Python drives both sides: it uses ``gcache`` directly and shells out to the ``gcachectl``
-binary for the Go half.
-
-This suite used to live in orbit, one repo away from the Python implementation it checks.
-That arrangement is why it existed and also why it was not enough: five cross-language
-claims went silently false in a single afternoon -- three Go comments about Python and
-TypeScript behaviour, a Go test whose NAME asserted a divergence it existed to prevent, and
-a conformance vector that went stale within the hour. A test can only catch drift between
-things it can both reach. Now it can reach both.
-
-Needs a Redis, and takes the session ``redis_server`` fixture (redislite) from conftest --
-no external container. Needs the Go toolchain, since it builds ``gcachectl`` itself.
+Go and Python write into the same Redis key space; a one-character drift in key
+construction silently splits it into a quiet miss. Needs Redis (redislite) and the Go
+toolchain to build ``gcachectl``.
 """
 
 import json
@@ -48,15 +33,9 @@ USE_CASE = "gcache_tests::cross_language"
 def gcachectl(tmp_path_factory: pytest.TempPathFactory) -> str:
     """Build the Go CLI from source in this repo and return its path.
 
-    Built rather than located: in orbit this resolved a Bazel runfile at the hardcoded path
-    ``orbit/libs/go/gcache/cmd/gcachectl/gcachectl_/gcachectl`` -- a string carrying that
-    repo's workspace name, which is wrong the moment the code moves. Building from the tree
-    means the binary under test is always the source in this working copy, which is the
-    property that matters for a conformance suite: a stale prebuilt binary would report
-    agreement with code nobody is running.
-
-    Skips rather than fails when the Go toolchain is absent, so a Python-only contributor is
-    not blocked. CI has Go and must never skip -- see the conformance workflow.
+    Built, not located, so the binary under test is always this working copy's source -- a
+    stale prebuilt would report agreement with code nobody runs. Skips if Go is absent (CI
+    must never skip -- see the conformance workflow).
     """
     if shutil.which("go") is None:
         pytest.skip("Go toolchain not available; this suite needs it to build gcachectl")
@@ -81,10 +60,9 @@ class GoClient:
 
     def _run(self, *args: str) -> subprocess.CompletedProcess:
         cmd = [self._binary, "-urn-prefix", self._urn, *args]
-        # gcachectl reads GALILEO_REDIS_HOST/PORT. In orbit these came from .bazelrc's
-        # test_env; here they must point at the redislite instance the fixtures started, or
-        # the two halves of the comparison would run against different servers and the suite
-        # would pass by never disagreeing.
+        # Must point at the redislite instance the fixtures started, or the two halves
+        # would compare against different servers and the suite would pass by never
+        # disagreeing.
         env = {**os.environ, "GALILEO_REDIS_HOST": "localhost", "GALILEO_REDIS_PORT": str(REDIS_PORT)}
         return subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
 
@@ -111,14 +89,9 @@ class GoClient:
 def urn_prefix(redis_server: redislite.Redis) -> Generator[str, None, None]:
     """A gcache ``urn_prefix`` unique to one test, cleaned up afterwards.
 
-    Every key the test writes lands under the prefix, so tests cannot collide with each
-    other or with anything a previous run left behind. In orbit this came from a shared
-    fixture that resolved a client through ``setgalileo``'s RedisConfig; here the session
-    ``redis_server`` is already a client, so the indirection is gone.
-
-    Both key forms are swept. An invalidation-tracked key is wrapped in braces -- the Redis
-    Cluster hash tag that keeps a value and its watermark in one slot -- so ``{prefix...``
-    does not match ``prefix*`` and a prefix-only sweep would leave every tracked key behind.
+    Sweeps both key forms: a tracked key is wrapped in braces (the Redis Cluster hash tag
+    keeping value and watermark in one slot), so ``{prefix...`` won't match ``prefix*`` and
+    a prefix-only sweep would leave tracked keys behind.
     """
     prefix = f"urn:galileo:xlang-{uuid.uuid4()}"
     yield prefix
@@ -136,11 +109,9 @@ def go(gcachectl: str, urn_prefix: str) -> GoClient:
 def redis_url() -> str:
     """The redislite endpoint both halves of the suite must share.
 
-    One source for the port, imported from conftest, for the reason orbit's version resolved
-    through RedisConfig: if the Python and Go halves ever pointed at different servers the
-    suite would pass by never being able to disagree. That is the failure mode a conformance
-    test must not have, so the port is taken from the fixture that started the server rather
-    than read independently.
+    Port comes from the fixture that started the server, not read independently -- if
+    Python and Go ever pointed at different servers, the suite would pass by never being
+    able to disagree.
     """
     return f"redis://localhost:{REDIS_PORT}"
 
@@ -175,8 +146,8 @@ async def py_cache(urn_prefix: str) -> AsyncGenerator[GCache, None]:
 def python_reader(gc: GCache, sentinel: dict) -> tuple[Callable, dict]:
     """A Python cached function over the shared key, plus a counter of fallback calls.
 
-    The counter is what proves a *cache read* happened rather than a fallback: asserting on
-    the returned value alone would pass even if Python had missed and recomputed.
+    The counter proves a *cache read* happened, not a fallback -- the return value alone
+    would pass even on a miss.
     """
     config = GCacheKeyConfig.enabled(3600)
     config.ramp[CacheLayer.LOCAL] = 0  # force every read through the shared Redis layer
@@ -293,12 +264,9 @@ def test_go_and_python_render_identical_keys(go: GoClient, urn_prefix: str) -> N
     from gcache.config import GCacheKey
 
     sid = "sid-key-shape"
-    # Deliberately NOT alphabetical, and passed to BOTH clients exactly as written.
-    #
-    # This used to hand Go these args and build the Python key from sorted(args). That was
-    # not wrong at the time -- hand-sorting mirrored what cached() does -- but it meant the
-    # test could not observe the constructors disagreeing, which is precisely what they did.
-    # Both now sort internally, so passing one order to both sides is a real comparison.
+    # Deliberately NOT alphabetical, passed unsorted to BOTH clients: both sort internally,
+    # so this is a real comparison rather than one where hand-sorted args could mask a
+    # disagreement between the two constructors.
     args = [("beta", "2"), ("alpha", "1")]
 
     previous = _GLOBAL_GCACHE_STATE.urn_prefix

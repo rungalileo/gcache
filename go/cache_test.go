@@ -421,11 +421,8 @@ func TestNilRecorderIsSafe(t *testing.T) {
 }
 
 func TestGetTreatsAnExpiredEnvelopeAsAMiss(t *testing.T) {
-	// The envelope's own expiry is the only cross-language ceiling on how long a value may
-	// live. Go caps its own writes under the 4h watermark lifetime, but Python's
-	// per-use-case TTL has none, so an entry written there can outlive the watermark that
-	// invalidated it -- and without this check Go would serve it as fresh. The TypeScript
-	// reader already treats a past expiresAtMs as a miss.
+	// Python's per-use-case TTL has no ceiling, so an entry can outlive the watermark that
+	// invalidated it; without honoring the envelope's own expiry, Go would serve it fresh.
 	client := newFakeClient()
 	cache, err := New(Options[sessionIdentity]{
 		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
@@ -474,11 +471,9 @@ func TestGetServesAnUnexpiredEnvelope(t *testing.T) {
 }
 
 func TestGetDistrustsATrackedEntryDeclaringMoreThanTheWatermarkLifetime(t *testing.T) {
-	// The scenario the expiry check alone does NOT cover, and which an earlier version of
-	// this code wrongly claimed was closed: Python writes with a 6h TTL at t=0, someone
-	// invalidates at t=1h so the watermark lives to t=5h, and Go reads at t=5h30m. The key
-	// is present, the declared expiry is still in the future, and the watermark is gone --
-	// so without this guard the invalidated value is served as a hit.
+	// The gap the expiry check alone misses: Python writes a 6h TTL at t=0, an invalidation
+	// at t=1h makes the watermark expire at t=5h, and Go reads at t=5h30m -- unexpired but
+	// with the watermark gone, so without this guard the invalidated value is served as a hit.
 	client := newFakeClient()
 	cache, err := New(Options[sessionIdentity]{
 		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
@@ -505,10 +500,8 @@ func TestGetDistrustsATrackedEntryDeclaringMoreThanTheWatermarkLifetime(t *testi
 }
 
 func TestDistrustedEntryIsRecordedDistinctlyFromAPlainMiss(t *testing.T) {
-	// An empty cache also records ResultMiss, so recording the guard as a miss made it
-	// invisible to metrics. That matters more here than on the other miss paths: the cure
-	// is a use-case TTL configured in another language and another repository, which an
-	// operator cannot reach from a miss count.
+	// An empty cache also records ResultMiss, so recording the guard as a miss would make
+	// it invisible: the cure is a use-case TTL in another language, unreachable from a miss count.
 	client := newFakeClient()
 	rec := &recordingRecorder{}
 	cache, err := New(Options[sessionIdentity]{
@@ -579,9 +572,8 @@ func TestGetAcceptsAnUntrackedEntryWithALongLifetime(t *testing.T) {
 }
 
 // ctxAwareClient returns the context's error, the way a real Redis client does. fakeClient
-// ignores the context entirely, so a cancellation test using it never reaches Cache.fail
-// at all -- and an assertion of the form "no ResultError was recorded" then passes because
-// NOTHING was recorded. That is how the original cancellation test was green.
+// ignores the context entirely, so a cancellation test using it never reaches Cache.fail,
+// and "no ResultError was recorded" then passes vacuously because nothing was recorded.
 type ctxAwareClient struct{ fakeClient }
 
 func (c *ctxAwareClient) MGet(ctx context.Context, keys ...string) ([][]byte, error) {
@@ -696,8 +688,7 @@ func TestOmittingTheCodecKeepsTheJSONDefault(t *testing.T) {
 func TestGetDoesNotCountACallerDeadlineAsACacheError(t *testing.T) {
 	// Get derives a child context with c.timeout, so a caller deadline that fires first
 	// surfaces as context.DeadlineExceeded -- indistinguishable from the cache's own
-	// timeout by the error alone. Classifying on the CALLER's context is what separates
-	// "the client gave up" from "Redis did not answer".
+	// timeout by the error alone. Classifying on the CALLER's context resolves that.
 	rec := &recordingRecorder{}
 	cache, err := New(Options[sessionIdentity]{
 		Client: newCtxAwareClient(), URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
@@ -751,11 +742,9 @@ func TestGetKeepsACancelledCallerOutOfTheErrorSeries(t *testing.T) {
 }
 
 func TestInvalidateKeepsCallerTerminationOutOfTheErrorSeries(t *testing.T) {
-	// Get and Put both exempt caller termination from galileo_gcache_errors_total.
-	// Invalidate derives the same child timeout and so has the same ambiguity, but it was
-	// counting both a hangup and an elapsed caller deadline as cache faults -- and it is
-	// the path a shutdown cancels mid-flight, so the spike lands exactly when a service is
-	// already degraded.
+	// Get and Put both exempt caller termination from galileo_gcache_errors_total, but
+	// Invalidate was counting a hangup or elapsed deadline as a cache fault -- exactly the
+	// path a shutdown cancels mid-flight, so the spike lands when a service is degraded.
 	for _, tc := range []struct {
 		name string
 		ctx  func() (context.Context, context.CancelFunc)
@@ -794,9 +783,8 @@ func TestInvalidateKeepsCallerTerminationOutOfTheErrorSeries(t *testing.T) {
 
 func TestGetDistrustsALifetimeWhoseSubtractionOverflows(t *testing.T) {
 	// Both timestamps fit in int64; their difference does not. The overflowed difference is
-	// NEGATIVE, so a subtract-then-compare guard passes it instead of failing it -- and the
-	// entry declares roughly 570 million years, which is exactly what the guard exists to
-	// distrust. No watermark, because an expired watermark is the case it covers.
+	// NEGATIVE, so a subtract-then-compare guard would pass an entry declaring roughly 570
+	// million years. No watermark: an expired watermark is a different case entirely.
 	client := newFakeClient()
 	cache := newTestCache(t, client)
 	key := Key{KeyType: "session_id", ID: "sid-overflow", UseCase: "test::overflow", Tracked: true}
@@ -834,10 +822,9 @@ func TestNewRejectsATTLThatRoundsToZeroMilliseconds(t *testing.T) {
 }
 
 func TestGetTreatsANonPositiveExpiryAsExpired(t *testing.T) {
-	// An `expiresAtMs > 0` sign test used to skip these and serve the entry. Both other
-	// readers compare the raw value -- Python's redis_cache.py does `expires_at_ms <= now`
-	// with no sign check -- so they call it expired, and Go was the only client answering
-	// hit. Untracked, so no watermark can mask the difference.
+	// A sign test on expiresAtMs used to skip these and serve the entry, but both other
+	// readers compare the raw value with no sign check and call it expired. Untracked, so
+	// no watermark can mask the difference.
 	for _, exp := range []string{"0", "-1"} {
 		client := newFakeClient()
 		cache := newTestCache(t, client)
@@ -856,10 +843,8 @@ func TestGetTreatsANonPositiveExpiryAsExpired(t *testing.T) {
 
 func TestInvalidateRejectsAFutureBufferThatOverflowsTheGuard(t *testing.T) {
 	// futureBuffer+c.ttl overflows time.Duration for a large buffer, and an overflowed sum
-	// is NEGATIVE -- so a summing guard inverted and accepted precisely what it refuses.
-	// Before the fix, time.Duration(math.MaxInt64) returned nil on this cache and wrote a
-	// watermark dated 2318 while the watermark key itself still expired in 4h, so every
-	// entry written in those 4h would resurrect.
+	// is NEGATIVE, so a summing guard would invert and accept precisely what it should
+	// refuse -- previously wrote a watermark dated 2318 while the key expired in 4h.
 	client := newFakeClient()
 	cache, err := New(Options[sessionIdentity]{
 		Client: client, URNPrefix: testPrefix, TTL: 2 * time.Hour, Logger: quietLogger(),
@@ -883,14 +868,9 @@ func TestInvalidateRejectsAFutureBufferThatOverflowsTheGuard(t *testing.T) {
 }
 
 func TestWatermarkOutranksTheDeclaredLifetimeGuard(t *testing.T) {
-	// The two tracked guards can both fire, and the order decides what an operator sees.
-	// The declared-lifetime guard used to run first, so a long-lifetime entry reported
-	// ResultDistrusted even when the watermark was corrupt or said it was stale -- masking
-	// a data-integrity signal and a working invalidation respectively. All four outcomes
-	// are still a miss; what is pinned here is the CLASSIFICATION.
-	//
-	// No test covered the combination before, which is how the ordering survived: the
-	// distrust tests write no watermark and the watermark tests use a normal lifetime.
+	// The two tracked guards can both fire, and the order decides what an operator sees:
+	// the declared-lifetime guard used to run first, masking a corrupt or stale watermark
+	// behind ResultDistrusted. All four outcomes below are a miss; what's pinned is the CLASSIFICATION, which no earlier test covered in combination.
 	build := func(t *testing.T, lifetime time.Duration, watermark string) (*recordingRecorder, bool) {
 		t.Helper()
 		client := newFakeClient()
@@ -945,21 +925,9 @@ func TestWatermarkOutranksTheDeclaredLifetimeGuard(t *testing.T) {
 }
 
 func TestATrackedEntryCannotBeServedOlderThanTheWatermarkLifetime(t *testing.T) {
-	// gcache's Python client grew an explicit AGE check on the read path -- a tracked entry
-	// older than the 4h watermark is distrusted regardless of what it declares. Go has no
-	// such check and does not need one: the bound is IMPLIED by the two guards it already
-	// has, and this test pins the implication so neither can be loosened quietly.
-	//
-	// Serving a tracked entry requires both
-	//     now < expiresAtMs                              (the expiry guard)
-	//     expiresAtMs - createdAtMs <= watermarkTTL       (the declared-lifetime guard)
-	// and substituting the second into the first gives now - createdAtMs < watermarkTTL.
-	// So age > watermarkTTL is unreachable rather than unchecked.
-	//
-	// Python needs the explicit check because of legacy pickle entries, which carry no
-	// expiresAtMs at all, so neither guard applies there. Go is covered more strongly:
-	// decodeEnvelope returns ErrPickleEnvelope and Get reports a plain miss, so it never
-	// reads one. Asserted below rather than argued.
+	// Python's client has an explicit AGE check because legacy pickle entries carry no
+	// expiresAtMs; Go instead refuses pickle outright (ErrPickleEnvelope), so age >
+	// watermarkTTL is implied by its two existing guards rather than checked explicitly.
 	base := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
 	key := Key{KeyType: "session_id", ID: "age", UseCase: "test::age", Tracked: true}
 

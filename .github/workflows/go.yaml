@@ -1,23 +1,8 @@
 name: Go
 
-# Path-filtered, unlike this repo's older workflows. With three implementations, a
-# Python-only change should not pay for a Go build. The cross-language gate is NOT filtered
-# -- see conformance.yaml -- so every PR still exercises all three clients.
-#
-# The saving is smaller than that reads, and the difference is worth knowing before anyone
-# tunes these lists. `paths` means two different things per event:
-#
-#   push         evaluated against THAT COMMIT's changed files -- the filter bites
-#   pull_request evaluated against the PR's CUMULATIVE diff (base...head)
-#
-# So on a PR that has ever touched go/**, this workflow runs on every later push no matter
-# what that push contained. Measured on this repo: a commit touching only README.md and
-# tests/ produced `test` and `conformance` twice each (push + pull_request) and `go` and
-# `gcache-ts` ONCE each -- the pull_request run only, because the PR as a whole adds go/.
-#
-# That is the correct GitHub semantics rather than a misconfiguration, and it is the safer
-# direction to be wrong in: a PR touching a language gets that language's suite for the
-# life of the PR. Do not "fix" it by narrowing the filters.
+# Path-filtered; conformance.yaml is not, so every PR still exercises all three clients.
+# NOTE: `paths` on `push` matches that commit, but on `pull_request` it matches the PR's
+# CUMULATIVE diff -- so a PR that ever touched go/** runs this on every later push.
 on:
   push:
     paths:

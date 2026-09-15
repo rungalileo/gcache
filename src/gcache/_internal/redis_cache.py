@@ -110,14 +110,8 @@ def _parse_watermark(raw: bytes | str | None, key: GCacheKey, record_degraded: C
         _GLOBAL_GCACHE_STATE.logger.warning("Unreadable watermark for %s; suppressing the entry", key.urn)
         record_degraded("unreadable_watermark")
         return _WATERMARK_SUPPRESS_ALL
-    # EVERY non-finite value, not just NaN. Guarding on isnan alone treated the three
-    # non-finite inputs three ways: nan and inf suppressed, but -inf clamped to the int64
-    # minimum and SERVED the entry. None of them is a timestamp, so all three are
-    # unreadable and all three must suppress.
-    #
-    # That also closes the one input where the two clients disagreed: Go rejects -inf
-    # (a miss), and Python was serving it. Finite out-of-range values still clamp in both
-    # -- -1e300 means "an extremely old watermark", which is a real instruction, not garbage.
+    # EVERY non-finite value: isnan alone let -inf clamp to int64 min and SERVE the entry,
+    # where Go calls it a miss. Finite out-of-range values still clamp in both.
     if not math.isfinite(as_float):
         _GLOBAL_GCACHE_STATE.logger.warning("Non-finite watermark %r for %s; suppressing the entry", as_float, key.urn)
         record_degraded("non_finite_watermark")
@@ -197,12 +191,8 @@ class RedisCache(CacheInterface):
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
         GCacheMetrics.INVALIDATION_COUNTER.labels(key_type, self.layer().name).inc()
 
-        # render_prefix, not a hand-rolled concatenation. The two disagreed when
-        # urn_prefix was empty -- this produced "{:kt:id}" where a GCacheKey produces
-        # "{kt:id}" -- which is a different cluster hash slot, so the watermark stopped
-        # sharing a slot with the value it was meant to suppress and the invalidation
-        # silently never matched. Go's WatermarkKey guards that case, so Python was also
-        # the odd one out across languages.
+        # render_prefix, not hand-rolled: on an empty urn_prefix the two produced
+        # "{:kt:id}" vs "{kt:id}" -- a different hash slot, so invalidation never matched.
         key = render_prefix(key_type, id, tracked=True) + "#watermark"
         exp_ms = int(time.time() * 1000 + future_buffer_ms)
         await self.client.setex(key, WATERMARK_TTL_SECONDS, exp_ms)
@@ -215,15 +205,9 @@ class RedisCache(CacheInterface):
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
 
-        # Every key, not only pickle-declared ones. Gating this on the declared envelope
-        # suppressed the warning in the case that needs it MOST: a JSON-declared key whose
-        # stored value is still a legacy pickle. That is not an edge case, it is the
-        # designed migration path -- decode() sniffs the leading byte precisely so a key can
-        # switch envelopes with no flag day, which means a JSON key is EXPECTED to meet
-        # pickle values for a while. In text mode client.get raises UnicodeDecodeError on
-        # those bytes before anything here runs, so the operator got gcache_error_counter
-        # with no explanation and the one diagnostic that would have explained it was
-        # skipped on envelope grounds.
+        # Every key, not only pickle-declared ones: a JSON key meeting a legacy pickle is
+        # the designed migration path, and in text mode client.get raises
+        # UnicodeDecodeError before any guard here -- this is the only diagnostic.
         self._warn_once_if_text_mode(key)
 
         watermark_ms = None
@@ -236,13 +220,9 @@ class RedisCache(CacheInterface):
         if raw is not None:
             start_sec = time.monotonic()
 
-            # Sniff the envelope rather than trusting key.envelope: a key may have been
-            # written under a different envelope (mid-migration, or by another language's
-            # client), and a reader must still understand it. A JSON key still refuses a
-            # pickle blob -- see decode's allow_pickle.
-            #
-            # Route to the executor on size alone: a multi-megabyte JSON envelope blocks the
-            # loop in json.loads/b64decode just as a large pickle does.
+            # Sniff the framing rather than trusting key.envelope -- mid-migration a key
+            # may hold either. A JSON key still refuses pickle (decode's allow_pickle).
+            # Executor on size alone: a large JSON envelope blocks the loop like a pickle.
             allow_pickle = key.envelope != Envelope.JSON
             try:
                 deserialized_value: DecodedValue = (
@@ -269,39 +249,9 @@ class RedisCache(CacheInterface):
                 self._record_degraded_read(key, "json_without_serializer")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
-            # Honour the envelope's own expiry, not just Redis's TTL. The two can disagree --
-            # a writer that calls PERSIST or sets a longer TTL leaves an entry Redis still
-            # serves -- and the TypeScript reader treats a past expiresAtMs as a miss, so
-            # ignoring it here makes the two languages answer differently for one key.
-            #
-            # Deliberately no skew tolerance. This does make a read depend on the WRITER's
-            # wall clock, which is new -- a writer running behind loses the tail of every
-            # entry's lifetime, and each affected read pays a fallback plus a rewrite. A
-            # tolerance would serve values the TypeScript reader calls expired, which is the
-            # divergence this check exists to remove.
-            #
-            # It is NOT self-correcting: a writer lagging by more than the use case's TTL
-            # stamps an already-past expiry on every entry, so the key's hit rate sits at
-            # zero indefinitely. That is an operational requirement, not a tolerance --
-            # clocks must agree within the shortest TTL of any JSON use case. The
-            # envelope_expired degraded-read reason is the alarm for it.
-            # Distrust a TRACKED entry declaring a lifetime longer than the watermark's.
-            #
-            # A value must never outlive the watermark that invalidated it. If it does, the
-            # watermark expires at WATERMARK_TTL_SECONDS, the value stops looking stale, and
-            # the invalidated entry RESURRECTS -- the one thing the watermark exists to
-            # prevent, and silent when it happens.
-            #
-            # This is a cross-language gap Python was on the wrong side of. Go has had both
-            # halves: it rejects an over-long TTL at construction (maxEntryTTL) and distrusts
-            # such an entry on read (ResultDistrusted). Its own comment named Python as the
-            # client that "can write an entry that outlives the watermark invalidating it".
-            # Python had neither, so the two answered differently for the same bytes: Go a
-            # miss, Python a hit on something an invalidation should have removed.
-            #
-            # Enforced on READ as well as write because the write cap only binds entries
-            # this process writes. The keyspace is shared -- an older Python entry, or any
-            # client configured with a longer TTL for the same key type, is only caught here.
+            # Honour the envelope's expiry, not just Redis's TTL: TypeScript calls a past
+            # expiresAtMs a miss. No skew tolerance, so clocks must agree within the
+            # shortest JSON TTL; a writer lagging further pins the hit rate at zero.
             if (
                 key.invalidation_tracking
                 and deserialized_value.expires_at_ms is not None
@@ -322,40 +272,9 @@ class RedisCache(CacheInterface):
                 self._record_degraded_read(key, "envelope_expired")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
-            # AFTER the expiry guard, deliberately. Placed before it, this stole
-            # envelope_expired's label from the case that label exists for: an entry whose
-            # envelope expiry has passed but whose Redis TTL has not (a writer that called
-            # PERSIST or set a longer TTL). Such an entry can easily be over 4h old as well,
-            # and it was then reported as a watermark problem rather than as the writer clock
-            # skew envelope_expired is the documented alarm for.
-            #
-            # A consequence worth stating: for a JSON envelope this guard is now UNREACHABLE,
-            # and that is correct. Serving requires now < expiresAtMs AND
-            # expiresAtMs - createdAtMs <= watermarkTTL, and substituting the second into the
-            # first gives now - createdAtMs < watermarkTTL -- so an over-age JSON entry has
-            # already been caught by one of the two guards above. (The orbit#2163 reviewer
-            # derived that for the Go client, where it is the whole argument for having no age
-            # check at all.)
-            #
-            # It is reachable, and load-bearing, only on the PICKLE path: expires_at_ms is
-            # None there, so the expiry and declared-lifetime guards both skip it and this is
-            # the sole protection. Go can do without it because it refuses pickle entries
-            # outright (ErrPickleEnvelope); Python reads them by default.
-            # The same invariant by AGE rather than declared lifetime, which is what closes
-            # the pickle path. expires_at_ms is JSON-only, so the guard above cannot see a
-            # legacy pickle entry at all -- and those are exactly the entries written before
-            # the write guard existed, with Redis TTLs already over 4h.
-            #
-            # created_at_ms IS carried by both framings (RedisValue has it too), and age is
-            # the sharper test anyway: a watermark lives WATERMARK_TTL_SECONDS from the
-            # moment it is written, so any watermark that could have marked an entry older
-            # than that stale has itself expired. The entry is then provably unprotected,
-            # whatever it declared.
-            #
-            # Not over-broad, which is the thing to check before adding an age check to a hot
-            # read: an entry can only REACH an age of 4h if its TTL exceeds 4h, because Redis
-            # evicts it otherwise. So this fires on exactly the population the write guard
-            # now refuses to create, and never on a correctly configured key.
+            # The same invariant by AGE, which is the only guard reaching the PICKLE path
+            # (expires_at_ms is JSON-only). AFTER the expiry guard, or it steals
+            # envelope_expired's label from the clock-skew case that label exists for.
             if (
                 key.invalidation_tracking
                 and deserialized_value.created_at_ms is not None
@@ -412,14 +331,9 @@ class RedisCache(CacheInterface):
         if ttl is None:
             raise MissingKeyConfig(key.use_case)
 
-        # Refuse a TRACKED write whose TTL outlives the watermark that would invalidate it.
-        # Go rejects the equivalent at construction (maxEntryTTL); Python's TTL arrives from
-        # a runtime config provider, so the write is the first point that knows it.
-        #
-        # Raising rather than capping. A cap silently gives the caller a shorter TTL than
-        # they configured, and the read guard above would not fire on the capped value, so
-        # the misconfiguration would never surface. gcache swallows write errors by design --
-        # the caller still gets its value -- so refusing is visible without being fatal.
+        # Refuse a tracked write outliving its watermark. Raising, not capping: a cap
+        # silently shortens the configured TTL and the read guard then never fires, so the
+        # misconfiguration stays invisible. gcache swallows write errors, so this is safe.
         if key.invalidation_tracking and ttl > WATERMARK_TTL_SECONDS:
             raise TrackedTTLExceedsWatermark(key.use_case, ttl, WATERMARK_TTL_SECONDS)
 

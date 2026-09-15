@@ -10,21 +10,9 @@ import (
 	"testing"
 )
 
-// The Go half of the shared cross-language conformance suite.
-//
-// This file, tests/test_conformance.py and packages/gcache-ts/test/gcache-conformance.test.ts
-// all read src/gcache/conformance/envelope_vectors.json. None of them may hardcode a case:
-// one source of truth is the entire point. Parity used to be asserted by hand-mirrored
-// literals in suites that ran in separate CI workflows -- and, until this package moved
-// here, in separate REPOSITORIES, where nothing could even run both sides. Five
-// cross-language claims went silently false in one afternoon under that arrangement.
-//
-// Changing a vector's expectation must fail all three suites. If only two fail, the third
-// is not really reading the file.
-//
-// The fixture lives outside this module, so go:embed cannot reach it (embed refuses ".."
-// paths). Read at test time by a path relative to this file, which is the same compromise
-// the TypeScript suite makes.
+// The Go half of the shared cross-language conformance suite: this file, test_conformance.py,
+// and gcache-conformance.test.ts all read envelope_vectors.json, so none may hardcode a case --
+// hand-mirrored literals once let five cross-language claims go silently false in an afternoon. Read by relative path since go:embed refuses the ".." needed to reach the fixture.
 
 type conformanceFile struct {
 	EnvelopeVersion int `json:"envelopeVersion"`
@@ -110,20 +98,15 @@ func TestConformanceVectors(t *testing.T) {
 			if v.Why == "" {
 				t.Fatal("every vector must record why it exists")
 			}
-			// Presence, not just content. `Envelope` is a plain string, so a missing or
-			// renamed `envelope` key in the fixture decodes to "" -- and decodeEnvelope("")
-			// returns an error, which SATISFIES every reject vector. Measured: dropping the
-			// field from the 12 reject vectors leaves this suite reporting ok while Python
-			// fails all 12. TypeScript had the same hole. No vector legitimately carries an
-			// empty envelope, so this is safe to require.
+			// Presence, not just content: a missing/renamed `envelope` key decodes to "",
+			// and decodeEnvelope("") errors, which SATISFIES every reject vector for the
+			// wrong reason. Measured: dropping the field from the 12 reject vectors left this suite green while Python failed all 12.
 			if v.Envelope == "" {
 				t.Fatal("vector has no `envelope` field; a reject vector would pass for the wrong reason")
 			}
-			// A vector may DELIBERATELY differ between clients, when one cannot represent
-			// the value faithfully and rejecting it yields a miss-and-rewrite rather than
-			// two clients serving the same bytes as different numbers. Assert our own side
-			// rather than skipping: a skip would let Go silently change sides and leave the
-			// recorded asymmetry a lie.
+			// A vector may DELIBERATELY differ between clients, when one can't represent
+			// the value faithfully. Assert our own side rather than skipping: a skip would
+			// let Go silently change sides and leave the recorded asymmetry a lie.
 			expectReject := v.Expect == "reject"
 			if len(v.RejectedBy) > 0 {
 				if v.AsymmetryIsSafe == "" {
@@ -182,10 +165,9 @@ func TestConformanceKeyRendering(t *testing.T) {
 				t.Errorf("Go renders %q, file says %q", got, c.Go)
 			}
 
-			// And the partition must match the recorded strings, so the file cannot claim
-			// an agreement its own values contradict. Replaced a two-way `agree: bool`,
-			// which could not express 2-of-3 -- the actual situation, since Go and Python
-			// agree here and TypeScript does not.
+			// The partition must match the recorded strings, so the file can't claim an
+			// agreement its own values contradict. Replaced a two-way `agree: bool`, which
+			// couldn't express 2-of-3 (e.g. Go and Python agree, TypeScript doesn't).
 			byRendering := map[string][]string{}
 			for client, rendering := range map[string]string{
 				"go": c.Go, "python": c.Python, "typescript": c.TypeScript,
@@ -235,13 +217,9 @@ func equalGroups(a, b [][]string) bool {
 	return true
 }
 
-// TestConformanceArgOrdering pins that ValueKey sorts args by name.
-//
-// The sort is not a local preference: Python's cached() has always sorted before building a
-// key, so sorted args are what every key in production already looks like, and Python's and
-// TypeScript's constructors were brought into line rather than this one being loosened.
-// Removing this sort was tried and reverted -- it broke parity with every key cached() had
-// written, which TestValueKeyMatchesProductionKeys caught immediately.
+// TestConformanceArgOrdering pins that ValueKey sorts args by name. Not a local preference:
+// Python's cached() has always sorted before building a key, so sorted args are what every
+// key in production already looks like; removing this sort broke parity with production keys.
 func TestConformanceArgOrdering(t *testing.T) {
 	f := loadConformance(t)
 	if len(f.ArgOrdering.Cases) == 0 {
@@ -268,10 +246,8 @@ func TestConformanceArgOrdering(t *testing.T) {
 }
 
 // TestConformanceArgOrderingCorpusCouldDetectAnUnsortedClient asserts the corpus's own
-// discriminating power. An already-alphabetical case renders the same whether a client sorts
-// or preserves input order, so a corpus of only those cannot detect a client that stops
-// sorting -- exactly how the Go/Python split survived. At least one case must differ from
-// its own input-order rendering.
+// discriminating power: an already-alphabetical case renders the same sorted or not, so a
+// corpus of only those can't detect a client that stopped sorting -- as one once did.
 func TestConformanceArgOrderingCorpusCouldDetectAnUnsortedClient(t *testing.T) {
 	f := loadConformance(t)
 	for _, c := range f.ArgOrdering.Cases {

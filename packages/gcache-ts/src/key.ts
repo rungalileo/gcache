@@ -36,20 +36,9 @@ export class GCacheKey {
 
     const rawPrefix = joinUrnComponents(this.urnPrefix, this.keyType, this.id);
     this.prefix = this.trackForInvalidation ? redisClusterHashTag(invalidationPrefix(this.urnPrefix, this.keyType, this.id)) : rawPrefix;
-    // Sorted by name, matching Python's GCacheKey and Go's ValueKey. Every writer of a
-    // real key sorts: Python's cached() sorts before constructing, Go's ValueKey sorts, and
-    // Python's constructor now does too. This one did not, so the same logical args in a
-    // different order built a different Redis entry here than in the other two clients.
-    //
-    // normalizeArgs' own localeCompare sort is a separate concern -- it converts an OBJECT
-    // to tuples, where JS key order carries no meaning. This sorts the tuple form as well,
-    // so both entry points agree. Byte-ordinal rather than localeCompare, to match Python
-    // and Go on non-ASCII names. Not `<`: JavaScript compares UTF-16 CODE UNITS, so a
-    // supplementary character sorts below U+E000 (its lead surrogate is 0xD800) while
-    // Python and Go put it above. Measured for "\uE000" vs "\u{10000}" -- Python and Go
-    // say a<b, `<` in JS says b<a. Not localeCompare either: that is locale-sensitive.
-    //
-    // Stable, so two args sharing a name keep their input order in every client.
+    // Sorted by name, matching Python's GCacheKey and Go's ValueKey -- all three sort, so
+    // it is what is already on the wire. By CODE POINT, not `<`: JS compares UTF-16 code
+    // units, so U+10000 sorts below U+E000 there while Python and Go put it above.
     const sortedArgs = [...this.args].sort(([l], [r]) => compareCodePoints(l, r));
     const args =
       sortedArgs.length > 0

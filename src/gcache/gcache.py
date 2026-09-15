@@ -82,18 +82,9 @@ class GCache:
         :raises EmptyUrnPrefixNotSupported: If urn_prefix is "" -- an empty prefix cannot
             interoperate, since Python renders ``kt:id`` where TypeScript renders ``:kt:id``.
         """
-        # PURE CONFIG VALIDATION FIRST, before the singleton check. Two reasons, and the
-        # second is the one that caught me out.
-        #
-        # It does not depend on global state, and the resulting error is the more actionable
-        # one: a caller holding an invalid config learns that, rather than learning another
-        # instance exists when both are true.
-        #
-        # And it is what makes the rejection testable at RUNTIME. With the singleton check
-        # first, a live GCache made this branch unreachable in-process, so the test asserted
-        # that `inspect.getsource` contained the raise -- which stays green if the condition
-        # itself is changed and the text is left behind. A reviewer caught that; the test was
-        # checking the source, not the behaviour.
+        # Pure config validation BEFORE the singleton check: with the order reversed a live
+        # GCache made this branch unreachable in-process, so the test could only assert on
+        # inspect.getsource -- which stays green if the condition changes and the text stays.
         if config.urn_prefix == "":
             # An empty prefix is not merely unusual, it cannot interoperate: Python renders
             # "kt:id" and TypeScript ":kt:id". See EmptyUrnPrefixNotSupported. An earlier
@@ -210,12 +201,9 @@ class GCache:
         # Stopping the pool is always right -- it is this object's own resource.
         pool.stop()
 
-        # Clearing the flag is only right if this object still OWNS it. Having a pool proves
-        # __init__ completed; it does not prove we are still the registered live instance. A
-        # GCache whose __del__ is invoked directly, or which is finalized after another has
-        # taken over, would otherwise release a flag belonging to a different object and let
-        # a third be built alongside the live one -- two GCaches racing one urn_prefix and
-        # one logger, which is the exact condition the singleton exists to prevent.
+        # Only clear the flag if this object still OWNS it: a pool proves __init__ finished,
+        # not that we are still the registered instance. Otherwise a stale __del__ releases
+        # another object's flag and two GCaches race one urn_prefix.
         if _GLOBAL_GCACHE_STATE.gcache_owner_id != id(self):
             return
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
@@ -313,13 +301,9 @@ class GCache:
         # point of declaring an envelope is that both languages agree on the framing.
         envelope = Envelope(envelope)
 
-        # Fail at decoration rather than per-request: Envelope.JSON with no serializer can
-        # never produce a valid entry, and it is knowable at decoration. Deferring it to
-        # call time yields a TypeError plus an error log on every single call instead.
-        #
-        # Raised inside `decorator`, not here, so the default use case has resolved to
-        # module.function by then -- at this point it is still None, and the message would
-        # name no code at all.
+        # Fail at decoration: JSON with no serializer can never produce a valid entry.
+        # Raised inside `decorator` so the default use case has resolved to module.function
+        # by then -- here it is still None and the message would name no code.
 
         def decorator(func: Any) -> Any:
             nonlocal use_case
@@ -523,12 +507,9 @@ class GCache:
         if declared is not None and declared != key.envelope:
             raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
 
-        # By (type, message type). Type alone accepted two ProtoJsonSerializers carrying
-        # DIFFERENT messages, which is the likeliest mismatch now that a second serializer
-        # ships -- and the quietest, because load() passes ignore_unknown_fields=True, so
-        # reading a FileOptions payload as a FieldOptions yields an empty message and no
-        # error. Never by identity or equality: two JsonSerializer()s are never ==, so that
-        # would reject every legitimate caller.
+        # By (type, message type): type alone accepted two ProtoJsonSerializers carrying
+        # DIFFERENT messages, and ignore_unknown_fields=True makes that silent -- the wrong
+        # payload yields an empty message. Never by identity: two JsonSerializer()s differ.
         if _serializer_identity(self._use_case_serializers.get(key.use_case)) != _serializer_identity(key.serializer):
             raise SerializerMismatchWithRegisteredUseCase(
                 key.use_case, self._use_case_serializers.get(key.use_case), key.serializer
@@ -582,15 +563,9 @@ class GCache:
         :param fallback: Async callable invoked on a miss to produce the value.
         :return: The cached value, or whatever ``fallback`` returned.
         """
-        # Fails OPEN, unlike aput. A misconfigured key is a programming error, but the
-        # README's Error Handling contract is that a read never breaks the caller's
-        # request, and the decorator path already honours it: it catches key-construction
-        # failures, logs, counts gcache_error_counter and runs the function uncached. A
-        # direct read that raised where a decorated one degraded would be the same
-        # misconfiguration failing two different ways.
-        #
-        # The counter is what makes it visible -- silently uncached forever is how this
-        # reaches production otherwise.
+        # Fails OPEN, unlike aput: a read must never break the caller's request, and the
+        # decorator path already degrades this way. gcache_error_counter is what keeps it
+        # visible -- silently uncached forever is how this reaches production.
         try:
             self._check_direct_key(key)
         except GCacheError as e:

@@ -120,13 +120,9 @@ async def test_default_envelope_is_still_pickle(
 async def test_a_json_key_refuses_a_pickle_it_finds_and_falls_back(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # Reads still sniff the framing rather than trusting the declared envelope -- but a key
-    # that declares JSON refuses the pickle branch outright, because sniffing alone would
-    # leave arbitrary-code-execution reachable for anyone who can write the keyspace.
-    #
-    # Migrating a live use case this way is not merely a cold TTL -- both pod generations
-    # overwrite each other's framing during a rollout, so a real migration uses a new
-    # use_case. What this test pins is only the refusal itself.
+    # Reads still sniff the framing, but a key declaring JSON refuses the pickle branch
+    # outright -- sniffing alone would leave arbitrary-code-execution reachable for anyone
+    # who can write the keyspace.
     cache_config_provider.configs["sniff_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["sniff_uc"].ramp[CacheLayer.LOCAL] = 0
 
@@ -271,11 +267,8 @@ async def test_a_pickle_key_without_a_serializer_treats_a_json_entry_as_a_miss(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
     # A JSON payload is SERIALIZED, so only a Serializer turns it back into a value. Without
-    # one this used to hand back the raw string -- worse than a miss, because the caller got
-    # a str where it expected a dict and nothing raised or logged.
-    #
-    # A rolling deploy reaches this exact state: old pods still declare Envelope.PICKLE with
-    # no serializer while new pods have started writing JSON.
+    # one this hands back the raw string -- a str where the caller expected a dict, nothing
+    # raised. A rolling deploy reaches this: old pods declare PICKLE while new pods write JSON.
     cache_config_provider.configs["mixed_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["mixed_uc"].ramp[CacheLayer.LOCAL] = 0
 
@@ -305,10 +298,9 @@ async def test_a_pickle_key_without_a_serializer_treats_a_json_entry_as_a_miss(
 async def test_a_payload_the_serializer_cannot_load_is_a_miss_and_heals(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # serializer.load used to run outside the EnvelopeDecodeError guard, so a payload it
-    # could not parse raised straight past it: the caller logged an error, re-ran the
-    # fallback, and never wrote back -- leaving the entry poisoned for its whole TTL, with
-    # every later read paying the fallback again. Any non-Python writer can produce one.
+    # serializer.load must run inside the EnvelopeDecodeError guard: unparseable payload
+    # (any non-Python writer can produce one) must not escape and poison the entry for its
+    # whole TTL, with every later read paying the fallback again.
     cache_config_provider.configs["badpayload_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["badpayload_uc"].ramp[CacheLayer.LOCAL] = 0
 
@@ -407,10 +399,9 @@ async def test_a_bytes_payload_round_trips_through_the_cache(
 async def test_an_expired_envelope_is_a_miss_even_when_redis_still_serves_it(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # The envelope's expiresAtMs and the Redis TTL can disagree -- a writer that calls
-    # PERSIST or sets a longer TTL leaves an entry Redis happily returns. The TypeScript
+    # expiresAtMs and the Redis TTL can disagree (PERSIST, a longer TTL); the TypeScript
     # reader treats a past expiresAtMs as a miss, so ignoring it here made one key answer
-    # differently in each language.
+    # differently per language.
     cache_config_provider.configs["expired_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["expired_uc"].ramp[CacheLayer.LOCAL] = 0
 
@@ -530,11 +521,9 @@ def test_gcache_key_rejects_an_unrecognized_envelope() -> None:
 
 
 def test_gcache_key_rejects_json_without_a_serializer() -> None:
-    # JSON framing carries a string payload, so it needs a serializer to make one.
-    # cached() rejects the pair at decoration; a directly built key (GCache.aget/aput)
-    # was the one route left open, and it failed per request instead -- the write raised
-    # inside RedisCache, gcache swallowed it, and only a log line said the entry never
-    # landed. Pickle needs no serializer, so that pair stays legal.
+    # JSON framing carries a string payload, so it needs a serializer to make one. cached()
+    # rejects the pair at decoration; a directly built key was the one route left open, and
+    # failed per request instead -- RedisCache swallowed the write error and only logged it.
     from gcache.config import GCacheKey
     from gcache.exceptions import GCacheError, JsonEnvelopeRequiresSerializer
 
@@ -550,10 +539,9 @@ def test_gcache_key_rejects_json_without_a_serializer() -> None:
 
 @pytest.mark.parametrize("field", ["createdAtMs", "expiresAtMs"])
 def test_decode_rejects_a_non_finite_timestamp(field: str) -> None:
-    # json.loads maps 1e999 to inf, isinstance(inf, float) is True, and int(inf) then raises
-    # OverflowError -- outside this function's contract, so it escaped the caller's miss
-    # guard and left the entry poisoned for its whole TTL. parseEnvelope requires
-    # Number.isFinite for the same reason.
+    # json.loads maps 1e999 to inf; int(inf) then raises OverflowError, outside this
+    # function's contract, escaping the caller's miss guard and poisoning the entry for its
+    # whole TTL. parseEnvelope requires Number.isFinite for the same reason.
     envelope = {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": "x"}
     raw = json.dumps({**envelope, field: 1e999}).encode()
     with pytest.raises(EnvelopeDecodeError):
@@ -561,22 +549,9 @@ def test_decode_rejects_a_non_finite_timestamp(field: str) -> None:
 
 
 def test_decode_accepts_a_large_in_range_integer_timestamp() -> None:
-    # A timestamp far beyond any real one is fine while it stays inside the SAFE-INTEGER
-    # range. This test used to use 2**62 and assert int64, and the bound was tightened
-    # deliberately -- not loosened by accident, which is what a reader will assume if this
-    # comment does not say otherwise.
-    #
-    # int64 was too loose because JavaScript has only doubles: JSON.parse rounds above 2^53
-    # (9007199254740993 reads as ...992), and Go's decodeEnvelope takes the field into a
-    # float64 and rounds identically, while Python's json.loads returns the exact int. In
-    # the 2^53..int64 band all three clients ACCEPTED and then compared different numbers
-    # against the same threshold, silently. A miss heals on the next read; a disagreement
-    # never announces itself.
-    #
-    # The guard must still never call math.isfinite on the int directly: it raises
-    # OverflowError on a very large one, escaping decode's contract of raising only
-    # EnvelopeDecodeError. That is why the float() conversion comes first and the range
-    # comparison is done on the original int.
+    # SAFE-INTEGER bound (2^53), tightened deliberately from a looser int64: above 2^53, JS
+    # and Go round the field through a float64 while Python's json.loads stays exact, so
+    # int64 let all three ACCEPT and silently compare different numbers.
     big = 2**52  # ~year 144000, and comfortably inside the safe-integer range
     raw = json.dumps(
         {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}
@@ -592,19 +567,9 @@ def test_decode_accepts_a_large_in_range_integer_timestamp() -> None:
 
 
 def test_decode_rejects_a_timestamp_outside_the_safe_integer_range() -> None:
-    # Double-representability was not a tight enough bound, and neither was int64.
-    #
-    # 1e300 passed the finiteness check and kept an exact 301-digit int, and no real
-    # watermark can satisfy `watermark_ms >= created_at_ms` against that -- so the entry was
-    # permanent and immune to invalidation, the one thing the watermark exists to prevent.
-    # int64 fixed that and left a subtler hole: in the 2^53..int64 band every client
-    # accepted, but JavaScript and Go both reach the field through a double and round it,
-    # while Python's json.loads is exact. Three clients, three reads of the same bytes, no
-    # error anywhere.
-    #
-    # 2^53-1 is where all three agree, and nothing legitimate is excluded -- that is year
-    # ~287396, and every writer stamps Date.now()-scale values. The previous version of this
-    # test asserted 2**63-1 was LEGAL; the change is deliberate.
+    # 1e300 passes finiteness but leaves an entry no real watermark can invalidate (a
+    # 301-digit int always satisfies `watermark_ms >= created_at_ms`). int64 fixed that but
+    # let JS/Go round the field through a double while Python stays exact -- silently.
     for value in ("1e300", "-1e300", "9223372036854775808", "9007199254740992"):
         raw = f'{{"version":1,"createdAtMs":{value},"expiresAtMs":1,"encoding":"utf8","payload":"x"}}'.encode()
         with pytest.raises(EnvelopeDecodeError):
@@ -618,11 +583,9 @@ def test_decode_rejects_a_timestamp_outside_the_safe_integer_range() -> None:
 
 
 def test_decode_rejects_an_integer_timestamp_past_a_double() -> None:
-    # JSON.parse maps an out-of-range integer literal to Infinity, so the TypeScript
-    # reader's Number.isFinite check rejects it. Python's arbitrary-precision int accepted
-    # it, and the entry then never looked expired AND could never be invalidated --
-    # `watermark_ms >= created_at_ms` is false for every real watermark. One key, two
-    # answers.
+    # JSON.parse maps an out-of-range integer literal to Infinity, so TypeScript's
+    # Number.isFinite rejects it. Python's arbitrary-precision int accepted it, so the entry
+    # never expired AND could never be invalidated -- one key, two answers.
     big = int("9" * 401)
     raw = json.dumps(
         {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}
@@ -659,10 +622,9 @@ def test_decode_accepts_unpadded_base64() -> None:
 
 
 def test_decode_accepts_the_url_safe_base64_alphabet() -> None:
-    # Node's Buffer.from(x, "base64") accepts "-" and "_"; Python's b64decode rejects them.
-    # A Go writer using base64.RawURLEncoding would otherwise make every Python read a
-    # miss-and-rewrite while the TypeScript reader kept hitting the same key. Same
-    # divergence class as the padding case.
+    # Node's Buffer.from(x, "base64") accepts "-" and "_"; Python's b64decode rejects them,
+    # which would make a Go writer using base64.RawURLEncoding a miss-and-rewrite for
+    # Python while TypeScript kept hitting the same key.
     payload = base64.urlsafe_b64encode(b"\xf8\xff\xfe binary").decode().rstrip("=")
     assert "-" in payload or "_" in payload, f"fixture must exercise the URL-safe chars: {payload}"
     raw = json.dumps(
@@ -684,10 +646,9 @@ def test_decode_still_rejects_a_bad_base64_alphabet() -> None:
 async def test_a_serializer_returning_a_non_string_writes_nothing(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # The decoration guard closes the serializer-is-None route, so a serializer whose dump
-    # returns a non-str/bytes value is the remaining way to reach the write guard. The
-    # caller must still get its value -- a cache must not fail a request -- and nothing
-    # unreadable may be stored.
+    # A serializer whose dump returns non-str/bytes is the one way left to reach the write
+    # guard. The caller must still get its value -- a cache must not fail a request -- and
+    # nothing unreadable may be stored.
     cache_config_provider.configs["badser_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["badser_uc"].ramp[CacheLayer.LOCAL] = 0
 
@@ -716,10 +677,8 @@ async def test_a_degraded_read_increments_its_counter_with_a_reason(
 ) -> None:
     """The degraded-read counter is the only signal that separates corruption from a miss.
 
-    All of these paths fall through to the fallback, which raises MISS_COUNTER, so without
-    this counter keyspace corruption and envelope thrash look exactly like ordinary misses
-    on a dashboard. Nothing asserted it before -- `_record_degraded_read` could have been
-    deleted outright and the suite would still have passed.
+    Every degraded path falls through to the fallback like an ordinary miss, so without
+    this counter corruption is invisible on a dashboard. Nothing asserted it before.
     """
     cache_config_provider.configs["degraded_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["degraded_uc"].ramp[CacheLayer.LOCAL] = 0
@@ -780,11 +739,8 @@ async def test_switching_a_live_use_case_to_json_heals_rather_than_raising(
 ) -> None:
     """The pickle -> JSON migration read, end to end.
 
-    This is the question an operator asks before flipping an envelope: what happens to the
-    entries already in Redis? Three things have to hold together, and asserting only the
-    first would pass in a world where the entry stays poisoned for its whole TTL --
-    precisely the bug that shipped twice on this branch, where the fallback ran but the
-    write-back never did.
+    Three things must hold together: asserting only the first would pass in a world where
+    the entry stays poisoned for its whole TTL -- the bug that shipped twice on this branch.
     """
     cache_config_provider.configs["migrate_uc"] = GCacheKeyConfig.enabled(60)
     cache_config_provider.configs["migrate_uc"].ramp[CacheLayer.LOCAL] = 0
@@ -833,11 +789,9 @@ async def test_switching_a_live_use_case_to_json_heals_rather_than_raising(
 
 @pytest.mark.asyncio
 async def test_json_serializer_refuses_nan_and_infinity() -> None:
-    # json.dumps defaults to allow_nan=True and emits the bare tokens NaN / Infinity /
-    # -Infinity. Those are not JSON: JSON.parse throws and Go's encoding/json rejects
-    # them, so the write would succeed and leave an entry no other language can read
-    # until its TTL ran out. Failing the write is the rule the rest of this envelope
-    # follows -- gcache swallows the error, so the caller still gets its value.
+    # json.dumps defaults to allow_nan=True and emits NaN/Infinity/-Infinity, which are not
+    # JSON: JSON.parse and Go's encoding/json both reject them, so the write would leave an
+    # entry no other language can read until its TTL ran out.
     for bad in (float("nan"), float("inf"), float("-inf")):
         with pytest.raises(ValueError):
             await JsonSerializer().dump({"score": bad})
@@ -858,14 +812,9 @@ def test_envelope_rejects_a_boolean_version() -> None:
 
 
 def test_json_serializer_parses_inline_even_when_large() -> None:
-    # Deliberately NOT offloaded. An earlier revision sent a large payload to an executor;
-    # measured on 5.3 MB that changed the maximum event-loop tick delay not at all (0.007s
-    # inline vs 0.007-0.014s offloaded), because json.loads runs in C and holds the GIL for
-    # its whole run -- so the worker thread blocks the loop thread just the same. It also
-    # used the default pool, which asyncio shares with getaddrinfo.
-    #
-    # This asserts the absence, because re-adding the offload looks like an obvious
-    # improvement and is not one. ProtoJsonSerializer.load is the case where it does help.
+    # Deliberately NOT offloaded: measured on 5.3 MB, offloading changed the max event-loop
+    # tick delay not at all (0.007s inline vs 0.007-0.014s offloaded) since json.loads holds
+    # the GIL throughout. ProtoJsonSerializer.load is the case where offloading does help.
     import inspect
 
     src = inspect.getsource(JsonSerializer.load)
@@ -874,16 +823,9 @@ def test_json_serializer_parses_inline_even_when_large() -> None:
 
 @pytest.mark.asyncio
 async def test_invalidate_writes_a_watermark_in_the_value_key_s_slot() -> None:
-    # Drives RedisCache.invalidate and captures the key it actually SETEXes -- comparing
-    # two calls to render_prefix would pass with the bug restored, since both sides would
-    # use the same helper.
-    #
-    # invalidate used to build this key by hand, and the two constructions disagreed when
-    # urn_prefix was empty: a GCacheKey renders "{kt:i}" while the hand-rolled form
-    # rendered "{:kt:i}". The braces ARE the cluster hash tag, so the watermark stopped
-    # sharing a slot with the value it was meant to suppress -- the paired MGET is not even
-    # legal across slots -- and the invalidation silently never matched. Go's WatermarkKey
-    # guards the empty case, so Python was also the odd one out across languages.
+    # Captures the actual SETEX key -- comparing two render_prefix calls would pass even
+    # with the bug restored: a hand-built watermark key rendered "{:kt:i}" against
+    # GCacheKey's "{kt:i}" on an empty urn_prefix, splitting the cluster hash tag.
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.metrics import GCacheMetrics
@@ -928,19 +870,9 @@ async def test_invalidate_writes_a_watermark_in_the_value_key_s_slot() -> None:
     ],
 )
 def test_parse_watermark_never_raises_and_fails_closed(raw: bytes | None, expected: int | None) -> None:
-    # Every one of these used to raise out of RedisCache.get -- float() on a non-numeric
-    # value, int(nan) with ValueError, int(inf) with OverflowError -- which is the one thing
-    # this class promises cannot happen: a cache must not be able to fail a request. The
-    # int() sat outside the guarded block, so nothing caught it.
-    #
-    # Unreadable suppresses rather than returning None. None means "no invalidation has
-    # happened", which would SERVE an entry someone tried to invalidate -- the one answer a
-    # broken watermark must never produce. NaN is the sharpest case: had int(nan) not
-    # raised, every comparison against it is False, so the entry would be neither stale nor
-    # written back -- served forever and never repopulated.
-    #
-    # Reachable because of this work: before the shared envelope, only Python wrote these
-    # keys. Go's parseWatermark has handled all three deliberately.
+    # Every one of these used to raise out of RedisCache.get (float()/int() outside the
+    # guarded block). Suppresses rather than returning None: None means "no invalidation",
+    # which would SERVE the entry a broken watermark should hide.
     from gcache._internal.redis_cache import _parse_watermark
     from gcache.config import GCacheKey
 
@@ -949,10 +881,9 @@ def test_parse_watermark_never_raises_and_fails_closed(raw: bytes | None, expect
 
 
 def test_an_unreadable_watermark_suppresses_rather_than_serving() -> None:
-    # The direction is the whole point, and I got it wrong first: staleness is
-    # `watermark_ms >= created_at_ms`, so suppressing needs the MAXIMUM. The minimum marks
-    # nothing stale and serves the very entry the broken watermark should have hidden --
-    # which is also what None does, so both wrong answers are the same wrong answer.
+    # Staleness is `watermark_ms >= created_at_ms`, so suppressing needs the MAXIMUM: the
+    # minimum (like None) marks nothing stale and serves the very entry a broken watermark
+    # should have hidden.
     from gcache._internal.redis_cache import _WATERMARK_SUPPRESS_ALL
 
     created_at_ms = 1757308800123
@@ -969,13 +900,9 @@ def test_an_unreadable_watermark_suppresses_rather_than_serving() -> None:
 
 @pytest.mark.asyncio
 async def test_get_does_not_raise_on_a_malformed_watermark() -> None:
-    # Drives RedisCache.get, because testing _parse_watermark alone proved the parser
-    # correct without proving it was WIRED IN -- reverting get() to the bare float()/int()
-    # pair left every parser test passing. The mutation check is what exposed that.
-    #
-    # Each of these raised out of get() before: float("abc") -> ValueError, int(nan) ->
-    # ValueError, int(inf) -> OverflowError, none of them inside the guarded block. A cache
-    # must not be able to fail a request.
+    # Drives RedisCache.get, not _parse_watermark alone: reverting get() to the bare
+    # float()/int() pair left every parser test passing, which is what the mutation check
+    # exposed. Each of these raised before (ValueError, OverflowError), outside the guard.
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.envelope import encode_json
@@ -1015,14 +942,9 @@ async def test_get_does_not_raise_on_a_malformed_watermark() -> None:
 
 
 def test_every_non_finite_watermark_suppresses_in_both_languages() -> None:
-    # The agreement matrix, asserted rather than described. Guarding on isnan alone treated
-    # the three non-finite inputs three ways -- nan and inf suppressed, -inf SERVED -- which
-    # was also the single input where the two clients disagreed, since Go rejects -inf.
-    #
-    # The line is finite-vs-not, not sign: -1e300 is a real instruction ("an extremely old
-    # watermark, nothing is stale") and clamps in both clients, while -inf is not a
-    # timestamp at all. Go reaches the same split from the other direction -- it rejects
-    # non-finite and clamps finite out-of-range.
+    # Guarding on isnan alone let -inf SERVE while nan/inf suppressed -- the one input where
+    # Go (which rejects -inf) disagreed. The split is finite-vs-not, not sign: -1e300 clamps
+    # as "very old" in both clients; -inf isn't a timestamp at all.
     import logging
 
     from gcache._internal.redis_cache import _parse_watermark
@@ -1050,17 +972,9 @@ def test_every_non_finite_watermark_suppresses_in_both_languages() -> None:
 
 @pytest.mark.parametrize("as_str", [False, True])
 def test_decode_handles_a_str_from_decode_responses(as_str: bool) -> None:
-    # A client built with decode_responses=True hands back str. Both sniff tests then fail
-    # silently and control reached the unrecognized-leading-byte error, whose
-    # f"{data[0]:#04x}" raised ValueError -- escaping decode's one-exception contract. The
-    # consequence was worse than a crash: CacheController logged and never wrote back, so
-    # the entry stayed unreadable for its whole TTL, every read re-ran the fallback, and
-    # gcache_degraded_read_counter never moved, so nothing observable pointed at it.
-    #
-    # decode_responses=True is an established pattern in the consuming repo
-    # (services/api's AssistantService builds its client that way through the same
-    # RedisConfig helper gcache's factory uses), so this is a reachable trap rather than a
-    # hypothetical one.
+    # decode_responses=True clients hand back str; f"{data[0]:#04x}" then raised ValueError,
+    # escaping decode's one-exception contract, so the entry stayed unreadable for its whole
+    # TTL with no metric moving. Reachable: services/api's AssistantService uses this pattern.
     raw = encode_json(created_at_ms=1757308800123, ttl_sec=3600, payload='{"v":1}')
     data = raw.decode() if as_str else raw
 
@@ -1072,19 +986,9 @@ def test_decode_handles_a_str_from_decode_responses(as_str: bool) -> None:
 
 @pytest.mark.asyncio
 async def test_a_suppressing_watermark_records_a_degraded_read() -> None:
-    # Suppression is the one corruption path that neither heals nor expires quickly:
-    # _exec_fallback re-puts only when watermark_ms < now, and _WATERMARK_SUPPRESS_ALL never
-    # is, so the entity's hit rate sits at zero until the watermark key's own 4h TTL runs
-    # out. A log line was the only record of that. gcache_degraded_read_counter exists so an
-    # operator can separate keyspace corruption from an ordinary miss, and a shared keyspace
-    # makes a foreign writer able to cause this one.
-    #
-    # Driven through RedisCache.get rather than _parse_watermark, because the parser can be
-    # correct and not wired in -- that exact mistake is what test_get_does_not_raise_on_a_
-    # malformed_watermark exists to catch. The recorder is passed into the parser rather than
-    # inferred from its return value: a legitimate watermark above the int64 maximum clamps
-    # to the identical _WATERMARK_SUPPRESS_ALL sentinel, so the return value cannot carry the
-    # distinction. That clamping case is asserted below to keep the two apart.
+    # Suppression never heals: hit rate sits at zero until the watermark key's own 4h TTL.
+    # Driven through RedisCache.get, not _parse_watermark alone, since the parser could be
+    # correct and not wired in. Recorder is explicit: a legitimate clamp hits the same sentinel.
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.redis_cache import RedisCache
@@ -1149,16 +1053,9 @@ async def test_a_suppressing_watermark_records_a_degraded_read() -> None:
 
 @pytest.mark.asyncio
 async def test_a_pickle_key_on_a_text_mode_client_warns_once() -> None:
-    # decode_responses=True makes redis-py decode every reply as UTF-8. A pickle blob starts
-    # 0x80, not a valid UTF-8 start byte, so client.get raises UnicodeDecodeError INSIDE
-    # redis-py -- before any guard in RedisCache. It escapes get(), CacheController logs and
-    # re-runs the fallback, and the entry is never rewritten, so every read of every
-    # Envelope.PICKLE use case in the process fails for its full TTL and does not heal.
-    #
-    # This became reachable in this PR, which is why it is guarded here rather than being a
-    # pre-existing wart: until decode() accepted a str the option broke JSON reads too, so
-    # nobody could turn it on. One GCache uses one client for every use case, so the two
-    # envelopes cannot be configured apart.
+    # A pickle blob starts 0x80, not a valid UTF-8 start byte, so decode_responses=True makes
+    # client.get raise UnicodeDecodeError INSIDE redis-py, before any RedisCache guard --
+    # every PICKLE use case in the process fails for its full TTL and never heals.
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.redis_cache import RedisCache
@@ -1193,14 +1090,9 @@ async def test_a_pickle_key_on_a_text_mode_client_warns_once() -> None:
     assert len(warnings) == 1, f"expected exactly one warning across two pickle reads, got {len(warnings)}"
     assert "pickle_uc" in str(warnings[0]), "the warning must name the use case it was first seen on"
 
-    # A JSON-declared key on a text-mode client must ALSO warn. This assertion used to be the
-    # opposite -- it asserted silence, on the reasoning that an all-JSON process is the
-    # supported configuration. A reviewer showed that suppressed the warning in the case that
-    # needs it most: reads SNIFF the framing rather than trusting the declaration (that is
-    # what makes a no-flag-day migration possible), so a JSON key is EXPECTED to meet legacy
-    # pickle values for a while. In text mode client.get raises UnicodeDecodeError on those
-    # bytes before any gcache guard runs, so the operator saw gcache_error_counter move with
-    # nothing to explain it. The gate is the client's mode, not the key's envelope.
+    # A JSON-declared key on a text-mode client must ALSO warn: reads SNIFF the framing (the
+    # no-flag-day migration), so a JSON key is EXPECTED to meet legacy pickle values, and
+    # those raise UnicodeDecodeError before any gcache guard. Gate is client mode, not envelope.
     fake2 = text_mode_client()
     cache2 = object.__new__(RedisCache)
     cache2._warned_text_mode_pickle = False
@@ -1258,22 +1150,9 @@ async def test_a_pickle_key_on_a_text_mode_client_warns_once() -> None:
 
 
 def test_an_empty_urn_prefix_is_rejected_because_it_cannot_interoperate() -> None:
-    # This test asserted the OPPOSITE an hour ago, and the reversal is the point.
-    #
-    # The original bug was real: GCache.__init__ gated the assignment on truthiness, so
-    # urn_prefix="" was silently ignored and the previous global survived. My first fix
-    # honoured "" instead -- and that enabled a configuration that silently breaks the
-    # cross-language keyspace this whole branch exists to establish:
-    #
-    #   Python  render_prefix omits an empty prefix        -> "kt:id"
-    #   TS      joinUrnComponents joins unconditionally    -> ":kt:id"
-    #
-    # (packages/gcache-ts/src/key.ts: ["", "kt", "id"].join(":")). Value keys AND #watermark
-    # keys diverge, so neither client sees the other's entries or invalidations, with no
-    # error at write time. "Silently ignored" was bad; "silently unshareable" is worse.
-    #
-    # So reject it. Nobody can be depending on the behaviour: anyone passing "" today has
-    # been running with the previous prefix and does not know it.
+    # GCache.__init__ used to silently ignore urn_prefix="". Honoring it is worse: Python's
+    # render_prefix omits an empty prefix ("kt:id") while TS joins it (":kt:id"), silently
+    # splitting both the value and watermark keyspace.
     import inspect
 
     from gcache.exceptions import EmptyUrnPrefixNotSupported
@@ -1316,10 +1195,9 @@ def test_the_typescript_client_really_does_render_a_leading_colon() -> None:
 
 
 def test_global_state_is_not_published_before_validation() -> None:
-    # The urn_prefix and logger assignments used to sit ABOVE the Redis checks, so a
-    # RedisConfigConflict left them published while no GCache existed -- and __del__ clears
-    # only gcache_instantiated, so nothing put them back. The next construction inherited a
-    # namespace from an attempt that failed.
+    # urn_prefix/logger used to be published ABOVE the Redis checks, so a RedisConfigConflict
+    # left them set with no GCache existing -- __del__ clears only gcache_instantiated, so
+    # the next construction inherited a namespace from a failed attempt.
     import inspect
 
     from gcache.gcache import GCache
@@ -1342,19 +1220,9 @@ def test_global_state_is_not_published_before_validation() -> None:
     ],
 )
 def test_a_fractional_timestamp_is_rejected_rather_than_rounded(field: str, created: float, expires: float) -> None:
-    # An earlier revision floored these, to make the rounding direction consistent by sign.
-    # That was the wrong fix, and the reason is worth keeping: BOTH readers compare the value
-    # against a threshold, so a sub-millisecond difference flips a boolean rather than
-    # shifting an answer slightly.
-    #
-    #   expiresAtMs=1000.9 at now=1000
-    #     Python, floored:  1000 <= 1000      -> expired, miss
-    #     TypeScript:       1000.9 <= 1000    -> false, HIT
-    #
-    # Same bytes, opposite answers. Consistent rounding still disagrees with a reader that
-    # does not round, so rejecting is the only outcome where the clients agree -- and it
-    # costs nothing: the entry is a degraded read, gets rewritten with integers, and heals.
-    # redis-cache.ts parseEnvelope now uses Number.isInteger for the same reason.
+    # BOTH readers compare against a threshold, so a sub-ms difference flips a boolean:
+    # expiresAtMs=1000.9 at now=1000 -- floored Python calls it expired, TS (unrounded) calls
+    # it a hit. Rejecting is the only outcome where both agree, and costs nothing (heals).
     raw = json.dumps(
         {
             "version": ENVELOPE_VERSION,
@@ -1388,14 +1256,9 @@ def test_a_whole_number_float_timestamp_is_still_accepted() -> None:
 
 
 def test_a_stateful_serializer_can_declare_its_own_wire_identity() -> None:
-    # _serializer_identity reduced every non-protobuf serializer to its class, and its
-    # docstring asserted that was "all it has". False for a stateful serializer -- and the
-    # claim was the bug: two instances with different wire formats compared EQUAL, passed
-    # _check_direct_key, shared a urn, and each decoded the other's payload. A miss or a
-    # load failure, with nothing at registration to explain it.
-    #
-    # The decision now belongs to the serializer. The default is still the class, so every
-    # stateless implementation behaves exactly as before.
+    # _serializer_identity used to reduce every serializer to its class, so two stateful
+    # instances with different wire formats compared EQUAL, shared a urn, and each decoded
+    # the other's payload. Default is still the class, so stateless serializers are unaffected.
     from gcache.gcache import _serializer_identity
 
     class Stateless(Serializer):
@@ -1433,19 +1296,9 @@ def test_a_stateful_serializer_can_declare_its_own_wire_identity() -> None:
 
 
 def test_a_failed_construction_does_not_release_the_live_instance(gcache: GCache) -> None:
-    # gcache_instantiated is set on the LAST line of __init__, so any earlier raise still
-    # gets the half-built object finalized. __del__ then called
-    # self._event_loop_thread_pool.stop() on an attribute that does not exist.
-    #
-    # The AttributeError was the visible half (twice per test run, as a
-    # PytestUnraisableExceptionWarning). The invisible half is worse: that exception was the
-    # only reason __del__'s NEXT line was not reached, and that line clears a flag this
-    # object does not own. Guard the .stop() naively and a failed construction starts marking
-    # the LIVE GCache as uninstantiated, letting a third be built alongside it -- two GCaches
-    # racing one global urn_prefix and one instantiation flag.
-    #
-    # The `gcache` fixture is the live instance, so a second construction is guaranteed to
-    # take the early-raise path.
+    # gcache_instantiated is set LAST in __init__, so an earlier raise still finalizes the
+    # half-built object. Its __del__ AttributeError (missing thread pool) also happened to
+    # skip clearing a flag it doesn't own -- fixing .stop() naively would free the LIVE flag.
     import gc
 
     from gcache import GCacheConfig
@@ -1467,12 +1320,9 @@ def test_a_failed_construction_does_not_release_the_live_instance(gcache: GCache
     with pytest.raises(GCacheAlreadyInstantiated):
         GCache(GCacheConfig(cache_config_provider=FakeCacheConfigProvider()))
 
-    # The assertion above does NOT catch the bug that was actually in the code, and that is
-    # worth stating rather than discovering later. Mutation-checked both ways: reverting
-    # __del__ to the bare `self._event_loop_thread_pool.stop()` leaves everything above
-    # GREEN, because the AttributeError is what aborted __del__ before it reached the flag.
-    # So the two failure modes need two assertions -- one for the raise, one for the
-    # ownership -- and neither substitutes for the other.
+    # Mutation-checked: reverting __del__ to the bare `.stop()` call leaves everything above
+    # GREEN, since the AttributeError itself is what aborted __del__ before reaching the
+    # flag. The raise and the ownership need separate assertions; neither substitutes.
     bare = object.__new__(GCache)
     bare.__del__()  # must return, not raise AttributeError on a missing thread pool
     assert _GLOBAL_GCACHE_STATE.gcache_instantiated, (
@@ -1481,14 +1331,9 @@ def test_a_failed_construction_does_not_release_the_live_instance(gcache: GCache
 
 
 def test_only_the_owning_gcache_releases_the_singleton_flag(gcache: GCache) -> None:
-    # Having a thread pool proves __init__ COMPLETED. It does not prove this object is still
-    # the registered live instance, and the destructor was treating the two as the same
-    # thing. A GCache whose __del__ is invoked directly, or which is finalized after another
-    # has taken over, would release a flag belonging to a different object -- letting a third
-    # be built alongside the live one, two GCaches racing one urn_prefix and one logger,
-    # which is the exact condition the singleton exists to prevent.
-    #
-    # Mutation-checked: dropping the owner-id comparison lets the flag go False here.
+    # Having a thread pool proves __init__ COMPLETED, not that this object is still the
+    # live instance -- the destructor treated the two as the same thing, letting an
+    # impostor's __del__ release the live flag. Mutation-checked against dropping owner-id.
     from gcache._internal.state import _GLOBAL_GCACHE_STATE
     from gcache.exceptions import GCacheAlreadyInstantiated
 
@@ -1516,18 +1361,9 @@ def test_only_the_owning_gcache_releases_the_singleton_flag(gcache: GCache) -> N
 
 
 def test_the_writer_refuses_to_frame_an_unreadable_expiry() -> None:
-    # Tightening decode() to the safe-integer range without tightening encode_json left a
-    # self-inflicted permanent miss reachable from CONFIGURATION alone: a large enough
-    # ttl_sec drives created_at_ms + ttl_sec*1000 past 2^53, the write succeeds, and every
-    # later read -- Python, TypeScript or Go -- rejects it as out of range. The entry is then
-    # rewritten on each read and rejected again, for as long as the config stands.
-    #
-    # I only fixed the reader. A reviewer found the writer, and mutation-checking is what
-    # proved this test was missing: deleting the writer bound left the whole suite green.
-    #
-    # Raising rather than clamping. A clamped expiry silently means something other than what
-    # the caller configured, and gcache swallows write errors by design -- the caller still
-    # gets its value from the fallback -- so refusing stores nothing wrong.
+    # Tightening decode() without encode_json left a permanent miss reachable from
+    # CONFIGURATION alone: a large ttl_sec pushes the expiry past 2^53, so every read
+    # rejects and rewrites it forever. Raises rather than silently clamping to a different value.
     from gcache._internal.envelope import EnvelopeEncodeError, encode_json
 
     now = 1757308800123
@@ -1601,20 +1437,9 @@ async def test_a_refused_write_reaches_redis_with_nothing() -> None:
 
 @pytest.mark.asyncio
 async def test_a_tracked_entry_outliving_the_watermark_is_distrusted() -> None:
-    # A value must never outlive the watermark that invalidated it. If it does, the watermark
-    # expires at WATERMARK_TTL_SECONDS, the value stops looking stale, and the invalidated
-    # entry RESURRECTS -- silently, for the rest of its own TTL.
-    #
-    # This was a cross-language gap Python was on the wrong side of, and Go's own comment
-    # named it: "Python's gcache has no equivalent ceiling, so it can write an entry that
-    # outlives the watermark invalidating it". Go had both halves -- reject over-long TTLs at
-    # construction, and distrust such an entry on read. Python had neither, so the two
-    # clients answered differently for one key: Go a miss, Python a hit on something an
-    # invalidation should have removed.
-    #
-    # The READ guard matters more than the write cap, because the write cap only binds
-    # entries this process writes. The keyspace is shared: an older Python entry, or any
-    # client configured with a longer TTL for the same key type, is caught only here.
+    # A value outliving its watermark RESURRECTS silently for the rest of its TTL -- a gap
+    # Go had a ceiling for and Python didn't. The READ guard matters more than any write cap,
+    # since the shared keyspace holds entries this process never wrote.
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.constants import WATERMARK_TTL_SECONDS
@@ -1686,13 +1511,9 @@ async def test_a_tracked_entry_outliving_the_watermark_is_distrusted() -> None:
 
 @pytest.mark.asyncio
 async def test_a_tracked_write_longer_than_the_watermark_is_refused() -> None:
-    # The write half of the same invariant. Go rejects this at construction (maxEntryTTL);
-    # Python's TTL arrives from a runtime config provider, so the write is the first point
-    # that knows it.
-    #
-    # Raising rather than capping: a cap silently gives the caller a shorter TTL than
-    # configured AND hides the misconfiguration from the read guard, so it would never
-    # surface anywhere.
+    # The write half of the same invariant. Go rejects at construction (maxEntryTTL); Python's
+    # TTL arrives from a runtime provider, so the write is the first point that knows it.
+    # Raises rather than caps: a cap would silently shorten the TTL and hide the misconfig.
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.constants import WATERMARK_TTL_SECONDS
@@ -1732,19 +1553,9 @@ async def test_a_tracked_write_longer_than_the_watermark_is_refused() -> None:
 
 @pytest.mark.asyncio
 async def test_a_stale_tracked_pickle_entry_is_distrusted_by_age() -> None:
-    # The declared-lifetime guard reads expires_at_ms, which is JSON-only -- so it cannot see
-    # a legacy PICKLE entry at all, and those are exactly the ones written before the write
-    # guard existed, already sitting in Redis with TTLs over 4h. A reviewer caught that the
-    # guard I had just added covered one framing and not the other.
-    #
-    # created_at_ms is carried by both framings (RedisValue has it), and age is the sharper
-    # test: a watermark lives WATERMARK_TTL_SECONDS from when it is WRITTEN, so any watermark
-    # that could have marked an older entry stale has itself expired. The entry is provably
-    # unprotected regardless of what it declared.
-    #
-    # And it is not over-broad -- the thing to verify before putting an age check on a hot
-    # read. An entry can only reach an age of 4h if its TTL exceeds 4h, since Redis evicts it
-    # otherwise. The fresh-pickle case below is what pins that.
+    # The declared-lifetime guard reads expires_at_ms (JSON-only), missing legacy PICKLE
+    # entries. Age (created_at_ms, both framings) is sharper: any watermark old enough to
+    # mark it stale has itself expired. Not over-broad: Redis would evict a shorter-TTL entry first.
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.constants import WATERMARK_TTL_SECONDS
@@ -1810,15 +1621,9 @@ async def test_a_stale_tracked_pickle_entry_is_distrusted_by_age() -> None:
 
 @pytest.mark.asyncio
 async def test_each_degraded_reason_goes_to_the_right_guard() -> None:
-    # The guards overlap, so ORDER decides which reason an operator sees, and the labels are
-    # not interchangeable -- envelope_expired is the documented alarm for writer clock skew,
-    # and reporting it as a watermark problem sends someone to the wrong system.
-    #
-    # Placed before the expiry guard, the age check stole that label: an entry whose envelope
-    # expiry has passed but whose Redis TTL has not (a writer that called PERSIST, or set a
-    # longer TTL) is easily over 4h old too, and reported as age_exceeds_watermark. Caught by
-    # checking the interaction rather than each guard alone, after the orbit#2163 reviewer
-    # proved the age check is implied by the other two for JSON.
+    # Guards overlap, so ORDER decides the reported reason: placed before the expiry guard,
+    # the age check stole envelope_expired's label for an entry whose Redis TTL outlived its
+    # envelope (PERSIST, a longer TTL) -- sending an operator to the wrong system.
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.constants import WATERMARK_TTL_SECONDS

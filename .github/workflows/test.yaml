@@ -1,18 +1,8 @@
 name: test
 
-# DELIBERATELY UNFILTERED, unlike go.yaml and typescript.yaml.
-#
-# `test` is a REQUIRED status check in the "Main branch rules" ruleset (alongside
-# `pre-commit` and `Validate PR title`). A path-filtered workflow does not report its check
-# as Success -- it leaves it Pending -- so filtering a required check means a pull request
-# that touches none of the filtered paths can never become mergeable. A PR touching only
-# go/** is exactly that case: on `pull_request` the filter is evaluated over the PR's
-# cumulative diff, which for such a PR is go/** alone.
-#
-# This workflow WAS filtered for one commit. Keep it unfiltered unless the ruleset changes;
-# the Python suite is ~15s, so there is little to save and a merge deadlock to lose.
-# go.yaml and typescript.yaml stay filtered because neither is required, and conformance.yaml
-# is unfiltered, so every PR still exercises all three clients.
+# DELIBERATELY UNFILTERED: `test` is a REQUIRED check, and a filtered workflow leaves its
+# check Pending rather than Success -- so a PR touching only go/** could never merge.
+# Keep it unfiltered unless the ruleset changes; the suite is ~15s.
 
 on:
   push:

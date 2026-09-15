@@ -32,11 +32,9 @@ def _key(use_case: str = "direct_uc", **kw: Any) -> GCacheKey:
 async def _local_ttl_cache(gcache: GCache, key: GCacheKey) -> TTLCache:
     """The LocalCache's own TTLCache for ``key``.
 
-    Two levels of ``.wrapped`` with a cast, rather than a type-ignore: ``_cache`` is a
-    CacheChain whose ``wrapped`` is the local CacheController, whose ``wrapped`` is the
-    LocalCache. CacheInterface does not declare ``wrapped``, so mypy cannot walk it -- and
-    asserting the concrete types is more useful than silencing the error, since a change to
-    the chain's shape should break this loudly rather than keep type-checking against Any.
+    Two levels of ``.wrapped`` with a cast, not a type-ignore: CacheInterface doesn't
+    declare ``wrapped``, so asserting the concrete types breaks loudly if the chain's
+    shape changes, instead of type-checking silently against Any.
     """
     chain = cast(CacheChain, gcache._cache)
     local_controller = cast(CacheWrapper, chain.wrapped)
@@ -212,12 +210,9 @@ async def test_aput_survives_a_config_that_omits_the_local_layer(
 async def test_aput_writes_redis_even_when_the_local_layer_raises(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # CacheChain.put writes the SHARED layer first, then the local one, and re-raises the
-    # first error. So a local failure still leaves the shared entry written (asserted below),
-    # while a shared failure skips local entirely (asserted in the second half). This comment
-    # used to claim both layers are always attempted; 593a289 reversed the order and the
-    # comment was not updated with it. Both halves are needed -- deleting either the
-    # except/raise or the skip-on-shared-failure leaves the other half green.
+    # CacheChain.put writes the SHARED layer first, then local, re-raising the first error:
+    # a local failure still leaves the shared entry written (below), while a shared failure
+    # skips local entirely (second half). Both halves are needed to catch either regressing.
     cache_config_provider.configs["both_uc"] = GCacheKeyConfig.enabled(60)
     chain = gcache._cache  # CacheChain over two CacheControllers
     local, remote = chain.wrapped, chain.fallback_cache
@@ -257,10 +252,9 @@ async def test_aput_writes_redis_even_when_the_local_layer_raises(
 async def test_invalidation_does_not_reach_a_local_hit(
     gcache: GCache, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # The documented limit, pinned: LocalCache does not read watermarks, so a Go or
-    # TypeScript invalidation clears the shared Redis entry but not this process's local
-    # copy, which keeps serving until its own TTL runs out. The enabled_uc fixture ramps
-    # LOCAL to 0, so every other test here exercises Redis only and cannot see this.
+    # Documented limit, pinned: LocalCache doesn't read watermarks, so a Go/TypeScript
+    # invalidation clears Redis but not this process's local copy, which keeps serving
+    # until its own TTL. Every other test ramps LOCAL to 0 and can't see this.
     cache_config_provider.configs["local_uc"] = GCacheKeyConfig.enabled(60)
     key = _key(use_case="local_uc", invalidation_tracking=True)
 
@@ -276,10 +270,9 @@ async def test_invalidation_does_not_reach_a_local_hit(
 
 @pytest.mark.asyncio
 async def test_a_key_cannot_claim_the_reserved_watermark_use_case() -> None:
-    # With invalidation_tracking the urn would be byte-identical to the key invalidate()
-    # writes, so a put would overwrite the watermark with a cache value and silently
-    # disable invalidation for every use case on that entity. cached() rejected this name;
-    # a directly-built key skipped that check.
+    # With invalidation_tracking the urn is byte-identical to invalidate()'s watermark key,
+    # so a put would overwrite it and silently disable invalidation for the entity.
+    # cached() rejected this name; a directly-built key skipped that check.
     from gcache.exceptions import UseCaseNameIsReserved
 
     with pytest.raises(UseCaseNameIsReserved):
@@ -322,11 +315,9 @@ async def test_sync_get_warns_when_called_from_an_async_context(
 
 
 def test_tracked_and_untracked_keys_are_not_the_same_key() -> None:
-    # They render DIFFERENT Redis keys -- a tracked key braces its prefix for the cluster
-    # hash tag -- but __hash__/__eq__ omitted invalidation_tracking, so LocalCache (a dict
-    # keyed on GCacheKey) served one for the other and the watermark was never consulted.
-    # A decorator declares track_for_invalidation once per use case, which is why this only
-    # became reachable when two call sites could build the same use case both ways.
+    # They render DIFFERENT Redis keys, but __hash__/__eq__ omitted invalidation_tracking,
+    # so LocalCache (a dict keyed on GCacheKey) served one for the other and the watermark
+    # was never consulted.
     tracked = _key(invalidation_tracking=True)
     untracked = _key(invalidation_tracking=False)
 
@@ -369,10 +360,9 @@ async def test_a_direct_key_cannot_contradict_a_decorated_use_case(
 
 @pytest.mark.asyncio
 async def test_a_disabled_context_is_counted_not_silent(gcache: GCache, enabled_uc: None) -> None:
-    # The three other skip reasons increment DISABLED_COUNTER; a disabled context did not.
-    # The decorator counts it itself and returns before reaching the cache, so aget/aput
-    # were the fully silent path: no exception, no log, no metric, and a caller believing
-    # another process could now read the entry.
+    # The three other skip reasons increment DISABLED_COUNTER; a disabled context didn't --
+    # aget/aput were the fully silent path: no exception, no log, no metric, and a caller
+    # believing another process could now read the entry.
     from prometheus_client import REGISTRY
 
     def disabled_count() -> float:
@@ -408,10 +398,9 @@ def test_args_are_frozen_so_the_urn_cannot_go_stale() -> None:
 
 @pytest.mark.asyncio
 async def test_a_key_built_before_gcache_is_rejected(gcache: GCache, enabled_uc: None) -> None:
-    # The prefix is global state GCache() sets from its config, so a module-level key
-    # constant captures the DEFAULT namespace while ainvalidate uses the configured one:
-    # the value and its watermark land in different namespaces and different cluster hash
-    # slots, and tracked invalidation silently does nothing.
+    # The prefix is global state GCache() sets from config, so a stale key built before it
+    # captures the DEFAULT namespace: value and watermark land in different namespaces and
+    # cluster hash slots, and tracked invalidation silently does nothing.
     from gcache._internal.state import _GLOBAL_GCACHE_STATE
     from gcache.exceptions import GCacheKeyPrefixMismatch
 
@@ -443,10 +432,9 @@ async def test_a_key_built_before_gcache_is_rejected(gcache: GCache, enabled_uc:
 async def test_resetting_the_registry_the_way_consumers_do_still_works(
     gcache: GCache, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # orbit's services/api/tests/conftest.py does `gcache._use_case_registry = set()` between
-    # tests. Making that attribute a dict broke every gcache test in that repo with
-    # "'set' object does not support item assignment" -- a cross-repo break from renaming a
-    # private type. It stays a set; the envelope map is separate and keyed off it.
+    # orbit's conftest.py does `gcache._use_case_registry = set()` between tests. Making
+    # that attribute a dict broke every gcache test there with "'set' object does not
+    # support item assignment". It stays a set; the envelope map is separate, keyed off it.
     cache_config_provider.configs["reset_uc"] = GCacheKeyConfig.enabled(60)
     gcache._use_case_registry = set()
 
@@ -587,10 +575,9 @@ async def test_a_failed_direct_key_check_is_counted_on_read(
 async def test_delete_works_with_a_bare_key_for_a_serializer_use_case(
     gcache: GCache, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # The regression the framing checks introduced. delete/adelete is public API on main,
-    # and the only way to delete a decorated entry is a hand-built key -- test_gcache.py
-    # ::test_delete_key does exactly this. Applying the framing checks here broke every
-    # use case declaring serializer=, for a call that needs nothing but the urn.
+    # The regression the framing checks introduced: the only way to delete a decorated
+    # entry is a hand-built key (test_gcache.py::test_delete_key), and applying the framing
+    # checks here broke every use case declaring serializer= for a call needing only the urn.
     cache_config_provider.configs["del_uc"] = GCacheKeyConfig.enabled(60)
 
     @gcache.cached(key_type="Test", id_arg="test", use_case="del_uc", serializer=JsonSerializer())
@@ -675,10 +662,9 @@ async def test_two_proto_serializers_for_different_messages_are_not_interchangea
 async def test_a_partial_ramp_drops_some_primes(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # Documented, and pinned so it is not mistaken for a bug later. _should_cache samples
-    # random() per invocation, so unlike ramp 0 -- which is the kill switch and drops
-    # everything -- a partial ramp drops SOME primes while aput returns normally either
-    # way. Asserted by fixing the sample rather than by sampling, so it cannot flake.
+    # Documented and pinned so it isn't mistaken for a bug: unlike ramp 0 (the kill switch),
+    # a partial ramp drops SOME primes while aput returns normally either way. Asserted by
+    # fixing the sample, not by sampling, so it can't flake.
     half = GCacheKeyConfig.enabled(60)
     half.ramp[CacheLayer.LOCAL] = 0
     half.ramp[CacheLayer.REMOTE] = 50
@@ -702,22 +688,9 @@ async def test_a_partial_ramp_drops_some_primes(
 async def test_local_promotion_bypasses_the_envelope_expiry_guard(
     gcache: GCache, cache_config_provider: FakeCacheConfigProvider, redis_server: redislite.Redis
 ) -> None:
-    # A remote hit is promoted into LocalCache as the bare decoded payload, so the local entry
-    # gets a FRESH local TTL from promotion time and knows nothing about the envelope's
-    # expiresAtMs. The envelope-expiry guard in RedisCache.get therefore protects the remote
-    # layer and not this process's local copy.
-    #
-    # Demonstrated rather than described: the entry's stored envelope is rewritten to a PAST
-    # expiry, then the SAME key is read twice -- once with the local copy present, once with
-    # it cleared -- and the two answers differ. That difference IS the bypass.
-    #
-    # NOT fixed here, for a structural reason rather than a judgement call:
-    # cachetools.TTLCache has no per-item TTL (__setitem__ takes none), so capping a promoted
-    # entry at the envelope's remaining lifetime means replacing the local cache structure.
-    # That is out of proportion for this PR. It is the same category as the watermark
-    # limitation pinned above -- the local layer reads no remote staleness signal of any kind
-    # -- and the overshoot is bounded by the local TTL, since promotion requires a successful
-    # remote read and the local entry dies at promotion + local_ttl.
+    # A promoted local entry gets a fresh local TTL and knows nothing about the envelope's
+    # expiresAtMs, so RedisCache.get's expiry guard protects only the remote layer. NOT
+    # fixed here (TTLCache has no per-item TTL); bounded by the local TTL, asserted below.
     local_ttl, remote_ttl = 30, 60
     cache_config_provider.configs["promote_uc"] = GCacheKeyConfig(
         ttl_sec={CacheLayer.LOCAL: local_ttl, CacheLayer.REMOTE: remote_ttl},
@@ -737,23 +710,17 @@ async def test_local_promotion_bypasses_the_envelope_expiry_guard(
         await gcache.aput(key, {"session_id": "cached"})
         (await _local_ttl_cache(gcache, key)).clear()
 
-        # This read is a remote hit, and the local entry it leaves behind arrived by
-        # PROMOTION. That matters: reading straight after the aput would leave a local entry
-        # the put wrote, and this test's whole subject is what promotion stores. Asserted
-        # rather than assumed, because a local hit here would look identical from outside.
+        # This read is a remote hit; the local entry it leaves behind arrived by PROMOTION,
+        # not the earlier aput -- reading right after aput would leave a put-written local
+        # entry, and this test's subject is what promotion stores.
         assert not await _local_ttl_cache(gcache, key), "local layer must be empty before the promoting read"
         assert await gcache.aget(key, fallback) == {"session_id": "cached"}
         assert calls == 0, "the remote layer still held the entry, so nothing should have fallen back"
         assert await _local_ttl_cache(gcache, key), "the remote hit should have promoted the entry into the local layer"
 
-        # Now make the STORED envelope already expired while leaving Redis's own TTL alone.
-        # This is the disagreement the guard exists for -- a writer that set a longer Redis
-        # TTL, or a clock that moved.
-        #
-        # keepttl=True is load-bearing, not tidiness: a bare SET clears the key's TTL, which
-        # would make the key persistent and let every assertion below pass for the wrong
-        # reason -- the disagreement being staged is envelope-vs-Redis-TTL, and dropping the
-        # Redis TTL removes one side of it.
+        # Stages the STORED envelope as already-expired while leaving Redis's own TTL alone
+        # (the disagreement the guard exists for). keepttl=True is load-bearing: a bare SET
+        # would clear the TTL and make every assertion below pass for the wrong reason.
         ttl_before = redis_server.ttl(key.urn)
         assert ttl_before > 0, "the entry should carry a Redis TTL to preserve"
         raw = redis_server.get(key.urn)

@@ -88,12 +88,9 @@ func TestDecodeEnvelopeRejectsGarbage(t *testing.T) {
 }
 
 func TestDecodeEnvelopeRejectsWhatPythonRejects(t *testing.T) {
-	// The two readers must agree about the same bytes, or one key answers differently in
-	// each language. Python's decode rejects all of these; so must this one.
-	//
-	// The version case is the load-bearing one: the field exists so a future writer -- one
-	// adding a tombstone or a compression flag -- becomes a miss rather than being read as
-	// if the new field were not there.
+	// The two readers must agree about the same bytes, or one key answers differently per
+	// language. The version case is load-bearing: the field exists so a future writer
+	// (tombstone, compression flag) becomes a miss instead of being silently misread.
 	for name, raw := range map[string]string{
 		"future version":   `{"version":99,"createdAtMs":5,"expiresAtMs":6,"encoding":"utf8","payload":"x"}`,
 		"missing version":  `{"createdAtMs":5,"expiresAtMs":6,"encoding":"utf8","payload":"x"}`,
@@ -226,16 +223,9 @@ func TestDecodeEnvelopeRejectsMissingFields(t *testing.T) {
 }
 
 func TestDecodeEnvelopeTakesAWholeFloatAndRejectsAFractionalOne(t *testing.T) {
-	// This test used to assert the OPPOSITE, under the name
-	// ...AcceptsAFloatTimestampLikePythonDoes, on the reasoning that "Python reads the
-	// field through int(), and TypeScript only asks for Number.isFinite". Both halves of
-	// that stopped being true at gcache 45f511f: Python raises "must be a whole number of
-	// milliseconds" and the TypeScript reader moved to Number.isInteger. Go accepting a
-	// fractional value was then the only disagreement left on this field, so the name was
-	// asserting the divergence it was written to prevent.
-	//
-	// A float that is WHOLE is still accepted, because that is what the other two do -- a
-	// writer emitting 1757308800123.0 is in spec and must not become a Go-only miss.
+	// A float that is WHOLE is still accepted -- a writer emitting 1757308800123.0 is in
+	// spec and must not become a Go-only miss. All three clients now reject a fractional
+	// timestamp, closing what was once the last disagreement on this field.
 	_, created, expires, err := decodeEnvelope([]byte(
 		`{"version":1,"createdAtMs":1757308800123.0,"expiresAtMs":1757308860123.0,"encoding":"utf8","payload":"{}"}`))
 	if err != nil {
@@ -245,10 +235,9 @@ func TestDecodeEnvelopeTakesAWholeFloatAndRejectsAFractionalOne(t *testing.T) {
 		t.Errorf("got (%d, %d), want (1757308800123, 1757308860123)", created, expires)
 	}
 
-	// Fractional is rejected, in either field. Both readers compare against a THRESHOLD,
-	// so a sub-millisecond difference flips a boolean rather than nudging a value:
+	// Fractional is rejected, in either field: readers compare against a THRESHOLD, so
 	// expiresAtMs=1000.9 at now=1000 is unexpired for a truncating reader and expired for
-	// a rounding one. Verified against Python at the pinned revision.
+	// a rounding one -- a sub-millisecond difference that flips a boolean, not a value.
 	for _, raw := range []string{
 		`{"version":1,"createdAtMs":1757308800123.5,"expiresAtMs":1757308860123,"encoding":"utf8","payload":"{}"}`,
 		`{"version":1,"createdAtMs":1757308800123,"expiresAtMs":1757308860123.9,"encoding":"utf8","payload":"{}"}`,
@@ -260,15 +249,9 @@ func TestDecodeEnvelopeTakesAWholeFloatAndRejectsAFractionalOne(t *testing.T) {
 }
 
 func TestDecodeEnvelopeRejectsATimestampOutsideInt64(t *testing.T) {
-	// Such an entry would be permanent and immune to invalidation: isStale compares
-	// watermarkMs >= createdAtMs, and no watermark can exceed a value outside int64.
-	// Rejecting makes it a miss, so the entry is rewritten with a sane timestamp.
-	//
-	// This also removes an architecture split. A bare int64(f) out of range yields
-	// MaxInt64 on arm64 and MinInt64 on amd64 -- opposite ends -- so before this check the
-	// same stored bytes were an un-invalidatable hit on a developer's Mac and an instant
-	// miss in production. That is why the test matters on amd64 specifically; on arm64 the
-	// pre-fix conversion happened to saturate the safe-looking way.
+	// Such an entry would be permanent and immune to invalidation (no watermark exceeds a
+	// value outside int64). A bare int64(f) out of range is arch-dependent -- MaxInt64 on
+	// arm64, MinInt64 on amd64 -- so the same bytes were once a hit on a Mac, miss in prod.
 	for _, body := range []string{
 		`{"version":1,"createdAtMs":1e300,"expiresAtMs":1e300,"encoding":"utf8","payload":"{}"}`,
 		`{"version":1,"createdAtMs":-1e300,"expiresAtMs":1,"encoding":"utf8","payload":"{}"}`,
@@ -288,20 +271,9 @@ func TestDecodeEnvelopeRejectsATimestampOutsideInt64(t *testing.T) {
 }
 
 func TestWatermarkClampsWhereTheEnvelopeRejects(t *testing.T) {
-	// The two paths ask the same range question and answer it differently ON PURPOSE. A
-	// watermark is a suppression instruction, so an out-of-range value saturates to
-	// MaxInt64 -- "everything is stale", which is Python's answer and the fail-closed
-	// direction. An envelope timestamp describes the entry's own lifetime, so the same
-	// value is rejected there. Pinned because a future reader is likely to assume the
-	// mismatch is an oversight and "fix" it.
-	//
-	// LIMITATION, and it is the same one that hid the original bug: the clamp assertion
-	// below cannot fail on arm64. Saturating to MaxInt64 is exactly what arm64's hardware
-	// conversion already does, so deleting the clamp leaves this green on a developer's
-	// Mac and fails only under amd64 (verified both ways). A green local run is therefore
-	// NOT evidence that the clamp is wired in -- CI's linux/amd64 run is what proves it.
-	// The rejection test above has no such hole: it fails on both architectures, because
-	// rejecting is a decision rather than a coincidence of the instruction set.
+	// The two paths answer the same range question differently ON PURPOSE: a watermark
+	// clamps to MaxInt64 (fail-closed, a suppression instruction), while an envelope
+	// timestamp is rejected. LIMITATION: arm64's hardware conversion already saturates this way, so only amd64 CI proves the clamp below is actually wired in.
 	ms, err := parseWatermark([]byte("1e300"))
 	if err != nil {
 		t.Fatalf("parseWatermark(1e300) errored, want a clamp: %v", err)
@@ -319,12 +291,8 @@ func TestWatermarkClampsWhereTheEnvelopeRejects(t *testing.T) {
 	}
 
 	// In range AND whole, both must agree exactly -- the divergence is only out-of-range.
-	//
-	// Fractional values are deliberately left out, and that is a second difference between
-	// the two fields rather than between the languages: parseWatermark truncates 1.9 to 1
-	// (Python's watermark read does float() then int(), same answer), while the envelope
-	// now REJECTS a fractional timestamp in both clients. Same rule in each language, and
-	// a different rule for the two fields -- which is why this loop cannot mix them.
+	// Fractional is deliberately excluded here: it is a difference between the two FIELDS,
+	// not the languages -- parseWatermark truncates it, the envelope now rejects it in both.
 	for _, f := range []float64{0, 1, -1, 1_757_000_000_000} {
 		str := strconv.FormatFloat(f, 'g', -1, 64)
 		fromWatermark, err := parseWatermark([]byte(str))
@@ -343,10 +311,9 @@ func TestWatermarkClampsWhereTheEnvelopeRejects(t *testing.T) {
 }
 
 func TestDecodeEnvelopeNamesTheVersionItRejected(t *testing.T) {
-	// The version field exists so a future writer is diagnosable, which requires the
-	// message to carry the number. w.Version is a *int, so `%v` printed the POINTER:
-	// `"version":2` produced "unsupported envelope version 0xc000014098". The error was
-	// still an error, so every existing test passed and the value was simply lost.
+	// The version field exists so a future writer is diagnosable, which requires the error
+	// to carry the number. w.Version is a *int, so `%v` on it printed the POINTER --
+	// "unsupported envelope version 0xc000014098" -- an error that passed tests but lost the number.
 	_, _, _, err := decodeEnvelope([]byte(
 		`{"version":2,"createdAtMs":1,"expiresAtMs":2,"encoding":"utf8","payload":"{}"}`))
 	if err == nil {
@@ -371,15 +338,9 @@ func TestDecodeEnvelopeNamesTheVersionItRejected(t *testing.T) {
 }
 
 func TestDecodeEnvelopeStopsAtTheSafeIntegerBoundary(t *testing.T) {
-	// The band between 2^53 and int64 is the one where every client used to ACCEPT and two
-	// of them compared different numbers, which is worse than a miss because nothing
-	// errors. Measured: createdAtMs 9007199254740993 decodes to ...992 here (float64
-	// rounds) and to ...993 in Python, whose json.loads yields an exact int.
-	//
-	// Go and the TypeScript reader now share this bound -- TS moved from Number.isInteger
-	// to Number.isSafeInteger for the same reason, since JSON.parse had already rounded
-	// the value before the check ran. Python stays looser, which is the self-healing
-	// direction: its entry misses here and is rewritten.
+	// The band between 2^53 and int64 is the one where every client used to ACCEPT and
+	// compare different numbers with no error -- measured, createdAtMs 9007199254740993
+	// decodes to ...992 here vs ...993 in Python's exact int. Go/TS now share this bound; Python stays looser, which is self-healing (a miss there instead).
 	const maxSafe = 1<<53 - 1 // 9007199254740991
 
 	// The boundary itself must be accepted, or the bound is off by one.

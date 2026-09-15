@@ -10,33 +10,19 @@ import (
 	"time"
 )
 
-// watermarkTTL is how long an invalidation watermark lives.
-//
-// It is 4h because that is what Python's gcache hardcodes (WATERMARK_TTL_SECONDS). The
-// value is not ours to choose: both languages write watermarks into the same key space, so
-// they must agree.
+// watermarkTTL is how long an invalidation watermark lives. It is 4h because that is what
+// Python's gcache hardcodes (WATERMARK_TTL_SECONDS); both languages write into the same key
+// space and must agree.
 const watermarkTTL = 4 * time.Hour
 
-// maxEntryTTL caps how long a cached value may live.
-//
-// A value must never outlive the watermark that invalidated it. If it did, the watermark
-// would expire, the value would stop looking stale, and the invalidated entry would
-// resurrect. Keeping entry TTL at or under watermarkTTL makes that impossible for an
-// invalidation with no future buffer; with one, Invalidate enforces a futureBuffer+TTL
-// bound against its OWN ttl, which is not sufficient when another cache writes the same
-// key type with a longer TTL -- see the read guard in Get for what survives that.
-//
-// This binds writes made through this package. Python's gcache has no equivalent ceiling,
-// so it can write an entry that outlives the watermark invalidating it -- but Get no longer
-// trusts one: a tracked entry declaring a lifetime longer than watermarkTTL is read as a
-// miss. So this is enforced on read as well as write, rather than relying on every language
-// configuring a shared key type under 4h.
+// maxEntryTTL caps how long a cached value may live: it must never outlive the watermark
+// that invalidated it, or the invalidated entry resurrects once the watermark expires.
+// Python has no such ceiling, so Get also enforces this on read, not just on write here.
 const maxEntryTTL = watermarkTTL
 
-// defaultTimeout bounds every Redis call. Short on purpose: a cache must degrade to a miss
-// long before it threatens the caller's own deadline, and it matches the 300ms that
-// Galileo's ingest service already uses for Redis. (The rule was written down in orbit's
-// AGENTS.md; the reason travels, the citation does not.)
+// defaultTimeout bounds every Redis call. 300ms, matching what Galileo's ingest service
+// already uses for Redis, so a cache degrades to a miss well before the caller's own
+// deadline.
 const defaultTimeout = 300 * time.Millisecond
 
 // Result classifies a lookup, for metrics.
@@ -51,33 +37,24 @@ const (
 	// ResultError so a client disconnect -- or load shedding, when these arrive in bulk --
 	// does not read as the cache breaking.
 	ResultCancelled Result = "cancelled"
-	// ResultDistrusted is a TRACKED entry that declares a lifetime longer than the
-	// watermark's, so it could have outlived the watermark that suppressed it.
-	//
-	// Separate from ResultMiss, which an empty cache also records, because otherwise no
-	// metric can show this guard firing -- and separate from ResultStale, which means a
-	// watermark said so. The cures differ: ResultStale points an operator at an
-	// invalidation, while this points at a use case's TTL configured in another language
-	// and another repository, which is undiagnosable from a miss count.
+	// ResultDistrusted is a TRACKED entry declaring a lifetime longer than the watermark's,
+	// so it could outlive the watermark that suppressed it. Separate from ResultMiss/Stale
+	// because the fix is a use case's TTL in another language, not an invalidation.
 	ResultDistrusted Result = "distrusted"
 )
 
-// Recorder receives cache events. It is an interface rather than a Prometheus dependency
-// so this library stays dependency-light; services implement it with promauto, the same
-// way ingest-service implements otterstats.Recorder for its otter caches.
-//
-// A nil Recorder is fine -- all calls are skipped.
+// Recorder receives cache events, as an interface rather than a Prometheus dependency so
+// this library stays dependency-light; services implement it with promauto, as
+// ingest-service does with otterstats.Recorder. A nil Recorder is fine -- calls are skipped.
 type Recorder interface {
 	RecordResult(useCase string, result Result)
 	RecordLatency(useCase, op string, d time.Duration)
 	RecordError(useCase, op string, err error)
 }
 
-// Client is the narrow slice of Redis this package needs.
-//
-// Kept deliberately small so tests can fake it and so the concrete client stays swappable:
-// rueidis (whose RESP3 client-side caching is verified working against Galileo's
-// ElastiCache) today, go-redis if a deployment's Redis rejects CLIENT TRACKING.
+// Client is the narrow slice of Redis this package needs, kept small so tests can fake it
+// and the concrete client stays swappable: rueidis today (RESP3 client-side caching
+// verified against Galileo's ElastiCache), go-redis if a deployment's Redis rejects it.
 type Client interface {
 	// MGet fetches keys in one round trip. The result has one entry per requested key, in
 	// order; a nil entry means that key was absent.
@@ -86,14 +63,9 @@ type Client interface {
 	SetEx(ctx context.Context, key string, value []byte, ttl time.Duration) error
 }
 
-// Codec converts a value to and from the bytes carried in the envelope payload.
-//
-// Exists so a payload whose schema is shared with another language can be a generated
-// type rather than a struct hand-written on each side -- which is how the six
-// cross-language divergences found in review got there. See libs/proto/cache.
-//
-// Unmarshal takes *V so a codec can populate a pointer receiver (every generated
-// protobuf message) without allocating in the caller.
+// Codec converts a value to and from the bytes carried in the envelope payload. Exists so a
+// shared-schema payload can be a generated type rather than a hand-written struct -- six
+// cross-language divergences found in review came from the latter. See libs/proto/cache.
 type Codec[V any] interface {
 	Marshal(V) ([]byte, error)
 	Unmarshal([]byte, *V) error
@@ -132,12 +104,9 @@ type Options[V any] struct {
 	now func() time.Time
 }
 
-// Cache is a Redis-backed cache speaking the gcache wire protocol.
-//
-// Reads never fail: any Redis, decode or protocol problem is recorded and reported as a
-// miss, so a degraded cache slows the caller down but cannot break it. Writes return their
-// error, because a caller that fails to publish or invalidate an entry usually wants to
-// know.
+// Cache is a Redis-backed cache speaking the gcache wire protocol. Reads never fail: any
+// Redis, decode, or protocol problem is recorded and reported as a miss, so a degraded
+// cache slows the caller down but cannot break it. Writes return their error.
 type Cache[V any] struct {
 	client    Client
 	urnPrefix string
@@ -160,19 +129,16 @@ func New[V any](o Options[V]) (*Cache[V], error) {
 		// cache writes fine and simply never hits.
 		return nil, errors.New("gcache: Options.URNPrefix is required (\"urn:galileo:<customer_name>\")")
 	case strings.ContainsAny(o.URNPrefix, "{}#?"):
-		// These are the grammar's own delimiters. A prefix carrying one produces a key
-		// that parses as a different key -- and in cluster mode a stray brace moves the
-		// hash tag, splitting a value from its watermark across slots and making the
-		// single MGET illegal.
+		// These are the grammar's own delimiters. A prefix carrying one produces a key that
+		// parses as a different key, and in cluster mode a stray brace can move the hash
+		// tag, splitting a value from its watermark across slots and breaking the MGET.
 		return nil, fmt.Errorf("gcache: Options.URNPrefix %q must not contain any of {}#?", o.URNPrefix)
 	case o.TTL <= 0:
 		return nil, errors.New("gcache: Options.TTL is required")
 	case o.TTL.Milliseconds() == 0:
-		// The wire resolution is milliseconds, so a sub-millisecond TTL cannot be
-		// expressed. Left unchecked it fails far from its cause: rueidisClient.SetEx
-		// rejects the rounded-to-zero PX on EVERY Put, and encodeEnvelope stamps
-		// expiresAtMs equal to createdAtMs, which every reader -- including this one --
-		// treats as already expired. Refuse at construction instead.
+		// The wire resolution is milliseconds; unchecked, a sub-millisecond TTL fails far
+		// from its cause -- SetEx rejects the rounded-to-zero PX on every Put, and
+		// encodeEnvelope stamps expiresAtMs==createdAtMs, read as already expired.
 		return nil, fmt.Errorf(
 			"gcache: Options.TTL %s rounds to zero milliseconds; the wire resolution is milliseconds", o.TTL)
 	case o.TTL > maxEntryTTL:
@@ -201,11 +167,9 @@ func New[V any](o Options[V]) (*Cache[V], error) {
 	}, nil
 }
 
-// Get returns the cached value for key.
-//
-// It returns ok=false for a genuine miss, a stale entry, or any failure -- deliberately
-// there is no error return, so a caller cannot accidentally propagate a cache problem into
-// its own request path.
+// Get returns the cached value for key. It returns ok=false for a genuine miss, a stale
+// entry, or any failure -- deliberately there is no error return, so a caller cannot
+// propagate a cache problem into its own request path.
 func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 	var zero V
 	if err := key.Validate(); err != nil {
@@ -253,63 +217,17 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		return zero, false
 	}
 
-	// Honour the writer's own expiry, not just Redis's TTL. The two can disagree -- Python
-	// has no ceiling on a use case's TTL, and any writer can PERSIST a key -- and the
-	// TypeScript reader already treats a past expiresAtMs as a miss, so ignoring it here
-	// would make one key answer differently per language.
-	//
-	// No sign test. There used to be an `expiresAtMs > 0` guard, which skipped a zero or
-	// negative expiry and served the entry. Both other readers compare the raw value --
-	// Python's redis_cache.py does `expires_at_ms <= now_ms` with no sign check -- so they
-	// call such an entry expired where Go called it a hit. decodeEnvelope rejects an ABSENT
-	// expiresAtMs, so a non-positive one is a value some writer really stored rather than a
-	// field Go had to default; there is no "0 means never expires" convention to honour.
+	// Honour the writer's own expiry, not just Redis's TTL -- Python has no TTL ceiling and
+	// any writer can PERSIST a key. No sign test: both other readers compare the raw value
+	// with no sign check, and decodeEnvelope already rejects an absent expiresAtMs.
 	if c.now().UnixMilli() >= expiresAtMs {
 		c.record(key.UseCase, ResultMiss)
 		return zero, false
 	}
 
-	// Distrust a TRACKED entry that declares a lifetime longer than the watermark's.
-	//
-	// The expiry check above does NOT close the resurrection gap on its own, and an earlier
-	// version of this code claimed it did. Concretely: Python writes with a 6h TTL at t=0,
-	// someone invalidates at t=1h so the watermark lives to t=5h, and Go reads at t=5h30m.
-	// The key is present, the declared expiry is still in the future, and the watermark has
-	// expired -- so the invalidated value is served as a hit. The expiry only helps when the
-	// declared lifetime is SHORTER than the window the watermark covers.
-	//
-	// Go's own writes always pass this, because New caps TTL at watermarkTTL. It is Python's
-	// per-use-case TTL, which has no ceiling, that can produce such an entry.
-	//
-	// The bound is watermarkTTL because that is all a reader knows. Invalidate's real
-	// ceiling is tighter -- futureBuffer+TTL -- so an entry whose lifetime sits between
-	// watermarkTTL-futureBuffer and watermarkTTL passes here and can still outlive a
-	// buffered watermark. Closing that would mean reading futureBuffer off the wire, which
-	// the watermark does not carry.
-	//
-	// Invalidate's own refusal does not close it either, and it is narrower than it looks:
-	// it compares futureBuffer against the INVALIDATING cache's ttl, but a watermark covers
-	// every use case under the key type. Two Go caches sharing a key type are enough -- a
-	// 1h-TTL cache invalidating with a 3h buffer is accepted, and a 3h30m-TTL cache writing
-	// inside that buffer produces exactly the entry above. So the residual gap is any
-	// writer whose TTL exceeds the invalidator's, not just one that skips this client.
-	//
-	// Compared in float64 because the int64 subtraction overflows on a crafted pair that is
-	// individually in range -- createdAtMs -9e18 with expiresAtMs 9e18 -- and an overflowed
-	// difference comes out NEGATIVE, which passes this guard silently rather than failing
-	// it. float64 cannot overflow here, and a 53-bit mantissa is far more precision than a
-	// comparison against four hours of milliseconds needs. The float form also subsumes the
-	// expiresAtMs > createdAtMs check it replaces: a non-positive difference is never
-	// greater than the limit.
-	//
-	// Runs AFTER the watermark check, and that order is load-bearing for diagnosis. This
-	// guard used to come first, so a tracked entry with a long declared lifetime reported
-	// ResultDistrusted even when the watermark was unreadable (no ResultError and no
-	// RecordError) or said the entry was genuinely stale (no ResultStale) -- measured, not
-	// theorised. Every path still ended in a miss, so nothing was served wrongly. But the
-	// watermark is direct evidence about THIS entry while the declared-lifetime bound is a
-	// heuristic, and reporting the heuristic sent an operator to a use-case TTL when the
-	// real answer was "someone invalidated it" or "this watermark is corrupt".
+	// Distrust a TRACKED entry declaring a lifetime longer than the watermark's: the expiry
+	// check alone does not close the resurrection gap, since Python's per-use-case TTL has
+	// no ceiling. Runs AFTER the watermark check below so diagnosis blames the real cause.
 	if key.Tracked && vals[1] != nil {
 		watermarkMs, err := parseWatermark(vals[1])
 		if err != nil {
@@ -370,23 +288,8 @@ func (c *Cache[V]) Put(ctx context.Context, key Key, value V) error {
 }
 
 // Invalidate marks every TRACKED entry under (keyType, id) stale, across every use case and
-// every language's client.
-//
-// An untracked entry is unaffected: Get reads a watermark only when key.Tracked is set, so
-// nothing on its read path consults one. Python behaves the same way for
-// track_for_invalidation=False. Stated here because a caller reads this, not Key.Tracked.
-//
-// futureBuffer extends the watermark past now, which also suppresses write-back for that
-// window -- use it when the underlying data is still settling and a read during the window
-// could otherwise re-cache a value that is about to change again.
-//
-// That suppression is not durable, and the limit is worth knowing before relying on it. The
-// watermark is written with a plain SET, in this client and in Python's alike, so a LATER
-// invalidation carrying a smaller buffer lowers it: invalidate at t=0 with a 1h buffer, then
-// again at t=10m with none, and the watermark is t+10m -- a write at t=20m is fresh and a
-// tracked read serves it, though the first call asked for suppression until t+1h. Making the
-// update monotonic would need a compare-and-set on the Client interface and the same change
-// in Python, since a Go-only fix would just make the two clients disagree about one key.
+// language. futureBuffer suppresses writes during a settling window, but is NOT durable: a
+// later invalidation with a smaller buffer LOWERS the watermark (plain SET, not monotonic).
 func (c *Cache[V]) Invalidate(ctx context.Context, keyType, id string, futureBuffer time.Duration) error {
 	if keyType == "" || id == "" {
 		return errors.New("gcache: Invalidate requires both keyType and id")
@@ -397,22 +300,9 @@ func (c *Cache[V]) Invalidate(ctx context.Context, keyType, id string, futureBuf
 		// other bad argument here is rejected; this one hid.
 		return fmt.Errorf("gcache: futureBuffer %s is negative; it moves the watermark into the past", futureBuffer)
 	}
-	// The watermark must outlive every entry it suppresses, or the entry resurrects. An
-	// entry written just before the buffer elapses lives until futureBuffer+TTL from now,
-	// so that sum is the real ceiling -- the TTL check in New is this same invariant at
-	// futureBuffer=0. Refuse rather than clamp: a caller asking for a longer buffer wants
-	// suppression they would not actually get.
-	//
-	// c.ttl only bounds what THIS cache writes, and a watermark covers every use case under
-	// the key type. A cache configured with a longer TTL can still write an entry inside
-	// this buffer that outlives the watermark; Get's declared-lifetime guard catches it
-	// only past watermarkTTL, so the span above it stays open. See that guard.
-	//
-	// Compared rather than summed: futureBuffer+c.ttl overflows time.Duration for a large
-	// buffer, and an overflowed sum is NEGATIVE, so the guard inverted and accepted exactly
-	// what it exists to refuse. time.Duration(math.MaxInt64) passed on a 2h-TTL cache and
-	// wrote a watermark dated 2318 while the key itself still lived 4h. New caps c.ttl at
-	// watermarkTTL, so watermarkTTL-c.ttl cannot underflow.
+	// The watermark must outlive every entry it suppresses, so futureBuffer+TTL is the real
+	// ceiling. Compared rather than summed: the sum overflows time.Duration and comes out
+	// NEGATIVE -- time.Duration(math.MaxInt64) once passed on a 2h-TTL cache this way.
 	if futureBuffer > watermarkTTL-c.ttl {
 		return fmt.Errorf(
 			"gcache: futureBuffer %s plus TTL %s exceeds the %s watermark lifetime; an entry "+
@@ -428,10 +318,9 @@ func (c *Cache[V]) Invalidate(ctx context.Context, keyType, id string, futureBuf
 	// Decimal ASCII, matching what Python's redis-py writes for an int.
 	body := []byte(fmt.Sprintf("%d", expMs))
 
-	// Invalidation is scoped to a key type, not a use case -- it clears every use case
-	// under that id at once. Prefixing keeps the metric label one domain: key types are
-	// bare names ("session_id") and use cases are qualified ("Service::method"), so an
-	// unprefixed key type would read as just another use case in the same series.
+	// Invalidation is scoped to a key type, not a use case. Prefixing keeps the metric
+	// label one domain: key types are bare names ("session_id"), use cases are qualified
+	// ("Service::method"), and an unprefixed key type would collide with the latter.
 	label := "invalidate:" + keyType
 
 	start := c.now()
@@ -467,22 +356,9 @@ func (c *Cache[V]) recordErr(useCase, op string, err error) {
 	}
 }
 
-// fail records a degradation and logs it. Read paths funnel through here so that "the
-// cache broke" is always observable even though the caller only sees a miss.
-//
-// Caller termination is separated out and reaches ResultCancelled ONLY. It is not a cache
-// fault -- the client hung up, or its own deadline fired -- and counting it as one inflates
-// the error rate exactly when a service is shedding load.
-//
-// It is decided on the CALLER's context, not on the error. Get derives a child with
-// c.timeout, so a parent deadline that fires first surfaces as context.DeadlineExceeded --
-// byte-identical to the cache's own timeout. Inspecting the error alone cannot tell a
-// client that gave up from a Redis that did not answer.
-//
-// Everything else logs at Debug, not Warn. The Recorder already counts every one of these,
-// which is what alerting should read; the log line is for a human already looking. At the
-// ingest hot path's ~13 lookups/sec/pod, a Redis outage at Warn would emit 13 lines per
-// second per pod for the duration, drowning the logs that explain it.
+// fail records a degradation and logs it, so a broken cache stays observable though the
+// caller only sees a miss. Caller termination alone reaches ResultCancelled, decided on
+// the CALLER's context since Get's own timeout looks identical. Logged at Debug, not Warn: ingest's ~13 lookups/sec/pod would flood the logs at Warn during an outage.
 func (c *Cache[V]) fail(callerCtx context.Context, useCase, op string, err error) {
 	if callerCtx != nil && callerCtx.Err() != nil {
 		c.record(useCase, ResultCancelled)

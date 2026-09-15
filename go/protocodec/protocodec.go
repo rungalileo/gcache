@@ -1,7 +1,6 @@
-// Package protocodec provides a gcache.Codec for generated protobuf messages.
-//
-// Separate package so google.golang.org/protobuf stays out of gcache's core import
-// graph: a caller holding a plain struct should not link a protobuf runtime.
+// Package protocodec provides a gcache.Codec for generated protobuf messages, kept
+// separate so google.golang.org/protobuf stays out of gcache's core import graph -- a
+// caller holding a plain struct should not link a protobuf runtime.
 package protocodec
 
 import (
@@ -17,11 +16,9 @@ import (
 // than at each call site. Python's counterparts
 // are preserving_proto_field_name=True and ignore_unknown_fields=True.
 var (
-	// snake_case, so the two languages write ONE wire form. Both protojson readers
-	// accept either spelling, so this is not about the other side failing -- it is the
-	// writers that differ by default. The value has readers that are not protojson
-	// implementations at all (a Lua script using cjson inside Redis, jq, a dashboard
-	// query); those see raw keys with no field-name mapping.
+	// snake_case, so the two languages write ONE wire form -- not about a reader failing
+	// (protojson accepts either spelling), but about readers that are not protojson at all
+	// (cjson in a Redis Lua script, jq, a dashboard query) needing one fixed key.
 	marshalOptions = protojson.MarshalOptions{UseProtoNames: true}
 
 	// Tolerate a field a newer writer added. Default is to error, which during a
@@ -30,11 +27,8 @@ var (
 	unmarshalOptions = protojson.UnmarshalOptions{DiscardUnknown: true}
 )
 
-// ProtoJSON returns a Codec that stores M as protojson.
-//
-// M is the pointer type of a generated message, e.g.
-//
-//	protocodec.ProtoJSON[*cachev1.SessionIdentity]()
+// ProtoJSON returns a Codec that stores M as protojson. M is the pointer type of a
+// generated message, e.g. protocodec.ProtoJSON[*cachev1.SessionIdentity]().
 func ProtoJSON[M proto.Message]() gcache.Codec[M] { return protoJSONCodec[M]{} }
 
 type protoJSONCodec[M proto.Message] struct{}

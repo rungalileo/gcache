@@ -1,15 +1,8 @@
 name: Cross-language conformance
 
-# DELIBERATELY UNFILTERED. Every other workflow here is scoped to its own language's paths;
-# this one runs on everything, because it is the only job that asserts the Python, TypeScript
-# and Go clients agree on the wire.
-#
-# Path-filtering it would recreate exactly the hole this repo closed by bringing the Go client
-# in: parity asserted by hand-mirrored literals in suites that ran separately -- and, until
-# recently, in separate repositories, where nothing could run both sides. Five cross-language
-# claims went silently false in a single afternoon under that arrangement.
-#
-# So: a change to any language, or to the shared fixture, runs all three suites.
+# DELIBERATELY UNFILTERED: the only job asserting the three clients agree on the wire.
+# Filtering it would restore the hole that let five cross-language claims go silently false
+# in one afternoon.
 on:
   push:
   pull_request:
@@ -78,23 +71,9 @@ jobs:
       - name: All three conformance suites
         run: inv test-conformance
 
-      # The property that makes the fixture worth having: a changed vector must fail EVERY
-      # suite. If only some fail, the ones that passed are not really reading the file.
-      # Asserted here rather than trusted, because it is the one check that cannot be
-      # verified by reading the suites.
-      #
-      # Three things this step learned the hard way, all of which made it report a FALSE
-      # cause before they were fixed:
-      #
-      #   1. `go test` CACHES. The step above runs the same suite against the UNMUTATED
-      #      fixture, so a bare `go test` here returns `ok (cached)` and Go looks like the
-      #      client that is not reading the file. Hence -count=1. This is not hypothetical:
-      #      it is what the first run of this workflow actually reported.
-      #   2. A mutation that silently no-ops (vector renamed, key renamed) makes all three
-      #      suites pass and the step blames the suites. So the mutation asserts it landed.
-      #   3. Discarding each suite's output means knowing only the COUNT that failed, not
-      #      WHICH -- and the count alone cannot distinguish "TS is not reading the file"
-      #      from "TS was cached". So each suite's outcome is named.
+      # A changed vector must fail EVERY suite; if one passes it is not reading the file.
+      # -count=1 is required (go caches, and the step above warms it with the UNMUTATED
+      # fixture), the mutation asserts it landed, and each suite's outcome is named.
       - name: Prove the fixture binds all three clients
         run: |
           set -e
@@ -123,18 +102,9 @@ jobs:
           missed=""
           unrelated=""
           MUTATED_VECTOR=fractional-expires
-          # A non-zero exit is NOT proof the client read the mutated vector. A collection
-          # error, a missing dependency or an unrelated assertion all exit non-zero too, and
-          # counting those as detection is the same false green this step exists to rule
-          # out -- one level further in. So the outcome is three-way, and only the middle
-          # case counts:
-          #
-          #   exit 0                          -> MISSED: the client did not read the vector
-          #   non-zero AND names the vector   -> DETECTED
-          #   non-zero and does NOT name it   -> UNRELATED failure, fails the step outright
-          #
-          # All three suites name the failing vector in their output, verified by running
-          # each against this exact mutation.
+          # A non-zero exit is NOT proof the client read the mutated vector -- a collection
+          # error exits non-zero too. Three-way: exit 0 = MISSED, non-zero + names the
+          # vector = DETECTED, non-zero without naming it = UNRELATED and fails the step.
           run_suite() {
             name="$1"; shift
             if "$@" >"/tmp/$name.log" 2>&1; then

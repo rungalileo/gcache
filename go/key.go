@@ -1,9 +1,5 @@
-// Package gcache is a Go client for the Redis cache protocol used by Galileo's Python
-// gcache library (github.com/rungalileo/gcache) and its TypeScript port.
-//
-// It deliberately speaks the same wire protocol rather than inventing another one, so a
-// value written by any of the three languages is readable by the others and an
-// invalidation issued by any of them is honoured by all. The protocol is:
+// Package gcache is a Go client for the Redis cache protocol shared with Galileo's Python
+// gcache and its TypeScript port, so any of the three honours the others' entries:
 //
 //	value key      {<urn_prefix>:<key_type>:<id>}[?k1=v1&k2=v2]#<use_case>
 //	watermark key  {<urn_prefix>:<key_type>:<id>}#watermark
@@ -13,18 +9,9 @@
 //	write       SETEX <value key> <ttl_sec> <envelope>
 //	invalidate  SETEX <watermark key> 14400 <now_ms + future_buffer_ms>
 //
-// The braces wrap urn_prefix:key_type:id only. Args and #use_case sit outside them, which
-// is what keeps a value and its watermark in the same Redis Cluster hash slot so the MGET
-// is legal. Timestamps are Unix epoch milliseconds, wall clock.
-//
-// # Payload encoding
-//
-// The protocol frames a payload but says nothing about its contents; that is
-// Options.Codec, defaulting to encoding/json. The envelope does NOT record which codec
-// wrote a value, so readers and writers of a use case must agree out of band -- a
-// mismatch does not error, it decodes to a zero value that looks like a hit. For a
-// payload shared with another language use subpackage protocodec with a generated type
-// (libs/proto/cache), which makes the agreement testable.
+// Braces cover urn_prefix:key_type:id only, so a value and its watermark share one Cluster
+// hash slot and the MGET is legal. Timestamps are epoch ms. Options.Codec handles the
+// payload and the envelope does not record it, so a mismatch decodes to a zero value.
 package gcache
 
 import (
@@ -45,12 +32,9 @@ type Arg struct {
 	Value string
 }
 
-// Key identifies one cache entry.
-//
-// KeyType is the invalidation namespace: watermarks are keyed by (key_type, id) and carry
-// neither the use case nor the args, so every entry sharing a KeyType and ID is
-// invalidated together. It must match the Python side's KeyTypes.<member>.name exactly, or
-// an invalidation from one language silently fails to reach the other's entry.
+// Key identifies one cache entry. KeyType is the invalidation namespace -- watermarks are
+// keyed by (key_type, id) only, so every entry sharing both is invalidated together -- and
+// must match Python's KeyTypes.<member>.name exactly, or an invalidation silently misses.
 type Key struct {
 	KeyType string
 	ID      string
@@ -63,31 +47,9 @@ type Key struct {
 	Tracked bool
 }
 
-// No component is escaped or rejected for carrying the grammar's own delimiters, and that
-// is deliberate: Python interpolates these with bare f-strings, so escaping or refusing
-// here would make Go unable to read entries that exist in production today. The fixture at
-// key_test.go:69 pins ids holding '?', '&' and '=' that were scanned out of a live Redis.
-//
-// The cost is one ambiguity, and it is narrower than it first looks. It needs an UNTRACKED
-// key that ALSO passes args:
-//
-//	Key{KeyType: "external_id", ID: "a?b=1", UseCase: "Svc::m"}                        // untracked
-//	Key{KeyType: "external_id", ID: "a", UseCase: "Svc::m", Args: []Arg{{"b", "1"}}}   // untracked
-//
-// both render urn:galileo:acme:external_id:a?b=1#Svc::m, so two lookups share one entry.
-// For a TRACKED key the closing brace lands between the id and the args, which separates
-// them: {...:a?b=1}#Svc::m versus {...:a}?b=1#Svc::m. Verified both ways.
-//
-// It cannot escalate beyond that. A crafted id cannot forge a watermark key, because the
-// use case is appended last and the urn can therefore never END in "#watermark" (and
-// Validate rejects that use case outright). It cannot cross a tenant either, since the urn
-// prefix carries the customer name, nor shift a project or run boundary, since those are
-// fixed-width 36-character UUIDs containing no colon -- a crafted id only ever extends the
-// tail.
-//
-// Closing it properly means unifying encoding across all three clients, which the
-// TypeScript port already does differently (it percent-encodes). That belongs in the
-// cross-client parity follow-up, not in one language.
+// No component is escaped, deliberately: Python interpolates these with bare f-strings, so
+// escaping here would make Go unable to read entries that exist in production (fixture at
+// key_test.go:69). The one gap -- an UNTRACKED key with args colliding with an id containing '?'/'=' -- cannot escalate to forge a watermark key or cross a tenant.
 
 // Validate reports why a Key cannot be used, or nil.
 func (k Key) Validate() error {
@@ -104,12 +66,9 @@ func (k Key) Validate() error {
 	return nil
 }
 
-// prefix renders `{urn:key_type:id}` (or the unbraced form when untracked).
-//
-// Note there is no escaping of any component. That is not an oversight: Python builds this
-// with bare f-string interpolation, so any escaping here would produce keys that Python
-// cannot find. (The TypeScript port percent-encodes and is, for that reason, already
-// incompatible with Python.)
+// prefix renders `{urn:key_type:id}` (or the unbraced form when untracked). No component
+// is escaped, deliberately: Python builds this with bare f-string interpolation, so
+// escaping here would produce keys Python can't find. (TypeScript percent-encodes instead.)
 func prefix(urnPrefix string, k Key) string {
 	var b strings.Builder
 	if k.Tracked {
@@ -136,11 +95,9 @@ func ValueKey(urnPrefix string, k Key) string {
 	if len(k.Args) > 0 {
 		args := make([]Arg, len(k.Args))
 		copy(args, k.Args)
-		// Byte-ordinal by name, matching Python's default string sort. (The TypeScript
-		// port uses localeCompare, which differs for non-ASCII names.)
-		//
-		// Stable, because Python's list.sort is: two args sharing a name must render in
-		// input order in both languages or the same call builds a different key in each.
+		// Byte-ordinal by name, matching Python's default string sort (TypeScript's
+		// localeCompare differs for non-ASCII names). Stable, matching Python's list.sort:
+		// two args sharing a name must render in input order in both languages.
 		sort.SliceStable(args, func(i, j int) bool { return args[i].Name < args[j].Name })
 
 		for i, a := range args {
@@ -160,12 +117,9 @@ func ValueKey(urnPrefix string, k Key) string {
 	return b.String()
 }
 
-// WatermarkKey renders the invalidation watermark key for (key_type, id).
-//
-// It always uses the braced form regardless of Key.Tracked, matching Python's invalidate(),
-// which builds the braced key unconditionally -- it simply only ever lands on tracked keys.
-// The watermark carries no use case and no args: (key_type, id) is the invalidation
-// namespace.
+// WatermarkKey renders the invalidation watermark key for (key_type, id). Always uses the
+// braced form regardless of Key.Tracked, matching Python's invalidate(); the watermark
+// carries no use case and no args, since (key_type, id) is the whole invalidation namespace.
 func WatermarkKey(urnPrefix, keyType, id string) string {
 	var b strings.Builder
 	b.WriteByte('{')

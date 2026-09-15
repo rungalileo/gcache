@@ -10,22 +10,13 @@ import (
 )
 
 // descriptorpb is the sample message because it ships with the protobuf runtime (no
-// coupling to a Galileo schema) and has real multi-word fields. The well-known types
-// mostly do not, and Timestamp/Struct/Value have bespoke JSON forms that would hide the
-// field naming being asserted here.
+// coupling to a Galileo schema) and has real multi-word fields; the well-known types
+// mostly lack these, and some have bespoke JSON forms that would hide the field naming asserted here.
 
 func TestMarshalUsesSnakeCaseFieldNames(t *testing.T) {
-	// The cross-language contract in one assertion. protojson's default is
-	// lowerCamelCase, so without UseProtoNames Go would write {"sessionId":...} where
-	// Python writes {"session_id":...}. Both readers accept either, so the cost is not a
-	// failed read -- it is two wire forms for one key, which makes the conformance
-	// fixture's exact keys unpinnable and breaks every reader that is not a protojson
-	// implementation (cjson in a Redis Lua script, jq, a dashboard query).
-	//
-	// Assert the decoded KEY SET, not raw bytes: protojson appends a random extra space
-	// after each comma, decided per binary build (internal/detrand). A byte assertion
-	// would pass or fail by build, and only for messages with 2+ fields -- solid on a
-	// one-field message, flaky on the real payload.
+	// The cross-language contract in one assertion: without UseProtoNames Go would write
+	// {"sessionId":...} where Python writes {"session_id":...}. Assert the decoded KEY SET,
+	// not raw bytes: protojson randomizes spacing per build (internal/detrand), flaky on 2+ fields.
 	c := ProtoJSON[*descriptorpb.FileOptions]()
 	got, err := c.Marshal(&descriptorpb.FileOptions{
 		GoPackage:   strptr("example/v1"),
@@ -103,15 +94,9 @@ func TestRoundTripThroughTheCodec(t *testing.T) {
 func strptr(s string) *string { return &s }
 
 func TestUnmarshalAcceptsTheLowerCamelCaseSpellingToo(t *testing.T) {
-	// The snake_case contract binds WRITERS. A Python caller that forgets
-	// preserving_proto_field_name=True emits the lowerCamelCase spelling, and this reader
-	// must still understand it. Verified against both runtimes: Go's protojson and
-	// Python's json_format each accept either spelling, and a mixture of the two.
-	//
-	// Worth pinning rather than trusting the claim, because the failure would be silent.
-	// UnmarshalOptions.DiscardUnknown drops an unrecognised field, so a spelling this
-	// reader did not accept would yield a zero-valued message that Cache.Get reports as a
-	// hit -- not a decode error.
+	// The snake_case contract binds WRITERS, not readers: a Python caller forgetting
+	// preserving_proto_field_name=True emits lowerCamelCase, and this reader must still
+	// accept it. Worth pinning: DiscardUnknown would otherwise silently yield a hit instead of a decode error.
 	c := ProtoJSON[*descriptorpb.FileOptions]()
 
 	for _, body := range []string{

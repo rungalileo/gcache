@@ -1,14 +1,7 @@
 """The README's metric label table must match what metrics.py actually declares.
 
-Written because the table had drifted and nothing could notice. It listed `reason` as the
-only label on `gcache_degraded_read_counter` (there are four), omitted `layer` from three
-histograms and `operation` from one, and asserted in prose that "all metrics include
-`use_case` and `key_type`" -- which was false for `gcache_invalidation_counter`, the one
-metric that carries neither a use case nor a way to join one.
-
-That class of error is worse than an ordinary stale comment: a PromQL query written against
-a label a metric does not have returns an empty result rather than an error, so the dashboard
-reads as "no degraded reads" instead of "your query is wrong".
+A stale label makes a PromQL query return an empty result, not an error -- it reads as
+"no degraded reads" instead of "your query is wrong".
 """
 
 import re
@@ -40,10 +33,8 @@ def _documented_types() -> dict[str, str]:
 def _declared_types() -> dict[str, str]:
     """Counter vs Histogram, as metrics.py actually constructs them.
 
-    The Type column was previously consumed by the row regex and thrown away, so swapping
-    Counter for Histogram in the table left every test here passing. A reader who trusts a
-    wrong type writes `rate(...)` over a histogram, or `histogram_quantile` over a counter,
-    and gets a plausible-looking wrong number rather than an error.
+    A wrong type here means `rate()` on a histogram or `histogram_quantile()` on a counter --
+    a plausible wrong number, not an error.
     """
     src = (_ROOT / "src/gcache/_internal/metrics.py").read_text()
     pairs = re.findall(r'= (Counter|Histogram)\(\s*\n\s*name=prefix \+ "([a-z_]+)"', src)
@@ -83,10 +74,8 @@ def test_documented_types_match_the_declarations() -> None:
 def _reason_list_for(metric: str) -> str:
     """Just the dedicated `reason` sentence for one metric, not the whole README.
 
-    Searching the entire file was the original bug here: `undecodable` also appears in the
-    alerting prose, so deleting it from this counter's list still passed. An assertion that
-    cannot distinguish "documented in the right place" from "the token occurs somewhere" is
-    not checking what it claims.
+    Matching the whole file is wrong: `undecodable` also appears in unrelated prose, so
+    removing it from this counter's list would still pass.
     """
     readme = (_ROOT / "README.md").read_text()
     match = re.search(rf"`{metric}`: ((?:[^\n]*\n)*?[^\n]*\.)\n", readme)

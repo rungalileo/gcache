@@ -51,13 +51,9 @@ ENVELOPE_VERSION = 1
 
 # Envelope timestamps are int64 milliseconds, matching the Go client. See decode().
 _INT64_MAX = 2**63 - 1
-# The largest integer a JSON number survives a round trip through. JavaScript has only
-# doubles, so JSON.parse rounds anything above this -- 9007199254740993 becomes
-# ...992 -- and Go's decodeEnvelope reads the field into a float64 and does the same.
-# Python's json.loads gives an exact int, so Python was the ONLY client reading these
-# values correctly, and the three then compared different numbers against the same
-# threshold with no error anywhere. Envelope timestamps are bounded here so all three
-# agree; see the comment at the bound for why the WATERMARK deliberately is not.
+# 2^53-1: above it JSON.parse and Go's float64 both round (9007199254740993 -> ...992)
+# while Python's json.loads stays exact, so the three compared different numbers against
+# the same threshold. Envelope timestamps are bounded here; the watermark deliberately is not.
 _MAX_SAFE_INTEGER = 2**53 - 1
 _MIN_SAFE_INTEGER = -(2**53 - 1)
 _INT64_MIN = -(2**63)
@@ -113,17 +109,9 @@ def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes
         encoding = "utf8"
         body = payload
 
-    # The WRITER has to honour the same bound as the reader, or it produces entries it cannot
-    # read back. Tightening decode() to the safe-integer range without this left a
-    # self-inflicted permanent miss reachable from configuration alone: a large enough
-    # ttl_sec drives created_at_ms + ttl_sec*1000 past 2^53, the write succeeds, and every
-    # subsequent read -- in any of the three clients -- rejects it as out of range. The entry
-    # is then rewritten on each read and rejected again, forever.
-    #
-    # Raising rather than clamping. A clamped expiry silently means something different from
-    # what the caller configured, and gcache swallows write errors by design (the caller
-    # still gets its value from the fallback), so refusing to store an unreadable entry costs
-    # nothing and stores nothing wrong. Same posture as Envelope.JSON without a serializer.
+    # The writer honours the reader's bound, or a large ttl_sec pushes expiresAtMs past
+    # 2^53 and every subsequent read rejects it -- rewritten and rejected forever.
+    # Raising, not clamping: a clamp silently changes the configured TTL.
     expires_at_ms = created_at_ms + ttl_sec * 1000
     for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
         if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):
@@ -163,31 +151,10 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
     if not data:
         raise EnvelopeDecodeError("empty value")
 
-    # A client built with decode_responses=True hands back str, not bytes. Both sniff
-    # tests below then fail silently -- `data[0] == 0x80` is False for a one-char str and
-    # `data[0:1] == b"{"` is False too -- and control reached the unrecognized-leading-byte
-    # error, whose f"{data[0]:#04x}" raised ValueError. That escaped this function's
-    # one-exception contract, so CacheController logged an error and never wrote back: the
-    # entry stayed unreadable for its whole TTL, gcache_degraded_read_counter never moved,
-    # and every read re-ran the fallback.
-    #
-    # Encoded rather than rejected, because a str is a legitimate transport form of the
-    # same JSON text and decode_responses=True is an established pattern in the consuming
-    # repo (services/api's AssistantService builds its client that way). The pickle branch
-    # is unreachable from a str by construction -- a pickle blob is not valid UTF-8, so
-    # redis-py could not have handed one back as str in the first place.
-    #
-    # That last sentence is also the constraint, so do not read this as making the option
-    # safe in general: one GCache uses one client for every use case, and decode_responses
-    # applies to every reply. A pickle use case sharing that client gets UnicodeDecodeError
-    # out of client.get -- raised inside redis-py, before any guard here -- and does NOT
-    # heal, because a rewrite would fail the same way on the next read. Accepting a str
-    # made JSON work under the option, which is precisely what made that reachable.
-    # And "every use case is Envelope.JSON" is NOT the sufficient condition it looks like:
-    # this function sniffs the framing rather than trusting the declaration, so a JSON key is
-    # expected to meet legacy pickle values mid-migration, and those reads fail at the client
-    # too. The real condition is that no pickle value can be reached on that client at all.
-    # RedisCache._warn_once_if_text_mode warns on the first read of ANY key for that reason.
+    # decode_responses=True hands back str, which failed both sniffs silently and then
+    # raised ValueError out of this function's one-exception contract. Encoded, not
+    # rejected -- but this does NOT make that option safe: a pickle value on the same
+    # client still raises inside redis-py and never heals (_warn_once_if_text_mode).
     if isinstance(data, str):
         data = data.encode("utf-8")
 
@@ -230,86 +197,37 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
             for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
                 if isinstance(value, bool) or not isinstance(value, int | float):
                     raise EnvelopeDecodeError(f"{field} must be a number, got {type(value).__name__}")
-                # Must be representable as a double, which is what the other two clients
-                # can hold. JSON.parse maps an out-of-range integer LITERAL to Infinity, so
-                # parseEnvelope's Number.isFinite check rejects it; Python's int is
-                # arbitrary-precision and accepted a 401-digit value happily. That entry
-                # then never looks expired and `watermark_ms >= created_at_ms` can never be
-                # true, so no invalidation can ever reach it -- while TypeScript calls the
-                # same bytes a miss.
-                #
-                # float() rather than math.isfinite: isfinite raises OverflowError on a
-                # very large int, escaping this function's contract of raising only
-                # EnvelopeDecodeError. float() fails on exactly the values JSON.parse
-                # cannot represent, which is the line we need to match.
+                # Double-representable, or a 401-digit value never looks expired and no
+                # invalidation can reach it while TypeScript calls the same bytes a miss.
+                # float() not math.isfinite: isfinite raises OverflowError on a large int.
                 try:
                     as_double = float(value)
                 except OverflowError as exc:
                     raise EnvelopeDecodeError(f"{field} exceeds a double, got {value!r}") from exc
                 if not math.isfinite(as_double):
                     raise EnvelopeDecodeError(f"{field} must be finite, got {value!r}")
-                # Integral, not just numeric. A fractional timestamp is out of spec -- every
-                # writer emits integer milliseconds (Python's encode_json, Go, and
-                # TypeScript's Date.now()) -- and rounding it cannot make the clients agree,
-                # only make them disagree differently.
-                #
-                # This branch previously floored. The magnitude of that divergence is under
-                # 1ms, which sounds ignorable and is not: both readers compare the value
-                # against a THRESHOLD, so a sub-millisecond difference flips a boolean.
-                # expiresAtMs=1000.9 at now=1000 is expired in Python (floor -> 1000 <= 1000)
-                # and a hit in TypeScript (1000.9 <= 1000 is false). Same bytes, opposite
-                # answers. Rejecting is the only outcome where the two agree, and it costs
-                # nothing real: the entry becomes a degraded read, gets rewritten with
-                # integers, and heals. packages/gcache-ts/src/internal/redis-cache.ts
-                # rejects it too, in parseEnvelope, for the same reason.
+                # Integral, not just numeric. Sub-1ms sounds ignorable but both readers
+                # compare against a THRESHOLD: expiresAtMs=1000.9 at now=1000 is expired in
+                # Python (floored) and a hit in TypeScript. Rejecting is the only agreement.
                 if not as_double.is_integer():
                     raise EnvelopeDecodeError(f"{field} must be a whole number of milliseconds, got {value!r}")
-                # Also bounded to int64, which is stricter than the TypeScript reader's
-                # Number.isFinite. Double-representability is not enough: 1e300 passed the
-                # check above and kept an exact 301-digit int, and no real watermark can
-                # ever satisfy `watermark_ms >= created_at_ms` against that -- so the entry
-                # became permanent and immune to invalidation, which is the one thing the
-                # watermark exists to prevent. Same bound the Go client applies.
-                #
-                # Nothing legitimate is excluded: 2^53 milliseconds runs to year ~287396,
-                # and all three writers stamp Date.now()-scale values.
-                #
-                # The bound is the SAFE-INTEGER range, not int64, and the difference is not
-                # cosmetic. JavaScript has only doubles, so JSON.parse rounds above 2^53 --
-                # 9007199254740993 reads as ...992 -- and Go's decodeEnvelope takes the
-                # field into a float64 and rounds identically. Python's json.loads returns
-                # an exact int. So in the 2^53..int64 band every client ACCEPTED and then
-                # compared a different number against the staleness threshold, silently.
-                # That is worse than any of them missing: a miss heals on the next read, a
-                # disagreement does not announce itself at all. All three now stop at 2^53.
-                #
-                # The WATERMARK keeps the int64 bound on purpose, and the asymmetry is
-                # measured rather than inherited. _parse_watermark reaches its value through
-                # float(), not json.loads, so Python rounds there exactly as Go and
-                # JavaScript do -- 9007199254740993 -> ...992 in both languages. Python and
-                # Go already AGREE on the watermark above 2^53; tightening it would
-                # introduce a divergence instead of closing one. The two fields differ
-                # because they reach Python through two different parsers.
+                # Bounded to the SAFE-INTEGER range, not int64: in the 2^53..int64 band all
+                # three clients accepted and then compared DIFFERENT numbers, which never
+                # announces itself. The watermark keeps int64 because it reaches Python
+                # through float(), so Python and Go already agree there.
                 if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):
                     raise EnvelopeDecodeError(f"{field} is outside the safe-integer range, got {value!r}")
             encoding = envelope.get("encoding")
             if encoding == "base64":
-                # Normalize before decoding. Node's Buffer.from(x, "base64") accepts both
-                # the URL-safe alphabet ("a-_8") and unpadded input ("YWJjZGU"); Python
-                # rejects both. So a Go writer using base64.RawURLEncoding would make every
-                # Python read a miss-and-rewrite while the TypeScript reader kept hitting
-                # the same key. validate=True is kept, so a genuinely wrong alphabet still
-                # fails after the two URL-safe characters are mapped back.
+                # Normalize first: Node accepts the URL-safe alphabet and unpadded input,
+                # Python rejects both, so a RawURLEncoding writer would miss in Python and
+                # hit in TypeScript. validate=True still rejects a genuinely wrong alphabet.
                 normalized = payload.replace("-", "+").replace("_", "/")
                 payload = base64.b64decode(normalized + "=" * (-len(normalized) % 4), validate=True)
             elif encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")
-            # int(), and it cannot lose anything: the validation above rejected any
-            # non-integral value, so these are whole numbers already and the call only
-            # narrows float to int for DecodedValue's type. An earlier revision floored here
-            # instead, to make the rounding direction consistent by sign -- that was the
-            # wrong fix, because consistent rounding still disagrees with a reader that does
-            # not round. See the is_integer() check above.
+            # int() loses nothing -- the is_integer() check above already rejected any
+            # fractional value, so this only narrows float to int for DecodedValue.
             return DecodedValue(
                 created_at_ms=int(created_at_ms),
                 payload=payload,

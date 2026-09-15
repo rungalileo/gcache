@@ -160,6 +160,4 @@ cython_debug/
 #.idea/
 
 # Node / TypeScript
-node_modules/
-packages/*/dist/
 packages/*/coverage/

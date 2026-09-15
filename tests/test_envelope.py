@@ -892,8 +892,8 @@ def test_an_unreadable_watermark_suppresses_rather_than_serving() -> None:
     assert not (-(2**63) >= created_at_ms), "the minimum would serve it -- the bug I wrote"
 
     # And it must not trigger write-back: _exec_fallback re-puts only when
-    # watermark_ms < now, so the maximum leaves the stored value alone until the watermark
-    # key expires on its own TTL.
+    # watermark_ms < now, so the maximum leaves the stored value alone. Recovery therefore
+    # cannot come from the sentinel; get() deletes a non-numeric watermark instead.
     import time
 
     assert not (_WATERMARK_SUPPRESS_ALL < time.time() * 1e3)
@@ -922,7 +922,9 @@ async def test_get_does_not_raise_on_a_malformed_watermark() -> None:
     stored = encode_json(created_at_ms=1757308800123, ttl_sec=3600, payload='{"v":1}')
 
     for bad in (b"abc", b"", b"nan", b"inf", b"-inf", b"1e400"):
-        fake = MagicMock(mget=AsyncMock(return_value=[stored, bad]), setex=AsyncMock(), set=AsyncMock())
+        fake = MagicMock(
+            mget=AsyncMock(return_value=[stored, bad]), setex=AsyncMock(), set=AsyncMock(), delete=AsyncMock()
+        )
         cache = object.__new__(RedisCache)
 
         async def fallback() -> dict:
@@ -987,7 +989,7 @@ def test_decode_handles_a_str_from_decode_responses(as_str: bool) -> None:
 
 @pytest.mark.asyncio
 async def test_a_suppressing_watermark_records_a_degraded_read() -> None:
-    # Suppression never heals: hit rate sits at zero until the watermark key's own 4h TTL.
+    # A non-finite watermark never heals: hit rate sits at zero until its own 4h TTL.
     # Driven through RedisCache.get, not _parse_watermark alone, since the parser could be
     # correct and not wired in. Recorder is explicit: a legitimate clamp hits the same sentinel.
     from unittest.mock import AsyncMock, MagicMock, patch
@@ -1016,7 +1018,9 @@ async def test_a_suppressing_watermark_records_a_degraded_read() -> None:
         b"1e400": "non_finite_watermark",
     }
     for bad, reason in expected.items():
-        fake = MagicMock(mget=AsyncMock(return_value=[stored, bad]), setex=AsyncMock(), set=AsyncMock())
+        fake = MagicMock(
+            mget=AsyncMock(return_value=[stored, bad]), setex=AsyncMock(), set=AsyncMock(), delete=AsyncMock()
+        )
         cache = object.__new__(RedisCache)
         recorder = MagicMock()
         with (
@@ -1034,7 +1038,9 @@ async def test_a_suppressing_watermark_records_a_degraded_read() -> None:
     # A finite out-of-range watermark clamps to the SAME sentinel but is a real instruction,
     # not corruption, so it must not be counted. Without this the test would pass on a
     # recorder that fires unconditionally.
-    fake = MagicMock(mget=AsyncMock(return_value=[stored, b"1e300"]), setex=AsyncMock(), set=AsyncMock())
+    fake = MagicMock(
+        mget=AsyncMock(return_value=[stored, b"1e300"]), setex=AsyncMock(), set=AsyncMock(), delete=AsyncMock()
+    )
     cache = object.__new__(RedisCache)
     recorder = MagicMock()
     with (
@@ -1050,6 +1056,68 @@ async def test_a_suppressing_watermark_records_a_degraded_read() -> None:
     assert "unreadable_watermark" not in clamped and "non_finite_watermark" not in clamped, (
         f"a finite out-of-range watermark is an instruction, not corruption; got {clamped}"
     )
+
+
+@pytest.mark.asyncio
+async def test_a_non_numeric_watermark_is_deleted_so_the_next_read_heals() -> None:
+    # The suppress-all sentinel also stops write-back, so nothing repaired a garbage
+    # watermark: every read for that entity missed for up to the key's 4-hour TTL. Two reads,
+    # because a single one cannot tell "recovered" from "still suppressed".
+    #
+    # Deliberately NOT done for a non-finite watermark -- that parses as a number, so it is
+    # what a format this reader does not understand yet would look like, and deleting it
+    # would silently resurrect whatever the newer writer had invalidated. Asserted below,
+    # since a test of the delete alone would pass on an unconditional one.
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.metrics import GCacheMetrics
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        invalidation_tracking=True,
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    watermark_key = key.prefix + "#watermark"
+    fresh = encode_json(created_at_ms=int(time.time() * 1000), ttl_sec=3600, payload='{"v":"stored"}')
+
+    async def fallback() -> dict:
+        return {"v": "fresh"}
+
+    for bad, heals in ((b"oops", True), (b"", True), (b"nan", False), (b"-inf", False)):
+        store: dict[str, bytes] = {key.urn: fresh, watermark_key: bad}
+
+        async def mget(*keys: str, _store: dict[str, bytes] = store) -> list[bytes | None]:
+            return [_store.get(k) for k in keys]
+
+        async def delete(*keys: str, _store: dict[str, bytes] = store) -> int:
+            return sum(_store.pop(k, None) is not None for k in keys)
+
+        fake = MagicMock(
+            mget=AsyncMock(side_effect=mget),
+            setex=AsyncMock(),
+            set=AsyncMock(),
+            delete=AsyncMock(side_effect=delete),
+        )
+        cache = object.__new__(RedisCache)
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", MagicMock()),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            first = await RedisCache.get(cache, key, fallback)
+            second = await RedisCache.get(cache, key, fallback)
+
+        # The read that finds the bad watermark still fails CLOSED, either way.
+        assert first == {"v": "fresh"}, f"{bad!r} must suppress on the read that finds it"
+        assert (watermark_key not in store) is heals, f"{bad!r}: deleted={watermark_key not in store}"
+        assert second == ({"v": "stored"} if heals else {"v": "fresh"}), f"{bad!r} second read: {second}"
 
 
 @pytest.mark.asyncio

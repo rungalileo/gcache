@@ -68,8 +68,10 @@ someone tried to invalidate. Both wrong answers are the same wrong answer.
 
 It also stops write-back: _exec_fallback only re-puts when ``watermark_ms < now``, which
 the maximum never is. So an unreadable watermark yields a miss AND leaves the stored value
-alone until the watermark key expires on its own TTL, rather than overwriting a value whose
-suppression state we cannot read.
+alone, rather than overwriting a value whose suppression state we cannot read.
+
+That is why ``get`` deletes a NON-NUMERIC watermark after this read: otherwise the
+suppression stands for the key's remaining 4-hour TTL with nothing able to repair it.
 """
 
 
@@ -90,17 +92,19 @@ def _parse_watermark(raw: bytes | str | None, key: GCacheKey, record_degraded: C
     The shared key space is what makes those reachable: before this envelope work only
     Python wrote these keys. Go's parseWatermark has handled all three deliberately.
 
-    Unreadable fails closed -- see _WATERMARK_SUPPRESS_ALL. Out-of-range clamps, matching
+    Unreadable fails closed -- see _WATERMARK_SUPPRESS_ALL, and ``get`` deletes the
+    non-numeric case afterwards so the next read recovers. Out-of-range clamps, matching
     Go's clampToInt64: a watermark is a suppression instruction rather than data about the
     entry, so saturating gives the same answer the exact value would.
 
     ``record_degraded`` is passed in rather than inferred from the return value, because the
     return value cannot carry the distinction: a legitimate watermark above the int64
-    maximum clamps to exactly the _WATERMARK_SUPPRESS_ALL sentinel. Suppression is also the
-    one corruption path that neither heals nor expires quickly -- _exec_fallback skips the
-    rewrite (the sentinel is never below now), so the entity's hit rate sits at zero until
-    the watermark key's own 4-hour TTL runs out. A log line is not enough for a condition
-    with that blast radius, and a shared keyspace makes a foreign writer able to cause it.
+    maximum clamps to exactly the _WATERMARK_SUPPRESS_ALL sentinel. It is also the one
+    corruption path a rewrite cannot repair -- _exec_fallback skips it, since the sentinel is
+    never below now -- so on the non-finite branch, which ``get`` does not delete, the
+    entity's hit rate sits at zero until the watermark key's own 4-hour TTL runs out. A log
+    line is not enough for that blast radius, and a shared keyspace lets a foreign writer
+    cause it.
     """
     if raw is None:
         return None
@@ -217,9 +221,23 @@ class RedisCache(CacheInterface):
 
         watermark_ms = None
         if key.invalidation_tracking:
-            vals = await self.client.mget(key.urn, key.prefix + "#watermark")
+            watermark_key = key.prefix + "#watermark"
+            vals = await self.client.mget(key.urn, watermark_key)
             raw = vals[0]
-            watermark_ms = _parse_watermark(vals[1], key, lambda reason: self._record_degraded_read(key, reason))
+            degraded: list[str] = []
+
+            def record(reason: str) -> None:
+                degraded.append(reason)
+                self._record_degraded_read(key, reason)
+
+            watermark_ms = _parse_watermark(vals[1], key, record)
+
+            # Delete a NON-NUMERIC watermark so the next read caches again; nothing else
+            # repairs it, since the sentinel also stops write-back. Only this branch -- a
+            # non-finite value parses as a number, so deleting it could silently resurrect
+            # what a writer using a format we do not know yet had invalidated.
+            if "unreadable_watermark" in degraded:
+                await self.client.delete(watermark_key)
         else:
             raw = await self.client.get(key.urn)
         if raw is not None:

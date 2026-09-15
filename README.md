@@ -626,6 +626,11 @@ invalidation is keyed on
 `age_exceeds_watermark`, `unloadable_payload`, `unreadable_watermark`,
 `non_finite_watermark`.
 
+`unreadable_watermark` self-heals -- a watermark that is not a number at all is deleted, so
+the next read caches again. `non_finite_watermark` does not: `nan`/`inf` parse as numbers, so
+they could be a format this client does not understand yet, and every entry for that
+`(key_type, id)` stays suppressed until the watermark key's own 4-hour TTL expires.
+
 `gcache_disabled_counter`: `ramped_down`, `context`, `server_down`, `missing_config`,
 `config_error`.
 

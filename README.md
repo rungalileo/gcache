@@ -585,6 +585,17 @@ await gcache.ainvalidate(
 )
 ```
 
+### A watermark outlives the kill switch
+
+Ramping a use case to 0%, or leaving the `enable()` context, stops reads and writes but does
+**not** clear watermarks — an invalidation written just before the switch survives in Redis
+for the watermark key's own 4-hour TTL. Only `flushall()` or that TTL expiring removes it.
+
+It is usually harmless: the watermark suppresses entries created at or before it, so each
+affected entity costs one miss and then repopulates. `future_buffer_ms` is the case to know
+about — a watermark set in the future also blocks write-back (`_exec_fallback` re-puts only
+once the watermark is in the past), so those entities keep missing until the buffer elapses.
+
 ### Full Flush
 
 For testing or emergencies:

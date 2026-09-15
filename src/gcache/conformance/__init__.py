@@ -1,7 +1,7 @@
 """Cross-language conformance vectors for the gcache wire protocol.
 
 Read by all three implementations in this repo -- ``tests/test_conformance.py``,
-``packages/gcache-ts/test/gcache-conformance.test.ts`` and ``go/conformance_test.go`` -- and
+``go/conformance_test.go`` and ``go/conformance_test.go`` -- and
 shipped as package data so a consumer in ANOTHER repository can read the same vectors from an
 installed gcache rather than mirroring them.
 

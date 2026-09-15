@@ -21,8 +21,8 @@ from gcache.exceptions import JsonEnvelopeRequiresSerializer
 from tests.conftest import FakeCacheConfigProvider
 
 
-def test_encode_json_shape_matches_typescript_port() -> None:
-    # The TS port (packages/gcache-ts/src/internal/redis-cache.ts) already writes this
+def test_encode_json_shape_is_the_shared_wire_format() -> None:
+    # The Go client at go/envelope.go writes this
     # envelope. Python must produce the identical shape or the two silently diverge.
     raw = encode_json(created_at_ms=1_757_308_800_123, ttl_sec=60, payload='{"a":1}')
     assert json.loads(raw) == {
@@ -191,7 +191,7 @@ async def test_undecodable_value_degrades_to_a_miss(
         ({"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "rot13", "payload": "x"}, "unknown encoding"),
     ],
 )
-def test_decode_rejects_envelopes_the_typescript_reader_rejects(envelope: dict, reason: str) -> None:
+def test_decode_rejects_envelopes_the_go_reader_rejects(envelope: dict, reason: str) -> None:
     # The two readers must agree about the same bytes. Accepting these silently would hand
     # a caller a future writer's data, or a non-string payload that blows up downstream in
     # a way EnvelopeDecodeError cannot catch.
@@ -254,7 +254,7 @@ def test_json_envelope_without_a_serializer_is_rejected_at_decoration(gcache: GC
 
 
 @pytest.mark.asyncio
-async def test_json_serializer_reads_the_typescript_undefined_sentinel() -> None:
+async def test_json_serializer_reads_the_undefined_sentinel() -> None:
     # A TS writer caching `undefined` stores this sentinel; json.loads raises on it, and
     # that error escapes the caller's EnvelopeDecodeError guard, so the entry never heals.
     assert await JsonSerializer().load("__gcache_json_undefined_v1__") is None
@@ -402,7 +402,7 @@ async def test_a_bytes_payload_round_trips_through_the_cache(
 async def test_an_expired_envelope_is_a_miss_even_when_redis_still_serves_it(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # expiresAtMs and the Redis TTL can disagree (PERSIST, a longer TTL); the TypeScript
+    # expiresAtMs and the Redis TTL can disagree (PERSIST, a longer TTL); the Go
     # reader treats a past expiresAtMs as a miss, so ignoring it here made one key answer
     # differently per language.
     cache_config_provider.configs["expired_uc"] = GCacheKeyConfig.enabled(60)
@@ -586,7 +586,7 @@ def test_decode_rejects_a_timestamp_outside_the_safe_integer_range() -> None:
 
 
 def test_decode_rejects_an_integer_timestamp_past_a_double() -> None:
-    # JSON.parse maps an out-of-range integer literal to Infinity, so TypeScript's
+    # Go reads the field into a float64, so an out-of-range literal loses precision and its
     # Number.isFinite rejects it. Python's arbitrary-precision int accepted it, so the entry
     # never expired AND could never be invalidated -- one key, two answers.
     big = int("9" * 401)
@@ -617,7 +617,7 @@ def test_decode_rejects_a_string_timestamp(field: str) -> None:
 def test_decode_accepts_unpadded_base64() -> None:
     # Python rejects unpadded base64 where Buffer.from(..., "base64") accepts it, so a
     # writer using a raw encoder would make every Python read a miss-and-rewrite while the
-    # TypeScript reader kept hitting the same key.
+    # Go reader kept hitting the same key.
     raw = json.dumps(
         {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "base64", "payload": "YWJjZGU"}
     ).encode()
@@ -627,7 +627,7 @@ def test_decode_accepts_unpadded_base64() -> None:
 def test_decode_accepts_the_url_safe_base64_alphabet() -> None:
     # Node's Buffer.from(x, "base64") accepts "-" and "_"; Python's b64decode rejects them,
     # which would make a Go writer using base64.RawURLEncoding a miss-and-rewrite for
-    # Python while TypeScript kept hitting the same key.
+    # Python while Go kept hitting the same key.
     payload = base64.urlsafe_b64encode(b"\xf8\xff\xfe binary").decode().rstrip("=")
     assert "-" in payload or "_" in payload, f"fixture must exercise the URL-safe chars: {payload}"
     raw = json.dumps(
@@ -805,7 +805,7 @@ async def test_json_serializer_refuses_nan_and_infinity() -> None:
 
 def test_envelope_rejects_a_boolean_version() -> None:
     # isinstance(True, int) and True == 1, so `"version": true` satisfied
-    # `!= ENVELOPE_VERSION` and was accepted. The TypeScript reader's `!== 1` rejects it
+    # `!= ENVELOPE_VERSION` and was accepted. The Go reader's typed unmarshal rejects it
     # and Go's *int unmarshal fails on it, so Python was the only client calling it a hit.
     from gcache._internal.envelope import EnvelopeDecodeError, decode
 
@@ -1170,31 +1170,7 @@ def test_an_empty_urn_prefix_is_rejected_because_it_cannot_interoperate() -> Non
     # It is a ValueError too, so an existing `except ValueError` around construction still
     # catches it.
     assert issubclass(EmptyUrnPrefixNotSupported, ValueError)
-    assert "TypeScript" in str(EmptyUrnPrefixNotSupported()), "the message must say why, not just no"
-
-
-def test_the_typescript_client_really_does_render_a_leading_colon() -> None:
-    # The claim the rejection rests on, checked against the TS source rather than assumed --
-    # if joinUrnComponents skipped an empty component there would be nothing to reject.
-    import pathlib
-
-    key_ts = pathlib.Path(__file__).parent.parent / "packages" / "gcache-ts" / "src" / "key.ts"
-    src = key_ts.read_text()
-    assert 'components.map(encodeComponent).join(":")' in src, (
-        "TS joins urn components unconditionally, which is why an empty prefix yields ':kt:id' "
-        "where Python yields 'kt:id'. If this line changed, re-derive the rejection."
-    )
-    # And the Python half, so the divergence is pinned from both sides in one place.
-    from gcache._internal.state import _GLOBAL_GCACHE_STATE
-    from gcache.config import render_prefix
-
-    original = _GLOBAL_GCACHE_STATE.urn_prefix
-    try:
-        _GLOBAL_GCACHE_STATE.urn_prefix = ""
-        assert render_prefix("kt", "i", tracked=False) == "kt:i"
-        assert ["", "kt", "i"] and ":".join(["", "kt", "i"]) == ":kt:i", "what TS would produce"
-    finally:
-        _GLOBAL_GCACHE_STATE.urn_prefix = original
+    assert "never hits" in str(EmptyUrnPrefixNotSupported()), "the message must say why, not just no"
 
 
 def test_global_state_is_not_published_before_validation() -> None:

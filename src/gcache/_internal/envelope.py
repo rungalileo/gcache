@@ -6,8 +6,7 @@ callers -- it serializes arbitrary objects -- but it is unreadable from other la
 couples readers to this module's private class path, and executes arbitrary code on load.
 
 ``Envelope.JSON`` is an opt-in alternative for keys that are shared with non-Python
-readers. It uses the same envelope the TypeScript port already writes
-(``packages/gcache-ts/src/internal/redis-cache.ts``), so Python, TypeScript and Go agree
+readers. Python and the Go client at ``go/`` write and read the same envelope, so both agree
 on one wire format.
 
 It also makes an entry readable *inside Redis*, which pickle can never be. Redis ships
@@ -21,7 +20,7 @@ There is no Lua unpickler, so a pickled entry is opaque to the server no matter 
 That forecloses server-side atomic operations on cached values -- a compare-and-set that
 only overwrites when the incoming record is newer, say -- which a JSON envelope leaves
 available. (``cmsgpack`` is built in too, and is ~25% more compact; JSON wins here on
-being what the TypeScript port already emits and on being readable straight out of
+being readable straight out of
 ``redis-cli``.)
 
 Reads sniff the first byte rather than trusting the declared envelope, so a reader
@@ -100,7 +99,7 @@ def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes
 
     ``payload`` must already be serialized -- the JSON envelope carries a string, so keys
     using it need a ``Serializer`` (``JsonSerializer`` by default). ``bytes`` payloads are
-    base64-encoded and flagged via ``encoding``, matching the TypeScript port.
+    base64-encoded and flagged via ``encoding``.
     """
     if isinstance(payload, bytes):
         encoding = "base64"
@@ -176,12 +175,12 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
     if data[0:1] == b"{":
         try:
             envelope = json.loads(data)
-            # Validate the same three fields the TypeScript reader validates. Skipping them
+            # Validate the same three fields the Go reader validates. Skipping them
             # makes the two readers disagree about the same bytes -- the version field in
             # particular exists precisely to turn a future writer's data into a miss.
             version = envelope.get("version")
             # isinstance(True, int) and True == 1, so a bare `"version": true` satisfied
-            # `!= ENVELOPE_VERSION` and was ACCEPTED here, while the TypeScript reader's
+            # `!= ENVELOPE_VERSION` and was ACCEPTED here, while the Go reader's
             # `parsed.version !== 1` rejects it and Go's *int unmarshal fails on it. Python
             # was the only client answering hit for those bytes.
             if isinstance(version, bool) or version != ENVELOPE_VERSION:
@@ -190,7 +189,7 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
             if not isinstance(payload, str):
                 raise EnvelopeDecodeError(f"payload must be a string, got {type(payload).__name__}")
             # Both timestamps must be real numbers, as parseEnvelope requires. int("5")
-            # would otherwise accept a string where the TypeScript reader rejects it, so the
+            # would otherwise accept a string where the Go reader rejects it, so the
             # two would disagree about the same bytes.
             created_at_ms = envelope["createdAtMs"]
             expires_at_ms = envelope["expiresAtMs"]
@@ -198,7 +197,7 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                 if isinstance(value, bool) or not isinstance(value, int | float):
                     raise EnvelopeDecodeError(f"{field} must be a number, got {type(value).__name__}")
                 # Double-representable, or a 401-digit value never looks expired and no
-                # invalidation can reach it while TypeScript calls the same bytes a miss.
+                # invalidation can reach it while Go calls the same bytes a miss.
                 # float() not math.isfinite: isfinite raises OverflowError on a large int.
                 try:
                     as_double = float(value)
@@ -208,7 +207,8 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                     raise EnvelopeDecodeError(f"{field} must be finite, got {value!r}")
                 # Integral, not just numeric. Sub-1ms sounds ignorable but both readers
                 # compare against a THRESHOLD: expiresAtMs=1000.9 at now=1000 is expired in
-                # Python (floored) and a hit in TypeScript. Rejecting is the only agreement.
+                # Python. Both clients reject it: rounding cannot make them agree, only
+                # disagree differently.
                 if not as_double.is_integer():
                     raise EnvelopeDecodeError(f"{field} must be a whole number of milliseconds, got {value!r}")
                 # Bounded to the SAFE-INTEGER range, not int64: in the 2^53..int64 band all
@@ -221,7 +221,8 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
             if encoding == "base64":
                 # Normalize first: Node accepts the URL-safe alphabet and unpadded input,
                 # Python rejects both, so a RawURLEncoding writer would miss in Python and
-                # hit in TypeScript. validate=True still rejects a genuinely wrong alphabet.
+                # Go normalizes too, so both accept. validate=True still rejects a
+                # genuinely wrong alphabet.
                 normalized = payload.replace("-", "+").replace("_", "/")
                 payload = base64.b64decode(normalized + "=" * (-len(normalized) % 4), validate=True)
             elif encoding != "utf8":

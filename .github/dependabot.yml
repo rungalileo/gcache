@@ -12,7 +12,7 @@ updates:
     schedule:
       interval: "monthly"
 
-  # The Go client. npm is deliberately absent for gcache-ts, which is unpublished; the Go
+  # The Go client. The
   # module IS consumed by a downstream service, so its dependencies are worth tracking.
   - package-ecosystem: "gomod"
     directory: "/go"

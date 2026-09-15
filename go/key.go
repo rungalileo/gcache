@@ -1,5 +1,5 @@
 // Package gcache is a Go client for the Redis cache protocol shared with Galileo's Python
-// gcache and its TypeScript port, so any of the three honours the others' entries:
+// gcache and its Python port, so any of the three honours the others' entries:
 //
 //	value key      {<urn_prefix>:<key_type>:<id>}[?k1=v1&k2=v2]#<use_case>
 //	watermark key  {<urn_prefix>:<key_type>:<id>}#watermark
@@ -68,7 +68,7 @@ func (k Key) Validate() error {
 
 // prefix renders `{urn:key_type:id}` (or the unbraced form when untracked). No component
 // is escaped, deliberately: Python builds this with bare f-string interpolation, so
-// escaping here would produce keys Python can't find. (TypeScript percent-encodes instead.)
+// escaping here would produce keys Python can't find. (Python percent-encodes instead.)
 func prefix(urnPrefix string, k Key) string {
 	var b strings.Builder
 	if k.Tracked {
@@ -95,7 +95,7 @@ func ValueKey(urnPrefix string, k Key) string {
 	if len(k.Args) > 0 {
 		args := make([]Arg, len(k.Args))
 		copy(args, k.Args)
-		// Byte-ordinal by name, matching Python's default string sort (TypeScript's
+		// Byte-ordinal by name, matching Python's default string sort (Python's
 		// localeCompare differs for non-ASCII names). Stable, matching Python's list.sort:
 		// two args sharing a name must render in input order in both languages.
 		sort.SliceStable(args, func(i, j int) bool { return args[i].Name < args[j].Name })

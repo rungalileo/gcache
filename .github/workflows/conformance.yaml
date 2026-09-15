@@ -1,13 +1,13 @@
 name: Cross-language conformance
 
-# DELIBERATELY UNFILTERED: the only job asserting the three clients agree on the wire.
+# DELIBERATELY UNFILTERED: the only job asserting the two clients agree on the wire.
 # Filtering it would restore the hole that let five cross-language claims go silently false
 # in one afternoon.
 on:
   push:
   pull_request:
 
-# Read-only. This job runs unpinned dependency code (poetry/pnpm/go installs), so the
+# Read-only. This job runs unpinned dependency code (poetry/go installs), so the
 # default repository token -- which may include contents: write -- is more than it needs.
 permissions:
   contents: read
@@ -39,15 +39,6 @@ jobs:
         with:
           python-version: "3.10"
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
       - name: Install
         # Through env rather than interpolated into the script -- see go-release.yaml.
         env:
@@ -56,7 +47,6 @@ jobs:
           pipx install "poetry==$POETRY_VERSION"
           pipx install invoke
           poetry install --with dev,test --no-root
-          pnpm install --frozen-lockfile
 
       # The Go↔Python suite builds gcachectl itself and drives it against the redislite
       # instance the Python fixtures start, so it needs the Go toolchain present. It SKIPS if
@@ -68,13 +58,13 @@ jobs:
             exit 1
           }
 
-      - name: All three conformance suites
+      - name: Both conformance suites
         run: inv test-conformance
 
-      # A changed vector must fail EVERY suite; if one passes it is not reading the file.
+      # A changed vector must fail BOTH suites; if one passes it is not reading the file.
       # -count=1 is required (go caches, and the step above warms it with the UNMUTATED
       # fixture), the mutation asserts it landed, and each suite's outcome is named.
-      - name: Prove the fixture binds all three clients
+      - name: Prove the fixture binds both clients
         run: |
           set -e
           F=src/gcache/conformance/envelope_vectors.json
@@ -127,9 +117,6 @@ jobs:
             unrelated="$unrelated $name"
           }
           run_suite python poetry run pytest tests/test_conformance.py -q
-          # The conformance FILE, not the whole vitest suite: a flake elsewhere among the 97
-          # tests would otherwise reach the classifier at all.
-          run_suite typescript pnpm --filter @rungalileo/gcache exec vitest run test/gcache-conformance.test.ts
           run_suite go go -C go test -count=1 -run TestConformance ./...
           cp /tmp/vectors.bak "$F"
           if [ -n "$unrelated" ]; then
@@ -137,9 +124,9 @@ jobs:
             exit 1
           fi
           echo "detected the mutation:$detected"
-          if [ "$fails" -ne 3 ]; then
+          if [ "$fails" -ne 2 ]; then
             echo "::error::mutated vector detected by$detected but NOT by$missed -- \
           that client is not reading the shared fixture, or its result was cached"
             exit 1
           fi
-          echo "all three suites detected the mutated vector"
+          echo "both suites detected the mutated vector"

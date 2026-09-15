@@ -100,44 +100,15 @@ def vet_go(ctx: Context) -> None:
 
 
 @task
-def test_ts(ctx: Context) -> None:
-    """
-    Run the TypeScript test suite.
-
-    Parameters
-    ----------
-    ctx : Context
-        Invoke context.
-    """
-    ctx.run("pnpm ts:gcache:test", **COMMON_PARAMS)
-
-
-@task
-def typecheck_ts(ctx: Context) -> None:
-    """
-    Type-check the TypeScript package.
-
-    Parameters
-    ----------
-    ctx : Context
-        Invoke context.
-    """
-    ctx.run("pnpm ts:gcache:typecheck", **COMMON_PARAMS)
-
-
-@task
 def test_conformance(ctx: Context) -> None:
     """
-    Run the cross-language conformance suites, all three of them.
+    Run both cross-language conformance suites.
 
-    This is the gate that the other suites cannot be: it is the only thing asserting that the
-    Python, TypeScript and Go clients agree on the wire. Parity used to be hand-mirrored
-    literals in suites that ran in separate CI workflows -- and, before the Go client moved
-    here, in separate repositories, where nothing could run both sides. Five cross-language
-    claims went silently false in one afternoon under that arrangement.
+    The only thing asserting that the Python and Go clients agree on the wire. Parity used to
+    be hand-mirrored literals in separate repositories, where nothing could run both sides;
+    five cross-language claims went silently false in one afternoon.
 
-    Changing a vector in src/gcache/conformance/envelope_vectors.json must fail ALL THREE. If
-    only two fail, the third is not really reading the file.
+    Changing a vector must fail BOTH. If only one fails, the other is not reading the file.
 
     Parameters
     ----------
@@ -145,11 +116,10 @@ def test_conformance(ctx: Context) -> None:
         Invoke context.
     """
     ctx.run("poetry run pytest tests/test_conformance.py tests/test_cross_language.py -vvv", **COMMON_PARAMS)
-    ctx.run("pnpm ts:gcache:test", **COMMON_PARAMS)
     ctx.run("cd go && go test -count=1 -run TestConformance ./...", **COMMON_PARAMS)
 
 
-@task(pre=[test, test_ts, test_go])
+@task(pre=[test, test_go])
 def test_all(ctx: Context) -> None:
     """
     Run every language's suite.

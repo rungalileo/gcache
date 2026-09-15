@@ -53,7 +53,7 @@ def test_the_vector_file_is_where_every_suite_expects_it() -> None:
             assert v["expect"] == "reject", f"{v['name']}: an asymmetry is expressed on a reject vector"
             overlap = set(v["rejectedBy"]) & set(v["acceptedBy"])
             assert not overlap, f"{v['name']}: a client cannot both accept and reject: {overlap}"
-            known = {"python", "typescript", "go"}
+            known = {"python", "go"}
             unknown = (set(v["rejectedBy"]) | set(v["acceptedBy"])) - known
             assert not unknown, f"{v['name']}: unknown client(s) {unknown}"
 
@@ -112,7 +112,7 @@ def test_envelope_vector(vector: dict) -> None:
 def test_the_key_rendering_divergences_are_still_what_the_file_says() -> None:
     # Not decode vectors -- a record of what each client renders, so a change to either side
     # shows up as a failure here instead of as silently unshared entries. The Python half is
-    # executed; the TypeScript half is a recorded literal that its own suite checks.
+    # executed; the Go half is a recorded literal that its own suite checks.
     from gcache._internal.state import _GLOBAL_GCACHE_STATE
     from gcache.config import render_prefix
 
@@ -126,9 +126,9 @@ def test_the_key_rendering_divergences_are_still_what_the_file_says() -> None:
             )
 
             # Partition must match what the recorded strings say, not a `agree: bool` --
-            # a boolean can't express "Go and Python agree, TypeScript doesn't."
+            # a partition survives a client being added or removed; a boolean would not.
             actual: dict[str, list[str]] = {}
-            for client in ("go", "python", "typescript"):
+            for client in ("go", "python"):
                 actual.setdefault(case[client], []).append(client)
             expected = sorted((sorted(v) for v in actual.values()), key=lambda g: g[0])
             assert case["agreeingClients"] == expected, (
@@ -149,12 +149,11 @@ def test_an_empty_prefix_is_unreachable_through_the_public_api() -> None:
     from gcache.exceptions import EmptyUrnPrefixNotSupported
     from tests.conftest import FakeCacheConfigProvider
 
+    # Both clients render an empty prefix identically, so the vector records agreement -- but
+    # it is still refused at construction, because it writes into a key space no namespaced
+    # deployment reads. The rendering is reachable only below the public API.
     case = next(c for c in _DATA["keyRendering"]["cases"] if c["name"] == "empty-prefix")
-    assert len(case["agreeingClients"]) > 1, "the empty-prefix case is recorded as divergent"
-    # Specifically: Python and Go omit the empty component, TypeScript joins it. This is the
-    # divergence that survives fixing the percent-encoding, which is why it is an error here
-    # rather than a documented caveat.
-    assert ["go", "python"] in case["agreeingClients"]
+    assert case["agreeingClients"] == [["go", "python"]]
 
     with pytest.raises(EmptyUrnPrefixNotSupported):
         GCache(GCacheConfig(cache_config_provider=FakeCacheConfigProvider(), urn_prefix=""))
@@ -227,7 +226,7 @@ def test_argument_order_is_normalized_identically_by_every_client() -> None:
             )
 
             actual: dict[str, list[str]] = {}
-            for client in ("go", "python", "typescript"):
+            for client in ("go", "python"):
                 actual.setdefault(case[client], []).append(client)
             expected = sorted((sorted(v) for v in actual.values()), key=lambda g: g[0])
             assert case["agreeingClients"] == expected, (

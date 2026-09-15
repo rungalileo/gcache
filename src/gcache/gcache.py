@@ -81,14 +81,14 @@ class GCache:
         :raises GCacheAlreadyInstantiated: If a GCache instance already exists.
         :raises RedisConfigConflict: If both redis_config and redis_client_factory are provided.
         :raises EmptyUrnPrefixNotSupported: If urn_prefix is "" -- an empty prefix cannot
-            interoperate, since Python renders ``kt:id`` where TypeScript renders ``:kt:id``.
+            interoperate, since Python renders ``kt:id`` where Go renders ``:kt:id``.
         """
         # Pure config validation BEFORE the singleton check: with the order reversed a live
         # GCache made this branch unreachable in-process, so the test could only assert on
         # inspect.getsource -- which stays green if the condition changes and the text stays.
         if config.urn_prefix == "":
             # An empty prefix is not merely unusual, it cannot interoperate: Python renders
-            # "kt:id" and TypeScript ":kt:id". See EmptyUrnPrefixNotSupported. An earlier
+            # "kt:id" and Go ":kt:id". See EmptyUrnPrefixNotSupported. An earlier
             # revision of this branch "fixed" the silent-ignore by honouring "", which
             # enabled a configuration that silently breaks the cross-language keyspace this
             # work exists to establish. Rejecting is the fix; honouring it was not.
@@ -277,7 +277,7 @@ class GCache:
                            entry as a miss); the pickle case cannot be detected at all.  Migrate under a new ``use_case``.
         :param envelope: How the value is framed in Redis.  ``Envelope.PICKLE`` (the default) serializes arbitrary
                          Python objects but is readable only from Python.  ``Envelope.JSON`` writes the same envelope
-                         the TypeScript and Go clients use, so the entry can be shared across languages; it requires a
+                         the Go and Go clients use, so the entry can be shared across languages; it requires a
                          ``Serializer`` producing str/bytes (pass ``serializer=JsonSerializer()``).  Reads sniff the
                          framing they actually find, so a JSON key still reads a JSON entry written by any language --
                          but a JSON key refuses to unpickle, rather than leaving unpickling reachable for whoever can
@@ -291,7 +291,7 @@ class GCache:
                          different keys and never fight.
 
                          Note also that cross-language invalidation reaches the REDIS layer only.  ``ainvalidate``
-                         writes a watermark, and ``LocalCache`` does not read watermarks, so a Go or TypeScript
+                         writes a watermark, and ``LocalCache`` does not read watermarks, so a Go or Go
                          invalidation does not clear a Python pod's in-process copy until the local TTL expires.  For a
                          use case shared across languages, keep the local TTL short or set the local ramp to 0.
         :return:
@@ -607,7 +607,7 @@ class GCache:
         silently: the entry is written with ``createdAtMs`` below the watermark, so remote
         reads find it stale until the window closes and a read rewrites it. That is the
         invalidation doing its job, but this call still returns normally. Go's ``Put``
-        behaves the same way; the TypeScript client is the outlier and returns ``false``.
+        behaves the same way; the Go client is the outlier and returns ``false``.
         Checking here would cost an extra round trip on every prime.
 
         The LOCAL layer does NOT honour that -- it never reads watermarks -- so a later

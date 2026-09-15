@@ -13,7 +13,7 @@ import (
 )
 
 // envelopeVersion is the `version` field of the JSON envelope. It is shared with the
-// Python and TypeScript clients; bump only in lockstep with them.
+// Python client; bump only in lockstep with it.
 const envelopeVersion = 1
 
 // picklePROTO is the first byte of every pickle blob at protocol >= 2 (the PROTO opcode).
@@ -25,8 +25,8 @@ const picklePROTO = 0x80
 // envelope; treat it as a miss. LOAD-BEARING for the age invariant too: Cache.Get's proof that an old tracked entry is unreachable relies on an expiresAtMs pickle lacks, so reading pickle later would need Python's explicit age guard.
 var ErrPickleEnvelope = errors.New("gcache: value uses the Python pickle envelope, not readable from Go")
 
-// envelope is the cross-language value framing, identical to the one the TypeScript port
-// writes (packages/gcache-ts/src/internal/redis-cache.ts) and the one Python emits under
+// envelope is the cross-language value framing, identical to the one the Python package
+// Python emits under
 // Envelope.JSON.
 type envelope struct {
 	Version     int    `json:"version"`
@@ -65,7 +65,7 @@ func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]b
 // its expiry -- paired with the timestamp, that gives Cache.Get the declared lifetime that
 // closes the resurrection gap (see the guard there). Sniffs the framing rather than assuming, so a key mid-migration or written by another language still works.
 // normalizeBase64 maps the URL-safe alphabet onto the standard one and restores padding,
-// so this reader accepts everything Python's and TypeScript's readers do. A genuinely wrong
+// so this reader accepts everything Python's reader does. A genuinely wrong
 // alphabet still fails in DecodeString afterwards.
 func normalizeBase64(s string) string {
 	s = strings.ReplaceAll(s, "-", "+")
@@ -89,7 +89,7 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 
 	// Pointers so an ABSENT field is distinguishable from a zero one. Decoding straight into
 	// the value struct made {"version":1,"encoding":"utf8","payload":"{}"} a HIT with
-	// createdAtMs=0, where Python and TypeScript both call those same bytes a miss.
+	// createdAtMs=0, where Python calls those same bytes a miss.
 	var w struct {
 		Version     *float64 `json:"version"`
 		CreatedAtMs *float64 `json:"createdAtMs"`
@@ -107,7 +107,7 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 		return nil, 0, 0, errors.New("gcache: envelope has no version")
 	}
 	// A NUMBER, not an int: JSON does not distinguish 1 from 1.0, and Python's
-	// `version != ENVELOPE_VERSION` and TypeScript's `!== 1` both accept the float spelling.
+	// `version != ENVELOPE_VERSION` accepts the float spelling.
 	// Unmarshalling into *int rejected it, making Go the only client to miss those bytes.
 	if *w.Version != float64(envelopeVersion) {
 		return nil, 0, 0, fmt.Errorf("gcache: unsupported envelope version %v, want %d", *w.Version, envelopeVersion)

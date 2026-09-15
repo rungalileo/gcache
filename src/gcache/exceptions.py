@@ -107,25 +107,14 @@ class EnvelopeMismatchWithRegisteredUseCase(GCacheError):
 class EmptyUrnPrefixNotSupported(GCacheError, ValueError):
     """Raised when ``GCacheConfig(urn_prefix="")`` is given.
 
-    An empty prefix cannot interoperate. Python's ``render_prefix`` omits the prefix
-    entirely and yields ``kt:i``, while the TypeScript client joins unconditionally
-    (``key.ts`` ``joinUrnComponents``) and yields ``:kt:i`` -- so value keys AND
-    ``#watermark`` keys diverge, and neither client sees the other's entries or
-    invalidations. There is no error at write time; the two just silently stop sharing a
-    keyspace, which is the one failure this envelope work exists to prevent.
+    An empty prefix still renders syntactically valid keys, but in an unnamespaced key space
+    that no namespaced deployment reads -- and there is no error at write time, so the cache
+    simply never hits. The Go client refuses it at construction for the same reason
+    (``Options.URNPrefix is required``).
 
-    Rejecting rather than supporting it, and rather than restoring the previous behaviour of
-    silently ignoring it: anyone passing "" today has been running with the previous prefix
-    ("urn" by default) and does not know it. An error says their configuration never did what
-    they asked.
-
-    Why THIS prefix and not every prefix, given that TypeScript interop is broken for all of
-    them today (it percent-encodes components, so ``urn:galileo:test`` renders as
-    ``urn%3Agalileo%3Atest``)? Because that one is an encoding defect with a fix: align the
-    two and every non-empty prefix interoperates. An empty prefix still will not, because the
-    divergence there is structural rather than an encoding choice -- Python omits the
-    component, TypeScript joins it. It is the one case that survives the fix, which is what
-    makes it worth a hard error instead of a README caveat.
+    Rejecting rather than silently ignoring it, which was the previous behaviour: anyone
+    passing "" today has been running with the default prefix and does not know it. An error
+    says their configuration never did what they asked.
 
     Subclasses ValueError as well, so a caller already guarding construction with
     ``except ValueError`` keeps catching it.
@@ -133,8 +122,8 @@ class EmptyUrnPrefixNotSupported(GCacheError, ValueError):
 
     def __init__(self) -> None:
         super().__init__(
-            'urn_prefix="" is not supported: an empty prefix renders as "kt:id" in Python but '
-            '":kt:id" in the TypeScript client, so the two cannot share a keyspace. Pass a '
+            'urn_prefix="" is not supported: an empty prefix writes into an unnamespaced key '
+            "space that no namespaced deployment reads, so the cache never hits. Pass a "
             "non-empty prefix, or omit urn_prefix to keep the default."
         )
 

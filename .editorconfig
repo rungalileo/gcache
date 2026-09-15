@@ -1,4 +1,4 @@
-# One place for whitespace conventions across the three implementations, so Python, TypeScript
+# One place for whitespace conventions across both implementations, so Python
 # and Go do not drift into three house styles. Each language's own formatter (ruff-format,
 # tsc/prettier, gofmt) remains the authority for its files; this only covers what they share.
 root = true

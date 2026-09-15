@@ -40,7 +40,6 @@ type conformanceFile struct {
 			ID              string     `json:"id"`
 			Go              string     `json:"go"`
 			Python          string     `json:"python"`
-			TypeScript      string     `json:"typescript"`
 			AgreeingClients [][]string `json:"agreeingClients"`
 			Reason          string     `json:"reason"`
 		} `json:"cases"`
@@ -56,7 +55,6 @@ type conformanceFile struct {
 			Why             string     `json:"why"`
 			Go              string     `json:"go"`
 			Python          string     `json:"python"`
-			TypeScript      string     `json:"typescript"`
 			AgreeingClients [][]string `json:"agreeingClients"`
 		} `json:"cases"`
 	} `json:"argOrdering"`
@@ -167,10 +165,10 @@ func TestConformanceKeyRendering(t *testing.T) {
 
 			// The partition must match the recorded strings, so the file can't claim an
 			// agreement its own values contradict. Replaced a two-way `agree: bool`, which
-			// couldn't express 2-of-3 (e.g. Go and Python agree, TypeScript doesn't).
+			// a partition survives a client being added or removed; a boolean would not.
 			byRendering := map[string][]string{}
 			for client, rendering := range map[string]string{
-				"go": c.Go, "python": c.Python, "typescript": c.TypeScript,
+				"go": c.Go, "python": c.Python,
 			} {
 				byRendering[rendering] = append(byRendering[rendering], client)
 			}

@@ -14,7 +14,7 @@ import (
 )
 
 func TestEncodeEnvelopeShapeMatchesTheOtherClients(t *testing.T) {
-	// This exact shape is what Python's Envelope.JSON and the TypeScript port write. If Go
+	// This exact shape is what Python's Envelope.JSON and the Python port write. If Go
 	// drifts, the three silently stop reading each other.
 	created := time.UnixMilli(1_757_308_800_123)
 	raw, err := encodeEnvelope(created, 60*time.Second, []byte(`{"a":1}`))
@@ -55,7 +55,7 @@ func TestDecodeEnvelopeRoundTrip(t *testing.T) {
 }
 
 func TestDecodeEnvelopeAcceptsBase64PayloadsFromOtherClients(t *testing.T) {
-	// The TypeScript port base64s Buffer payloads. Go must read those even though it only
+	// The Python port base64s Buffer payloads. Go must read those even though it only
 	// ever writes utf8.
 	raw, _ := json.Marshal(envelope{
 		Version: 1, CreatedAtMs: 7, ExpiresAtMs: 8,
@@ -202,7 +202,7 @@ func TestIsStaleIsInclusive(t *testing.T) {
 }
 
 func TestDecodeEnvelopeRejectsMissingFields(t *testing.T) {
-	// Python and TypeScript both call these bytes a miss. Decoding straight into the value
+	// Python and Python both call these bytes a miss. Decoding straight into the value
 	// struct made the first one a HIT with createdAtMs=0, which skips every expiry guard --
 	// one key answering differently per language is the failure the envelope exists to stop.
 	for name, raw := range map[string]string{

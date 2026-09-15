@@ -29,10 +29,6 @@ tests/
 ├── test_cross_language.py   # Go<->Python round trip, drives a locally-built gcachectl
 └── test_*.py                # Test suites
 
-packages/gcache-ts/          # TypeScript port (pnpm workspace member, versioned separately)
-├── src/                     # Mirrors src/gcache/ module-for-module
-└── test/gcache-conformance.test.ts   # TypeScript half of the shared corpus
-
 go/                          # Go client (module github.com/rungalileo/gcache/go)
 ├── cache.go                 # Cache[V]: Get/Put/Invalidate, Result, Options
 ├── envelope.go              # The cross-language JSON envelope; refuses pickle
@@ -44,24 +40,23 @@ go/                          # Go client (module github.com/rungalileo/gcache/go
 └── cmd/gcachectl/           # CLI; also what the Go<->Python suite drives
 ```
 
-**Three implementations, one wire protocol.** Python is the reference and the published
-package; TypeScript and Go are independent ports that must agree with it on the wire. They are
-versioned separately (`gcache-ts` at 0.1.0, `go/` at v0.1.0, Python at 2.x) because a package
-version is the wrong instrument for wire compatibility -- see the conformance section below
-for the one that is.
+**Two implementations, one wire protocol.** Python is the reference and the published
+package; Go is an independent port that must agree with it on the wire. They are versioned
+separately (`go/` at v0.1.0, Python at 3.x) because a package version is the wrong instrument
+for wire compatibility -- see the conformance section below for the one that is.
 
 Commands are the same shape for each:
 
 ```bash
-inv test          inv test-ts          inv test-go       inv test-all
-inv type-check    inv typecheck-ts     inv vet-go
-inv test-conformance                   # all three against the shared corpus
+inv test          inv test-go        inv test-all
+inv type-check    inv vet-go
+inv test-conformance                 # both against the shared corpus
 ```
 
-These shell out to each language's own tooling -- poetry/pytest, pnpm/tsc, go build/test.
-Deliberately not a build system: three independent ports share no build graph, which is the
-only thing Bazel or Nx exists to exploit. The Go client arrived carrying five BUILD.bazel
-files and they were dropped for that reason.
+These shell out to each language's own tooling -- poetry/pytest, go build/test. Deliberately
+not a build system: two independent ports share no build graph, which is the only thing Bazel
+or Nx exists to exploit. The Go client arrived carrying five BUILD.bazel files and they were
+dropped for that reason.
 
 ## Key Components
 
@@ -93,17 +88,16 @@ files and they were dropped for that reason.
 
 ```bash
 poetry run pytest tests/          # Python
-pnpm ts:gcache:test               # TypeScript
 ```
 
 ### Cross-language conformance vectors
 
 `src/gcache/conformance/envelope_vectors.json` is the single source of truth for envelope wire
-behaviour and key rendering. It is read by ALL THREE suites: `tests/test_conformance.py`,
-`packages/gcache-ts/test/gcache-conformance.test.ts` and `go/conformance_test.go`.
+behaviour and key rendering. It is read by BOTH suites: `tests/test_conformance.py` and
+`go/conformance_test.go`.
 
 Run them together with `inv test-conformance`. CI runs it on **every** PR with no path filter,
-unlike the per-language workflows -- it is the only job that checks the three clients agree,
+unlike the per-language workflows -- it is the only job that checks both clients agree,
 and filtering it would recreate the hole that bringing the Go client in-repo closed.
 
 **Do not copy a case into either suite.** Parity used to be asserted by hand-mirrored literals
@@ -112,21 +106,21 @@ reading both — and two escaped that way (an empty `urn_prefix`, and a fraction
 and were found in review rather than by a test. A mirrored copy restores exactly that failure
 mode: each suite then passes against its own assumptions.
 
-To add a case, edit the JSON and run all three suites. Every vector must carry a `why`, and an
+To add a case, edit the JSON and run both suites. Every vector must carry a `why`, and an
 `expect: "accept"` case must declare what it decodes to. Changing a vector's expectation
-should fail **all three**; if only two fail, the third is not really reading the file. The
-conformance workflow asserts that property by mutating a vector and requiring three failures.
+should fail **both**; if only one fails, the other is not really reading the file. The
+conformance workflow asserts that property by mutating a vector and requiring two failures.
 
 **Always run the Go suite with `-count=1`** (`inv test-go` and `inv test-conformance` both do).
 Go caches test results, and its cache does not reliably invalidate on a change to the fixture,
 so a mutated vector comes back `ok (cached)` -- the exact green-means-nothing failure this
 corpus exists to prevent, appearing in the check meant to prevent it. The first run of the
 conformance workflow reported "a mutated vector failed only 2 of 3 suites" for precisely this
-reason and blamed the Go suite for not reading the file, which was false. pytest and vitest
+reason and blamed the Go suite for not reading the file, which was false. pytest
 cache transforms, not results, so neither has this hazard; Go is the only one.
 
 `keyRendering.cases` carry an `agreeingClients` partition rather than a boolean, because the
-real situation is 2-of-3: Go and Python render identically, TypeScript percent-encodes. Each
+partition survives a client being added or removed, where a boolean would not. Each
 suite asserts its own client's column against what it actually renders, plus that the
 partition matches the recorded strings -- so the file cannot claim an agreement its own values
 contradict. More than one group requires a `reason`.
@@ -154,14 +148,14 @@ prefix and rejects input that already has it.
 **A published Go version is permanent.** `proxy.golang.org` caches module versions immutably,
 so a broken `go/v0.1.0` cannot be re-tagged — you burn the version and ship `go/v0.1.1`. The
 workflow therefore validates *before* tagging: version format, tag collision, gofmt, vet,
-`go test`, and the full three-client conformance suite. It is the only irreversible action in
+`go test`, and the full conformance suite. It is the only irreversible action in
 this repo.
 
 **Do not tag by hand.** A bare `v0.1.0` already exists from the Python package's history
 (`0bc6951`, 2025-02-24), so a mistyped tag attaches silently to the wrong thing. The workflow
 guards both forms.
 
-**Why not one version for all three.** Lockstep versioning is a real argument for a monorepo,
+**Why not one version for both.** Lockstep versioning is a real argument for a monorepo,
 and it is declined here for a concrete reason: Go requires a major-version suffix in the
 module path from v2, so sharing the namespace would make a future Python 3.0.0 force a
 breaking import-path change (`/v2/go` → `/v3/go`) on Go consumers for reasons unrelated to Go.

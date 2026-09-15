@@ -836,7 +836,7 @@ func TestGetTreatsANonPositiveExpiryAsExpired(t *testing.T) {
 		client.data[ValueKey(testPrefix, key)] = []byte(raw)
 
 		if _, ok := cache.Get(context.Background(), key); ok {
-			t.Errorf("expiresAtMs=%s was served; Python and TypeScript both call it expired", exp)
+			t.Errorf("expiresAtMs=%s was served; Python and Python both call it expired", exp)
 		}
 	}
 }

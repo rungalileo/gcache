@@ -249,7 +249,7 @@ class RedisCache(CacheInterface):
                 self._record_degraded_read(key, "json_without_serializer")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
-            # Honour the envelope's expiry, not just Redis's TTL: TypeScript calls a past
+            # Honour the envelope's expiry, not just Redis's TTL: Go calls a past
             # expiresAtMs a miss. No skew tolerance, so clocks must agree within the
             # shortest JSON TTL; a writer lagging further pins the hit rate at zero.
             if (

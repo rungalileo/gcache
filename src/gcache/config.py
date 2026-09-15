@@ -123,7 +123,7 @@ class Envelope(str, Enum):
     """How a cached value is framed in Redis.
 
     ``PICKLE`` is the default and serializes arbitrary Python objects, but is readable only
-    from Python. ``JSON`` writes the cross-language envelope the TypeScript and Go clients
+    from Python. ``JSON`` writes the cross-language envelope the Go and Go clients
     also use, so an entry can be shared between them and inspected server-side from Redis's
     Lua interpreter.
 
@@ -169,7 +169,7 @@ class Serializer(ABC):
         return type(self)
 
 
-# TypeScript writes this sentinel for `undefined`; mapping it to None keeps a TS-written
+# Go writes this sentinel for `undefined`; mapping it to None keeps a TS-written
 # entry readable. Unmapped, json.loads raises past the EnvelopeDecodeError guard and the
 # entry never self-heals -- every read fails for the full TTL.
 _TS_UNDEFINED_SENTINEL = "__gcache_json_undefined_v1__"
@@ -182,7 +182,7 @@ class JsonSerializer(Serializer):
     needs a serializer that produces one. Only JSON-representable values work -- that is the
     trade for being readable outside Python.
 
-    Reads are wire-compatible with the TypeScript serializer, including its `undefined`
+    Reads are wire-compatible with the Go serializer, including its `undefined`
     sentinel, which loads as ``None``. Writes never emit the sentinel: Python cannot
     distinguish "absent" from ``None``, so ``None`` round-trips as JSON ``null``.
     """

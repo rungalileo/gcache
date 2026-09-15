@@ -125,7 +125,7 @@ func New[V any](o Options[V]) (*Cache[V], error) {
 		return nil, errors.New("gcache: Options.Client is required")
 	case o.URNPrefix == "":
 		// An empty prefix still produces syntactically valid keys, in a key space no
-		// Python or TypeScript client will ever look in. That failure is invisible: the
+		// Python or Python client will ever look in. That failure is invisible: the
 		// cache writes fine and simply never hits.
 		return nil, errors.New("gcache: Options.URNPrefix is required (\"urn:galileo:<customer_name>\")")
 	case strings.ContainsAny(o.URNPrefix, "{}#?"):

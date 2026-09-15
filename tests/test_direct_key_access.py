@@ -252,7 +252,7 @@ async def test_aput_writes_redis_even_when_the_local_layer_raises(
 async def test_invalidation_does_not_reach_a_local_hit(
     gcache: GCache, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # Documented limit, pinned: LocalCache doesn't read watermarks, so a Go/TypeScript
+    # Documented limit, pinned: LocalCache doesn't read watermarks, so a Go/Go
     # invalidation clears Redis but not this process's local copy, which keeps serving
     # until its own TTL. Every other test ramps LOCAL to 0 and can't see this.
     cache_config_provider.configs["local_uc"] = GCacheKeyConfig.enabled(60)

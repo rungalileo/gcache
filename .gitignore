@@ -159,11 +159,14 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Node / TypeScript
-node_modules/
-packages/*/dist/
+# Editor and OS cruft
 packages/*/coverage/
 
 # Go
 go/coverage.out
 go/gcachectl
+
+# Keep ignoring these even though no JS ships from this repo: a stale node_modules/ from an
+# earlier checkout is still on plenty of dev machines, and dropping the entry let `git add -A`
+# sweep 386,880 lines of it into a branch.
+node_modules/

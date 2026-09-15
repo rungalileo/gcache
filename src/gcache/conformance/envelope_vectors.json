@@ -2,30 +2,21 @@
   "$comment": [
     "Shared conformance vectors for the gcache JSON value envelope.",
     "",
-    "Read by BOTH tests/test_conformance.py and packages/gcache-ts/test/gcache-conformance.test.ts.",
-    "Neither suite may hardcode these cases: the point is one source of truth, so a reader that",
-    "diverges fails rather than passing against its own mirrored copy.",
-    "",
-    "Why this file exists. Parity between the Python and TypeScript readers used to be asserted",
-    "by hand-mirrored literals in two suites that run in separate CI workflows, so a divergence",
-    "was only ever caught by a human reading both. Two escaped that way and were found in",
-    "review, not by a test: an empty urn_prefix (Python omits the component, TS joins it) and a",
-    "fractional timestamp (TS kept the fraction, Python rounded, and the comparison is against a",
-    "threshold so the boolean flipped). Both are in here now as vectors.",
+    "Read by BOTH tests/test_conformance.py and go/conformance_test.go. Neither may hardcode a",
+    "case: one source of truth is the point, so a reader that diverges fails instead of passing",
+    "against its own mirrored copy. Parity used to be hand-mirrored literals in suites that ran",
+    "in separate repositories, where nothing could run both sides; five cross-language claims",
+    "went silently false in one afternoon under that arrangement.",
     "",
     "expect=accept means decode succeeds AND yields `decoded`. expect=reject means the reader",
-    "must treat the value as a MISS -- an exception both clients convert to 'miss', never a",
-    "partial or defaulted value. A reject case with a plausible-looking payload is deliberate:",
-    "expect=accept means decode succeeds AND yields `decoded`. expect=reject means the reader",
-    "must treat the value as a MISS -- an exception both clients convert to 'miss', never a",
-    "partial or defaulted value. A reject case with a plausible-looking payload is deliberate:",
-    "a reader that ignores the invalid field and returns the payload anyway must fail here.",
+    "must treat the value as a MISS -- an exception the client converts to 'miss', never a",
+    "partial or defaulted value. A reject case with a plausible payload is deliberate: a reader",
+    "that ignores the invalid field and returns the payload anyway must fail here.",
     "",
-    "A vector may carry `rejectedBy`/`acceptedBy` when the clients DELIBERATELY differ. That is",
-    "not a divergence bug: it means one client cannot represent the value faithfully and",
-    "rejecting it there produces a miss-and-rewrite, which is strictly better than two clients",
-    "serving the same bytes as different numbers. `asymmetryIsSafe` must say why the direction",
-    "is the safe one. A suite only asserts the cases that apply to its own client."
+    "A vector may carry `rejectedBy`/`acceptedBy` when the clients DELIBERATELY differ, meaning",
+    "one cannot represent the value faithfully and rejecting it there yields a miss-and-rewrite",
+    "rather than two clients serving the same bytes as different numbers. `asymmetryIsSafe` must",
+    "say why that direction is the safe one. A suite asserts only its own client's side."
   ],
   "envelopeVersion": 1,
   "vectorCount": 16,
@@ -131,7 +122,7 @@
     },
     {
       "name": "created-above-2-53",
-      "why": "The silent-disagreement case, and the reason isInteger was not enough. JSON.parse rounds 9007199254740993 to 9007199254740992, and Go's decodeEnvelope takes the field into a float64 and rounds identically; Python's json.loads returns the exact int. So in the 2^53..int64 band every client ACCEPTED and then compared a different number against the staleness threshold, with no error anywhere. Worse than a miss: a miss heals on the next read, a disagreement never announces itself. All three now stop at 2^53. This vector was briefly recorded as a deliberate asymmetry (rejected only by TypeScript) and that was wrong within the hour -- Go tightened, and the record was stale before anyone read it. Uniform beats documented.",
+      "why": "The silent-disagreement case. Go's decodeEnvelope takes the field into a float64 and rounds 9007199254740993 to ...992; Python's json.loads returns the exact int. So in the 2^53..int64 band both clients ACCEPTED and then compared a different number against the staleness threshold, with no error anywhere -- worse than a miss, which heals on the next read. Both now stop at 2^53.",
       "envelope": "{\"version\":1,\"createdAtMs\":9007199254740993,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
       "expect": "reject"
     },
@@ -149,23 +140,10 @@
   ],
   "keyRendering": {
     "$comment": [
-      "Key grammar, which is where the OTHER divergence lives. These are not decode vectors;",
-      "they record what each client renders today so a change to any of them is visible here.",
-      "TS percent-encodes every component via encodeURIComponent (key.ts joinUrnComponents);",
-      "Python and Go interpolate raw. That is a known defect; no ticket is filed for it yet.",
-      "",
-      "`agreeingClients` partitions the clients by what they ACTUALLY render, replacing an",
-      "earlier two-way `agree: bool`. A boolean could not express 2-of-3, which is the real",
-      "situation: Go and Python agree, TypeScript does not. Each suite asserts (a) its own",
-      "client's column against what it really renders, and (b) that the partition matches the",
-      "recorded strings -- so the file cannot claim an agreement its own values contradict.",
-      "A case with more than one group must carry a `reason`.",
-      "",
-      "The empty-prefix row is different in kind: it is the one case that SURVIVES fixing the",
-      "encoding, because the divergence is structural -- Python and Go omit an empty component,",
-      "TS joins it. That is why gcache raises EmptyUrnPrefixNotSupported at construction, and",
-      "why Go's New() refuses an empty URNPrefix too. Note the Go RENDERER will happily produce",
-      "'kt:i'; it is the client constructor that refuses, so this row records the renderer."
+      "What each client renders for a key PREFIX, recorded rather than asserted, so a change to",
+      "either side fails here instead of becoming silently unshared entries. Both clients agree on",
+      "every case; the percent-encoding divergence these cases were written for is gone with the",
+      "client that had it."
     ],
     "cases": [
       {
@@ -174,13 +152,11 @@
         "keyType": "kt",
         "id": "i",
         "python": "urn:kt:i",
-        "typescript": "urn:kt:i",
         "go": "urn:kt:i",
         "agreeingClients": [
           [
             "go",
-            "python",
-            "typescript"
+            "python"
           ]
         ]
       },
@@ -190,16 +166,11 @@
         "keyType": "kt",
         "id": "i",
         "python": "urn:galileo:test:kt:i",
-        "typescript": "urn%3Agalileo%3Atest:kt:i",
-        "reason": "TS percent-encodes the prefix. A namespaced prefix is the normal case and contains colons, so this is the common path, not an edge case. Known defect; no ticket is filed for it yet -- an earlier revision of this file claimed one was.",
         "go": "urn:galileo:test:kt:i",
         "agreeingClients": [
           [
             "go",
             "python"
-          ],
-          [
-            "typescript"
           ]
         ]
       },
@@ -209,23 +180,18 @@
         "keyType": "kt",
         "id": "i",
         "python": "kt:i",
-        "typescript": ":kt:i",
-        "reason": "Structural, not an encoding choice: Python omits an empty component, TS joins it. Survives the encoding fix, so gcache rejects this configuration at construction (EmptyUrnPrefixNotSupported) rather than documenting it.",
         "go": "kt:i",
         "agreeingClients": [
           [
             "go",
             "python"
-          ],
-          [
-            "typescript"
           ]
         ]
       }
     ]
   },
   "argOrdering": {
-    "$comment": "Argument ORDER is not part of the wire key: every client sorts by name, byte-ordinal and stable. Recorded because the absence of any multi-arg vector let Go and Python disagree unnoticed. TypeScript's normalizeArgs sorts OBJECT input for a different reason (JS key order is not meaningful); its tuple path now sorts too. Values here are MEASURED from each client, not asserted.",
+    "$comment": "Argument ORDER is not part of the wire key: both clients sort by name, byte-ordinal and stable. Recorded because no multi-arg vector existed, which let Go sort while Python's constructor did not -- the same call built two different Redis entries. Values are MEASURED from each client, not asserted.",
     "cases": [
       {
         "name": "reverse-alpha",
@@ -243,15 +209,13 @@
             "1"
           ]
         ],
-        "why": "The case that caught a real divergence, and the only shape that can. Go sorted args and Python's constructor did not, so the same call built two different Redis entries. No multi-arg vector existed, which is why it survived review. Every writer of a real key sorts -- cached() before constructing, Go's ValueKey, and now Python's and TypeScript's constructors -- so the sorted rendering IS the existing wire format.",
+        "why": "The case that caught a real divergence, and the only shape that can. Go sorted args and Python's constructor did not, so the same call built two different Redis entries. No multi-arg vector existed, which is why it survived review. Every writer of a real key sorts -- cached() before constructing, and Go's ValueKey -- so the sorted rendering IS the existing wire format.",
         "python": "urn:kt:i?a=1&b=2#u",
-        "typescript": "urn:kt:i?a=1&b=2#u",
         "go": "urn:kt:i?a=1&b=2#u",
         "agreeingClients": [
           [
             "go",
-            "python",
-            "typescript"
+            "python"
           ]
         ]
       },
@@ -273,13 +237,11 @@
         ],
         "why": "The control, and a warning. It renders identically whether a client sorts or preserves input order, so a corpus of only alphabetical cases proves nothing. Meaningful only paired with reverse-alpha.",
         "python": "urn:kt:i?a=1&b=2#u",
-        "typescript": "urn:kt:i?a=1&b=2#u",
         "go": "urn:kt:i?a=1&b=2#u",
         "agreeingClients": [
           [
             "go",
-            "python",
-            "typescript"
+            "python"
           ]
         ]
       },
@@ -301,13 +263,11 @@
         ],
         "why": "Two args sharing a name. Order is the only thing distinguishing them, so an UNSTABLE sort reorders them and changes the key. All three sorts are stable.",
         "python": "urn:kt:i?a=1&a=2#u",
-        "typescript": "urn:kt:i?a=1&a=2#u",
         "go": "urn:kt:i?a=1&a=2#u",
         "agreeingClients": [
           [
             "go",
-            "python",
-            "typescript"
+            "python"
           ]
         ]
       },
@@ -325,13 +285,11 @@
         ],
         "why": "One arg cannot expose an ordering bug. Present so a suite that silently skips the multi-arg cases still has something to fail on.",
         "python": "urn:kt:i?z=9#u",
-        "typescript": "urn:kt:i?z=9#u",
         "go": "urn:kt:i?z=9#u",
         "agreeingClients": [
           [
             "go",
-            "python",
-            "typescript"
+            "python"
           ]
         ]
       }

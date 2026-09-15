@@ -208,12 +208,11 @@ change the keys you were actually getting.
 is no configuration that reproduces the old behaviour, because the old behaviour was "use the
 previous value", not "use no prefix".
 
-**Why rejected rather than made to work:** an empty prefix cannot interoperate. Python's
-`render_prefix` omits an empty component and yields `kt:id`; `gcache-ts` joins unconditionally
-and yields `:kt:id`. Value keys *and* `#watermark` keys diverge, so neither client sees the
-other's entries or invalidations, with no error at write time.
+**Why rejected rather than made to work:** an empty prefix writes into an unnamespaced key
+space that no namespaced deployment reads, so the cache never hits and nothing errors at write
+time. The Go client refuses it at construction for the same reason.
 
-That is a different problem from the percent-encoding mismatch below, which is an encoding
+That is a different problem from the encoding question below, which is an encoding
 defect with a fix — align the two clients and every non-empty prefix interoperates. An empty
 one still would not, because that divergence is structural. It is the one case that survives
 the fix, which is why it gets an error instead of a caveat.
@@ -309,8 +308,8 @@ Under the hood, sync functions run through a thread pool to avoid blocking the e
 ### Sharing a Cache With Other Languages
 
 By default a value is stored as a Python pickle, which only Python can read. `envelope=`
-switches to a JSON framing that the TypeScript and Go clients also understand, so all three
-can share one entry and one invalidation:
+switches to a JSON framing the Go client also understands, so both can share one entry and
+one invalidation:
 
 ```python
 from gcache import Envelope, JsonSerializer
@@ -337,21 +336,12 @@ Four constraints:
   caller instead of the value, with nothing logged. The JSON case *is* caught — the reader
   knows it needs a serializer and treats the entry as a miss — but the pickle one cannot be.
   New `use_case` for that too.
-- **TypeScript interop is broken today, and the prefix is why.** `gcache-ts` percent-encodes
-  *every* component — `joinUrnComponents` maps all of them through `encodeURIComponent`
-  (`packages/gcache-ts/src/key.ts:73`) — while Python interpolates raw. A `use_case` like
-  `SessionService::identity` renders as `SessionService%3A%3Aidentity` there, and the same
-  applies to `urn_prefix`, which is the part that makes this unavoidable rather than
-  avoidable: a namespaced prefix is the normal case and contains colons. This repo's own
-  fixture uses `urn:galileo:test`; a deployment uses `urn:galileo:<customer>`.
-
-      Python      urn:galileo:test:kt:id
-      TypeScript  urn%3Agalileo%3Atest:kt:id
-
-  So there is no configuration of key components that makes the two share a key space —
-  zero sharing, no error, for every key. Keeping a `use_case` URL-safe is not sufficient;
-  the prefix would have to be too, and a colon-free prefix defeats the namespacing it
-  exists for. Unifying the encoding is the only real fix. Go and Python agree today.
+- **Key components are interpolated raw, in both clients.** Neither Python nor Go
+  percent-encodes, so a component containing `:`, `#`, `?`, `&` or `=` can collide with a
+  differently-structured key that renders identically — `id="a#u2"` with `use_case="u"`
+  renders the same as `id="a"` with `use_case="u2#u"`. Both clients agree, so this is a
+  property of the key grammar rather than a divergence, but it means component values should
+  not carry the grammar's own delimiters.
 - **Never flip this on a live use case.** A rolling deploy runs both pod generations at
   once: an old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle
   over it, and a new pod refuses that pickle and writes JSON again. Each destroys the
@@ -432,8 +422,8 @@ Four things to know:
 - **A prime inside an active invalidation window is lost silently — on the Redis layer.**
   The entry is written with `createdAtMs` below the watermark, so remote reads find it stale
   until the window closes and a read rewrites it. That is the invalidation doing its job, but
-  `aput` still returns normally. Go behaves the same way; the TypeScript client returns
-  `false` here. The **local** layer never reads watermarks, so a later `aget` in the same
+  `aput` still returns normally. Go behaves the same way. The **local** layer never reads
+  watermarks, so a later `aget` in the same
   process returns the primed value regardless — keep the local ramp at 0 for a shared use
   case, as above.
 

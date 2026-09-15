@@ -60,7 +60,7 @@ repos:
   # can then disagree with the version in go/go.mod that CI uses. These shell out to the
   # developer's own go, same as CI does.
   #
-  # Note pre-commit was Python-only before this; TypeScript is still uncovered, which is a
+  # Note pre-commit was Python-only before this; the Go hooks below extend it.
   # pre-existing gap rather than something Go introduced.
   - repo: local
     hooks:

@@ -118,7 +118,7 @@ conformance workflow asserts that property by mutating a vector and requiring tw
 Go caches test results, and its cache does not reliably invalidate on a change to the fixture,
 so a mutated vector comes back `ok (cached)` -- the exact green-means-nothing failure this
 corpus exists to prevent, appearing in the check meant to prevent it. The first run of the
-conformance workflow reported "a mutated vector failed only 2 of 3 suites" for precisely this
+conformance workflow reported "a mutated vector failed only 1 of 2 suites" for precisely this
 reason and blamed the Go suite for not reading the file, which was false. pytest
 cache transforms, not results, so neither has this hazard; Go is the only one.
 

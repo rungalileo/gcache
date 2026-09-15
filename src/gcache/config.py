@@ -123,8 +123,8 @@ class Envelope(str, Enum):
     """How a cached value is framed in Redis.
 
     ``PICKLE`` is the default and serializes arbitrary Python objects, but is readable only
-    from Python. ``JSON`` writes the cross-language envelope the Go and Go clients
-    also use, so an entry can be shared between them and inspected server-side from Redis's
+    from Python. ``JSON`` writes the cross-language envelope the Go client
+    also uses, so an entry can be shared between them and inspected server-side from Redis's
     Lua interpreter.
 
     Public API: this lives here rather than in ``gcache._internal`` so callers do not have
@@ -169,12 +169,6 @@ class Serializer(ABC):
         return type(self)
 
 
-# Go writes this sentinel for `undefined`; mapping it to None keeps a TS-written
-# entry readable. Unmapped, json.loads raises past the EnvelopeDecodeError guard and the
-# entry never self-heals -- every read fails for the full TTL.
-_TS_UNDEFINED_SENTINEL = "__gcache_json_undefined_v1__"
-
-
 class JsonSerializer(Serializer):
     """JSON serializer, for values shared with non-Python readers.
 
@@ -182,15 +176,14 @@ class JsonSerializer(Serializer):
     needs a serializer that produces one. Only JSON-representable values work -- that is the
     trade for being readable outside Python.
 
-    Reads are wire-compatible with the Go serializer, including its `undefined`
-    sentinel, which loads as ``None``. Writes never emit the sentinel: Python cannot
-    distinguish "absent" from ``None``, so ``None`` round-trips as JSON ``null``.
+    Reads are wire-compatible with the Go serializer. ``None`` round-trips as JSON ``null``:
+    Python cannot distinguish "absent" from ``None``, and neither client has a third state.
     """
 
     async def dump(self, obj: Any) -> str:
         # allow_nan=False because json.dumps otherwise emits the bare tokens NaN, Infinity
-        # and -Infinity, which are not JSON: JSON.parse throws on them and Go's
-        # encoding/json rejects them. The write would succeed and the entry would be
+        # and -Infinity, which are not JSON -- Go's encoding/json rejects all three. The
+        # write would succeed and the entry would be
         # unreadable from every non-Python client until its TTL ran out. Failing the write
         # is the rule the rest of this envelope follows.
         return json.dumps(obj, separators=(",", ":"), allow_nan=False)
@@ -198,8 +191,6 @@ class JsonSerializer(Serializer):
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, bytes):
             data = data.decode("utf-8")
-        if data == _TS_UNDEFINED_SENTINEL:
-            return None
         # Inline on purpose: json.loads holds the GIL, so offloading a 5.3 MB payload moved
         # the max tick delay 0.007s -> 0.007-0.014s and starved getaddrinfo in the default
         # pool. ProtoJsonSerializer.load DOES offload -- it yields per field (0.104s -> 0.014s).

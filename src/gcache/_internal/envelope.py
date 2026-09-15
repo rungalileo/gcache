@@ -43,16 +43,21 @@ import base64
 import json
 import math
 import pickle
+import re
 from dataclasses import dataclass
 from typing import Any
 
 ENVELOPE_VERSION = 1
 
+# Exactly the six ASCII bytes Go's normalizeBase64 strips. Not \s, which on a str pattern
+# also matches U+00A0 and friends -- those would diverge from Go, which keeps them.
+_WHITESPACE_RE = re.compile(r"[ \t\n\r\x0b\f]")
+
 # Envelope timestamps are int64 milliseconds, matching the Go client. See decode().
 _INT64_MAX = 2**63 - 1
-# 2^53-1: above it JSON.parse and Go's float64 both round (9007199254740993 -> ...992)
-# while Python's json.loads stays exact, so the three compared different numbers against
-# the same threshold. Envelope timestamps are bounded here; the watermark deliberately is not.
+# 2^53-1: above it Go's float64 rounds (9007199254740993 -> ...992) while Python's json.loads
+# stays exact, so the two compared different numbers against the same threshold. Envelope
+# timestamps are bounded here; the watermark deliberately is not.
 _MAX_SAFE_INTEGER = 2**53 - 1
 _MIN_SAFE_INTEGER = -(2**53 - 1)
 _INT64_MIN = -(2**63)
@@ -188,9 +193,9 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
             payload = envelope["payload"]
             if not isinstance(payload, str):
                 raise EnvelopeDecodeError(f"payload must be a string, got {type(payload).__name__}")
-            # Both timestamps must be real numbers, as parseEnvelope requires. int("5")
-            # would otherwise accept a string where the Go reader rejects it, so the
-            # two would disagree about the same bytes.
+            # Both timestamps must be real numbers. int("5") would otherwise accept a
+            # string where the Go reader rejects it, so the two would disagree about the
+            # same bytes.
             created_at_ms = envelope["createdAtMs"]
             expires_at_ms = envelope["expiresAtMs"]
             for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
@@ -219,11 +224,14 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                     raise EnvelopeDecodeError(f"{field} is outside the safe-integer range, got {value!r}")
             encoding = envelope.get("encoding")
             if encoding == "base64":
-                # Normalize first: Node accepts the URL-safe alphabet and unpadded input,
-                # Python rejects both, so a RawURLEncoding writer would miss in Python and
-                # Go normalizes too, so both accept. validate=True still rejects a
-                # genuinely wrong alphabet.
-                normalized = payload.replace("-", "+").replace("_", "/")
+                # Normalize first, because Python alone rejects three legal spellings a
+                # foreign writer produces: the URL-safe alphabet, missing padding, and line
+                # wrapping (the base64 CLI wraps at 76 columns by default, so a hand-repaired
+                # entry has newlines). Go's normalizeBase64 does the same three, in the same
+                # order -- whitespace BEFORE padding, or the padding is computed from a
+                # length that counts the newlines and the decode fails on both sides for
+                # some inputs and not others. validate=True still rejects a wrong alphabet.
+                normalized = _WHITESPACE_RE.sub("", payload).replace("-", "+").replace("_", "/")
                 payload = base64.b64decode(normalized + "=" * (-len(normalized) % 4), validate=True)
             elif encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")

@@ -15,7 +15,7 @@ import (
 
 func TestEncodeEnvelopeShapeMatchesTheOtherClients(t *testing.T) {
 	// This exact shape is what Python's Envelope.JSON and the Python port write. If Go
-	// drifts, the three silently stop reading each other.
+	// drifts, the two silently stop reading each other.
 	created := time.UnixMilli(1_757_308_800_123)
 	raw, err := encodeEnvelope(created, 60*time.Second, []byte(`{"a":1}`))
 	if err != nil {

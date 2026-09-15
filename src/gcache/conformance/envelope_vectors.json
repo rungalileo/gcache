@@ -19,7 +19,7 @@
     "say why that direction is the safe one. A suite asserts only its own client's side."
   ],
   "envelopeVersion": 1,
-  "vectorCount": 16,
+  "vectorCount": 19,
   "vectors": [
     {
       "name": "canonical",
@@ -135,6 +135,39 @@
         "createdAtMs": 9007199254740991,
         "expiresAtMs": 9007199254740991,
         "payload": "{\"a\":1}"
+      }
+    },
+    {
+      "name": "base64-unpadded",
+      "why": "A raw encoder emits no padding. Python's b64decode rejects it, so without the shared re-padding step the same entry is a Go hit and a Python miss-and-rewrite.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"eyJhIjoxfQ\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payloadBase64": "eyJhIjoxfQ=="
+      }
+    },
+    {
+      "name": "base64-url-safe-alphabet",
+      "why": "base64.RawURLEncoding and urlsafe_b64encode emit - and _. Python's b64decode rejects both, so each client must map them onto the standard alphabet first.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"-P_-IGJpbmFyeQ\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payloadBase64": "+P/+IGJpbmFyeQ=="
+      }
+    },
+    {
+      "name": "base64-line-wrapped",
+      "why": "The base64 CLI wraps at 76 columns, so an entry repaired by hand carries newlines. Whitespace must be stripped BEFORE padding is computed: padding a length that counts the newlines decoded for one client only when that length happened to be a multiple of four.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"YWJj\\nZGVm\\nZ2hp\\namts\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payloadBase64": "YWJjZGVmZ2hpamts"
       }
     }
   ],

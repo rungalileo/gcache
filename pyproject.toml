@@ -34,7 +34,7 @@ dynamic = ["dependencies"]
 protobuf = ["protobuf>=5.0.0,<8.0.0"]
 
 # The conformance vectors ship as package data so a consumer in ANOTHER repo can read them
-# from an installed gcache instead of mirroring them. All three in-repo clients read the file
+# from an installed gcache instead of mirroring them. Both in-repo clients read the file
 # directly; shipping it serves a downstream service that wants to assert its own payloads
 # against the same corpus. Poetry does not pick up non-Python files under src/ on its own.
 [tool.poetry]

@@ -13,6 +13,10 @@ on:
       - "go/**"
       - ".github/workflows/go.yaml"
 
+concurrency:
+  group: go-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 # Read-only: this job runs unpinned dependency code. See conformance.yaml.
 permissions:
   contents: read
@@ -47,7 +51,7 @@ jobs:
       # gofmt is CHECKED, not applied. A CI job that rewrites files would pass while leaving
       # the repo unformatted for everyone else.
       - name: gofmt
-        run: cd go && test -z "$(gofmt -l .)" || (echo "unformatted:" && gofmt -l . && exit 1)
+        run: cd go && out=$(gofmt -l . 2>&1) || { printf "%s\n" "$out"; exit 1; }; test -z "$out" || { echo "unformatted:"; printf "%s\n" "$out"; exit 1; }
 
       - name: go vet
         run: cd go && go vet ./...
@@ -55,8 +59,17 @@ jobs:
       - name: go test
         run: cd go && go test -count=1 ./... -coverprofile=coverage.out
 
-      - uses: codecov/codecov-action@v4
-        if: github.actor != 'dependabot[bot]'
+      # Same version, token and failure mode as test.yaml. Without the token the upload is
+      # rejected; fail_ci_if_error has no default, so the step stayed GREEN and Go coverage
+      # simply never arrived. The skip condition has to cover forks as well as dependabot --
+      # neither can read repository secrets. See test.yaml's note.
+      - uses: codecov/codecov-action@v7.0.0
+        if: >-
+          ${{ github.actor != 'dependabot[bot]'
+              && (github.event_name != 'pull_request'
+                  || github.event.pull_request.head.repo.full_name == github.repository) }}
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: go/coverage.out
           flags: gcache-go
+          fail_ci_if_error: true

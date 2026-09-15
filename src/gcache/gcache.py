@@ -282,7 +282,7 @@ class GCache:
                            entry as a miss); the pickle case cannot be detected at all.  Migrate under a new ``use_case``.
         :param envelope: How the value is framed in Redis.  ``Envelope.PICKLE`` (the default) serializes arbitrary
                          Python objects but is readable only from Python.  ``Envelope.JSON`` writes the same envelope
-                         the Go and Go clients use, so the entry can be shared across languages; it requires a
+                         the Go client uses, so the entry can be shared across languages; it requires a
                          ``Serializer`` producing str/bytes (pass ``serializer=JsonSerializer()``).  Reads sniff the
                          framing they actually find, so a JSON key still reads a JSON entry written by any language --
                          but a JSON key refuses to unpickle, rather than leaving unpickling reachable for whoever can
@@ -296,7 +296,7 @@ class GCache:
                          different keys and never fight.
 
                          Note also that cross-language invalidation reaches the REDIS layer only.  ``ainvalidate``
-                         writes a watermark, and ``LocalCache`` does not read watermarks, so a Go or Go
+                         writes a watermark, and ``LocalCache`` does not read watermarks, so a Go
                          invalidation does not clear a Python pod's in-process copy until the local TTL expires.  For a
                          use case shared across languages, keep the local TTL short or set the local ramp to 0.
         :return:

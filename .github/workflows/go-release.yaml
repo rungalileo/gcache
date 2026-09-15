@@ -14,8 +14,12 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # READ, not write. The tag push authenticates with GALILEO_AUTOMATION_GITHUB_TOKEN via a
+    # one-shot credential helper, so GITHUB_TOKEN never performs a write -- and setup-go and
+    # setup-python both default their `token` input to github.token, so a write-scoped one
+    # would reach two third-party actions for nothing.
     permissions:
-      contents: write
+      contents: read
 
     services:
       redis:
@@ -109,7 +113,7 @@ jobs:
         run: |
           set -euo pipefail
           cd go
-          test -z "$(gofmt -l .)" || (echo "::error::unformatted files" && gofmt -l . && exit 1)
+          out=$(gofmt -l . 2>&1) || { printf "%s\n" "$out"; exit 1; }; test -z "$out" || { echo "unformatted:"; printf "%s\n" "$out"; exit 1; }
           go vet ./...
           go test -count=1 ./...
 

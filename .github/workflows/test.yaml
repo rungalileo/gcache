@@ -8,6 +8,18 @@ on:
   push:
   pull_request:
 
+# Without this, `push` and `pull_request` both fire for every push to a PR branch, so this
+# job -- the only one on the self-hosted `galileo` runner -- runs twice and a later push
+# cancels neither. Keyed on the ref, so a PR's own pushes supersede each other.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+# Read-only. This job installs and runs unpinned dependency code (pipx, poetry, the test
+# suite) on a persistent runner, so the default token is more than it needs.
+permissions:
+  contents: read
+
 jobs:
   test:
     # Self-hosted for same-repo refs, GitHub-hosted for forks.
@@ -29,9 +41,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # The default leaves the token in .git/config as an http.extraheader for the whole
+          # job, and the steps below run third-party code on a persistent runner.
+          persist-credentials: false
 
       - name: Install poetry
-        run: pipx install poetry==${{vars.POETRY_V2_VERSION}}
+        # Through env, not interpolated into the script: a repository variable carrying a
+        # newline or $(...) would otherwise run as shell here. Same fix as conformance.yaml.
+        env:
+          POETRY_VERSION: ${{ vars.POETRY_V2_VERSION }}
+        run: pipx install "poetry==$POETRY_VERSION"
 
       - name: Set up Python
         uses: actions/setup-python@v6

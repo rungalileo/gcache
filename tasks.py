@@ -96,7 +96,12 @@ def vet_go(ctx: Context) -> None:
     ctx : Context
         Invoke context.
     """
-    ctx.run('cd go && test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)', **COMMON_PARAMS)
+    # The exit status too: gofmt -l prints nothing and exits 2 on a file it cannot parse, so
+    # checking stdout alone passed on exactly the file most in need of checking.
+    ctx.run(
+        'cd go && out=$(gofmt -l . 2>&1) || { printf "%s\n" "$out"; exit 1; }; test -z "$out" || { echo "unformatted:"; printf "%s\n" "$out"; exit 1; }',
+        **COMMON_PARAMS,
+    )
     ctx.run("cd go && go vet ./...", **COMMON_PARAMS)
 
 

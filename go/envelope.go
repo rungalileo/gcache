@@ -61,13 +61,23 @@ func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]b
 	})
 }
 
-// decodeEnvelope unframes a stored value, returning the payload, its write timestamp, and
-// its expiry -- paired with the timestamp, that gives Cache.Get the declared lifetime that
-// closes the resurrection gap (see the guard there). Sniffs the framing rather than assuming, so a key mid-migration or written by another language still works.
-// normalizeBase64 maps the URL-safe alphabet onto the standard one and restores padding,
-// so this reader accepts everything Python's reader does. A genuinely wrong
-// alphabet still fails in DecodeString afterwards.
+// normalizeBase64 accepts the three legal spellings a foreign writer produces and neither
+// client emits: the URL-safe alphabet, missing padding, and line wrapping (the base64 CLI
+// wraps at 76 columns). Python's decode does the same three, in the same order.
+//
+// Whitespace comes out BEFORE padding is computed. Not stripping it at all -- what this did
+// -- padded a length that counted the newlines, so a wrapped payload decoded here when that
+// length happened to be a multiple of four and errored otherwise, agreeing with Python on
+// neither outcome. Exactly these six ASCII bytes, not unicode.IsSpace, so Python's
+// character class matches byte for byte.
 func normalizeBase64(s string) string {
+	s = strings.Map(func(r rune) rune {
+		switch r {
+		case ' ', '\t', '\n', '\r', '\v', '\f':
+			return -1
+		}
+		return r
+	}, s)
 	s = strings.ReplaceAll(s, "-", "+")
 	s = strings.ReplaceAll(s, "_", "/")
 	if pad := len(s) % 4; pad != 0 {
@@ -76,6 +86,9 @@ func normalizeBase64(s string) string {
 	return s
 }
 
+// decodeEnvelope unframes a stored value, returning the payload, its write timestamp and its
+// expiry -- together those give Cache.Get the declared lifetime that closes the resurrection
+// gap. Sniffs the framing, so a key mid-migration or written by the other client still works.
 func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs int64, err error) {
 	if len(raw) == 0 {
 		return nil, 0, 0, errors.New("gcache: empty value")

@@ -1,5 +1,5 @@
-// Package gcache is a Go client for the Redis cache protocol shared with Galileo's Python
-// gcache and its Python port, so any of the three honours the others' entries:
+// Package gcache is a Go client for the Redis cache protocol shared with the Python gcache
+// package, so either client honours the other's entries:
 //
 //	value key      {<urn_prefix>:<key_type>:<id>}[?k1=v1&k2=v2]#<use_case>
 //	watermark key  {<urn_prefix>:<key_type>:<id>}#watermark
@@ -67,8 +67,8 @@ func (k Key) Validate() error {
 }
 
 // prefix renders `{urn:key_type:id}` (or the unbraced form when untracked). No component
-// is escaped, deliberately: Python builds this with bare f-string interpolation, so
-// escaping here would produce keys Python can't find. (Python percent-encodes instead.)
+// is escaped, deliberately: Python builds this with bare f-string interpolation (see
+// render_prefix), so escaping here would produce keys Python cannot find.
 func prefix(urnPrefix string, k Key) string {
 	var b strings.Builder
 	if k.Tracked {

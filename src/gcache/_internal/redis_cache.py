@@ -451,9 +451,10 @@ class RedisCache(CacheInterface):
         """Count a read that found an entry it could not use.
 
         Sets the reason for the miss the fallback is about to count, rather than counting
-        anything here. All of these fall through to the fallback, which raises MISS_COUNTER
-        separate signal keyspace corruption and envelope thrash are indistinguishable from
-        ordinary misses on a dashboard -- and both are conditions an operator needs to see.
+        anything here: all of these fall through to the fallback, so the miss is counted
+        there and this only labels it. Without the label, keyspace corruption and envelope
+        thrash are indistinguishable from ordinary misses on a dashboard, and both are
+        conditions an operator needs to see.
         """
         DEGRADED_REASON.set(reason)
 

@@ -253,15 +253,6 @@ def test_json_envelope_without_a_serializer_is_rejected_at_decoration(gcache: GC
             return {"a": 1}
 
 
-@pytest.mark.asyncio
-async def test_json_serializer_reads_the_undefined_sentinel() -> None:
-    # A TS writer caching `undefined` stores this sentinel; json.loads raises on it, and
-    # that error escapes the caller's EnvelopeDecodeError guard, so the entry never heals.
-    assert await JsonSerializer().load("__gcache_json_undefined_v1__") is None
-    assert await JsonSerializer().load(b"__gcache_json_undefined_v1__") is None
-    assert await JsonSerializer().load('{"a":1}') == {"a": 1}
-
-
 # --- Read-path defects: each of these returned a wrong value or poisoned an entry. ---
 
 
@@ -544,7 +535,7 @@ def test_gcache_key_rejects_json_without_a_serializer() -> None:
 def test_decode_rejects_a_non_finite_timestamp(field: str) -> None:
     # json.loads maps 1e999 to inf; int(inf) then raises OverflowError, outside this
     # function's contract, escaping the caller's miss guard and poisoning the entry for its
-    # whole TTL. parseEnvelope requires Number.isFinite for the same reason.
+    # whole TTL. Go's decodeEnvelope rejects non-finite values for the same reason.
     envelope = {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": "x"}
     raw = json.dumps({**envelope, field: 1e999}).encode()
     with pytest.raises(EnvelopeDecodeError):
@@ -587,7 +578,7 @@ def test_decode_rejects_a_timestamp_outside_the_safe_integer_range() -> None:
 
 def test_decode_rejects_an_integer_timestamp_past_a_double() -> None:
     # Go reads the field into a float64, so an out-of-range literal loses precision and its
-    # Number.isFinite rejects it. Python's arbitrary-precision int accepted it, so the entry
+    # Go rejects it. Python's arbitrary-precision int accepted it, so the entry
     # never expired AND could never be invalidated -- one key, two answers.
     big = int("9" * 401)
     raw = json.dumps(
@@ -607,7 +598,7 @@ def test_decode_wraps_a_recursion_error_from_deeply_nested_json() -> None:
 
 @pytest.mark.parametrize("field", ["createdAtMs", "expiresAtMs"])
 def test_decode_rejects_a_string_timestamp(field: str) -> None:
-    # int("5") succeeds, which is exactly why the isinstance check exists -- parseEnvelope
+    # int("5") succeeds, which is exactly why the isinstance check exists -- Go's decoder
     # requires a number, so without this the two readers accept different bytes.
     envelope = {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": "x"}
     with pytest.raises(EnvelopeDecodeError):
@@ -615,7 +606,7 @@ def test_decode_rejects_a_string_timestamp(field: str) -> None:
 
 
 def test_decode_accepts_unpadded_base64() -> None:
-    # Python rejects unpadded base64 where Buffer.from(..., "base64") accepts it, so a
+    # Python rejects unpadded base64 where Go's RawStdEncoding path accepts it, so a
     # writer using a raw encoder would make every Python read a miss-and-rewrite while the
     # Go reader kept hitting the same key.
     raw = json.dumps(
@@ -625,7 +616,7 @@ def test_decode_accepts_unpadded_base64() -> None:
 
 
 def test_decode_accepts_the_url_safe_base64_alphabet() -> None:
-    # Node's Buffer.from(x, "base64") accepts "-" and "_"; Python's b64decode rejects them,
+    # Go's URLEncoding accepts "-" and "_"; Python's b64decode rejects them,
     # which would make a Go writer using base64.RawURLEncoding a miss-and-rewrite for
     # Python while Go kept hitting the same key.
     payload = base64.urlsafe_b64encode(b"\xf8\xff\xfe binary").decode().rstrip("=")

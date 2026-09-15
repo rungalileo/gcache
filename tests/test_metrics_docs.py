@@ -102,3 +102,37 @@ def test_every_reason_value_is_documented() -> None:
     disabled_list = _reason_list_for("gcache_disabled_counter")
     missing = sorted(r for r in disabled if f"`{r}`" not in disabled_list)
     assert not missing, f"DisabledReasons values not in the README: {missing}"
+
+
+def _alerting_table_reasons() -> set[str]:
+    """The `reason` rows in the alerting-change section's own table.
+
+    A second table listing the same labels is a second thing that can rot, and it already
+    had: it carried four of the eight reasons while the metrics section carried all eight.
+    """
+    readme = (_ROOT / "README.md").read_text()
+    section = re.search(
+        r"### .*Alerting change.*?\n(.*?)(?=\n## |\Z)",
+        readme,
+        re.S,
+    )
+    assert section, "the alerting-change section is gone -- this test needs re-pointing"
+    body = section.group(1)
+    assert "| `reason` | What was found |" in body, "the reason table's header changed"
+    rows = set(re.findall(r"^\| `([a-z_]+)` \| ", body, re.M)) - {"reason"}
+    assert rows, "the alerting-change section no longer has a reason table"
+    return rows
+
+
+def test_the_alerting_section_lists_every_reason_too() -> None:
+    # The metrics section's list is pinned above. This table is a SECOND copy, and a reader
+    # arriving from an alert lands here rather than there, so an omission sends them looking
+    # for a reason value the library emits and this table does not mention.
+    redis_cache = (_ROOT / "src/gcache/_internal/redis_cache.py").read_text()
+    emitted = set(re.findall(r'_record_degraded_read\([^,]+, "([a-z_]+)"\)', redis_cache))
+    emitted |= set(re.findall(r'record_degraded\("([a-z_]+)"\)', redis_cache))
+    assert len(emitted) >= 8, f"expected the degraded-read reasons, found {sorted(emitted)}"
+
+    documented = _alerting_table_reasons()
+    assert not emitted - documented, f"emitted but missing from the alerting table: {sorted(emitted - documented)}"
+    assert not documented - emitted, f"in the alerting table but never emitted: {sorted(documented - emitted)}"

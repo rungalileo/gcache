@@ -1,6 +1,6 @@
 """Python half of the shared cross-language envelope conformance suite.
 
-Both this file and ``gcache-conformance.test.ts`` read the same ``envelope_vectors.json``,
+Both this file and ``go/conformance_test.go`` read the same ``envelope_vectors.json``,
 so a divergence fails a test here instead of escaping to review as it did twice before.
 """
 

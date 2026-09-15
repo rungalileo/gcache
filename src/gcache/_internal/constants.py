@@ -3,8 +3,11 @@
 LOCAL_CACHE_MAX_SIZE = 10_000
 
 # Thresholds
-# Threshold above which pickling runs in a thread to avoid blocking the event loop.
-ASYNC_PICKLE_THRESHOLD_BYTES = 50_000
+# Size above which DECODING runs in a thread rather than on the event loop. Named for
+# decoding, not pickling: RedisCache.get routes on size alone, so this gates json.loads and
+# base64 decoding as much as pickle.loads -- a multi-megabyte JSON envelope blocks the loop
+# just as a large pickle does.
+ASYNC_DECODE_THRESHOLD_BYTES = 50_000
 
 # TTLs (seconds)
 # Watermark TTL must be longer than any invalidatable cache's TTL to ensure

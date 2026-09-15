@@ -11,3 +11,10 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+
+  # The Go client. The
+  # module IS consumed by a downstream service, so its dependencies are worth tracking.
+  - package-ecosystem: "gomod"
+    directory: "/go"
+    schedule:
+      interval: "monthly"

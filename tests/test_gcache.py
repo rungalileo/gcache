@@ -741,7 +741,7 @@ async def test_miss_counter_incremented(
         await cached_func(1)
         # Check miss counter was incremented (both LOCAL and REMOTE layers)
         miss_count = get_func_metric(
-            'api_gcache_miss_counter_total{key_type="Test",layer="LOCAL",use_case="test_miss"}'
+            'api_gcache_miss_counter_total{key_type="Test",layer="LOCAL",reason="",use_case="test_miss"}'
         )
         assert miss_count >= 1.0
 
@@ -879,3 +879,20 @@ async def test_sync_from_async_logs_warning(
         assert "Sync cached function" in caplog.text
         assert "async context" in caplog.text
         assert "test_sync_async_warning" not in caplog.text or "sync_cached_func" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_invalidate_rejects_an_empty_identifier(gcache: GCache) -> None:
+    """Through the PUBLIC api, with a real Redis layer.
+
+    An empty half wrote a watermark for a malformed key -- suppressing nothing while
+    reporting success. Driven through GCache.ainvalidate rather than RedisCache.invalidate
+    because a NoopCache deployment swallows it, so testing the inner method alone would not
+    show which callers are actually protected.
+    """
+    for key_type, id_ in (("", "some-id"), ("kt", ""), ("", "")):
+        with pytest.raises(ValueError, match="requires both key_type and id"):
+            await gcache.ainvalidate(key_type, id_)
+
+    # And a well-formed pair still works, so the guard is not rejecting everything.
+    await gcache.ainvalidate("kt", "some-id")

@@ -1,0 +1,359 @@
+{
+  "$comment": [
+    "Shared conformance vectors for the gcache JSON value envelope.",
+    "",
+    "Read by BOTH tests/test_conformance.py and go/conformance_test.go. Neither may hardcode a",
+    "case: one source of truth is the point, so a reader that diverges fails instead of passing",
+    "against its own mirrored copy. Parity used to be hand-mirrored literals in suites that ran",
+    "in separate repositories, where nothing could run both sides; five cross-language claims",
+    "went silently false in one afternoon under that arrangement.",
+    "",
+    "expect=accept means decode succeeds AND yields `decoded`. expect=reject means the reader",
+    "must treat the value as a MISS -- an exception the client converts to 'miss', never a",
+    "partial or defaulted value. A reject case with a plausible payload is deliberate: a reader",
+    "that ignores the invalid field and returns the payload anyway must fail here.",
+    "",
+    "A vector may carry `rejectedBy`/`acceptedBy` when the clients DELIBERATELY differ, meaning",
+    "one cannot represent the value faithfully and rejecting it there yields a miss-and-rewrite",
+    "rather than two clients serving the same bytes as different numbers. `asymmetryIsSafe` must",
+    "say why that direction is the safe one. A suite asserts only its own client's side."
+  ],
+  "envelopeVersion": 1,
+  "vectorCount": 19,
+  "vectors": [
+    {
+      "name": "canonical",
+      "why": "The shape both writers emit. If this fails nothing else matters.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payload": "{\"a\":1}"
+      }
+    },
+    {
+      "name": "whole-number-float-timestamps",
+      "why": "1757308800123.0 IS a whole number of milliseconds. Rejecting every float would be over-strict, and this vector is what keeps the is_integer/isInteger check from degenerating into that.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123.0,\"expiresAtMs\":1757308860123.0,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payload": "{\"a\":1}"
+      }
+    },
+    {
+      "name": "fractional-expires",
+      "why": "Found in review, not by a test. TS kept the fraction and Python rounded; both compare against a threshold, so expiresAtMs=x.9 at now=x is a HIT in one client and EXPIRED in the other. Same bytes, opposite answers -- so both must reject.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123.9,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "fractional-created",
+      "why": "Same divergence on the other field, which feeds `watermark_ms >= createdAtMs` rather than expiry. Both fields need the vector; fixing one and not the other passed a single-field test.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123.9,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "negative-fractional-created",
+      "why": "int() truncates toward zero and floor does not, so the two rounding strategies disagree in OPPOSITE directions for a negative value. That sign dependence is why rounding was the wrong fix at all.",
+      "envelope": "{\"version\":1,\"createdAtMs\":-1000.9,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "version-zero",
+      "why": "Not the current version, so not readable. Pinned because `version` was once checked truthily, which accepted 0.",
+      "envelope": "{\"version\":0,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "version-true",
+      "why": "JSON true is not 1. Python's `version != 1` is False for True because bool is an int subclass, so it was ACCEPTED there and rejected in TS -- a divergence with no symptom until a foreign writer produced one.",
+      "envelope": "{\"version\":true,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "created-at-string",
+      "why": "A timestamp as a string is the most likely shape from a hand-written or foreign entry. Must be a miss, not a coerced number.",
+      "envelope": "{\"version\":1,\"createdAtMs\":\"1757308800123\",\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "expires-beyond-double",
+      "why": "A 401-digit integer literal. JSON.parse maps it to Infinity so TS rejected it, while Python's arbitrary-precision int accepted it happily -- and an entry with an impossible expiry never looks expired AND can never satisfy watermark_ms >= createdAtMs, so no invalidation can ever reach it.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1e400,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "base64-payload",
+      "why": "The bytes path. Python base64s a bytes payload where Go never does, so this is the one encoding both must agree on.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"eyJhIjoxfQ==\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payloadBase64": "eyJhIjoxfQ=="
+      }
+    },
+    {
+      "name": "unknown-encoding",
+      "why": "An encoding neither client implements must miss rather than being read as utf8.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"gzip\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "payload-not-a-string",
+      "why": "The payload is a JSON string carrying serialized bytes, never a nested object. A reader that accepts an object here would re-serialize it differently from the writer.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":{\"a\":1}}",
+      "expect": "reject"
+    },
+    {
+      "name": "missing-expires",
+      "why": "An absent expiry is not an infinite one.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "not-json-at-all",
+      "why": "Garbage in the keyspace must be a miss, never an exception that escapes the read path -- a cache must not be able to fail a request.",
+      "envelope": "{not json",
+      "expect": "reject"
+    },
+    {
+      "name": "created-above-2-53",
+      "why": "The silent-disagreement case. Go's decodeEnvelope takes the field into a float64 and rounds 9007199254740993 to ...992; Python's json.loads returns the exact int. So in the 2^53..int64 band both clients ACCEPTED and then compared a different number against the staleness threshold, with no error anywhere -- worse than a miss, which heals on the next read. Both now stop at 2^53.",
+      "envelope": "{\"version\":1,\"createdAtMs\":9007199254740993,\"expiresAtMs\":1757308860123,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "reject"
+    },
+    {
+      "name": "created-at-max-safe-integer",
+      "why": "The boundary itself, so the safe-integer bound cannot drift into rejecting the largest faithfully-representable value. 9007199254740991 is Number.MAX_SAFE_INTEGER and every client reads it exactly. Mutation-checked in Go too: making the boundary exclusive rejects this vector.",
+      "envelope": "{\"version\":1,\"createdAtMs\":9007199254740991,\"expiresAtMs\":9007199254740991,\"encoding\":\"utf8\",\"payload\":\"{\\\"a\\\":1}\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 9007199254740991,
+        "expiresAtMs": 9007199254740991,
+        "payload": "{\"a\":1}"
+      }
+    },
+    {
+      "name": "base64-unpadded",
+      "why": "A raw encoder emits no padding. Python's b64decode rejects it, so without the shared re-padding step the same entry is a Go hit and a Python miss-and-rewrite.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"eyJhIjoxfQ\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payloadBase64": "eyJhIjoxfQ=="
+      }
+    },
+    {
+      "name": "base64-url-safe-alphabet",
+      "why": "base64.RawURLEncoding and urlsafe_b64encode emit - and _. Python's b64decode rejects both, so each client must map them onto the standard alphabet first.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"-P_-IGJpbmFyeQ\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payloadBase64": "+P/+IGJpbmFyeQ=="
+      }
+    },
+    {
+      "name": "base64-line-wrapped",
+      "why": "The base64 CLI wraps at 76 columns, so an entry repaired by hand carries newlines. Whitespace must be stripped BEFORE padding is computed: padding a length that counts the newlines decoded for one client only when that length happened to be a multiple of four.",
+      "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"YWJj\\nZGVm\\nZ2hp\\namts\"}",
+      "expect": "accept",
+      "decoded": {
+        "createdAtMs": 1757308800123,
+        "expiresAtMs": 1757308860123,
+        "payloadBase64": "YWJjZGVmZ2hpamts"
+      }
+    }
+  ],
+  "keyRendering": {
+    "$comment": [
+      "What each client renders for a key PREFIX, recorded rather than asserted, so a change to",
+      "either side fails here instead of becoming silently unshared entries. Both clients agree on",
+      "every case; the percent-encoding divergence these cases were written for is gone with the",
+      "client that had it."
+    ],
+    "cases": [
+      {
+        "name": "plain-prefix",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "python": "urn:kt:i",
+        "go": "urn:kt:i",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ]
+        ]
+      },
+      {
+        "name": "namespaced-prefix",
+        "urnPrefix": "urn:galileo:test",
+        "keyType": "kt",
+        "id": "i",
+        "python": "urn:galileo:test:kt:i",
+        "go": "urn:galileo:test:kt:i",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ]
+        ]
+      },
+      {
+        "name": "empty-prefix",
+        "urnPrefix": "",
+        "keyType": "kt",
+        "id": "i",
+        "python": "kt:i",
+        "go": "kt:i",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ]
+        ]
+      }
+    ]
+  },
+  "argOrdering": {
+    "$comment": "Argument ORDER is not part of the wire key: both clients sort by name, byte-ordinal and stable. Recorded because no multi-arg vector existed, which let Go sort while Python's constructor did not -- the same call built two different Redis entries. Values are MEASURED from each client, not asserted.",
+    "cases": [
+      {
+        "name": "reverse-alpha",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "useCase": "u",
+        "args": [
+          [
+            "b",
+            "2"
+          ],
+          [
+            "a",
+            "1"
+          ]
+        ],
+        "why": "The case that caught a real divergence, and the only shape that can. Go sorted args and Python's constructor did not, so the same call built two different Redis entries. No multi-arg vector existed, which is why it survived review. Every writer of a real key sorts -- cached() before constructing, and Go's ValueKey -- so the sorted rendering IS the existing wire format.",
+        "python": "urn:kt:i?a=1&b=2#u",
+        "go": "urn:kt:i?a=1&b=2#u",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ]
+        ]
+      },
+      {
+        "name": "already-alpha",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "useCase": "u",
+        "args": [
+          [
+            "a",
+            "1"
+          ],
+          [
+            "b",
+            "2"
+          ]
+        ],
+        "why": "The control, and a warning. It renders identically whether a client sorts or preserves input order, so a corpus of only alphabetical cases proves nothing. Meaningful only paired with reverse-alpha.",
+        "python": "urn:kt:i?a=1&b=2#u",
+        "go": "urn:kt:i?a=1&b=2#u",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ]
+        ]
+      },
+      {
+        "name": "duplicate-names",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "useCase": "u",
+        "args": [
+          [
+            "a",
+            "1"
+          ],
+          [
+            "a",
+            "2"
+          ]
+        ],
+        "why": "Two args sharing a name. Order is the only thing distinguishing them, so an UNSTABLE sort reorders them and changes the key. All three sorts are stable.",
+        "python": "urn:kt:i?a=1&a=2#u",
+        "go": "urn:kt:i?a=1&a=2#u",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ]
+        ]
+      },
+      {
+        "name": "single-arg",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "useCase": "u",
+        "args": [
+          [
+            "z",
+            "9"
+          ]
+        ],
+        "why": "One arg cannot expose an ordering bug. Present so a suite that silently skips the multi-arg cases still has something to fail on.",
+        "python": "urn:kt:i?z=9#u",
+        "go": "urn:kt:i?z=9#u",
+        "agreeingClients": [
+          [
+            "go",
+            "python"
+          ]
+        ]
+      }
+    ]
+  },
+  "watermarkVsEnvelope": {
+    "$comment": [
+      "Why the watermark keeps an int64 bound while envelope timestamps stop at 2^53.",
+      "",
+      "Not an oversight, and not inherited -- measured. The two fields reach Python through",
+      "DIFFERENT parsers:",
+      "",
+      "  envelope   json.loads  -> an exact Python int at any magnitude",
+      "  watermark  float()     -> a float64, so it rounds above 2^53, exactly as Go and",
+      "                            JavaScript do",
+      "",
+      "Measured in Python at this revision:",
+      "",
+      "  9007199254740993  envelope 9007199254740993   watermark 9007199254740992",
+      "  9007199254740995  envelope 9007199254740995   watermark 9007199254740996",
+      "  9007199254740991  envelope 9007199254740991   watermark 9007199254740991",
+      "",
+      "The watermark values are identical to Go's. So above 2^53 Python and Go ALREADY agree",
+      "on the watermark and disagreed only on the envelope. Tightening the watermark would",
+      "introduce a divergence rather than close one.",
+      "",
+      "Consequence to know before anyone 'fixes' this: within Python, above 2^53, a rounded",
+      "watermark is compared against an exact created_at, so `watermark_ms >= created_at_ms`",
+      "can be off by one millisecond. Unreachable in practice -- 2^53 ms is year 287396 -- and",
+      "now doubly so, since the envelope side rejects those values outright. Do not align the",
+      "two parsers without re-measuring Go first."
+    ]
+  }
+}

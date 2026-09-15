@@ -223,6 +223,119 @@
       }
     ]
   },
+  "argOrdering": {
+    "$comment": "Argument ORDER is not part of the wire key: every client sorts by name, byte-ordinal and stable. Recorded because the absence of any multi-arg vector let Go and Python disagree unnoticed. TypeScript's normalizeArgs sorts OBJECT input for a different reason (JS key order is not meaningful); its tuple path now sorts too. Values here are MEASURED from each client, not asserted.",
+    "cases": [
+      {
+        "name": "reverse-alpha",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "useCase": "u",
+        "args": [
+          [
+            "b",
+            "2"
+          ],
+          [
+            "a",
+            "1"
+          ]
+        ],
+        "why": "The case that caught a real divergence, and the only shape that can. Go sorted args and Python's constructor did not, so the same call built two different Redis entries. No multi-arg vector existed, which is why it survived review. Every writer of a real key sorts -- cached() before constructing, Go's ValueKey, and now Python's and TypeScript's constructors -- so the sorted rendering IS the existing wire format.",
+        "python": "urn:kt:i?a=1&b=2#u",
+        "typescript": "urn:kt:i?a=1&b=2#u",
+        "go": "urn:kt:i?a=1&b=2#u",
+        "agreeingClients": [
+          [
+            "go",
+            "python",
+            "typescript"
+          ]
+        ]
+      },
+      {
+        "name": "already-alpha",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "useCase": "u",
+        "args": [
+          [
+            "a",
+            "1"
+          ],
+          [
+            "b",
+            "2"
+          ]
+        ],
+        "why": "The control, and a warning. It renders identically whether a client sorts or preserves input order, so a corpus of only alphabetical cases proves nothing. Meaningful only paired with reverse-alpha.",
+        "python": "urn:kt:i?a=1&b=2#u",
+        "typescript": "urn:kt:i?a=1&b=2#u",
+        "go": "urn:kt:i?a=1&b=2#u",
+        "agreeingClients": [
+          [
+            "go",
+            "python",
+            "typescript"
+          ]
+        ]
+      },
+      {
+        "name": "duplicate-names",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "useCase": "u",
+        "args": [
+          [
+            "a",
+            "1"
+          ],
+          [
+            "a",
+            "2"
+          ]
+        ],
+        "why": "Two args sharing a name. Order is the only thing distinguishing them, so an UNSTABLE sort reorders them and changes the key. All three sorts are stable.",
+        "python": "urn:kt:i?a=1&a=2#u",
+        "typescript": "urn:kt:i?a=1&a=2#u",
+        "go": "urn:kt:i?a=1&a=2#u",
+        "agreeingClients": [
+          [
+            "go",
+            "python",
+            "typescript"
+          ]
+        ]
+      },
+      {
+        "name": "single-arg",
+        "urnPrefix": "urn",
+        "keyType": "kt",
+        "id": "i",
+        "useCase": "u",
+        "args": [
+          [
+            "z",
+            "9"
+          ]
+        ],
+        "why": "One arg cannot expose an ordering bug. Present so a suite that silently skips the multi-arg cases still has something to fail on.",
+        "python": "urn:kt:i?z=9#u",
+        "typescript": "urn:kt:i?z=9#u",
+        "go": "urn:kt:i?z=9#u",
+        "agreeingClients": [
+          [
+            "go",
+            "python",
+            "typescript"
+          ]
+        ]
+      }
+    ]
+  },
   "watermarkVsEnvelope": {
     "$comment": [
       "Why the watermark keeps an int64 bound while envelope timestamps stop at 2^53.",

@@ -59,10 +59,25 @@ interface KeyCase {
   readonly reason?: string;
 }
 
+interface ArgOrderCase {
+  readonly name: string;
+  readonly urnPrefix: string;
+  readonly keyType: string;
+  readonly id: string;
+  readonly useCase: string;
+  readonly args: readonly (readonly string[])[];
+  readonly why: string;
+  readonly go: string;
+  readonly python: string;
+  readonly typescript: string;
+  readonly agreeingClients: readonly (readonly string[])[];
+}
+
 const data = JSON.parse(readFileSync(vectorsPath, "utf8")) as {
   envelopeVersion: number;
   vectors: readonly Vector[];
   keyRendering: { cases: readonly KeyCase[] };
+  argOrdering: { cases: readonly ArgOrderCase[] };
 };
 
 class FakeRedis implements RedisCommandClient {
@@ -264,5 +279,40 @@ describe("cross-language envelope conformance", () => {
         expect(c.reason, `${c.name} must explain a divergence`).toBeTruthy();
       }
     }
+  });
+
+  it("sorts args by name, as every client does", () => {
+    // Sorted args are the existing wire format, not a new convention: Python's cached() has
+    // always sorted before building a key. This constructor did not, so the same logical
+    // args in a different order built a different Redis entry here than in Go.
+    for (const c of data.argOrdering.cases) {
+      const rendered = new GCacheKey({
+        keyType: c.keyType,
+        id: c.id,
+        useCase: c.useCase,
+        urnPrefix: c.urnPrefix,
+        args: c.args.map((pair) => [pair[0], pair[1]] as [string, string]),
+      }).urn;
+      expect(rendered, `${c.name}: TS renders ${rendered}, file says ${c.typescript}`).toBe(c.typescript);
+
+      const byRendering = new Map<string, string[]>();
+      for (const client of ["go", "python", "typescript"] as const) {
+        byRendering.set(c[client], [...(byRendering.get(c[client]) ?? []), client]);
+      }
+      const expected = [...byRendering.values()].map((g) => [...g].sort()).sort((a, b) => a[0]!.localeCompare(b[0]!));
+      expect(c.agreeingClients.map((g) => [...g]), `${c.name}: agreeingClients contradicts the renderings`).toEqual(expected);
+      expect(c.why, `${c.name} must say what it is for`).toBeTruthy();
+    }
+  });
+
+  it("has an arg-order corpus that could detect an unsorted client", () => {
+    // An already-alphabetical case renders the same either way, so a corpus of only those
+    // proves nothing -- exactly how the Go/Python split survived. At least one case must
+    // differ from its own input-order rendering.
+    const discriminating = data.argOrdering.cases.filter((c) => {
+      const body = c.args.map((pair) => `${pair[0]}=${pair[1]}`).join("&");
+      return c.typescript !== `${c.urnPrefix}:${c.keyType}:${c.id}?${body}#${c.useCase}`;
+    });
+    expect(discriminating.length, "no argOrdering case can distinguish sorted from input order").toBeGreaterThan(0);
   });
 });

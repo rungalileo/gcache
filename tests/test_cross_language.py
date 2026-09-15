@@ -293,7 +293,13 @@ def test_go_and_python_render_identical_keys(go: GoClient, urn_prefix: str) -> N
     from gcache.config import GCacheKey
 
     sid = "sid-key-shape"
-    args = [("beta", "2"), ("alpha", "1")]  # deliberately out of order
+    # Deliberately NOT alphabetical, and passed to BOTH clients exactly as written.
+    #
+    # This used to hand Go these args and build the Python key from sorted(args). That was
+    # not wrong at the time -- hand-sorting mirrored what cached() does -- but it meant the
+    # test could not observe the constructors disagreeing, which is precisely what they did.
+    # Both now sort internally, so passing one order to both sides is a real comparison.
+    args = [("beta", "2"), ("alpha", "1")]
 
     previous = _GLOBAL_GCACHE_STATE.urn_prefix
     _GLOBAL_GCACHE_STATE.urn_prefix = urn_prefix
@@ -302,7 +308,7 @@ def test_go_and_python_render_identical_keys(go: GoClient, urn_prefix: str) -> N
             key_type=KEY_TYPE,
             id=sid,
             use_case=USE_CASE,
-            args=sorted(args, key=lambda a: a[0]),
+            args=args,
             invalidation_tracking=True,
         )
         py_value_key = py_key.urn

@@ -291,7 +291,22 @@ class GCacheKey:
         if self.use_case == "watermark":
             raise UseCaseNameIsReserved()
 
-        object.__setattr__(self, "args", tuple(self.args))
+        # Sorted by name, matching what already exists on the wire.
+        #
+        # Two writers produce every real key today and BOTH sort: cached() sorts before it
+        # constructs a key (gcache.py), and Go's ValueKey sorts. This constructor did not,
+        # so the aget/aput path added here was the one route that could build a key Go
+        # renders differently -- same logical args, different order, different Redis entry,
+        # a silent miss in both directions.
+        #
+        # Sorting HERE rather than unsorting Go is the direction that preserves existing
+        # entries: cached() already hands them sorted, so this is idempotent for every key
+        # in production. The reverse was tried and reverted -- removing Go's sort broke
+        # parity with every key cached() had ever written, which go/key_test.go's
+        # production-key fixtures caught immediately.
+        #
+        # Stable, so two args sharing a name keep their input order in every client.
+        object.__setattr__(self, "args", tuple(sorted(self.args, key=lambda pair: pair[0])))
 
         prefix = render_prefix(self.key_type, self.id, tracked=self.invalidation_tracking)
         object.__setattr__(self, "prefix", prefix)

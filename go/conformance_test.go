@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -55,6 +56,21 @@ type conformanceFile struct {
 			Reason          string     `json:"reason"`
 		} `json:"cases"`
 	} `json:"keyRendering"`
+	ArgOrdering struct {
+		Cases []struct {
+			Name            string     `json:"name"`
+			URNPrefix       string     `json:"urnPrefix"`
+			KeyType         string     `json:"keyType"`
+			ID              string     `json:"id"`
+			UseCase         string     `json:"useCase"`
+			Args            [][]string `json:"args"`
+			Why             string     `json:"why"`
+			Go              string     `json:"go"`
+			Python          string     `json:"python"`
+			TypeScript      string     `json:"typescript"`
+			AgreeingClients [][]string `json:"agreeingClients"`
+		} `json:"cases"`
+	} `json:"argOrdering"`
 }
 
 func loadConformance(t *testing.T) conformanceFile {
@@ -212,4 +228,63 @@ func equalGroups(a, b [][]string) bool {
 		}
 	}
 	return true
+}
+
+// TestConformanceArgOrdering pins that ValueKey sorts args by name.
+//
+// The sort is not a local preference: Python's cached() has always sorted before building a
+// key, so sorted args are what every key in production already looks like, and Python's and
+// TypeScript's constructors were brought into line rather than this one being loosened.
+// Removing this sort was tried and reverted -- it broke parity with every key cached() had
+// written, which TestValueKeyMatchesProductionKeys caught immediately.
+func TestConformanceArgOrdering(t *testing.T) {
+	f := loadConformance(t)
+	if len(f.ArgOrdering.Cases) == 0 {
+		t.Fatal("no argOrdering cases -- the fixture moved or the section was dropped")
+	}
+	for _, c := range f.ArgOrdering.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			if c.Why == "" {
+				t.Error("every case must say what it is for")
+			}
+			args := make([]Arg, 0, len(c.Args))
+			for _, pair := range c.Args {
+				if len(pair) != 2 {
+					t.Fatalf("malformed arg pair %v", pair)
+				}
+				args = append(args, Arg{Name: pair[0], Value: pair[1]})
+			}
+			key := Key{KeyType: c.KeyType, ID: c.ID, UseCase: c.UseCase, Args: args}
+			if got := ValueKey(c.URNPrefix, key); got != c.Go {
+				t.Errorf("Go renders %q, file says %q", got, c.Go)
+			}
+		})
+	}
+}
+
+// TestConformanceArgOrderingCorpusCouldDetectAnUnsortedClient asserts the corpus's own
+// discriminating power. An already-alphabetical case renders the same whether a client sorts
+// or preserves input order, so a corpus of only those cannot detect a client that stops
+// sorting -- exactly how the Go/Python split survived. At least one case must differ from
+// its own input-order rendering.
+func TestConformanceArgOrderingCorpusCouldDetectAnUnsortedClient(t *testing.T) {
+	f := loadConformance(t)
+	for _, c := range f.ArgOrdering.Cases {
+		var b strings.Builder
+		b.WriteString(c.URNPrefix + ":" + c.KeyType + ":" + c.ID)
+		for i, pair := range c.Args {
+			if i == 0 {
+				b.WriteByte('?')
+			} else {
+				b.WriteByte('&')
+			}
+			b.WriteString(pair[0] + "=" + pair[1])
+		}
+		b.WriteString("#" + c.UseCase)
+		if b.String() != c.Go {
+			return // this case distinguishes sorted from input order; the corpus has teeth
+		}
+	}
+	t.Fatal("every argOrdering case renders the same sorted or unsorted, so this suite cannot " +
+		"detect a client that stopped sorting -- add a case whose args are not alphabetical")
 }

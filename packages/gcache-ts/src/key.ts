@@ -36,7 +36,22 @@ export class GCacheKey {
 
     const rawPrefix = joinUrnComponents(this.urnPrefix, this.keyType, this.id);
     this.prefix = this.trackForInvalidation ? redisClusterHashTag(invalidationPrefix(this.urnPrefix, this.keyType, this.id)) : rawPrefix;
-    const args = this.args.length > 0 ? `?${this.args.map(([name, value]) => `${encodeComponent(name)}=${encodeComponent(value)}`).join("&")}` : "";
+    // Sorted by name, matching Python's GCacheKey and Go's ValueKey. Every writer of a
+    // real key sorts: Python's cached() sorts before constructing, Go's ValueKey sorts, and
+    // Python's constructor now does too. This one did not, so the same logical args in a
+    // different order built a different Redis entry here than in the other two clients.
+    //
+    // normalizeArgs' own localeCompare sort is a separate concern -- it converts an OBJECT
+    // to tuples, where JS key order carries no meaning. This sorts the tuple form as well,
+    // so both entry points agree. Byte-ordinal rather than localeCompare, to match Python
+    // and Go on non-ASCII names; localeCompare is locale-sensitive and would diverge.
+    //
+    // Stable, so two args sharing a name keep their input order in every client.
+    const sortedArgs = [...this.args].sort(([l], [r]) => (l < r ? -1 : l > r ? 1 : 0));
+    const args =
+      sortedArgs.length > 0
+        ? `?${sortedArgs.map(([name, value]) => `${encodeComponent(name)}=${encodeComponent(value)}`).join("&")}`
+        : "";
     this.urn = `${this.prefix}${args}#${encodeComponent(this.useCase)}`;
   }
 

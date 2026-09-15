@@ -121,6 +121,20 @@ jobs:
           fails=0
           detected=""
           missed=""
+          unrelated=""
+          MUTATED_VECTOR=fractional-expires
+          # A non-zero exit is NOT proof the client read the mutated vector. A collection
+          # error, a missing dependency or an unrelated assertion all exit non-zero too, and
+          # counting those as detection is the same false green this step exists to rule
+          # out -- one level further in. So the outcome is three-way, and only the middle
+          # case counts:
+          #
+          #   exit 0                          -> MISSED: the client did not read the vector
+          #   non-zero AND names the vector   -> DETECTED
+          #   non-zero and does NOT name it   -> UNRELATED failure, fails the step outright
+          #
+          # All three suites name the failing vector in their output, verified by running
+          # each against this exact mutation.
           run_suite() {
             name="$1"; shift
             if "$@" >"/tmp/$name.log" 2>&1; then
@@ -128,19 +142,30 @@ jobs:
               echo "::group::$name PASSED on a mutated fixture (tail)"
               tail -40 "/tmp/$name.log"
               echo "::endgroup::"
-            else
+              return
+            fi
+            if grep -q "$MUTATED_VECTOR" "/tmp/$name.log"; then
               detected="$detected $name"
               fails=$((fails+1))
+              return
             fi
+            echo "::group::$name failed WITHOUT naming $MUTATED_VECTOR (tail)"
+            tail -60 "/tmp/$name.log"
+            echo "::endgroup::"
+            echo "::error::$name failed for an unrelated reason, so this step cannot tell"
+            echo "::error::whether it reads the shared fixture. Fix that failure first."
+            unrelated="$unrelated $name"
           }
           run_suite python poetry run pytest tests/test_conformance.py -q
-          # The conformance FILE, not the whole vitest suite. run_suite treats any non-zero
-          # exit as proof the client read the mutated vector, so a flake anywhere else in
-          # the 95 tests would satisfy this step while the conformance suite never saw the
-          # mutation -- the exact false green this step exists to rule out.
+          # The conformance FILE, not the whole vitest suite: a flake elsewhere among the 97
+          # tests would otherwise reach the classifier at all.
           run_suite typescript pnpm --filter @rungalileo/gcache exec vitest run test/gcache-conformance.test.ts
           run_suite go go -C go test -count=1 -run TestConformance ./...
           cp /tmp/vectors.bak "$F"
+          if [ -n "$unrelated" ]; then
+            echo "::error::unrelated failures in:$unrelated"
+            exit 1
+          fi
           echo "detected the mutation:$detected"
           if [ "$fails" -ne 3 ]; then
             echo "::error::mutated vector detected by$detected but NOT by$missed -- \

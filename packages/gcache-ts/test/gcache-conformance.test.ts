@@ -291,7 +291,13 @@ describe("cross-language envelope conformance", () => {
         id: c.id,
         useCase: c.useCase,
         urnPrefix: c.urnPrefix,
-        args: c.args.map((pair) => [pair[0], pair[1]] as [string, string]),
+        args: c.args.map((pair) => {
+          // Length checked, matching the Go reader's `if len(pair) != 2`. Mapping
+          // [pair[0], pair[1]] blind silently TRUNCATES a malformed 3-element entry, so a
+          // corrupt fixture would still render a plausible key and pass.
+          expect(pair.length, `${c.name}: arg pair ${JSON.stringify(pair)} must have exactly 2 elements`).toBe(2);
+          return [pair[0], pair[1]] as [string, string];
+        }),
       }).urn;
       expect(rendered, `${c.name}: TS renders ${rendered}, file says ${c.typescript}`).toBe(c.typescript);
 

@@ -404,7 +404,9 @@ Four things to know:
 
 - **`envelope` and `serializer` are not part of the key.** `key_type`, `id`, `args` and
   `use_case` are, so getting one of those wrong just means the two participants never see
-  each other's entries. Getting the envelope wrong is worse: both then share one key with
+  each other's entries. `args` is **sorted by name** in the constructor, as `@cached` and
+  Go's `ValueKey` both do, so the order you pass does not matter and `key.args` reads back
+  in a different order than you gave it. Getting the envelope wrong is worse: both then share one key with
   incompatible framing, each overwrites the other, and neither can read what it finds. Within
   one process the library now catches it — a direct key whose envelope contradicts a
   `@cached` declaration on the same `use_case` raises — but across languages it cannot.

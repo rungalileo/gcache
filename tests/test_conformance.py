@@ -27,8 +27,8 @@ def test_the_vector_file_is_where_every_suite_expects_it() -> None:
     # suite dies quietly.
     assert pathlib.Path(vectors_path()).exists(), f"shared vectors missing at {vectors_path()}"
     # EXACT, not a floor: a floor of 14 let two vectors disappear from 16 with every guard
-    # still green. Count lives in the fixture, so adding a vector is one edit that all
-    # three suites check.
+    # still green. Count lives in the fixture, so adding a vector is one edit that both
+    # suites check.
     assert len(_VECTORS) == _DATA["vectorCount"], (
         f"fixture declares vectorCount={_DATA['vectorCount']} but carries {len(_VECTORS)} vectors"
     )
@@ -205,7 +205,7 @@ def test_the_watermark_and_envelope_parsers_really_do_differ() -> None:
 
 
 def test_argument_order_is_normalized_identically_by_every_client() -> None:
-    # Args sort by name in all three clients, so caller order cannot change the key. Exists
+    # Args sort by name in both clients, so caller order cannot change the key. Exists
     # because keyRendering's cases carry no args, so Go sorted while Python's constructor
     # didn't, and every suite stayed green.
     from gcache import GCacheKey

@@ -61,9 +61,10 @@ def test(ctx: Context) -> None:
     ctx.run("poetry run pytest -vvv --cov=gcache --cov-report=xml", **COMMON_PARAMS)
 
 
-# Unified verbs across the three implementations. A NAMING CONVENTION, not a build system:
-# each language keeps its native tooling and these shell out to it. Three ports of one
-# library share no build graph, which is the only thing Bazel or Nx exists to exploit.
+# Unified verbs across both implementations. A NAMING CONVENTION, not a build system: each
+# language keeps its native tooling and these shell out to it. Two ports of one library share
+# no build graph, which is the only thing Bazel or Nx exists to exploit. The Go commands are
+# bare `go`/`gofmt` on purpose -- there is no venv for `poetry run` to enter.
 
 
 @task

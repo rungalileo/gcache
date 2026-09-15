@@ -135,8 +135,8 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 		if math.IsNaN(*f.val) || math.IsInf(*f.val, 0) {
 			return nil, 0, 0, fmt.Errorf("gcache: %s must be finite, got %v", f.name, *f.val)
 		}
-		// A FRACTIONAL timestamp is rejected (a whole-valued float is not); all three
-		// clients now reject it. It matters because readers compare against a THRESHOLD:
+		// A FRACTIONAL timestamp is rejected (a whole-valued float is not); Python rejects
+		// it too. It matters because readers compare against a THRESHOLD:
 		// expiresAtMs=1000.9 at now=1000 is unexpired for a truncating reader, expired for a rounding one.
 		if *f.val != math.Trunc(*f.val) {
 			return nil, 0, 0, fmt.Errorf(
@@ -144,7 +144,7 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 		}
 		// Beyond the SAFE-INTEGER range (2^53) is rejected here; parseWatermark clamps at
 		// int64 instead, since above 2^53 Go's float64 decode DISAGREED with Python's own
-		// envelope parse with no error (measured: createdAtMs 9007199254740993 read as ...992 in Go, ...993 in Python). All three clients now share this bound.
+		// envelope parse with no error (measured: createdAtMs 9007199254740993 read as ...992 in Go, ...993 in Python). Both clients now share this bound.
 		if !isSafeInteger(*f.val) {
 			return nil, 0, 0, fmt.Errorf(
 				"gcache: %s %v is outside the safe-integer range; it cannot round-trip "+

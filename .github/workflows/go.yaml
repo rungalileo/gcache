@@ -1,6 +1,6 @@
 name: Go
 
-# Path-filtered; conformance.yaml is not, so every PR still exercises all three clients.
+# Path-filtered; conformance.yaml is not, so every PR still exercises both clients.
 # NOTE: `paths` on `push` matches that commit, but on `pull_request` it matches the PR's
 # CUMULATIVE diff -- so a PR that ever touched go/** runs this on every later push.
 on:

@@ -553,8 +553,8 @@ def test_decode_rejects_a_non_finite_timestamp(field: str) -> None:
 
 def test_decode_accepts_a_large_in_range_integer_timestamp() -> None:
     # SAFE-INTEGER bound (2^53), tightened deliberately from a looser int64: above 2^53, JS
-    # and Go round the field through a float64 while Python's json.loads stays exact, so
-    # int64 let all three ACCEPT and silently compare different numbers.
+    # Go rounds the field through a float64 while Python's json.loads stays exact, so
+    # int64 let both ACCEPT and silently compare different numbers.
     big = 2**52  # ~year 144000, and comfortably inside the safe-integer range
     raw = json.dumps(
         {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}

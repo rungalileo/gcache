@@ -25,7 +25,7 @@ being readable straight out of
 
 Reads sniff the first byte rather than trusting the declared envelope, so a reader
 understands whatever the writer actually produced -- which is what lets a pickle key read a
-JSON entry, and lets all three languages share one keyspace. Sniffing alone, though, would
+JSON entry, and lets both languages share one keyspace. Sniffing alone, though, would
 leave the pickle path reachable for every key, including one that declares
 ``Envelope.JSON``, so ``decode`` takes ``allow_pickle`` and a JSON key refuses pickle
 outright. Choosing ``Envelope.JSON`` therefore does close the arbitrary-code-execution path
@@ -115,7 +115,7 @@ def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes
     for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
         if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):
             raise EnvelopeEncodeError(
-                f"{field} would be {value}, outside the safe-integer range that all three "
+                f"{field} would be {value}, outside the safe-integer range that both "
                 f"clients can read (created_at_ms={created_at_ms}, ttl_sec={ttl_sec})"
             )
 
@@ -211,8 +211,8 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                 # disagree differently.
                 if not as_double.is_integer():
                     raise EnvelopeDecodeError(f"{field} must be a whole number of milliseconds, got {value!r}")
-                # Bounded to the SAFE-INTEGER range, not int64: in the 2^53..int64 band all
-                # three clients accepted and then compared DIFFERENT numbers, which never
+                # Bounded to the SAFE-INTEGER range, not int64: in the 2^53..int64 band both
+                # clients accepted and then compared DIFFERENT numbers, which never
                 # announces itself. The watermark keeps int64 because it reaches Python
                 # through float(), so Python and Go already agree there.
                 if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):

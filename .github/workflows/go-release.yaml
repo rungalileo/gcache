@@ -55,8 +55,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::version must look like v0.1.0, got '$VERSION'"
+          # Each component is 0 or has no leading zero: v01.02.03 is not canonical SemVer,
+          # and the proxy would cache it permanently as a version nobody would ever write.
+          if ! printf '%s' "$VERSION" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::version must be canonical SemVer with no leading zeroes, got '$VERSION'"
             exit 1
           fi
 
@@ -117,7 +119,7 @@ jobs:
       #    effort on -- five cross-language claims went silently false in one
       #    afternoon before the implementations were co-located.
       # ---------------------------------------------------------------------
-      - name: Cross-language conformance, all three clients
+      - name: Cross-language conformance, both clients
         # Through env, not interpolated into the script. A repository variable is not a
         # secret but it is still attacker-influenceable config, and `${{ vars.X }}` pasted
         # into a run: block executes a newline or $(...) as shell -- inside the job that
@@ -138,6 +140,7 @@ jobs:
       - name: Create and push the signed tag
         env:
           VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
           SSH_PUBLIC: ${{ secrets.GALILEO_AUTOMATION_SSH_PUBLIC_KEY }}
           SSH_PRIVATE: ${{ secrets.GALILEO_AUTOMATION_SSH_PRIVATE_KEY }}
           TAG_PUSH_TOKEN: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
@@ -167,7 +170,13 @@ jobs:
           git config gpg.format ssh
           git config user.signingkey ~/.ssh/signing_key
 
-          git tag -s "go/$VERSION" -m "gcache Go client $VERSION"
+          # The dispatched commit explicitly, not HEAD: HEAD is whatever the checkout and
+          # every step since left behind, so tagging it would make the immutable tag's
+          # contents depend on steps that run third-party code. This is the commit the
+          # build, vet and conformance gates above actually ran against.
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA" \
+            || { echo "::error::HEAD moved during the release job; refusing to tag"; exit 1; }
+          git tag -s "go/$VERSION" -m "gcache Go client $VERSION" "$RELEASE_SHA"
 
           # Credentials via a one-shot helper, so the token is in neither .git/config nor
           # argv. An earlier version of this put it in the push URL, which keeps it out of
@@ -198,8 +207,12 @@ jobs:
             echo "attempt $attempt: not yet indexed, waiting"
             sleep 15
           done
-          # Not a release failure: the tag is pushed and valid, the proxy is just slow to
-          # index. Say so precisely rather than failing a release that succeeded.
-          echo "::warning::tag go/$VERSION pushed, but the proxy had not indexed it after"
-          echo "::warning::5 attempts. Re-run 'go get github.com/rungalileo/gcache/go@$VERSION'"
-          echo "::warning::to confirm; no re-release is needed."
+          # FAIL, even though the tag is pushed and may well be fine. This step exists to
+          # PROVE the version resolves, and `go get` does not say whether it failed because
+          # the proxy is slow or because the module is unservable -- so a green job here
+          # would report a verification that did not happen. Red makes someone look.
+          echo "::error::tag go/$VERSION is pushed, but the proxy did not serve it after 5"
+          echo "::error::attempts. Do NOT re-release -- the version is permanent. Run"
+          echo "::error::'go get github.com/rungalileo/gcache/go@$VERSION' to tell a slow"
+          echo "::error::index from a module the proxy cannot build."
+          exit 1

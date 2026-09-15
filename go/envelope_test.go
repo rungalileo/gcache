@@ -224,7 +224,7 @@ func TestDecodeEnvelopeRejectsMissingFields(t *testing.T) {
 
 func TestDecodeEnvelopeTakesAWholeFloatAndRejectsAFractionalOne(t *testing.T) {
 	// A float that is WHOLE is still accepted -- a writer emitting 1757308800123.0 is in
-	// spec and must not become a Go-only miss. All three clients now reject a fractional
+	// spec and must not become a Go-only miss. Both clients now reject a fractional
 	// timestamp, closing what was once the last disagreement on this field.
 	_, created, expires, err := decodeEnvelope([]byte(
 		`{"version":1,"createdAtMs":1757308800123.0,"expiresAtMs":1757308860123.0,"encoding":"utf8","payload":"{}"}`))

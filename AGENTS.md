@@ -82,12 +82,15 @@ dropped for that reason.
 
 - Type hints required, line length 120, ruff + mypy
 - Python 3.10+ (uses `|` union syntax)
-- Always use `poetry run` for all commands including git (e.g., `poetry run pytest`, `poetry run git push`)
+- Always use `poetry run` for PYTHON tooling, including git (e.g., `poetry run pytest`, `poetry run git push`) -- it is what puts the project venv on PATH
+- Go tooling runs directly (`go test`, `gofmt`, `go vet`). There is no venv for it to enter, so `poetry run go` would resolve the same binary with a layer of indirection
 
 ## Testing
 
 ```bash
 poetry run pytest tests/          # Python
+inv test-go                       # Go (needs a Redis on localhost:6379)
+inv test-conformance              # both clients against the shared vectors
 ```
 
 ### Cross-language conformance vectors

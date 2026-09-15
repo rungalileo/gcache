@@ -690,7 +690,7 @@ async def test_a_degraded_read_increments_its_counter_with_a_reason(
     async def cached_func(test: int = 1) -> str:
         return "ok"
 
-    counter = GCacheMetrics.DEGRADED_READ_COUNTER.labels("degraded_uc", "Test", CacheLayer.REMOTE.name, "undecodable")
+    counter = GCacheMetrics.MISS_COUNTER.labels("degraded_uc", "Test", CacheLayer.REMOTE.name, "undecodable")
     before = counter._value.get()
 
     with gcache.enable():
@@ -721,9 +721,7 @@ async def test_an_expired_envelope_is_counted_separately_from_corruption(
     async def cached_func(test: int = 1) -> dict:
         return {"a": 1}
 
-    counter = GCacheMetrics.DEGRADED_READ_COUNTER.labels(
-        "expired_reason_uc", "Test", CacheLayer.REMOTE.name, "envelope_expired"
-    )
+    counter = GCacheMetrics.MISS_COUNTER.labels("expired_reason_uc", "Test", CacheLayer.REMOTE.name, "envelope_expired")
     before = counter._value.get()
 
     with gcache.enable():
@@ -758,7 +756,7 @@ async def test_switching_a_live_use_case_to_json_heals_rather_than_raising(
         calls += 1
         return {"calls": calls}
 
-    counter = GCacheMetrics.DEGRADED_READ_COUNTER.labels("migrate_uc", "Test", CacheLayer.REMOTE.name, "undecodable")
+    counter = GCacheMetrics.MISS_COUNTER.labels("migrate_uc", "Test", CacheLayer.REMOTE.name, "undecodable")
     before = counter._value.get()
 
     with gcache.enable():

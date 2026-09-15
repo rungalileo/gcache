@@ -14,7 +14,7 @@ from redis.asyncio import Redis, RedisCluster
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
 from gcache._internal.envelope import _INT64_MAX, _INT64_MIN, DecodedValue, EnvelopeDecodeError, decode, encode_json
-from gcache._internal.metrics import GCacheMetrics
+from gcache._internal.metrics import DEGRADED_REASON, GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.config import CacheConfigProvider, CacheLayer, Envelope, GCacheKey, RedisConfig, render_prefix
 from gcache.exceptions import MissingKeyConfig, TrackedTTLExceedsWatermark
@@ -432,11 +432,12 @@ class RedisCache(CacheInterface):
     def _record_degraded_read(self, key: GCacheKey, reason: str) -> None:
         """Count a read that found an entry it could not use.
 
-        All of these fall through to the fallback, which raises MISS_COUNTER, so without a
+        Sets the reason for the miss the fallback is about to count, rather than counting
+        anything here. All of these fall through to the fallback, which raises MISS_COUNTER
         separate signal keyspace corruption and envelope thrash are indistinguishable from
         ordinary misses on a dashboard -- and both are conditions an operator needs to see.
         """
-        GCacheMetrics.DEGRADED_READ_COUNTER.labels(key.use_case, key.key_type, self.layer().name, reason).inc()
+        DEGRADED_REASON.set(reason)
 
     def layer(self) -> CacheLayer:
         return CacheLayer.REMOTE

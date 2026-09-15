@@ -4,7 +4,7 @@ from random import random
 from typing import Any
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
-from gcache._internal.metrics import GCacheMetrics
+from gcache._internal.metrics import DEGRADED_REASON, GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE, GCacheContext
 from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey
 
@@ -88,7 +88,12 @@ class CacheController(CacheWrapper):
                     nonlocal fallback_succeeded
                     nonlocal fallback_time
                     start_fallback = time.monotonic()
-                    GCacheMetrics.MISS_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
+                    # `reason` is set by the layer below when a read found an entry it
+                    # could not use; empty for an ordinary miss. Reset after reading so the
+                    # next request on this task does not inherit it.
+                    reason = DEGRADED_REASON.get()
+                    DEGRADED_REASON.set("")
+                    GCacheMetrics.MISS_COUNTER.labels(key.use_case, key.key_type, self.layer().name, reason).inc()
                     try:
                         fallback_result = await fallback()
                         fallback_succeeded = True

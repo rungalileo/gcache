@@ -741,7 +741,7 @@ async def test_miss_counter_incremented(
         await cached_func(1)
         # Check miss counter was incremented (both LOCAL and REMOTE layers)
         miss_count = get_func_metric(
-            'api_gcache_miss_counter_total{key_type="Test",layer="LOCAL",use_case="test_miss"}'
+            'api_gcache_miss_counter_total{key_type="Test",layer="LOCAL",reason="",use_case="test_miss"}'
         )
         assert miss_count >= 1.0
 

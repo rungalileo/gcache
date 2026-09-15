@@ -182,7 +182,7 @@ hides the misconfiguration from the read guards below, so it would surface nowhe
 writes and the keyspace is shared:
 
 - a tracked JSON entry whose envelope *declares* a lifetime over 4 hours is a miss
-  (`gcache_degraded_read_counter{reason="lifetime_exceeds_watermark"}`)
+  (`gcache_miss_counter{reason="lifetime_exceeds_watermark"}`)
 - a tracked entry of **either** framing that is *older* than 4 hours is a miss
   (`reason="age_exceeds_watermark"`). This is the one that covers legacy pickle entries,
   which carry no `expiresAtMs` for the first check to read. An entry can only reach that age
@@ -604,10 +604,9 @@ against the wrong label set returns nothing rather than erroring.
 | Metric | Type | Labels |
 |--------|------|--------|
 | `gcache_request_counter` | Counter | `use_case`, `key_type`, `layer` |
-| `gcache_miss_counter` | Counter | `use_case`, `key_type`, `layer` |
+| `gcache_miss_counter` | Counter | `use_case`, `key_type`, `layer`, `reason` |
 | `gcache_disabled_counter` | Counter | `use_case`, `key_type`, `layer`, `reason` |
 | `gcache_error_counter` | Counter | `use_case`, `key_type`, `layer`, `error`, `in_fallback` |
-| `gcache_degraded_read_counter` | Counter | `use_case`, `key_type`, `layer`, `reason` |
 | `gcache_invalidation_counter` | Counter | `key_type`, `layer` |
 | `gcache_get_timer` | Histogram | `use_case`, `key_type`, `layer` |
 | `gcache_fallback_timer` | Histogram | `use_case`, `key_type`, `layer` |
@@ -622,9 +621,10 @@ invalidation is keyed on
 
 **`reason` values.**
 
-`gcache_degraded_read_counter`: `undecodable`, `json_without_serializer`,
-`lifetime_exceeds_watermark`, `envelope_expired`, `age_exceeds_watermark`,
-`unloadable_payload`, `unreadable_watermark`, `non_finite_watermark`.
+`gcache_miss_counter`: empty for an ordinary miss, otherwise `undecodable`,
+`json_without_serializer`, `lifetime_exceeds_watermark`, `envelope_expired`,
+`age_exceeds_watermark`, `unloadable_payload`, `unreadable_watermark`,
+`non_finite_watermark`.
 
 `gcache_disabled_counter`: `ramped_down`, `context`, `server_down`, `missing_config`,
 `config_error`.
@@ -653,10 +653,13 @@ A **corrupt pickle** and a **serializer `load` failure** used to raise out of
 `RedisCache.get`, which incremented `gcache_error_counter` and re-ran the fallback
 *without* writing back — so the bad entry stayed for its whole TTL and failed every read.
 
-Both are now a **miss that heals**: the entry is rewritten, and the event is counted in
-`gcache_degraded_read_counter` instead. Strictly better behaviour, but an operator alerting
-on `gcache_error_counter` loses both signals silently. The `reason` label distinguishes
-them:
+A read that finds an entry it cannot use -- a corrupt pickle, a serializer `load`
+failure -- used to raise `gcache_error_counter` and leave the entry in place for its
+full TTL. It is now a miss that rewrites the entry, counted as
+`gcache_miss_counter{reason="..."}`. **An operator alerting on `gcache_error_counter`
+loses those two signals**; the equivalent alert is a non-empty `reason` on the miss
+counter. Note this means every existing exact-match query on `gcache_miss_counter`
+needs `reason=""` adding, or it will match nothing.
 
 | `reason` | What was found |
 |---|---|

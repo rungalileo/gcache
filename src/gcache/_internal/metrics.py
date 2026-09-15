@@ -1,4 +1,13 @@
+from contextvars import ContextVar
+
 from prometheus_client import Counter, Histogram
+
+#: Why the current read degraded, set by RedisCache and read by CacheController when it
+#: counts the miss. A ContextVar rather than an argument because the two are a layer apart:
+#: the reason is known in RedisCache, the miss is counted in the fallback closure
+#: CacheController owns -- and widening the public zero-argument ``Fallback`` type to carry
+#: it would change an API every caller annotates against.
+DEGRADED_REASON: ContextVar[str] = ContextVar("gcache_degraded_reason", default="")
 
 
 class GCacheMetrics:
@@ -9,7 +18,6 @@ class GCacheMetrics:
     # Counters
     DISABLED_COUNTER: Counter
     MISS_COUNTER: Counter
-    DEGRADED_READ_COUNTER: Counter
     REQUEST_COUNTER: Counter
     ERROR_COUNTER: Counter
     INVALIDATION_COUNTER: Counter
@@ -34,17 +42,12 @@ class GCacheMetrics:
 
         cls.MISS_COUNTER = Counter(
             name=prefix + "gcache_miss_counter",
-            labelnames=["use_case", "key_type", "layer"],
-            documentation="Cache miss counter",
-        )
-
-        cls.DEGRADED_READ_COUNTER = Counter(
-            name=prefix + "gcache_degraded_read_counter",
             labelnames=["use_case", "key_type", "layer", "reason"],
             documentation=(
-                "Reads that found an entry but could not use it. These also raise the miss "
-                "counter via the fallback, so without this a corrupt or foreign entry is "
-                "indistinguishable from an ordinary miss on a dashboard."
+                "Cache misses. `reason` is empty for an ordinary miss and names the cause "
+                "when a read found an entry it could not use -- those degrade to a miss and "
+                "rewrite the entry, so they are misses rather than errors, but a dashboard "
+                "needs to tell them apart."
             ),
         )
 

@@ -87,7 +87,7 @@ def test_every_reason_value_is_documented() -> None:
     # The `reason` labels are the ones an operator actually has to guess at, and they are
     # string literals scattered across the read path rather than an enum, so nothing but a
     # test like this can keep the list complete.
-    degraded_list = _reason_list_for("gcache_degraded_read_counter")
+    degraded_list = _reason_list_for("gcache_miss_counter")
     redis_cache = (_ROOT / "src/gcache/_internal/redis_cache.py").read_text()
     emitted = set(re.findall(r'_record_degraded_read\([^,]+, "([a-z_]+)"\)', redis_cache))
     emitted |= set(re.findall(r'record_degraded\("([a-z_]+)"\)', redis_cache))

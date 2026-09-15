@@ -28,6 +28,10 @@ on:
       - "go/**"
       - ".github/workflows/go.yaml"
 
+# Read-only: this job runs unpinned dependency code. See conformance.yaml.
+permissions:
+  contents: read
+
 jobs:
   go:
     runs-on: ubuntu-latest

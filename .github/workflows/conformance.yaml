@@ -14,6 +14,11 @@ on:
   push:
   pull_request:
 
+# Read-only. This job runs unpinned dependency code (poetry/pnpm/go installs), so the
+# default repository token -- which may include contents: write -- is more than it needs.
+permissions:
+  contents: read
+
 jobs:
   conformance:
     runs-on: ubuntu-latest
@@ -51,8 +56,11 @@ jobs:
           cache: pnpm
 
       - name: Install
+        # Through env rather than interpolated into the script -- see go-release.yaml.
+        env:
+          POETRY_VERSION: ${{ vars.POETRY_V2_VERSION }}
         run: |
-          pipx install poetry==${{ vars.POETRY_V2_VERSION }}
+          pipx install "poetry==$POETRY_VERSION"
           pipx install invoke
           poetry install --with dev,test --no-root
           pnpm install --frozen-lockfile
@@ -126,7 +134,11 @@ jobs:
             fi
           }
           run_suite python poetry run pytest tests/test_conformance.py -q
-          run_suite typescript pnpm ts:gcache:test
+          # The conformance FILE, not the whole vitest suite. run_suite treats any non-zero
+          # exit as proof the client read the mutated vector, so a flake anywhere else in
+          # the 95 tests would satisfy this step while the conformance suite never saw the
+          # mutation -- the exact false green this step exists to rule out.
+          run_suite typescript pnpm --filter @rungalileo/gcache exec vitest run test/gcache-conformance.test.ts
           run_suite go go -C go test -count=1 -run TestConformance ./...
           cp /tmp/vectors.bak "$F"
           echo "detected the mutation:$detected"

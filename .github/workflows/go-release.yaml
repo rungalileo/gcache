@@ -56,11 +56,22 @@ jobs:
       - name: Validate the version and check for tag collisions
         env:
           VERSION: ${{ inputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
 
           if ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::version must look like v0.1.0, got '$VERSION'"
+            exit 1
+          fi
+
+          # workflow_dispatch accepts ANY ref, and this job tags that ref's HEAD. A version
+          # published to proxy.golang.org is permanent, so dispatching from a feature branch
+          # by mistake burns the version rather than producing a fixable release. Releases
+          # come from the default branch only.
+          if [ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]; then
+            echo "::error::refusing to release from '$GITHUB_REF_NAME'; dispatch from '$DEFAULT_BRANCH'."
+            echo "::error::proxy.golang.org caches a version immutably, so a wrong tag burns it."
             exit 1
           fi
 
@@ -119,9 +130,15 @@ jobs:
       #    afternoon before the implementations were co-located.
       # ---------------------------------------------------------------------
       - name: Cross-language conformance, all three clients
+        # Through env, not interpolated into the script. A repository variable is not a
+        # secret but it is still attacker-influenceable config, and `${{ vars.X }}` pasted
+        # into a run: block executes a newline or $(...) as shell -- inside the job that
+        # holds the signing key.
+        env:
+          POETRY_VERSION: ${{ vars.POETRY_V2_VERSION }}
         run: |
           set -euo pipefail
-          pipx install poetry==${{ vars.POETRY_V2_VERSION }}
+          pipx install "poetry==$POETRY_VERSION"
           pipx install invoke
           poetry install --with dev,test --no-root
           pnpm install --frozen-lockfile

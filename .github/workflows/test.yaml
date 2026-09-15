@@ -1,34 +1,22 @@
 name: test
 
-# Path-filtered: with three implementations a Go-only change should not pay for a Python
-# run. The cross-language gate is deliberately unfiltered -- see conformance.yaml.
+# DELIBERATELY UNFILTERED, unlike go.yaml and typescript.yaml.
 #
-# NOTE: on `pull_request` the filter is evaluated over the PR's CUMULATIVE diff, not the
-# latest commit -- see the longer note in go.yaml.
+# `test` is a REQUIRED status check in the "Main branch rules" ruleset (alongside
+# `pre-commit` and `Validate PR title`). A path-filtered workflow does not report its check
+# as Success -- it leaves it Pending -- so filtering a required check means a pull request
+# that touches none of the filtered paths can never become mergeable. A PR touching only
+# go/** is exactly that case: on `pull_request` the filter is evaluated over the PR's
+# cumulative diff, which for such a PR is go/** alone.
 #
-# pull_request added alongside the filter. This workflow previously triggered on `push`
-# only, so the Python suite never ran on a PR from a fork; scoping a trigger that barely
-# fires would have been worse than not scoping it.
+# This workflow WAS filtered for one commit. Keep it unfiltered unless the ruleset changes;
+# the Python suite is ~15s, so there is little to save and a merge deadlock to lose.
+# go.yaml and typescript.yaml stay filtered because neither is required, and conformance.yaml
+# is unfiltered, so every PR still exercises all three clients.
+
 on:
   push:
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "poetry.lock"
-      # tests/test_metrics_docs.py asserts the README's metric table matches metrics.py, so
-      # a README-only edit must run this suite -- otherwise the test guarding the README is
-      # the one thing a README change cannot trigger.
-      - "README.md"
-      - ".github/workflows/test.yaml"
   pull_request:
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "poetry.lock"
-      - "README.md"
-      - ".github/workflows/test.yaml"
 
 jobs:
   test:
@@ -75,10 +63,18 @@ jobs:
       - name: Run Tets
         run: inv test
 
-      # Dependabot-triggered runs cannot access repository secrets, so this
-      # upload would fail with an empty Codecov token.
+      # Skipped wherever the Codecov token is unavailable, because fail_ci_if_error is
+      # true and an empty token turns the check red AFTER a green suite.
+      #
+      # Two such cases, not one. Dependabot runs cannot read repository secrets -- already
+      # handled. Neither can a pull_request from a FORK, and that trigger was added to this
+      # workflow alongside the path filter, so an outside contributor would see the tests
+      # pass and the check fail. Guarding the actor alone missed it.
       - name: Upload Test Coverage Reports
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: >-
+          ${{ github.actor != 'dependabot[bot]'
+              && (github.event_name != 'pull_request'
+                  || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: codecov/codecov-action@v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

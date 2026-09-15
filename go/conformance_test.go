@@ -89,6 +89,15 @@ func TestConformanceVectors(t *testing.T) {
 			if v.Why == "" {
 				t.Fatal("every vector must record why it exists")
 			}
+			// Presence, not just content. `Envelope` is a plain string, so a missing or
+			// renamed `envelope` key in the fixture decodes to "" -- and decodeEnvelope("")
+			// returns an error, which SATISFIES every reject vector. Measured: dropping the
+			// field from the 12 reject vectors leaves this suite reporting ok while Python
+			// fails all 12. TypeScript had the same hole. No vector legitimately carries an
+			// empty envelope, so this is safe to require.
+			if v.Envelope == "" {
+				t.Fatal("vector has no `envelope` field; a reject vector would pass for the wrong reason")
+			}
 			// A vector may DELIBERATELY differ between clients, when one cannot represent
 			// the value faithfully and rejecting it yields a miss-and-rewrite rather than
 			// two clients serving the same bytes as different numbers. Assert our own side

@@ -151,7 +151,7 @@
       "Key grammar, which is where the OTHER divergence lives. These are not decode vectors;",
       "they record what each client renders today so a change to any of them is visible here.",
       "TS percent-encodes every component via encodeURIComponent (key.ts joinUrnComponents);",
-      "Python and Go interpolate raw. That is a known defect with a follow-up.",
+      "Python and Go interpolate raw. That is a known defect; no ticket is filed for it yet.",
       "",
       "`agreeingClients` partitions the clients by what they ACTUALLY render, replacing an",
       "earlier two-way `agree: bool`. A boolean could not express 2-of-3, which is the real",
@@ -190,7 +190,7 @@
         "id": "i",
         "python": "urn:galileo:test:kt:i",
         "typescript": "urn%3Agalileo%3Atest:kt:i",
-        "reason": "TS percent-encodes the prefix. A namespaced prefix is the normal case and contains colons, so this is the common path, not an edge case. Known defect, follow-up filed against the encoding.",
+        "reason": "TS percent-encodes the prefix. A namespaced prefix is the normal case and contains colons, so this is the common path, not an edge case. Known defect; no ticket is filed for it yet -- an earlier revision of this file claimed one was.",
         "go": "urn:galileo:test:kt:i",
         "agreeingClients": [
           [

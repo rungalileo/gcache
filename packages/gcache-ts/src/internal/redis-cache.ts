@@ -309,12 +309,15 @@ export class RedisCache {
       // side of 2^53 with no error anywhere.
       //
       // isSafeInteger rejects exactly the range this reader cannot represent faithfully, so
-      // the entry misses here and is rewritten in a form all three agree about. It leaves TS
-      // STRICTER than Go and Python, which both accept up to int64 -- and that asymmetry is
-      // the safe direction, the one go/envelope.go already relies on: an
-      // out-of-domain entry makes a reader miss and rewrite rather than serve a value
-      // another reader reads differently. Real timestamps are ~1.7e12; 2^53 ms is year
-      // 287396, so nothing legitimate is excluded.
+      // the entry misses here and is rewritten in a form all three agree about.
+      //
+      // All THREE readers now share this bound -- Python raises from decode and Go checks
+      // against maxSafeInteger = 1<<53 - 1 (go/envelope.go:289). An earlier version of this
+      // comment said TS was "STRICTER than Go and Python, which both accept up to int64",
+      // which described the state before those two were tightened; left uncorrected it
+      // invites a maintainer to widen this check back to int64 to "match" them. Real
+      // timestamps are ~1.7e12 and 2^53 ms is year 287396, so nothing legitimate is
+      // excluded on any client.
       !Number.isSafeInteger(parsed.createdAtMs) ||
       typeof parsed.expiresAtMs !== "number" ||
       !Number.isSafeInteger(parsed.expiresAtMs) ||

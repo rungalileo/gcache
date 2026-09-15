@@ -112,6 +112,16 @@ describe("cross-language envelope conformance", () => {
     for (const v of data.vectors) {
       expect(v.expect === "accept" || v.expect === "reject").toBe(true);
       expect(v.why, `${v.name} must record why it exists`).toBeTruthy();
+
+      // Presence, not just content. `as Vector` is erased at runtime, so a missing or
+      // renamed `envelope` key leaves v.envelope undefined -- and an undefined envelope
+      // fails to parse, which SATISFIES every reject vector. Measured: dropping the field
+      // from the 12 reject vectors left this suite reporting 95 passed while Python failed
+      // all 12. Go had the same hole. No vector legitimately carries an empty envelope.
+      expect(
+        typeof v.envelope === "string" && v.envelope.length > 0,
+        `${v.name} has no envelope field; a reject vector would pass for the wrong reason`,
+      ).toBe(true);
       if (v.expect === "accept") expect(v.decoded, `${v.name} accept case needs a decode`).toBeDefined();
 
       // The asymmetry invariant is checked HERE, unconditionally, not inside the per-vector

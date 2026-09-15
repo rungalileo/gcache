@@ -1,9 +1,10 @@
 name: test
 
 # Path-filtered: with three implementations a Go-only change should not pay for a Python
-# run. NOTE: on `pull_request` the filter is evaluated over the PR's cumulative diff, not
-# the latest commit -- see the longer note in go.yaml.
 # run. The cross-language gate is deliberately unfiltered -- see conformance.yaml.
+#
+# NOTE: on `pull_request` the filter is evaluated over the PR's CUMULATIVE diff, not the
+# latest commit -- see the longer note in go.yaml.
 #
 # pull_request added alongside the filter. This workflow previously triggered on `push`
 # only, so the Python suite never ran on a PR from a fork; scoping a trigger that barely
@@ -15,6 +16,10 @@ on:
       - "tests/**"
       - "pyproject.toml"
       - "poetry.lock"
+      # tests/test_metrics_docs.py asserts the README's metric table matches metrics.py, so
+      # a README-only edit must run this suite -- otherwise the test guarding the README is
+      # the one thing a README change cannot trigger.
+      - "README.md"
       - ".github/workflows/test.yaml"
   pull_request:
     paths:
@@ -22,11 +27,26 @@ on:
       - "tests/**"
       - "pyproject.toml"
       - "poetry.lock"
+      - "README.md"
       - ".github/workflows/test.yaml"
 
 jobs:
   test:
-    runs-on: galileo
+    # Self-hosted for same-repo refs, GitHub-hosted for forks.
+    #
+    # This is the only workflow here on the self-hosted `galileo` runner; everything else is
+    # ubuntu-latest. Adding the `pull_request` trigger above therefore routed FORK-controlled
+    # code onto persistent infrastructure, where it checks out and executes the PR's own
+    # install/type-check/test steps. Fork token and secret restrictions do not help with
+    # that: the risk is runner state and whatever the runner can reach, not the token.
+    #
+    # Forks run on ubuntu-latest instead of being skipped, so a fork PR keeps full Python
+    # coverage. That is known to work rather than hoped: conformance.yaml already installs
+    # this project and runs pytest on ubuntu-latest on every PR.
+    runs-on: >-
+      ${{ (github.event_name == 'pull_request'
+           && github.event.pull_request.head.repo.full_name != github.repository)
+          && 'ubuntu-latest' || 'galileo' }}
 
     steps:
       - name: Checkout

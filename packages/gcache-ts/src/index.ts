@@ -14,6 +14,7 @@ export type {
   SerializationMetricLabels,
 } from "./metrics.js";
 export {
+  EmptyUrnPrefixNotSupportedError,
   GCacheError,
   MissingKeyConfigError,
   UseCaseIsAlreadyRegisteredError,

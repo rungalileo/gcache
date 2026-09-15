@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   CacheLayer,
+  EmptyUrnPrefixNotSupportedError,
   GCache,
   GCacheKey,
   GCacheKeyConfig,
@@ -198,6 +199,27 @@ describe("cross-language envelope conformance", () => {
       expect(value).toEqual(JSON.parse(expectedPayload));
     });
   }
+
+  it("refuses an empty urnPrefix through the public constructor", () => {
+    // The empty-prefix row in keyRendering is a divergence gcache FORBIDS rather than
+    // documents, so the rejection and the record must not drift apart -- the same reason
+    // tests/test_conformance.py carries test_an_empty_prefix_is_unreachable_through_the_public_api.
+    //
+    // This client was the last one still accepting it. Python raises
+    // EmptyUrnPrefixNotSupported and Go returns "Options.URNPrefix is required" from New(),
+    // while `config.urnPrefix ?? "urn"` let "" through because "" is not nullish -- so a
+    // TypeScript caller silently wrote ":keyType:id" keys into a key space neither of the
+    // other two ever reads. Behaviour, not source text: a source-text assertion stays green
+    // if the condition is changed and the wording left behind.
+    expect(() => new GCache({ urnPrefix: "" })).toThrow(EmptyUrnPrefixNotSupportedError);
+
+    // The nullish default is unaffected -- only an EXPLICIT empty string is refused.
+    expect(() => new GCache({})).not.toThrow();
+
+    // And the lower-level GCacheKey rendering stays reachable on purpose: it is what the
+    // keyRendering fixture records, and it is the evidence for WHY the constructor refuses.
+    expect(new GCacheKey({ keyType: "kt", id: "i", useCase: "u", urnPrefix: "" }).urn).toBe(":kt:i#u");
+  });
 
   it("still renders the key divergences the file records", () => {
     // Not decode vectors -- a record of what each client renders, so a change to either side

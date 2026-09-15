@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 
 import { CacheLayer, GCacheConfig, randomRampSampler, type CacheConfigProvider, type CacheRampSampler, type InvalidateOptions, type Logger } from "./config.js";
 import { GCacheContext } from "./context.js";
-import { UseCaseIsAlreadyRegisteredError, UseCaseNameIsReservedError } from "./errors.js";
+import { EmptyUrnPrefixNotSupportedError, UseCaseIsAlreadyRegisteredError, UseCaseNameIsReservedError } from "./errors.js";
 import { GCacheKey, normalizeArgs } from "./key.js";
 import { createPrometheusGCacheMetrics, errorName, labelsFor, type CacheMetricLabels, type GCacheMetricsAdapter } from "./metrics.js";
 import type { Serializer } from "./serializer.js";
@@ -40,6 +40,15 @@ export class GCache {
 
   constructor(config: GCacheConfig = {}) {
     this.configProvider = config.cacheConfigProvider ?? defaultConfigProvider;
+    // `?? "urn"` alone is not a guard: "" is not nullish, so an explicitly empty prefix
+    // passed straight through and wrote ":keyType:id" keys. Python raises
+    // EmptyUrnPrefixNotSupported and Go returns "Options.URNPrefix is required" from New(),
+    // so TypeScript accepting it made this the only client that would silently write into a
+    // key space the other two never read -- and the two that accept it at the rendering
+    // level do not even agree on the shape (Go omits the component, TS joins it).
+    if (config.urnPrefix === "") {
+      throw new EmptyUrnPrefixNotSupportedError();
+    }
     this.urnPrefix = config.urnPrefix ?? "urn";
     this.logger = config.logger ?? defaultLogger;
     this.rampSampler = config.rampSampler ?? randomRampSampler;

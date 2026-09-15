@@ -49,6 +49,11 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
+          # Do not leave the push-capable token in .git/config. The default is true, which
+          # stores it as an http.extraheader readable by every later step in the job -- and
+          # several of those run third-party code (go test, pipx/poetry/pnpm install). The
+          # tag push authenticates explicitly instead; see step 4.
+          persist-credentials: false
 
       # ---------------------------------------------------------------------
       # 1. Validate the input before anything else touches the repo.
@@ -153,6 +158,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           SSH_PUBLIC: ${{ secrets.GALILEO_AUTOMATION_SSH_PUBLIC_KEY }}
           SSH_PRIVATE: ${{ secrets.GALILEO_AUTOMATION_SSH_PRIVATE_KEY }}
+          TAG_PUSH_TOKEN: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -180,7 +186,13 @@ jobs:
           git config user.signingkey ~/.ssh/signing_key
 
           git tag -s "go/$VERSION" -m "gcache Go client $VERSION"
-          git push origin "go/$VERSION"
+
+          # Explicit credentials, because the checkout deliberately persisted none. The URL
+          # is built here and used once, so the token never lands in .git/config and is not
+          # readable by the proxy-verification step that follows. Actions masks the secret in
+          # logs, and nothing here echoes the command.
+          git push "https://x-access-token:${TAG_PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/tags/go/$VERSION"
 
       # ---------------------------------------------------------------------
       # 5. Confirm the proxy serves it, which also warms the cache so a consumer's

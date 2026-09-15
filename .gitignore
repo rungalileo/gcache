@@ -161,3 +161,8 @@ cython_debug/
 
 # Node / TypeScript
 packages/*/coverage/
+
+# Kept even though no JavaScript ships from this repo: a stale node_modules/ from an earlier
+# checkout is still on plenty of dev machines, and dropping the entry lets `git add -A` sweep
+# it into a branch.
+node_modules/

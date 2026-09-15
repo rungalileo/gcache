@@ -17,6 +17,7 @@ from gcache._internal.envelope import (
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.redis_cache import RedisValue
 from gcache.config import GCacheKey
+from gcache.exceptions import JsonEnvelopeRequiresSerializer
 from tests.conftest import FakeCacheConfigProvider
 
 
@@ -243,7 +244,9 @@ async def test_plain_string_envelope_still_opts_in(
 
 def test_json_envelope_without_a_serializer_is_rejected_at_decoration(gcache: GCache) -> None:
     # Knowable at decoration, so fail there rather than raising per request forever.
-    with pytest.raises(ValueError, match="requires a Serializer"):
+    # JsonEnvelopeRequiresSerializer, which GCacheKey raises for the same condition -- it
+    # subclasses ValueError too, so `except ValueError` callers are unaffected.
+    with pytest.raises(JsonEnvelopeRequiresSerializer, match="requires a serializer"):
 
         @gcache.cached(key_type="Test", id_arg="test", use_case="no_ser_uc", envelope=Envelope.JSON)
         async def cached_func(test: int = 1) -> dict:
@@ -974,7 +977,7 @@ def test_every_non_finite_watermark_suppresses_in_both_languages() -> None:
 def test_decode_handles_a_str_from_decode_responses(as_str: bool) -> None:
     # decode_responses=True clients hand back str; f"{data[0]:#04x}" then raised ValueError,
     # escaping decode's one-exception contract, so the entry stayed unreadable for its whole
-    # TTL with no metric moving. Reachable: services/api's AssistantService uses this pattern.
+    # TTL with no metric moving. Reachable: a real consumer uses this pattern.
     raw = encode_json(created_at_ms=1757308800123, ttl_sec=3600, payload='{"v":1}')
     data = raw.decode() if as_str else raw
 

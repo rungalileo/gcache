@@ -41,6 +41,13 @@ type envelope struct {
 // encoding/json would silently substitute U+FFFD per bad byte and write an unreadable value.
 func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]byte, error) {
 	createdMs := createdAt.UnixMilli()
+	// The writer refuses what the reader rejects, matching Python's encode_json. Without
+	// this an out-of-range timestamp wrote an entry no client can read back: rewritten and
+	// rejected on every read, forever. Go was the one writer with no such check.
+	if !isSafeInteger(float64(createdMs)) || !isSafeInteger(float64(createdMs+ttl.Milliseconds())) {
+		return nil, fmt.Errorf("gcache: timestamps %d/%d outside the safe-integer range; no client could read this back",
+			createdMs, createdMs+ttl.Milliseconds())
+	}
 	encoding, body := "utf8", string(payload)
 	if !utf8.Valid(payload) {
 		encoding, body = "base64", base64.StdEncoding.EncodeToString(payload)
@@ -57,6 +64,18 @@ func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]b
 // decodeEnvelope unframes a stored value, returning the payload, its write timestamp, and
 // its expiry -- paired with the timestamp, that gives Cache.Get the declared lifetime that
 // closes the resurrection gap (see the guard there). Sniffs the framing rather than assuming, so a key mid-migration or written by another language still works.
+// normalizeBase64 maps the URL-safe alphabet onto the standard one and restores padding,
+// so this reader accepts everything Python's and TypeScript's readers do. A genuinely wrong
+// alphabet still fails in DecodeString afterwards.
+func normalizeBase64(s string) string {
+	s = strings.ReplaceAll(s, "-", "+")
+	s = strings.ReplaceAll(s, "_", "/")
+	if pad := len(s) % 4; pad != 0 {
+		s += strings.Repeat("=", 4-pad)
+	}
+	return s
+}
+
 func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs int64, err error) {
 	if len(raw) == 0 {
 		return nil, 0, 0, errors.New("gcache: empty value")
@@ -72,7 +91,7 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 	// the value struct made {"version":1,"encoding":"utf8","payload":"{}"} a HIT with
 	// createdAtMs=0, where Python and TypeScript both call those same bytes a miss.
 	var w struct {
-		Version     *int     `json:"version"`
+		Version     *float64 `json:"version"`
 		CreatedAtMs *float64 `json:"createdAtMs"`
 		ExpiresAtMs *float64 `json:"expiresAtMs"`
 		Encoding    *string  `json:"encoding"`
@@ -87,8 +106,11 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 	if w.Version == nil {
 		return nil, 0, 0, errors.New("gcache: envelope has no version")
 	}
-	if *w.Version != envelopeVersion {
-		return nil, 0, 0, fmt.Errorf("gcache: unsupported envelope version %d, want %d", *w.Version, envelopeVersion)
+	// A NUMBER, not an int: JSON does not distinguish 1 from 1.0, and Python's
+	// `version != ENVELOPE_VERSION` and TypeScript's `!== 1` both accept the float spelling.
+	// Unmarshalling into *int rejected it, making Go the only client to miss those bytes.
+	if *w.Version != float64(envelopeVersion) {
+		return nil, 0, 0, fmt.Errorf("gcache: unsupported envelope version %v, want %d", *w.Version, envelopeVersion)
 	}
 	if w.Payload == nil {
 		return nil, 0, 0, errors.New("gcache: envelope has no payload")
@@ -132,7 +154,10 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 	case "utf8":
 		return []byte(*w.Payload), createdAtMs, expiresAtMs, nil
 	case "base64":
-		decoded, err := base64.StdEncoding.DecodeString(*w.Payload)
+		// Normalize first: Node's Buffer.from accepts the URL-safe alphabet and unpadded
+		// input, and Python normalizes both before decoding. StdEncoding alone rejected
+		// them, so a RawURLEncoding writer was a miss in Go and a hit in the other two.
+		decoded, err := base64.StdEncoding.DecodeString(normalizeBase64(*w.Payload))
 		if err != nil {
 			return nil, 0, 0, fmt.Errorf("gcache: malformed base64 payload: %w", err)
 		}

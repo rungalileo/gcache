@@ -432,7 +432,7 @@ async def test_a_key_built_before_gcache_is_rejected(gcache: GCache, enabled_uc:
 async def test_resetting_the_registry_the_way_consumers_do_still_works(
     gcache: GCache, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # orbit's conftest.py does `gcache._use_case_registry = set()` between tests. Making
+    # A consumer's conftest does `gcache._use_case_registry = set()` between tests. Making
     # that attribute a dict broke every gcache test there with "'set' object does not
     # support item assignment". It stays a set; the envelope map is separate, keyed off it.
     cache_config_provider.configs["reset_uc"] = GCacheKeyConfig.enabled(60)

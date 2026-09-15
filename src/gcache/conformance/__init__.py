@@ -5,7 +5,7 @@ Read by all three implementations in this repo -- ``tests/test_conformance.py``,
 shipped as package data so a consumer in ANOTHER repository can read the same vectors from an
 installed gcache rather than mirroring them.
 
-The package-data decision predates the Go client living here. It was made when orbit held the
+The package-data decision predates the Go client living here. It was made when another repo held the
 Go implementation and the only way to check three-way agreement was across a repo boundary --
 which turned out not to work: five cross-language claims went silently false in one afternoon,
 because a comment in one repo asserting another repo's behaviour is not something any test can

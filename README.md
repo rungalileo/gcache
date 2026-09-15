@@ -343,7 +343,7 @@ Four constraints:
   `SessionService::identity` renders as `SessionService%3A%3Aidentity` there, and the same
   applies to `urn_prefix`, which is the part that makes this unavoidable rather than
   avoidable: a namespaced prefix is the normal case and contains colons. This repo's own
-  fixture uses `urn:galileo:test`, and orbit uses `urn:galileo:<customer>`.
+  fixture uses `urn:galileo:test`; a deployment uses `urn:galileo:<customer>`.
 
       Python      urn:galileo:test:kt:id
       TypeScript  urn%3Agalileo%3Atest:kt:id

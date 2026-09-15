@@ -37,7 +37,7 @@ type RueidisOptions struct {
 	// enables TLS. Cluster mode needs nothing here -- see NewRueidisClient.
 	Protocol string
 	// DisableClientSideCache turns off RESP3 CLIENT TRACKING. Galileo's ElastiCache supports
-	// it (verified against rc0: Redis 7.2.4 accepts OPTIN/OPTOUT/BCAST), but some managed
+	// it (verified against Redis 7.2.4, which accepts OPTIN/OPTOUT/BCAST), but some managed
 	// Redis offerings reject the command outright (redis/rueidis#612); set this for those.
 	DisableClientSideCache bool
 	// CacheSizeEachConn bounds the client-side cache per connection. Zero uses the

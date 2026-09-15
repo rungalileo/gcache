@@ -45,7 +45,7 @@ const (
 
 // Recorder receives cache events, as an interface rather than a Prometheus dependency so
 // this library stays dependency-light; services implement it with promauto, as
-// ingest-service does with otterstats.Recorder. A nil Recorder is fine -- calls are skipped.
+// a service does with its own metrics adapter. A nil Recorder is fine -- calls are skipped.
 type Recorder interface {
 	RecordResult(useCase string, result Result)
 	RecordLatency(useCase, op string, d time.Duration)
@@ -65,7 +65,7 @@ type Client interface {
 
 // Codec converts a value to and from the bytes carried in the envelope payload. Exists so a
 // shared-schema payload can be a generated type rather than a hand-written struct -- six
-// cross-language divergences found in review came from the latter. See libs/proto/cache.
+// cross-language divergences found in review came from the latter. See subpackage protocodec.
 type Codec[V any] interface {
 	Marshal(V) ([]byte, error)
 	Unmarshal([]byte, *V) error

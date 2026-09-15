@@ -28,6 +28,7 @@ from gcache.exceptions import (
     GCacheAlreadyInstantiated,
     GCacheError,
     GCacheKeyPrefixMismatch,
+    JsonEnvelopeRequiresSerializer,
     KeyArgDoesNotExist,
     RedisConfigConflict,
     ReentrantSyncFunctionDetected,
@@ -153,7 +154,7 @@ class GCache:
         self._cache = CacheChain(config.cache_config_provider, local_cache, redis_cache)
 
         # Deliberately still a set. Consumers reach into this private attribute to reset it
-        # between tests (orbit's services/api/tests/conftest.py does `gcache
+        # between tests (a consumer's test conftest does `gcache
         # ._use_case_registry = set()`), so changing its type breaks them at a distance --
         # which is exactly what happened when this was a dict for one commit. The declared
         # envelope lives alongside it instead.
@@ -317,9 +318,11 @@ class GCache:
                 use_case = f"{func.__module__}.{func.__name__}"
 
             if envelope == Envelope.JSON and serializer is None:
-                raise ValueError(
-                    f"use case {use_case!r}: envelope=Envelope.JSON requires a Serializer producing "
-                    "str or bytes (pass serializer=JsonSerializer())"
+                # JsonEnvelopeRequiresSerializer, not a bare ValueError: GCacheKey raises that
+                # for the identical condition, so a caller wrapping both in `except GCacheError`
+                # caught one route and not the other.
+                raise JsonEnvelopeRequiresSerializer(
+                    key_type, id_arg if isinstance(id_arg, str) else id_arg[0], use_case
                 )
 
             if use_case in self._use_case_registry:

@@ -105,7 +105,7 @@ func liveAdapter(t *testing.T, disableCSC bool) (gcache.Client, string) {
 	return client, prefix
 }
 
-// sessionIdentity is the shape ingest-service caches, so the round trip exercises a real
+// sessionIdentity is a representative cached shape, so the round trip exercises a real
 // value rather than a string.
 type sessionIdentity struct {
 	SessionID string `json:"session_id"`

@@ -1,6 +1,8 @@
 name: test
 
 # Path-filtered: with three implementations a Go-only change should not pay for a Python
+# run. NOTE: on `pull_request` the filter is evaluated over the PR's cumulative diff, not
+# the latest commit -- see the longer note in go.yaml.
 # run. The cross-language gate is deliberately unfiltered -- see conformance.yaml.
 #
 # pull_request added alongside the filter. This workflow previously triggered on `push`

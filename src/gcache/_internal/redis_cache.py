@@ -189,6 +189,11 @@ class RedisCache(CacheInterface):
         return val
 
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
+        # Both required, matching Go's Invalidate. An empty one wrote a watermark for a
+        # malformed key -- suppressing nothing, while reporting success.
+        if not key_type or not id:
+            raise ValueError("gcache: invalidate requires both key_type and id")
+
         GCacheMetrics.INVALIDATION_COUNTER.labels(key_type, self.layer().name).inc()
 
         # render_prefix, not hand-rolled: on an empty urn_prefix the two produced

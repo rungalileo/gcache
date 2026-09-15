@@ -86,6 +86,13 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 	if raw[0] != '{' {
 		return nil, 0, 0, fmt.Errorf("gcache: unrecognized envelope, leading byte %#04x", raw[0])
 	}
+	// Validate UTF-8 before unmarshalling. json.Unmarshal SUBSTITUTES U+FFFD for malformed
+	// bytes inside a string rather than failing, so a corrupt payload came back as a cache
+	// HIT with the bad bytes replaced -- the caller got wrong data, where Python's json.loads
+	// raises and the entry becomes a miss-and-rewrite.
+	if !utf8.Valid(raw) {
+		return nil, 0, 0, errors.New("gcache: envelope is not valid UTF-8")
+	}
 
 	// Pointers so an ABSENT field is distinguishable from a zero one. Decoding straight into
 	// the value struct made {"version":1,"encoding":"utf8","payload":"{}"} a HIT with

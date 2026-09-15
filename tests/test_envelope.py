@@ -1659,3 +1659,34 @@ async def test_each_degraded_reason_goes_to_the_right_guard() -> None:
     # PICKLE is where it is load-bearing: no expires_at_ms, so both guards above skip it.
     old_pickle = pickle.dumps(RedisValue(created_at_ms=now - (WATERMARK_TTL_SECONDS + 60) * 1000, payload={"v": 1}))
     assert await reasons_for(old_pickle, pickle_key) == ["age_exceeds_watermark"]
+
+
+def test_a_prefix_carrying_a_grammar_delimiter_is_refused() -> None:
+    # Go's New refuses {}#? too. A brace is the dangerous one: it moves the Redis Cluster
+    # hash tag, so a value and its watermark stop sharing a slot and the single MGET that
+    # reads both becomes illegal.
+    from gcache import GCache, GCacheConfig
+    from gcache.exceptions import UrnPrefixContainsDelimiter
+    from tests.conftest import FakeCacheConfigProvider
+
+    for bad in ("urn:galileo:a{b", "urn:galileo:a}b", "urn:galileo:a#b", "urn:galileo:a?b"):
+        with pytest.raises(UrnPrefixContainsDelimiter):
+            GCache(GCacheConfig(cache_config_provider=FakeCacheConfigProvider(), urn_prefix=bad))
+
+    # A ValueError too, like the other construction-time failures.
+    assert issubclass(UrnPrefixContainsDelimiter, ValueError)
+
+
+@pytest.mark.asyncio
+async def test_invalidate_requires_both_key_type_and_id() -> None:
+    # Matching Go's Invalidate. An empty one wrote a watermark for a malformed key,
+    # suppressing nothing while reporting success.
+    from gcache._internal.redis_cache import RedisCache
+
+    class _Bare(RedisCache):
+        def __init__(self) -> None:
+            pass
+
+    for key_type, id_ in (("", "id"), ("kt", ""), ("", "")):
+        with pytest.raises(ValueError, match="requires both key_type and id"):
+            await _Bare().invalidate(key_type, id_, 0)

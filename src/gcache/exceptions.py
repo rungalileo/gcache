@@ -128,6 +128,28 @@ class EmptyUrnPrefixNotSupported(GCacheError, ValueError):
         )
 
 
+class UrnPrefixContainsDelimiter(GCacheError, ValueError):
+    """Raised when ``urn_prefix`` contains one of the key grammar's own delimiters.
+
+    ``{}`` ``#`` and ``?`` all change what the key MEANS rather than just how it looks. A
+    brace is the worst: it moves the Redis Cluster hash tag, so a value and its watermark
+    land in different slots and the single MGET that reads both becomes illegal. ``#`` and
+    ``?`` make the prefix parse as a use case or an argument list.
+
+    The Go client refuses the same set in ``New``, so accepting them here produced a prefix
+    Python would write and Go could not even construct a client for.
+
+    Subclasses ValueError as well, matching the other construction-time failures.
+    """
+
+    def __init__(self, urn_prefix: str) -> None:
+        super().__init__(
+            f"urn_prefix {urn_prefix!r} must not contain any of {{}}#? -- those are the key "
+            "grammar's own delimiters, and a brace moves the Redis Cluster hash tag so a "
+            "value and its watermark stop sharing a slot."
+        )
+
+
 class TrackedTTLExceedsWatermark(GCacheError, ValueError):
     """Raised when a tracked key's TTL would outlive the watermark that invalidates it.
 

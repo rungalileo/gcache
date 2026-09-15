@@ -33,6 +33,7 @@ from gcache.exceptions import (
     RedisConfigConflict,
     ReentrantSyncFunctionDetected,
     SerializerMismatchWithRegisteredUseCase,
+    UrnPrefixContainsDelimiter,
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )
@@ -93,6 +94,10 @@ class GCache:
             # enabled a configuration that silently breaks the cross-language keyspace this
             # work exists to establish. Rejecting is the fix; honouring it was not.
             raise EmptyUrnPrefixNotSupported()
+        if config.urn_prefix is not None and any(ch in config.urn_prefix for ch in "{}#?"):
+            # Go's New refuses the same set, so accepting them here produced a prefix Python
+            # writes and Go cannot construct a client for.
+            raise UrnPrefixContainsDelimiter(config.urn_prefix)
 
         if config.redis_config is not None and config.redis_client_factory is not None:
             raise RedisConfigConflict()

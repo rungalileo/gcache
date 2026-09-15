@@ -608,20 +608,36 @@ await gcache.aflushall()  # Async
 
 GCache exports Prometheus metrics automatically:
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `gcache_request_counter` | Counter | Total cache requests |
-| `gcache_miss_counter` | Counter | Cache misses |
-| `gcache_disabled_counter` | Counter | Requests where caching was skipped (labels: `reason`) |
-| `gcache_error_counter` | Counter | Errors during cache operations (labels: `layer`, `error`, `in_fallback`) |
-| `gcache_degraded_read_counter` | Counter | Reads that found an entry but could not use it, so degraded to a miss and rewrote it (labels: `reason`) |
-| `gcache_invalidation_counter` | Counter | Invalidation calls |
-| `gcache_get_timer` | Histogram | Cache get latency |
-| `gcache_fallback_timer` | Histogram | Time spent in the underlying function |
-| `gcache_serialization_timer` | Histogram | Pickle serialization time |
-| `gcache_size_histogram` | Histogram | Size of cached values |
+Labels are listed in full per metric, because they are **not** uniform -- a query written
+against the wrong label set returns nothing rather than erroring.
 
-All metrics include `use_case` and `key_type` labels for filtering.
+| Metric | Type | Labels |
+|--------|------|--------|
+| `gcache_request_counter` | Counter | `use_case`, `key_type`, `layer` |
+| `gcache_miss_counter` | Counter | `use_case`, `key_type`, `layer` |
+| `gcache_disabled_counter` | Counter | `use_case`, `key_type`, `layer`, `reason` |
+| `gcache_error_counter` | Counter | `use_case`, `key_type`, `layer`, `error`, `in_fallback` |
+| `gcache_degraded_read_counter` | Counter | `use_case`, `key_type`, `layer`, `reason` |
+| `gcache_invalidation_counter` | Counter | `key_type`, `layer` |
+| `gcache_get_timer` | Histogram | `use_case`, `key_type`, `layer` |
+| `gcache_fallback_timer` | Histogram | `use_case`, `key_type`, `layer` |
+| `gcache_serialization_timer` | Histogram | `use_case`, `key_type`, `layer`, `operation` |
+| `gcache_size_histogram` | Histogram | `use_case`, `key_type`, `layer` |
+
+`gcache_invalidation_counter` is the exception worth knowing -- it carries **no `use_case`**:
+invalidation is keyed on
+`(key_type, id)` and carries no use case, so it cannot be broken down or joined by
+`use_case`. An earlier version of this section claimed "all metrics include `use_case` and
+`key_type`", which was false for exactly that metric.
+
+**`reason` values.**
+
+`gcache_degraded_read_counter`: `undecodable`, `json_without_serializer`,
+`lifetime_exceeds_watermark`, `envelope_expired`, `age_exceeds_watermark`,
+`unloadable_payload`, `unreadable_watermark`, `non_finite_watermark`.
+
+`gcache_disabled_counter`: `ramped_down`, `context`, `server_down`, `missing_config`,
+`config_error`.
 
 You can add a prefix to avoid collisions:
 

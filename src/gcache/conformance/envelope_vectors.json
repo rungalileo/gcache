@@ -28,6 +28,7 @@
     "is the safe one. A suite only asserts the cases that apply to its own client."
   ],
   "envelopeVersion": 1,
+  "vectorCount": 16,
   "vectors": [
     {
       "name": "canonical",

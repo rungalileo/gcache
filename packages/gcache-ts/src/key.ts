@@ -44,10 +44,13 @@ export class GCacheKey {
     // normalizeArgs' own localeCompare sort is a separate concern -- it converts an OBJECT
     // to tuples, where JS key order carries no meaning. This sorts the tuple form as well,
     // so both entry points agree. Byte-ordinal rather than localeCompare, to match Python
-    // and Go on non-ASCII names; localeCompare is locale-sensitive and would diverge.
+    // and Go on non-ASCII names. Not `<`: JavaScript compares UTF-16 CODE UNITS, so a
+    // supplementary character sorts below U+E000 (its lead surrogate is 0xD800) while
+    // Python and Go put it above. Measured for "\uE000" vs "\u{10000}" -- Python and Go
+    // say a<b, `<` in JS says b<a. Not localeCompare either: that is locale-sensitive.
     //
     // Stable, so two args sharing a name keep their input order in every client.
-    const sortedArgs = [...this.args].sort(([l], [r]) => (l < r ? -1 : l > r ? 1 : 0));
+    const sortedArgs = [...this.args].sort(([l], [r]) => compareCodePoints(l, r));
     const args =
       sortedArgs.length > 0
         ? `?${sortedArgs.map(([name, value]) => `${encodeComponent(name)}=${encodeComponent(value)}`).join("&")}`
@@ -58,6 +61,24 @@ export class GCacheKey {
   toString(): string {
     return this.urn;
   }
+}
+
+/** Compares by Unicode CODE POINT, matching Python's `<` and Go's byte-wise UTF-8 order.
+ *
+ * JavaScript's `<` on strings compares UTF-16 code units, which disagrees with both above the
+ * basic multilingual plane: a supplementary character is a surrogate pair starting at 0xD800,
+ * so it sorts below anything in U+E000..U+FFFF. Arg names are caller-supplied, so this is
+ * reachable rather than theoretical.
+ */
+function compareCodePoints(left: string, right: string): number {
+  const l = Array.from(left);
+  const r = Array.from(right);
+  const shared = Math.min(l.length, r.length);
+  for (let i = 0; i < shared; i += 1) {
+    const diff = l[i]!.codePointAt(0)! - r[i]!.codePointAt(0)!;
+    if (diff !== 0) return diff;
+  }
+  return l.length - r.length;
 }
 
 export function normalizeArgs(args: Record<string, string | number | boolean | bigint | null | undefined>): Array<[string, string]> {

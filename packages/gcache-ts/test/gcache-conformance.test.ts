@@ -75,6 +75,7 @@ interface ArgOrderCase {
 
 const data = JSON.parse(readFileSync(vectorsPath, "utf8")) as {
   envelopeVersion: number;
+  vectorCount: number;
   vectors: readonly Vector[];
   keyRendering: { cases: readonly KeyCase[] };
   argOrdering: { cases: readonly ArgOrderCase[] };
@@ -121,7 +122,9 @@ describe("cross-language envelope conformance", () => {
     // A missing or moved file must fail loudly here rather than making the suite vacuously
     // green by iterating an empty list -- which is exactly how a shared-fixture suite dies
     // quietly.
-    expect(data.vectors.length).toBeGreaterThanOrEqual(14);
+    // EXACT, not a floor: a floor of 14 with 16 vectors present let two disappear silently.
+    expect(data.vectorCount, "fixture declares no vectorCount").toBeGreaterThan(0);
+    expect(data.vectors.length, "fixture vectorCount disagrees with the vectors present").toBe(data.vectorCount);
     expect(data.envelopeVersion).toBe(1);
     const known = new Set(["python", "typescript", "go"]);
     for (const v of data.vectors) {

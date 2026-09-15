@@ -243,9 +243,15 @@ class GCacheKey:
     key_type: str
     id: str
     use_case: str
-    # Normalized to a tuple in __post_init__. The dataclass is frozen, but a list field
-    # makes that a lie for the one field the urn is built from: key.args.append(...) left
-    # the rendered urn -- and therefore the Redis key and this object's identity -- stale.
+    # SORTED by name and normalized to a tuple in __post_init__, so what you read back is
+    # not always what you passed. Both matter to a caller, and this is where they look:
+    #
+    #   sorted -- because cached() has always sorted before building a key, so sorted args
+    #     are what is already on the wire, and Go's ValueKey sorts too. A constructor that
+    #     preserved input order was the one route to a key Go renders differently.
+    #   tuple  -- the dataclass is frozen, but a list field makes that a lie for the one
+    #     field the urn is built from: key.args.append(...) left the rendered urn, and
+    #     therefore the Redis key and this object's identity, stale.
     args: Sequence[tuple[str, str]] = field(default_factory=tuple)
     invalidation_tracking: bool = False
     default_config: GCacheKeyConfig | None = None

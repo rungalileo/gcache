@@ -28,6 +28,7 @@ import (
 
 type conformanceFile struct {
 	EnvelopeVersion int `json:"envelopeVersion"`
+	VectorCount     int `json:"vectorCount"`
 	Vectors         []struct {
 		Name     string `json:"name"`
 		Why      string `json:"why"`
@@ -87,7 +88,11 @@ func loadConformance(t *testing.T) conformanceFile {
 	if err := json.Unmarshal(raw, &f); err != nil {
 		t.Fatalf("shared conformance vectors are not valid JSON: %v", err)
 	}
-	if len(f.Vectors) < 14 {
+	// EXACT, not a floor: a floor of 14 with 16 vectors present let two disappear silently.
+	if f.VectorCount == 0 {
+		t.Fatal("fixture declares no vectorCount -- the field was renamed or dropped")
+	}
+	if len(f.Vectors) != f.VectorCount {
 		t.Fatalf("expected the full vector set, got %d -- a truncated file would make this "+
 			"suite vacuously green", len(f.Vectors))
 	}

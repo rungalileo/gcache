@@ -30,7 +30,13 @@ def test_the_vector_file_is_where_every_suite_expects_it() -> None:
     # green by parametrizing over an empty list -- which is exactly how a shared-fixture
     # suite dies quietly.
     assert pathlib.Path(vectors_path()).exists(), f"shared vectors missing at {vectors_path()}"
-    assert len(_VECTORS) >= 14, f"expected the full vector set, got {len(_VECTORS)}"
+    # EXACT, not a floor. A floor of 14 with 16 vectors present let two disappear with every
+    # guard still green -- the fixture is the only thing binding the three clients, so a
+    # silently shrinking corpus is the failure it cannot be allowed to have. The expected
+    # count lives in the fixture, so adding a vector is one edit and all three suites check it.
+    assert len(_VECTORS) == _DATA["vectorCount"], (
+        f"fixture declares vectorCount={_DATA['vectorCount']} but carries {len(_VECTORS)} vectors"
+    )
     assert _DATA["envelopeVersion"] == ENVELOPE_VERSION, (
         "the vector file's envelopeVersion must track ENVELOPE_VERSION, or every "
         "version-sensitive vector silently tests the wrong thing"

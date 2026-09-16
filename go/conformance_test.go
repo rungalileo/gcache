@@ -58,6 +58,15 @@ type conformanceFile struct {
 			AgreeingClients [][]string `json:"agreeingClients"`
 		} `json:"cases"`
 	} `json:"argOrdering"`
+	HashedComponents struct {
+		Algorithm string `json:"algorithm"`
+		Encoding  string `json:"encoding"`
+		Cases     []struct {
+			Input  string `json:"input"`
+			Digest string `json:"digest"`
+			Why    string `json:"_why"`
+		} `json:"cases"`
+	} `json:"hashedComponents"`
 }
 
 func loadConformance(t *testing.T) conformanceFile {
@@ -266,4 +275,27 @@ func TestConformanceArgOrderingCorpusCouldDetectAnUnsortedClient(t *testing.T) {
 	}
 	t.Fatal("every argOrdering case renders the same sorted or unsorted, so this suite cannot " +
 		"detect a client that stopped sorting -- add a case whose args are not alphabetical")
+}
+
+// TestHashedComponentsMatchTheSharedDigests pins HashComponent against Python's
+// hash_component. A digest the two disagree on makes a hashed component unfindable by the
+// other language -- a cache that writes fine and never hits, with no error on either side.
+func TestHashedComponentsMatchTheSharedDigests(t *testing.T) {
+	data := loadConformance(t)
+	if data.HashedComponents.Algorithm != "sha256" || data.HashedComponents.Encoding != "hex-lower" {
+		t.Fatalf("unexpected hashing contract: %s/%s",
+			data.HashedComponents.Algorithm, data.HashedComponents.Encoding)
+	}
+	if len(data.HashedComponents.Cases) == 0 {
+		t.Fatal("the hashed-component cases are gone")
+	}
+	for _, c := range data.HashedComponents.Cases {
+		got := HashComponent(c.Input)
+		if got != c.Digest {
+			t.Errorf("HashComponent(%q) = %s, fixture says %s (%s)", c.Input, got, c.Digest, c.Why)
+		}
+		if got != strings.ToLower(got) || len(got) != 64 {
+			t.Errorf("HashComponent(%q) = %q; want 64 chars of lowercase hex", c.Input, got)
+		}
+	}
 }

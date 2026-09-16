@@ -1,3 +1,4 @@
+import hashlib
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
@@ -10,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache.exceptions import JsonEnvelopeRequiresSerializer, UseCaseNameIsReserved
+from gcache.exceptions import JsonEnvelopeRequiresSerializer, UnhashableKeyComponent, UseCaseNameIsReserved
 
 #: Async callable that fetches the value on a miss. Zero-argument: ``Callable[..., ...]``
 #: deferred the TypeError to the first cache miss. Bind args with functools.partial.
@@ -195,6 +196,34 @@ class JsonSerializer(Serializer):
         # the max tick delay 0.007s -> 0.007-0.014s and starved getaddrinfo in the default
         # pool. ProtoJsonSerializer.load DOES offload -- it yields per field (0.104s -> 0.014s).
         return json.loads(data)
+
+
+def hash_component(value: str) -> str:
+    """Hash one key component, identically in every gcache client. Returns lowercase hex.
+
+    For a component that must not sit in a Redis key in the clear -- an external id that may
+    be an email, an api key. Keys appear in SCAN, --bigkeys, slowlog, MONITOR and any
+    key-sampling metrics, which is a wider audience than the store the value came from.
+
+    Hash the COMPONENT, not the whole id: callers build ids like
+    ``f"{project_id}:{run_id}:{external_id}"``, and hashing only the sensitive part keeps the
+    rest readable from redis-cli. Because the caller hands the result in as an ordinary
+    component, every path -- get, put, delete, invalidate, the watermark key -- agrees with
+    no further work.
+
+    Plain SHA-256 over the UTF-8 bytes, which is what Go's HashComponent does; the shared
+    conformance corpus pins their agreement. Deliberately NOT salted or truncated: a salt
+    could not be shared across processes without new configuration, and truncation trades
+    collision resistance -- two external ids answering to one cache entry is a wrong answer,
+    not a slow one.
+
+    :raises UnhashableKeyComponent: if ``value`` has no UTF-8 encoding. See that class.
+    """
+    try:
+        raw = value.encode("utf-8")
+    except UnicodeEncodeError as e:
+        raise UnhashableKeyComponent(f"gcache: key component cannot be encoded as UTF-8: {e}") from e
+    return hashlib.sha256(raw).hexdigest()
 
 
 def render_prefix(key_type: str, id: str, *, tracked: bool) -> str:

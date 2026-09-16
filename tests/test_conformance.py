@@ -252,3 +252,37 @@ def test_the_arg_order_corpus_could_detect_a_client_that_stopped_sorting() -> No
         "every argOrdering case renders the same sorted or unsorted, so this corpus cannot "
         "detect a client that stopped sorting -- add a case whose args are not alphabetical"
     )
+
+
+def test_hashed_components_match_the_shared_digests() -> None:
+    # Go asserts the same cases. A digest the two clients disagree on makes a hashed component
+    # unfindable by the other language -- a cache that writes fine and never hits, with no
+    # error on either side, which is the failure this corpus exists to catch.
+    from gcache import hash_component
+
+    section = _DATA["hashedComponents"]
+    assert section["algorithm"] == "sha256"
+    assert section["encoding"] == "hex-lower"
+    assert section["cases"], "the hashed-component cases are gone"
+
+    for case in section["cases"]:
+        actual = hash_component(case["input"])
+        assert actual == case["digest"], f"{case['input'][:40]!r}: {actual} != {case['digest']}"
+        assert actual == actual.lower() and len(actual) == 64, "lowercase hex, fixed width"
+
+
+def test_an_unhashable_component_raises_rather_than_substituting() -> None:
+    # Deliberately absent from the corpus: Python cannot encode a lone surrogate and Go hashes
+    # whatever bytes it holds, so there is no agreed digest. Raising is the two clients
+    # declining to disagree -- returning a digest over some substitute would put them in
+    # different key spaces silently.
+    import pytest
+
+    from gcache import hash_component
+    from gcache.exceptions import GCacheError, UnhashableKeyComponent
+
+    with pytest.raises(UnhashableKeyComponent):
+        hash_component("conv-\ud800-42")
+    # Catchable the way every other gcache failure is.
+    assert issubclass(UnhashableKeyComponent, GCacheError)
+    assert issubclass(UnhashableKeyComponent, ValueError)

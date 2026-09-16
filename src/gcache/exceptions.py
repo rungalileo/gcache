@@ -177,3 +177,14 @@ class TrackedTTLExceedsWatermark(GCacheError, ValueError):
             f"outlives the {watermark_ttl_sec}s watermark. The entry would resurrect after an "
             f"invalidation. Shorten the TTL, or turn off invalidation_tracking for this key."
         )
+
+
+class UnhashableKeyComponent(GCacheError, ValueError):
+    """A value handed to ``hash_component`` has no UTF-8 encoding.
+
+    Only a lone surrogate reaches this -- ``json.loads`` accepts ``"\\ud800"`` and ``str.encode``
+    refuses it. Raised rather than hashed over a substitute: Go's ``encoding/json`` turns the
+    same input into U+FFFD, so the two clients would hash DIFFERENT bytes and silently occupy
+    different key spaces. The caller decides what to do with such a value; the one thing this
+    must not do is return a digest the other client disagrees with.
+    """

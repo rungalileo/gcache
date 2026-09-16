@@ -9,6 +9,7 @@ from gcache.config import (
     JsonSerializer,
     RedisConfig,
     Serializer,
+    hash_component,
 )
 from gcache.gcache import GCache
 
@@ -25,6 +26,7 @@ __all__ = [
     "GCacheConfig",
     "GCacheKey",
     "GCacheKeyConfig",
+    "hash_component",
     "JsonSerializer",
     "ProtoJsonSerializer",
     "RedisConfig",

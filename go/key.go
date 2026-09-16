@@ -15,6 +15,8 @@
 package gcache
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -64,6 +66,32 @@ func (k Key) Validate() error {
 		return fmt.Errorf("gcache: Key.UseCase %q is reserved -- it would collide with the watermark key", watermarkUseCase)
 	}
 	return nil
+}
+
+// HashComponent hashes one key component, identically to Python's hash_component. Returns
+// lowercase hex.
+//
+// For a component that must not sit in a Redis key in the clear -- an external id that may be
+// an email, an api key. Keys appear in SCAN, --bigkeys, slowlog, MONITOR and any key-sampling
+// metrics, which is a wider audience than the store the value came from.
+//
+// Hash the COMPONENT, not the whole id: callers build ids like
+// projectID + ":" + runID + ":" + externalID, and hashing only the sensitive part keeps the
+// rest readable from redis-cli. Because the caller hands the result back in as an ordinary
+// component, every path -- Get, Put, Invalidate, the watermark key -- agrees with no further
+// work.
+//
+// Plain SHA-256 over the string's bytes; the shared conformance corpus pins agreement with
+// Python. Deliberately NOT salted or truncated: truncation trades collision resistance, and
+// two external ids answering to one cache entry is a wrong answer rather than a slow one.
+//
+// Total, unlike Python's, which raises UnhashableKeyComponent: a Go string is arbitrary bytes,
+// so there is no unencodable input here. The divergence is real but only reachable for a lone
+// surrogate, which encoding/json has already replaced with U+FFFD by the time it reaches this
+// -- so Python refusing is the two clients declining to disagree, not Go being more capable.
+func HashComponent(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }
 
 // prefix renders `{urn:key_type:id}` (or the unbraced form when untracked). No component

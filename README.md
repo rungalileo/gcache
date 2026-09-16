@@ -359,6 +359,36 @@ consult watermarks, so an invalidation from another language does not clear a Py
 in-process copy until its local TTL expires — keep the local TTL short (or the local ramp at
 0) for a use case shared across languages.
 
+#### Hashing a sensitive key component
+
+`hash_component()` (Go: `HashComponent()`) returns lowercase hex of SHA-256 over the UTF-8
+bytes, identically in both clients — the shared conformance corpus pins their agreement.
+
+```python
+from gcache import GCacheKey, hash_component
+
+key = GCacheKey(
+    key_type="session_external_id",
+    # project and run stay readable from redis-cli; only the caller-supplied id is opaque.
+    id=f"{project_id}:{run_id}:{hash_component(external_id)}",
+    use_case="ingest::session_by_external_id",
+)
+```
+
+Use it for a component that must not sit in a Redis key in the clear — an external id that
+may be an email, an api key. Keys appear in `SCAN`, `--bigkeys`, slowlog, `MONITOR` and any
+key-sampling metrics, which is a wider audience than the store the value came from.
+
+**Hash the component, not the whole id.** Since the result goes in as an ordinary component,
+every path — `aget`, `aput`, `adelete`, `ainvalidate`, the watermark key — agrees with no
+further work, and the unhashed parts stay greppable.
+
+Not salted and not truncated, deliberately: a salt cannot be shared across processes without
+new configuration, and truncating trades collision resistance — two ids answering to one
+entry is a wrong answer, not a slow one. It raises `UnhashableKeyComponent` for a value with
+no UTF-8 encoding (only a lone surrogate reaches that), because Go would hash different bytes
+for the same input and the two clients would silently occupy different key spaces.
+
 #### Reading and writing one key directly
 
 `@cached` fits whenever the value is a pure function of a call's arguments. A shared cache

@@ -461,7 +461,14 @@ class GCache:
         :param key_type: The type of cache key to invalidate.
         :param id: The ID of the entity to invalidate.
         :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the future.
+        :raises ValueError: if ``key_type`` or ``id`` is empty.
         """
+        # HERE, not in RedisCache.invalidate. Down there the guard fires only when a Redis
+        # layer exists, so a NoopCache deployment -- documented, and what local runs and many
+        # consumer test suites use -- accepted the malformed call while production rejected
+        # it. A caller met the bug in the environment where it costs most.
+        if not key_type or not id:
+            raise ValueError("gcache: invalidate requires both key_type and id")
         await self._redis_cache.invalidate(key_type, id, future_buffer_ms)
 
     def invalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:

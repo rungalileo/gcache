@@ -95,9 +95,9 @@ func ValueKey(urnPrefix string, k Key) string {
 	if len(k.Args) > 0 {
 		args := make([]Arg, len(k.Args))
 		copy(args, k.Args)
-		// Byte-ordinal by name, matching Python's default string sort (Python's
-		// localeCompare differs for non-ASCII names). Stable, matching Python's list.sort:
-		// two args sharing a name must render in input order in both languages.
+		// Byte-ordinal by name, which matches Python: Python compares str by CODE POINT, and
+		// UTF-8 byte order equals code-point order, so this agrees even for a non-ASCII name.
+		// Stable, matching list.sort: two args sharing a name render in input order in both.
 		sort.SliceStable(args, func(i, j int) bool { return args[i].Name < args[j].Name })
 
 		for i, a := range args {

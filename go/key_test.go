@@ -70,8 +70,8 @@ func TestValueKeyMatchesProductionKeys(t *testing.T) {
 		},
 		{
 			// The `::` in a use case and any punctuation in an id are stored literally.
-			// Percent-encoding here would break Python compatibility outright -- which is
-			// exactly the bug the Python port has.
+			// Percent-encoding here would break Python compatibility outright: render_prefix
+			// interpolates with an f-string and escapes nothing. The want value proves it.
 			name: "no percent-encoding of any component",
 			urn:  "urn:galileo:acme",
 			key:  Key{KeyType: "log_records_search_run_id", ID: "a b/c?d&e=f", UseCase: "Svc::method"},

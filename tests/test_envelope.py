@@ -577,9 +577,9 @@ def test_decode_rejects_a_timestamp_outside_the_safe_integer_range() -> None:
 
 
 def test_decode_rejects_an_integer_timestamp_past_a_double() -> None:
-    # Go reads the field into a float64, so an out-of-range literal loses precision and its
-    # Go rejects it. Python's arbitrary-precision int accepted it, so the entry
-    # never expired AND could never be invalidated -- one key, two answers.
+    # Go reads the field into a float64, so an out-of-range literal loses precision and Go
+    # rejects it. Python's arbitrary-precision int accepted it, so the entry never expired
+    # AND could never be invalidated -- one key, two answers.
     big = int("9" * 401)
     raw = json.dumps(
         {"version": 1, "createdAtMs": big, "expiresAtMs": big, "encoding": "utf8", "payload": "x"}

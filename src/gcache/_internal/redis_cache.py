@@ -194,7 +194,9 @@ class RedisCache(CacheInterface):
 
     async def invalidate(self, key_type: str, id: str, future_buffer_ms: int) -> None:
         # Both required, matching Go's Invalidate. An empty one wrote a watermark for a
-        # malformed key -- suppressing nothing, while reporting success.
+        # malformed key -- suppressing nothing, while reporting success. Kept as well as the
+        # public-API guard: this class is constructed directly in tests and by a consumer
+        # reaching past GCache, and it is the layer Go's Invalidate corresponds to.
         if not key_type or not id:
             raise ValueError("gcache: invalidate requires both key_type and id")
 

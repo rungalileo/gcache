@@ -174,9 +174,7 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 	case "utf8":
 		return []byte(*w.Payload), createdAtMs, expiresAtMs, nil
 	case "base64":
-		// Normalize first: Node's Buffer.from accepts the URL-safe alphabet and unpadded
-		// input, and Python normalizes both before decoding. StdEncoding alone rejected
-		// them, so a RawURLEncoding writer was a miss in Go and a hit in the other two.
+		// See normalizeBase64 for which spellings this accepts and why.
 		decoded, err := base64.StdEncoding.DecodeString(normalizeBase64(*w.Payload))
 		if err != nil {
 			return nil, 0, 0, fmt.Errorf("gcache: malformed base64 payload: %w", err)

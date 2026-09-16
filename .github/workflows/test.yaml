@@ -5,15 +5,22 @@ name: test
 # Keep it unfiltered unless the ruleset changes; the suite is ~15s.
 
 on:
+  # main only. `push` and `pull_request` both fire for every push to a PR branch, and a
+  # concurrency group does NOT dedupe them -- github.head_ref is empty on push, so the two
+  # events land in different groups and both runs complete. Measured on bacbe24: two `test`
+  # runs, two seconds apart, neither cancelled, both on the one self-hosted runner. The
+  # required check comes from the pull_request event.
   push:
+    branches: [main]
   pull_request:
 
-# Without this, `push` and `pull_request` both fire for every push to a PR branch, so this
-# job -- the only one on the self-hosted `galileo` runner -- runs twice and a later push
-# cancels neither. Keyed on the ref, so a PR's own pushes supersede each other.
+# Supersession only, which is what a group actually buys: a later push to a PR branch
+# cancels the earlier run. NOT on main -- two quick merges would have the second cancel the
+# first, leaving that commit with no coverage upload and a cancelled `test` status that every
+# later PR then compares against.
 concurrency:
   group: test-${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Read-only. This job installs and runs unpinned dependency code (pipx, poetry, the test
 # suite) on a persistent runner, so the default token is more than it needs.

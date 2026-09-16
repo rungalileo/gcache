@@ -4,7 +4,10 @@ name: Go
 # NOTE: `paths` on `push` matches that commit, but on `pull_request` it matches the PR's
 # CUMULATIVE diff -- so a PR that ever touched go/** runs this on every later push.
 on:
+  # main only on push; see test.yaml. A concurrency group does not dedupe push against
+  # pull_request, because github.head_ref is empty on push.
   push:
+    branches: [main]
     paths:
       - "go/**"
       - ".github/workflows/go.yaml"
@@ -13,9 +16,10 @@ on:
       - "go/**"
       - ".github/workflows/go.yaml"
 
+# Supersession only, and not on main -- see test.yaml.
 concurrency:
   group: go-${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Read-only: this job runs unpinned dependency code. See conformance.yaml.
 permissions:
@@ -60,8 +64,8 @@ jobs:
         run: cd go && go test -count=1 ./... -coverprofile=coverage.out
 
       # Same version, token and failure mode as test.yaml. Without the token the upload is
-      # rejected; fail_ci_if_error has no default, so the step stayed GREEN and Go coverage
-      # simply never arrived. The skip condition has to cover forks as well as dependabot --
+      # rejected; fail_ci_if_error defaults to false in v7.0.0, so the step stayed GREEN and
+      # Go coverage simply never arrived. The skip condition has to cover forks as well as dependabot --
       # neither can read repository secrets. See test.yaml's note.
       - uses: codecov/codecov-action@v7.0.0
         if: >-

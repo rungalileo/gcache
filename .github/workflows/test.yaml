@@ -1,8 +1,10 @@
 name: test
 
-# DELIBERATELY UNFILTERED: `test` is a REQUIRED check, and a filtered workflow leaves its
-# check Pending rather than Success -- so a PR touching only go/** could never merge.
-# Keep it unfiltered unless the ruleset changes; the suite is ~15s.
+# NO `paths:` FILTER, deliberately: `test` is a REQUIRED check, and a path-filtered workflow
+# leaves its check Pending rather than Success -- so a PR touching only go/** could never
+# merge. The suite is ~15s. (The `branches: [main]` on push below is a different thing and is
+# fine: the required check comes from the pull_request event, which carries no filter of any
+# kind. Do not add `paths:` to either trigger unless the ruleset changes.)
 
 on:
   # main only. `push` and `pull_request` both fire for every push to a PR branch, and a
@@ -18,8 +20,14 @@ on:
 # cancels the earlier run. NOT on main -- two quick merges would have the second cancel the
 # first, leaving that commit with no coverage upload and a cancelled `test` status that every
 # later PR then compares against.
+#
+# github.ref, NOT github.head_ref: head_ref is the branch NAME, which two fork pull requests
+# share all the time (`patch-1` is what the web editor creates, `main` is common in a fork),
+# so one PR would cancel another's REQUIRED check and leave it unmergeable until someone
+# re-ran it by hand. github.ref is refs/pull/<n>/merge here -- unique per PR, stable across
+# that PR's own pushes, and the branch ref on a push to main.
 concurrency:
-  group: test-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: test-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Read-only. This job installs and runs unpinned dependency code (pipx, poetry, the test

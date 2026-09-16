@@ -12,7 +12,7 @@ on:
 
 # Supersession only, and not on main -- see test.yaml.
 concurrency:
-  group: conformance-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: conformance-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Read-only. This job runs unpinned dependency code (poetry/go installs), so the

@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Update Python packages weekly.
+  # Update Python packages monthly.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

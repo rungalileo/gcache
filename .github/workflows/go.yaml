@@ -18,7 +18,7 @@ on:
 
 # Supersession only, and not on main -- see test.yaml.
 concurrency:
-  group: go-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: go-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Read-only: this job runs unpinned dependency code. See conformance.yaml.

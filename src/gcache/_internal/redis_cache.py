@@ -13,7 +13,15 @@ from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
-from gcache._internal.envelope import _INT64_MAX, _INT64_MIN, DecodedValue, EnvelopeDecodeError, decode, encode_json
+from gcache._internal.envelope import (
+    _INT64_MAX,
+    _INT64_MIN,
+    DecodedValue,
+    EnvelopeDecodeError,
+    decode,
+    encode_json,
+    encode_proto,
+)
 from gcache._internal.metrics import DEGRADED_REASON, GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.config import CacheConfigProvider, CacheLayer, Envelope, GCacheKey, RedisConfig, render_prefix
@@ -245,10 +253,14 @@ class RedisCache(CacheInterface):
         if raw is not None:
             start_sec = time.monotonic()
 
-            # Sniff the framing rather than trusting key.envelope -- mid-migration a key
-            # may hold either. A JSON key still refuses pickle (decode's allow_pickle).
-            # Executor on size alone: a large JSON envelope blocks the loop like a pickle.
-            allow_pickle = key.envelope != Envelope.JSON
+            # Framings identify themselves by first byte, so decode needs no hint -- except
+            # for pickle, which is the one case the DECLARATION decides rather than the bytes.
+            #
+            # POSITIVE, not `!= Envelope.JSON`. Negative was correct while JSON was the only
+            # alternative; adding PROTO made it grant unpickling to a PROTO key, which is the
+            # arbitrary-code-execution path this envelope exists to close. Declaring pickle is
+            # what grants pickle, and nothing else does.
+            allow_pickle = key.envelope == Envelope.PICKLE
             try:
                 deserialized_value: DecodedValue = (
                     decode(raw, allow_pickle=allow_pickle)
@@ -378,6 +390,16 @@ class RedisCache(CacheInterface):
                     f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=JsonSerializer()."
                 )
             encoded = encode_json(current_time_ms, ttl, serialized_value)
+        elif key.envelope == Envelope.PROTO:
+            # bytes only. A str payload would be silently utf-8 encoded here and read back as
+            # bytes by the other client, so the two would disagree about the value's type
+            # with nothing raising.
+            if key.serializer is None or not isinstance(serialized_value, bytes):
+                raise TypeError(
+                    f"Envelope.PROTO requires a Serializer producing bytes for use case "
+                    f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=ProtoSerializer(YourMessage)."
+                )
+            encoded = encode_proto(current_time_ms, ttl, serialized_value)
         else:
             encoded = pickle.dumps(
                 RedisValue(created_at_ms=current_time_ms, payload=serialized_value), protocol=pickle.HIGHEST_PROTOCOL

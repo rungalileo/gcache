@@ -806,7 +806,7 @@ def test_envelope_rejects_a_boolean_version() -> None:
 def test_json_serializer_parses_inline_even_when_large() -> None:
     # Deliberately NOT offloaded: measured on 5.3 MB, offloading changed the max event-loop
     # tick delay not at all (0.007s inline vs 0.007-0.014s offloaded) since json.loads holds
-    # the GIL throughout. ProtoJsonSerializer.load is the case where offloading does help.
+    # the GIL throughout, as ParseFromString does -- neither needs offloading.
     import inspect
 
     src = inspect.getsource(JsonSerializer.load)

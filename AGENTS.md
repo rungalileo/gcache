@@ -13,7 +13,7 @@ src/gcache/
 │                            #   Serializer, JsonSerializer, Fallback
 ├── exceptions.py            # All exception classes
 ├── gcache.py                # GCache main class, @cached decorator, aget/aput direct keys
-├── proto_serializer.py      # ProtoJsonSerializer (protobuf extra; imported lazily)
+├── proto_serializer.py      # ProtoSerializer, binary protobuf (extra; imported lazily)
 └── _internal/               # Implementation details (not public API)
     ├── constants.py         # Named constants (cache sizes, TTLs, thresholds)
     ├── envelope.py          # Value framing: pickle vs the cross-language JSON envelope
@@ -181,4 +181,4 @@ Do not wire the Go module into python-semantic-release. It emits bare `v{version
 ## Dependencies
 
 Core: pydantic, prometheus-client, cachetools, redis
-Optional: uvloop; protobuf (extra `protobuf`, needed only for `ProtoJsonSerializer`)
+Optional: uvloop; protobuf (extra `protobuf`, needed only for `ProtoSerializer`)

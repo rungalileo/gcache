@@ -99,6 +99,144 @@ class EnvelopeDecodeError(Exception):
     """Raised when a stored value matches no known envelope."""
 
 
+# --- The PROTO envelope -------------------------------------------------------------------
+#
+# Protobuf wire format, hand-written rather than generated: four fields is small enough to
+# pin byte-for-byte in the conformance corpus, and generating it would put protoc in a repo
+# that has none AND make protobuf non-optional here (it is a lazy import on purpose --
+# ~30 google.* modules on every `import gcache` was ruled out). See envelope.proto, which
+# documents the same schema so another language can interoperate.
+#
+#   field 1  version        varint
+#   field 2  created_at_ms  varint
+#   field 3  expires_at_ms  varint
+#   field 4  payload        length-delimited
+#
+# FIELD NUMBERS MUST STAY <= 14. That is what makes the framing self-identifying: a tag byte
+# is (field_number << 3) | wire_type, so fields 1-14 over proto3's wire types (0/1/2/5) span
+# 0x08..0x75 -- disjoint from JSON's '{' (0x7b) and pickle's PROTO opcode (0x80). Field 16
+# with a varint is exactly 0x80, so going past 15 would collide with pickle; and capping at
+# 15 rather than 14 would stretch the range over 0x7b. Ten spare numbers remain.
+_PROTO_FIRST_BYTE_MIN = 0x08
+_PROTO_FIRST_BYTE_MAX = 0x75
+
+_WIRE_VARINT, _WIRE_64BIT, _WIRE_LEN, _WIRE_32BIT = 0, 1, 2, 5
+
+
+def _put_varint(out: bytearray, value: int) -> None:
+    while value > 0x7F:
+        out.append((value & 0x7F) | 0x80)
+        value >>= 7
+    out.append(value)
+
+
+def _get_varint(data: bytes, i: int) -> tuple[int, int]:
+    """Read a varint at ``i``; return (value, next index). Bounded at 10 bytes, which is the
+    most an int64 can take -- an unbounded loop on a truncated value reads past the end."""
+    value = shift = 0
+    for _ in range(10):
+        if i >= len(data):
+            raise EnvelopeDecodeError("truncated varint")
+        byte = data[i]
+        i += 1
+        value |= (byte & 0x7F) << shift
+        if not byte & 0x80:
+            return value, i
+        shift += 7
+    raise EnvelopeDecodeError("varint longer than 10 bytes")
+
+
+def encode_proto(created_at_ms: int, ttl_sec: int, payload: bytes) -> bytes:
+    """Frame an already-serialized binary ``payload`` in the PROTO envelope.
+
+    18 bytes of overhead against the JSON envelope's ~102, and no base64 -- which is a third
+    of the payload back. The cost is that neither the payload nor the metadata is readable
+    from ``redis-cli`` or Redis's Lua ``cjson`` any more; see the README.
+    """
+    if not isinstance(payload, bytes):
+        raise EnvelopeEncodeError(f"the PROTO envelope carries bytes, got {type(payload).__name__}")
+
+    # The SAME bound the JSON envelope enforces, though binary has no float64 rounding to
+    # fear. One bound across both framings means a value written under either can be
+    # expressed under the other, so switching a use case cannot make a timestamp
+    # unrepresentable.
+    expires_at_ms = created_at_ms + ttl_sec * 1000
+    for field, value in (("createdAtMs", created_at_ms), ("expiresAtMs", expires_at_ms)):
+        if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):
+            raise EnvelopeEncodeError(
+                f"{field} would be {value}, outside the safe-integer range that both "
+                f"clients can read (created_at_ms={created_at_ms}, ttl_sec={ttl_sec})"
+            )
+    if created_at_ms < 0 or expires_at_ms < 0:
+        # A negative varint is 10 bytes and reads back as a huge unsigned value in a reader
+        # that does not sign-extend. Refuse rather than write something the two clients
+        # would disagree about.
+        raise EnvelopeEncodeError(f"timestamps must be non-negative, got {created_at_ms}/{expires_at_ms}")
+
+    out = bytearray()
+    out.append((1 << 3) | _WIRE_VARINT)
+    _put_varint(out, ENVELOPE_VERSION)
+    out.append((2 << 3) | _WIRE_VARINT)
+    _put_varint(out, created_at_ms)
+    out.append((3 << 3) | _WIRE_VARINT)
+    _put_varint(out, expires_at_ms)
+    out.append((4 << 3) | _WIRE_LEN)
+    _put_varint(out, len(payload))
+    out += payload
+    return bytes(out)
+
+
+def _decode_proto(data: bytes) -> DecodedValue:
+    """Parse the PROTO envelope. Fields in any order, unknown fields skipped."""
+    version: int | None = None
+    created_at_ms: int | None = None
+    expires_at_ms: int | None = None
+    payload: bytes | None = None
+
+    i = 0
+    while i < len(data):
+        tag, i = _get_varint(data, i)
+        field, wire = tag >> 3, tag & 0x07
+        if wire == _WIRE_VARINT:
+            value, i = _get_varint(data, i)
+            if field == 1:
+                version = value
+            elif field == 2:
+                created_at_ms = value
+            elif field == 3:
+                expires_at_ms = value
+        elif wire == _WIRE_LEN:
+            length, i = _get_varint(data, i)
+            if i + length > len(data):
+                raise EnvelopeDecodeError("length-delimited field runs past the end")
+            if field == 4:
+                payload = data[i : i + length]
+            i += length
+        elif wire == _WIRE_64BIT:
+            i += 8
+        elif wire == _WIRE_32BIT:
+            i += 4
+        else:
+            # Wire types 3 and 4 are proto2 groups. proto3 never emits them, so a value
+            # carrying one was not written by any gcache client.
+            raise EnvelopeDecodeError(f"unsupported wire type {wire} on field {field}")
+        if i > len(data):
+            raise EnvelopeDecodeError("field runs past the end")
+
+    # GREATER than, not !=. A strict check makes every added field a flag day: an old reader
+    # would reject an entry it could otherwise parse, because protobuf already skips fields
+    # it does not know. Rejecting only a HIGHER version keeps that forward compatibility and
+    # still refuses a deliberate incompatible break.
+    if version is None or version > ENVELOPE_VERSION:
+        raise EnvelopeDecodeError(f"unsupported envelope version {version!r}")
+    if created_at_ms is None or expires_at_ms is None or payload is None:
+        raise EnvelopeDecodeError(
+            f"incomplete PROTO envelope (version={version} createdAtMs={created_at_ms} "
+            f"expiresAtMs={expires_at_ms} payload={'set' if payload is not None else None})"
+        )
+    return DecodedValue(created_at_ms=created_at_ms, payload=payload, is_json=True, expires_at_ms=expires_at_ms)
+
+
 def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes:
     """Frame ``payload`` in the cross-language JSON envelope.
 
@@ -137,10 +275,20 @@ def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes
 
 
 def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
-    """Decode a stored value, sniffing the framing rather than trusting the key's config.
+    """Decode a stored value from its framing, which every framing identifies itself by.
 
-    Sniffing is what lets a key move between envelopes with no flag day: a reader handles
-    whatever the writer left.
+    The key's declared envelope is deliberately NOT consulted to pick a framing. It was
+    considered: prioritise the declaration, fall back to the others. But the three framings
+    occupy disjoint first bytes, so the sniff already lands on exactly one -- the declaration
+    could only ever agree with it, and a branch for it would be ceremony. What the declaration
+    IS used for is the one place it changes an outcome: ``allow_pickle``, below.
+
+    Self-identifying by first byte, which is why no magic prefix is needed:
+
+    * ``0x08``-``0x75`` -- PROTO. A tag byte is ``(field << 3) | wire_type``, so fields 1-14
+      over proto3's wire types span exactly this range. See _PROTO_FIRST_BYTE_MIN.
+    * ``0x7b`` (``{``) -- JSON.
+    * ``0x80`` -- pickle. Only ever unpickled when the key declares it; see ``allow_pickle``.
 
     ``allow_pickle`` gates the pickle branch. A key that declares ``Envelope.JSON`` passes
     ``False``, because unpickling executes arbitrary code and the reader cannot tell a
@@ -161,6 +309,9 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
     # client still raises inside redis-py and never heals (_warn_once_if_text_mode).
     if isinstance(data, str):
         data = data.encode("utf-8")
+
+    if _PROTO_FIRST_BYTE_MIN <= data[0] <= _PROTO_FIRST_BYTE_MAX:
+        return _decode_proto(data)
 
     if data[0] == _PICKLE_PROTO_OPCODE:
         if not allow_pickle:

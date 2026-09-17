@@ -15,7 +15,7 @@ from gcache.gcache import GCache
 
 # Safe to import unconditionally: proto_serializer imports protobuf lazily and only
 # fails when the class is actually constructed without the extra installed.
-from gcache.proto_serializer import ProtoJsonSerializer
+from gcache.proto_serializer import ProtoSerializer
 
 __all__ = [
     "CacheConfigProvider",
@@ -28,7 +28,7 @@ __all__ = [
     "GCacheKeyConfig",
     "hash_component",
     "JsonSerializer",
-    "ProtoJsonSerializer",
+    "ProtoSerializer",
     "RedisConfig",
     "Serializer",
 ]

@@ -286,3 +286,59 @@ def test_an_unhashable_component_raises_rather_than_substituting() -> None:
     # Catchable the way every other gcache failure is.
     assert issubclass(UnhashableKeyComponent, GCacheError)
     assert issubclass(UnhashableKeyComponent, ValueError)
+
+
+def test_the_proto_envelope_matches_the_shared_bytes() -> None:
+    # Go asserts this same section. The PROTO framing is hand-written in both clients, so
+    # nothing but these bytes stops them drifting -- and a drift is silent: one client writes
+    # an entry the other cannot read, with no error on the write side.
+    import base64
+
+    from gcache._internal.envelope import decode, encode_proto
+
+    section = _DATA["protoEnvelope"]
+    c = section["canonical"]
+    payload = base64.b64decode(c["payloadBase64"])
+    expected = base64.b64decode(c["envelopeBase64"])
+
+    ttl_sec = (c["expiresAtMs"] - c["createdAtMs"]) // 1000
+    actual = encode_proto(created_at_ms=c["createdAtMs"], ttl_sec=ttl_sec, payload=payload)
+    assert actual == expected, f"{actual.hex()} != {expected.hex()}"
+    assert len(actual) == c["envelopeLength"]
+
+    decoded = decode(expected, allow_pickle=False)
+    assert decoded.created_at_ms == c["createdAtMs"]
+    assert decoded.expires_at_ms == c["expiresAtMs"]
+    assert decoded.payload == payload
+
+
+def test_the_proto_first_byte_range_is_disjoint_from_the_other_framings() -> None:
+    # The whole reason the framing needs no magic prefix. Asserted over the RANGE rather than
+    # one example, because the guarantee is about every field the schema may ever use: a tag
+    # byte is (field << 3) | wire_type, and the range only holds while fields stay <= 14.
+    section = _DATA["protoEnvelope"]
+    lo, hi = section["firstByteRange"]["min"], section["firstByteRange"]["max"]
+    others = section["otherFramings"]
+
+    assert not lo <= others["json"] <= hi, "JSON's '{' must not fall inside the PROTO range"
+    assert not lo <= others["pickle"] <= hi, "pickle's 0x80 must not fall inside the PROTO range"
+
+    # Every tag byte a conforming envelope can start with, for any field 1-14 and any proto3
+    # wire type, lands in the range.
+    for field in range(1, 15):
+        for wire in (0, 1, 2, 5):
+            assert lo <= (field << 3) | wire <= hi, f"field {field} wire {wire} escapes the range"
+    # And field 16 with a varint is exactly pickle's marker -- the reason for the cap.
+    assert (16 << 3) | 0 == others["pickle"]
+
+
+@pytest.mark.parametrize("case", _DATA["protoEnvelope"]["rejects"], ids=lambda c: c["name"])
+def test_the_proto_envelope_rejects_what_go_rejects(case: dict) -> None:
+    # Each of these is a value no gcache client writes. Accepting one means answering a hit
+    # with data the other client would refuse.
+    import base64
+
+    from gcache._internal.envelope import EnvelopeDecodeError, decode
+
+    with pytest.raises(EnvelopeDecodeError):
+        decode(base64.b64decode(case["envelopeBase64"]), allow_pickle=False)

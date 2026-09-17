@@ -6,38 +6,35 @@ package protocodec
 import (
 	"fmt"
 
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/rungalileo/gcache/go"
 )
 
-// The cross-language contract. Neither is protojson's default, so they live here rather
-// than at each call site. Python's counterparts
-// are preserving_proto_field_name=True and ignore_unknown_fields=True.
-var (
-	// snake_case, so the two languages write ONE wire form -- not about a reader failing
-	// (protojson accepts either spelling), but about readers that are not protojson at all
-	// (cjson in a Redis Lua script, jq, a dashboard query) needing one fixed key.
-	marshalOptions = protojson.MarshalOptions{UseProtoNames: true}
+// Proto returns a Codec that stores M in the binary protobuf wire format. M is the pointer
+// type of a generated message, e.g. protocodec.Proto[*cachev1.SessionIdentity]().
+//
+// Pairs with gcache.EnvelopePROTO, which carries the bytes in a binary envelope with no
+// base64 and no JSON wrapper. Measured against the same message as protojson in a JSON
+// envelope: 69 bytes stored rather than 204, and roughly 20x cheaper to serialize and parse.
+//
+// Python's counterpart is ProtoSerializer. Binary needs no cross-language options, which is
+// most of the point: protojson had to agree on UseProtoNames/preserving_proto_field_name
+// because it spells every field twice, and the wire form was two mistakes wide. Binary
+// carries field NUMBERS, so there is no spelling to disagree about -- and unknown fields are
+// skipped by proto.Unmarshal itself, so there is no DiscardUnknown to forget either.
+//
+// What it gives up is readability: a stored entry is opaque to redis-cli, jq and Redis's Lua
+// cjson. Use the JSON envelope with a text codec where that matters.
+func Proto[M proto.Message]() gcache.Codec[M] { return protoCodec[M]{} }
 
-	// Tolerate a field a newer writer added. Default is to error, which during a
-	// rolling deploy that adds a field makes each pod generation reject the other's
-	// entries for the whole rollout.
-	unmarshalOptions = protojson.UnmarshalOptions{DiscardUnknown: true}
-)
+type protoCodec[M proto.Message] struct{}
 
-// ProtoJSON returns a Codec that stores M as protojson. M is the pointer type of a
-// generated message, e.g. protocodec.ProtoJSON[*cachev1.SessionIdentity]().
-func ProtoJSON[M proto.Message]() gcache.Codec[M] { return protoJSONCodec[M]{} }
-
-type protoJSONCodec[M proto.Message] struct{}
-
-func (protoJSONCodec[M]) Marshal(m M) ([]byte, error) {
-	return marshalOptions.Marshal(m)
+func (protoCodec[M]) Marshal(m M) ([]byte, error) {
+	return proto.Marshal(m)
 }
 
-func (protoJSONCodec[M]) Unmarshal(b []byte, out *M) error {
+func (protoCodec[M]) Unmarshal(b []byte, out *M) error {
 	// A generic M cannot be new()'d, so allocate through the descriptor. ProtoReflect on
 	// the typed-nil zero value is safe: generated code handles a nil receiver.
 	var zero M
@@ -46,7 +43,7 @@ func (protoJSONCodec[M]) Unmarshal(b []byte, out *M) error {
 		// Unreachable for a generated type; beats panicking on the type assertion.
 		return fmt.Errorf("protocodec: %T.ProtoReflect().New() did not yield %T", zero, zero)
 	}
-	if err := unmarshalOptions.Unmarshal(b, msg); err != nil {
+	if err := proto.Unmarshal(b, msg); err != nil {
 		return err
 	}
 	*out = msg

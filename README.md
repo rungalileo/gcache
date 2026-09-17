@@ -466,36 +466,51 @@ that is where cross-language caches actually break: not in the framing, which is
 in a field one side renamed, retyped, or made optional. Review of the first shared use case
 here turned up six such divergences, every one found by a person rather than a test.
 
-`ProtoJsonSerializer` takes a generated protobuf message instead, so one `.proto` defines
-the payload for every language:
+`ProtoSerializer` takes a generated protobuf message instead, so one `.proto` defines the
+payload for every language — and pairs with `Envelope.PROTO`, which stores it in the binary
+wire format:
 
 ```python
-from gcache import Envelope, ProtoJsonSerializer
+from gcache import Envelope, ProtoSerializer
 from libs.python.schemas.cache.proto import session_identity_pb2
 
 @gcache.cached(
     key_type="session_id",
     id_arg="session_id",
     use_case="session-identity",
-    envelope=Envelope.JSON,
-    serializer=ProtoJsonSerializer(session_identity_pb2.SessionIdentity),
+    envelope=Envelope.PROTO,
+    serializer=ProtoSerializer(session_identity_pb2.SessionIdentity),
     track_for_invalidation=True,
 )
 async def get_session(session_id: str) -> session_identity_pb2.SessionIdentity: ...
 ```
 
 Requires the extra: `pip install 'gcache[protobuf]'`. Importing gcache without it is fine;
-only constructing `ProtoJsonSerializer` raises.
+only constructing `ProtoSerializer` raises. The Go counterpart is `go/protocodec.Proto`.
 
-The Go counterpart is `go/protocodec.ProtoJSON` in this repo, and the two set the same
-two non-default options — snake_case field names, and tolerating unknown fields so a rolling
-deploy that adds a field does not make each pod generation reject the other's entries. Both
-are enforced by tests on each side.
+Measured on a small message (a uuid string and a timestamp), against the same message as
+protojson inside the JSON envelope:
 
-**Do not compare the two languages' bytes.** Go's protojson deliberately emits unstable
-whitespace — it appends a random extra space after each comma, decided per binary build — and
-Python's `MessageToJson` spaces differently again. This is harmless, because both sides parse
-JSON, but it means a conformance test has to compare parsed values, never raw output.
+| | protojson in JSON envelope | binary in PROTO envelope |
+|---|---|---|
+| serialize | 2.23 µs | **0.12 µs** |
+| parse | 6.48 µs | **0.29 µs** |
+| stored entry | 204 B | **69 B** |
+
+Most of the size win is the envelope, not the payload: the JSON envelope costs ~102 bytes
+against the binary one's 18, and base64 would give back a third of what binary saves.
+
+Binary also removes a class of bug rather than testing for it. protojson spells every field
+twice — `session_id` and `sessionId` — and both readers accept either, so a writer emitting
+the wrong one produces two wire forms for one key and nothing fails. Binary carries field
+*numbers*, so there is no spelling to disagree about, and unknown fields are skipped by
+protobuf itself rather than by an option each language has to remember to set.
+
+**What you give up is inspectability.** A JSON-enveloped entry can be read with `redis-cli
+GET`, piped through `jq`, or parsed inside Redis by a Lua script using `cjson`. A PROTO entry
+is opaque to all three — payload *and* metadata. `go/cmd/gcachectl` is the way to look at one.
+If being able to eyeball an entry matters more than its size, use `Envelope.JSON` with a text
+serializer.
 
 ## Redis Configuration
 

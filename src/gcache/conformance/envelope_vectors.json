@@ -394,5 +394,56 @@
         "_why": "long input: the digest is fixed width, which is why hashing retires the byte bound"
       }
     ]
+  },
+  "protoEnvelope": {
+    "_why": [
+      "The PROTO framing, byte for byte. Hand-written in both clients (four fields is too",
+      "small to justify putting protoc in this repo), so nothing but these vectors stops",
+      "the two from drifting -- and a drift here is silent: one client writes an entry the",
+      "other cannot read, with no error on the write side.",
+      "",
+      "firstByteRange is the load-bearing part. A tag byte is (field << 3) | wire_type, so",
+      "fields 1-14 over proto3's wire types span 0x08..0x75 -- disjoint from JSON's '{'",
+      "(0x7b) and pickle's 0x80. Field 16 with a varint IS 0x80, which is why the schema",
+      "may never use a field number above 14."
+    ],
+    "firstByteRange": {
+      "min": 8,
+      "max": 117
+    },
+    "otherFramings": {
+      "json": 123,
+      "pickle": 128
+    },
+    "canonical": {
+      "why": "One fully-specified entry. Both clients must produce these exact bytes.",
+      "createdAtMs": 1757308800123,
+      "expiresAtMs": 1757308860123,
+      "payloadBase64": "CgNhYmM=",
+      "envelopeBase64": "CAEQ+5iRvpIzGNvtlL6SMyIFCgNhYmM=",
+      "envelopeLength": 23
+    },
+    "rejects": [
+      {
+        "name": "version-too-new",
+        "envelopeBase64": "CGMQ+5iRvpIzGNvtlL6SMyIFCgNhYmM=",
+        "why": "version 99 > what this reader knows. GREATER than, not !=: an added field must not be a flag day."
+      },
+      {
+        "name": "no-version",
+        "envelopeBase64": "EPuYkb6SMxjb7ZS+kjMiBQoDYWJj",
+        "why": "field 1 absent. An unversioned entry was not written by any gcache client."
+      },
+      {
+        "name": "payload-runs-past-the-end",
+        "envelopeBase64": "CAEQ+5iRvpIzGNvtlL6SMyIFCgM=",
+        "why": "truncated in transit: the length prefix outruns the buffer."
+      },
+      {
+        "name": "group-wire-type",
+        "envelopeBase64": "CwEQ+5iRvpIzGNvtlL6SMyIFCgNhYmM=",
+        "why": "wire type 3 is a proto2 group. proto3 never emits one, so no client wrote this."
+      }
+    ]
   }
 }

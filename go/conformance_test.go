@@ -1,6 +1,7 @@
 package gcache
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The Go half of the shared cross-language conformance suite: this file, test_conformance.py,
@@ -67,6 +69,28 @@ type conformanceFile struct {
 			Why    string `json:"_why"`
 		} `json:"cases"`
 	} `json:"hashedComponents"`
+	ProtoEnvelope struct {
+		FirstByteRange struct {
+			Min int `json:"min"`
+			Max int `json:"max"`
+		} `json:"firstByteRange"`
+		OtherFramings struct {
+			JSON   int `json:"json"`
+			Pickle int `json:"pickle"`
+		} `json:"otherFramings"`
+		Canonical struct {
+			CreatedAtMs    int64  `json:"createdAtMs"`
+			ExpiresAtMs    int64  `json:"expiresAtMs"`
+			PayloadBase64  string `json:"payloadBase64"`
+			EnvelopeBase64 string `json:"envelopeBase64"`
+			EnvelopeLength int    `json:"envelopeLength"`
+		} `json:"canonical"`
+		Rejects []struct {
+			Name           string `json:"name"`
+			EnvelopeBase64 string `json:"envelopeBase64"`
+			Why            string `json:"why"`
+		} `json:"rejects"`
+	} `json:"protoEnvelope"`
 }
 
 func loadConformance(t *testing.T) conformanceFile {
@@ -297,5 +321,91 @@ func TestHashedComponentsMatchTheSharedDigests(t *testing.T) {
 		if got != strings.ToLower(got) || len(got) != 64 {
 			t.Errorf("HashComponent(%q) = %q; want 64 chars of lowercase hex", c.Input, got)
 		}
+	}
+}
+
+// TestProtoEnvelopeMatchesTheSharedBytes pins the PROTO framing against Python. Both sides
+// hand-write it, so nothing but these bytes stops them drifting -- and a drift is silent: one
+// client writes an entry the other cannot read, with no error on the write side.
+func TestProtoEnvelopeMatchesTheSharedBytes(t *testing.T) {
+	data := loadConformance(t)
+	c := data.ProtoEnvelope.Canonical
+
+	payload, err := base64.StdEncoding.DecodeString(c.PayloadBase64)
+	if err != nil {
+		t.Fatalf("fixture payload: %v", err)
+	}
+	want, err := base64.StdEncoding.DecodeString(c.EnvelopeBase64)
+	if err != nil {
+		t.Fatalf("fixture envelope: %v", err)
+	}
+
+	got, err := encodeProtoEnvelope(
+		time.UnixMilli(c.CreatedAtMs), time.Duration(c.ExpiresAtMs-c.CreatedAtMs)*time.Millisecond, payload)
+	if err != nil {
+		t.Fatalf("encodeProtoEnvelope: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("encodeProtoEnvelope = %x, fixture says %x", got, want)
+	}
+	if len(got) != c.EnvelopeLength {
+		t.Fatalf("envelope is %d bytes, fixture says %d", len(got), c.EnvelopeLength)
+	}
+
+	gotPayload, createdAtMs, expiresAtMs, err := decodeEnvelope(want)
+	if err != nil {
+		t.Fatalf("decodeEnvelope: %v", err)
+	}
+	if !bytes.Equal(gotPayload, payload) || createdAtMs != c.CreatedAtMs || expiresAtMs != c.ExpiresAtMs {
+		t.Fatalf("decode gave payload=%x created=%d expires=%d", gotPayload, createdAtMs, expiresAtMs)
+	}
+}
+
+// TestProtoFirstByteRangeIsDisjointFromTheOtherFramings is why the framing needs no magic
+// prefix. Asserted over the RANGE, not one example: the guarantee is about every field the
+// schema may ever use, and it only holds while field numbers stay <= 14.
+func TestProtoFirstByteRangeIsDisjointFromTheOtherFramings(t *testing.T) {
+	data := loadConformance(t)
+	lo, hi := data.ProtoEnvelope.FirstByteRange.Min, data.ProtoEnvelope.FirstByteRange.Max
+	if lo != protoFirstByteMin || hi != protoFirstByteMax {
+		t.Fatalf("this client uses 0x%02x..0x%02x, fixture says 0x%02x..0x%02x",
+			protoFirstByteMin, protoFirstByteMax, lo, hi)
+	}
+	if j := data.ProtoEnvelope.OtherFramings.JSON; j >= lo && j <= hi {
+		t.Errorf("JSON's 0x%02x falls inside the PROTO range", j)
+	}
+	if pk := data.ProtoEnvelope.OtherFramings.Pickle; pk >= lo && pk <= hi {
+		t.Errorf("pickle's 0x%02x falls inside the PROTO range", pk)
+	}
+	for field := 1; field <= 14; field++ {
+		for _, wire := range []int{0, 1, 2, 5} {
+			if tag := (field << 3) | wire; tag < lo || tag > hi {
+				t.Errorf("field %d wire %d gives 0x%02x, outside the range", field, wire, tag)
+			}
+		}
+	}
+	if tag := (16 << 3) | 0; tag != data.ProtoEnvelope.OtherFramings.Pickle {
+		t.Errorf("field 16 varint = 0x%02x; the field cap exists because it is pickle's 0x%02x",
+			tag, data.ProtoEnvelope.OtherFramings.Pickle)
+	}
+}
+
+// TestProtoEnvelopeRejectsWhatPythonRejects -- each is a value no gcache client writes.
+// Accepting one means answering a hit with data the other client would refuse.
+func TestProtoEnvelopeRejectsWhatPythonRejects(t *testing.T) {
+	data := loadConformance(t)
+	if len(data.ProtoEnvelope.Rejects) == 0 {
+		t.Fatal("the PROTO reject cases are gone")
+	}
+	for _, c := range data.ProtoEnvelope.Rejects {
+		t.Run(c.Name, func(t *testing.T) {
+			raw, err := base64.StdEncoding.DecodeString(c.EnvelopeBase64)
+			if err != nil {
+				t.Fatalf("fixture: %v", err)
+			}
+			if _, _, _, err := decodeEnvelope(raw); err == nil {
+				t.Fatalf("accepted %x, which should be rejected: %s", raw, c.Why)
+			}
+		})
 	}
 }

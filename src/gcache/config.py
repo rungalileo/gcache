@@ -128,12 +128,20 @@ class Envelope(str, Enum):
     also uses, so an entry can be shared between them and inspected server-side from Redis's
     Lua interpreter.
 
+    ``PROTO`` frames a binary payload in a binary envelope: 18 bytes of overhead against
+    JSON's ~102, and no base64, so a small entry is roughly a third the size (measured: 69
+    bytes against 204 for the same protobuf message as protojson). It gives up what JSON
+    buys -- neither payload nor metadata is readable from ``redis-cli`` or Redis's Lua
+    ``cjson``. Use it for a hot path where size and parse cost matter more than being able
+    to eyeball an entry.
+
     Public API: this lives here rather than in ``gcache._internal`` so callers do not have
     to import from a private path to name it.
     """
 
     PICKLE = "pickle"
     JSON = "json"
+    PROTO = "proto"
 
 
 class Serializer(ABC):
@@ -160,7 +168,7 @@ class Serializer(ABC):
         serializer configured per instance must override this, or two instances with
         different wire formats compare equal, share a urn, and each decodes the other's
         payload: a miss or a load failure with no error at registration to explain it.
-        ``ProtoJsonSerializer`` overrides it with its message's full name for exactly this
+        ``ProtoSerializer`` overrides it with its message's full name for exactly this
         reason.
 
         Return anything hashable and stable across processes. Do NOT return something whose
@@ -194,7 +202,8 @@ class JsonSerializer(Serializer):
             data = data.decode("utf-8")
         # Inline on purpose: json.loads holds the GIL, so offloading a 5.3 MB payload moved
         # the max tick delay 0.007s -> 0.007-0.014s and starved getaddrinfo in the default
-        # pool. ProtoJsonSerializer.load DOES offload -- it yields per field (0.104s -> 0.014s).
+        # pool. (ProtoSerializer.load does NOT offload: ParseFromString is C and blocks the
+        # loop once -- 0.5ms measured at 1.24MB, against protojson's 104ms at 1.18MB.)
         return json.loads(data)
 
 

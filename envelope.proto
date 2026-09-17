@@ -1,0 +1,58 @@
+// envelope.proto -- DOCUMENTATION ONLY. Nothing generates code from this file.
+//
+// The PROTO envelope is hand-written in both clients:
+//
+//   Python  src/gcache/_internal/envelope.py   encode_proto / _decode_proto
+//   Go      go/envelope.go                     encodeProtoEnvelope / decodeProtoEnvelope
+//
+// Hand-written on purpose. Four fields is small enough to pin byte-for-byte in
+// src/gcache/conformance/envelope_vectors.json (section `protoEnvelope`, asserted by both
+// suites), and generating it would mean putting protoc in a repo that has no codegen at all
+// -- plus protobuf is a deliberately OPTIONAL extra here, lazily imported, because pulling
+// ~30 google.* modules into every `import gcache` was ruled out.
+//
+// This file exists so a third language can interoperate without reading either
+// implementation, and so the schema has one authoritative statement. If you change it, change
+// both implementations and the conformance vectors -- the vectors are what will catch you.
+
+syntax = "proto3";
+
+package gcache.v1;
+
+// CacheEnvelope frames one cached value. Stored as the Redis string value, with no base64 and
+// no JSON wrapper: 18 bytes of overhead against the JSON envelope's ~102.
+//
+// FIELD NUMBERS MUST STAY <= 14, and that is not a style rule. The framing is identified by
+// its first byte, which for a protobuf message is a tag: (field_number << 3) | wire_type.
+// Fields 1-14 over proto3's wire types (0, 1, 2, 5) span 0x08..0x75, which is disjoint from
+// the other two framings a reader may meet:
+//
+//   0x08..0x75   this envelope
+//   0x7b  '{'    the JSON envelope
+//   0x80         a Python pickle (PROTO opcode)
+//
+// Field 16 with a varint is exactly 0x80, so a field number above 15 would make an envelope
+// indistinguishable from a pickle. Capping at 15 rather than 14 would stretch the range over
+// 0x7b and swallow the JSON envelope. Ten spare numbers remain; if a fifteenth field is ever
+// needed, the framing needs an explicit magic prefix instead.
+message CacheEnvelope {
+  // Always >= 1. A reader rejects an envelope whose version is GREATER than it knows, not one
+  // that merely differs -- protobuf already skips fields a reader does not recognise, so a
+  // strict check would make every added field a flag day.
+  //
+  // Being field 1 also means a conforming envelope normally starts 0x08, though readers must
+  // not rely on that: proto3 omits a zero default, and field ordering is not guaranteed by
+  // the spec. The RANGE above is the contract; this byte is not.
+  uint32 version = 1;
+
+  // When the value was written. The staleness comparison against an invalidation watermark is
+  // `watermark_ms >= created_at_ms`, inclusive.
+  int64 created_at_ms = 2;
+
+  // When the writer intended the value to expire. Honoured independently of Redis's own TTL,
+  // so a clock-skewed writer's entry is a miss rather than a stale hit.
+  int64 expires_at_ms = 3;
+
+  // The serialized value. Opaque here: the key's Serializer/Codec owns its meaning.
+  bytes payload = 4;
+}

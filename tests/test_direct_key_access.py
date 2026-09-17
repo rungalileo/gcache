@@ -478,12 +478,13 @@ async def test_a_direct_key_cannot_contradict_a_decorated_serializer(
         # Deleting is fine -- same urn, and framing is irrelevant to a delete.
         await gcache.adelete(clashing)
 
-    # The mirror -- two DIFFERENT serializer types on one JSON use case, which this change
-    # makes likely by shipping a second one. (Decorator-with, direct-without is already
-    # impossible: GCacheKey rejects Envelope.JSON with no serializer at construction.)
+    # The mirror -- two DIFFERENT serializer types on one use case. Both keys declare the
+    # SAME envelope on purpose: with different envelopes the envelope check fires first and
+    # this stops testing the serializer at all, which is how it failed when PROTO landed.
+    # Two proto message types, so only the serializer differs.
     from google.protobuf import descriptor_pb2
 
-    from gcache import ProtoJsonSerializer
+    from gcache import ProtoSerializer
 
     cache_config_provider.configs["ser_uc2"] = GCacheKeyConfig.enabled(60)
 
@@ -491,22 +492,22 @@ async def test_a_direct_key_cannot_contradict_a_decorated_serializer(
         key_type="session_id",
         id_arg="sid",
         use_case="ser_uc2",
-        envelope=Envelope.JSON,
-        serializer=JsonSerializer(),
+        envelope=Envelope.PROTO,
+        serializer=ProtoSerializer(descriptor_pb2.FileOptions),
     )
-    async def decorated2(sid: str) -> dict:
-        return {"a": 1}
+    async def decorated2(sid: str) -> descriptor_pb2.FileOptions:
+        return descriptor_pb2.FileOptions(go_package="example/v1")
 
-    proto_keyed = GCacheKey(
+    other_message_keyed = GCacheKey(
         key_type="session_id",
         id="p:r:s",
         use_case="ser_uc2",
-        envelope=Envelope.JSON,
-        serializer=ProtoJsonSerializer(descriptor_pb2.FileOptions),
+        envelope=Envelope.PROTO,
+        serializer=ProtoSerializer(descriptor_pb2.FieldOptions),
     )
     with gcache.enable():
         with pytest.raises(SerializerMismatchWithRegisteredUseCase):
-            await gcache.aput(proto_keyed, {"a": 1})
+            await gcache.aput(other_message_keyed, descriptor_pb2.FieldOptions())
 
 
 @pytest.mark.asyncio
@@ -621,7 +622,7 @@ async def test_two_proto_serializers_for_different_messages_are_not_interchangea
     # FieldOptions yields an EMPTY message with no error at all.
     from google.protobuf import descriptor_pb2
 
-    from gcache import ProtoJsonSerializer
+    from gcache import ProtoSerializer
     from gcache.exceptions import SerializerMismatchWithRegisteredUseCase
 
     cache_config_provider.configs["proto_uc"] = GCacheKeyConfig.enabled(60)
@@ -630,8 +631,8 @@ async def test_two_proto_serializers_for_different_messages_are_not_interchangea
         key_type="session_id",
         id_arg="sid",
         use_case="proto_uc",
-        envelope=Envelope.JSON,
-        serializer=ProtoJsonSerializer(descriptor_pb2.FileOptions),
+        envelope=Envelope.PROTO,
+        serializer=ProtoSerializer(descriptor_pb2.FileOptions),
     )
     async def decorated(sid: str) -> object:
         return descriptor_pb2.FileOptions()
@@ -640,15 +641,15 @@ async def test_two_proto_serializers_for_different_messages_are_not_interchangea
         key_type="session_id",
         id="p:r:s",
         use_case="proto_uc",
-        envelope=Envelope.JSON,
-        serializer=ProtoJsonSerializer(descriptor_pb2.FieldOptions),
+        envelope=Envelope.PROTO,
+        serializer=ProtoSerializer(descriptor_pb2.FieldOptions),
     )
     same_message = GCacheKey(
         key_type="session_id",
         id="p:r:s",
         use_case="proto_uc",
-        envelope=Envelope.JSON,
-        serializer=ProtoJsonSerializer(descriptor_pb2.FileOptions),
+        envelope=Envelope.PROTO,
+        serializer=ProtoSerializer(descriptor_pb2.FileOptions),
     )
 
     with gcache.enable():

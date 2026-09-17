@@ -86,12 +86,170 @@ func normalizeBase64(s string) string {
 	return s
 }
 
+// The PROTO envelope. Protobuf wire format, hand-written rather than generated: four fields
+// is small enough to pin byte-for-byte in the conformance corpus, and generating it would put
+// protoc in a repo that has none. Python's counterpart is encode_proto/_decode_proto in
+// _internal/envelope.py; envelope.proto documents the same schema.
+//
+//	field 1  version        varint
+//	field 2  created_at_ms  varint
+//	field 3  expires_at_ms  varint
+//	field 4  payload        length-delimited
+//
+// FIELD NUMBERS MUST STAY <= 14. That is what makes the framing self-identifying: a tag byte
+// is (field_number << 3) | wire_type, so fields 1-14 over proto3's wire types (0/1/2/5) span
+// 0x08..0x75 -- disjoint from JSON's '{' (0x7b) and pickle's PROTO opcode (0x80). Field 16
+// with a varint is exactly 0x80, so going past 15 would collide with pickle; capping at 15
+// rather than 14 would stretch the range over 0x7b. Ten spare numbers remain.
+const (
+	protoFirstByteMin = 0x08
+	protoFirstByteMax = 0x75
+
+	wireVarint = 0
+	wire64Bit  = 1
+	wireLen    = 2
+	wire32Bit  = 5
+)
+
+func putVarint(out []byte, value uint64) []byte {
+	for value > 0x7F {
+		out = append(out, byte(value&0x7F)|0x80)
+		value >>= 7
+	}
+	return append(out, byte(value))
+}
+
+// getVarint reads a varint at i, returning the value and the next index. Bounded at 10 bytes,
+// the most an int64 takes -- an unbounded loop on a truncated value reads past the end.
+func getVarint(data []byte, i int) (uint64, int, error) {
+	var value uint64
+	var shift uint
+	for n := 0; n < 10; n++ {
+		if i >= len(data) {
+			return 0, 0, errors.New("gcache: truncated varint")
+		}
+		b := data[i]
+		i++
+		value |= uint64(b&0x7F) << shift
+		if b&0x80 == 0 {
+			return value, i, nil
+		}
+		shift += 7
+	}
+	return 0, 0, errors.New("gcache: varint longer than 10 bytes")
+}
+
+// encodeProtoEnvelope frames an already-serialized binary payload. 18 bytes of overhead
+// against the JSON envelope's ~102, and no base64 -- which is a third of the payload back.
+func encodeProtoEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]byte, error) {
+	createdAtMs := createdAt.UnixMilli()
+	expiresAtMs := createdAtMs + ttl.Milliseconds()
+	for _, f := range []struct {
+		name string
+		val  int64
+	}{{"createdAtMs", createdAtMs}, {"expiresAtMs", expiresAtMs}} {
+		if !isSafeInteger(float64(f.val)) {
+			return nil, fmt.Errorf(
+				"gcache: %s %d is outside the safe-integer range both clients read", f.name, f.val)
+		}
+		if f.val < 0 {
+			// A negative varint is 10 bytes and reads back as a huge unsigned value in a
+			// reader that does not sign-extend. Refuse rather than write something the two
+			// clients would disagree about.
+			return nil, fmt.Errorf("gcache: %s must be non-negative, got %d", f.name, f.val)
+		}
+	}
+
+	out := make([]byte, 0, len(payload)+24)
+	out = append(out, (1<<3)|wireVarint)
+	out = putVarint(out, uint64(envelopeVersion))
+	out = append(out, (2<<3)|wireVarint)
+	out = putVarint(out, uint64(createdAtMs))
+	out = append(out, (3<<3)|wireVarint)
+	out = putVarint(out, uint64(expiresAtMs))
+	out = append(out, (4<<3)|wireLen)
+	out = putVarint(out, uint64(len(payload)))
+	out = append(out, payload...)
+	return out, nil
+}
+
+// decodeProtoEnvelope parses the PROTO envelope. Fields in any order, unknown fields skipped.
+func decodeProtoEnvelope(data []byte) (payload []byte, createdAtMs int64, expiresAtMs int64, err error) {
+	var version uint64
+	var haveVersion, haveCreated, haveExpires, havePayload bool
+
+	for i := 0; i < len(data); {
+		tag, next, err := getVarint(data, i)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		i = next
+		field, wire := tag>>3, tag&0x07
+		switch wire {
+		case wireVarint:
+			value, next, err := getVarint(data, i)
+			if err != nil {
+				return nil, 0, 0, err
+			}
+			i = next
+			switch field {
+			case 1:
+				version, haveVersion = value, true
+			case 2:
+				createdAtMs, haveCreated = int64(value), true
+			case 3:
+				expiresAtMs, haveExpires = int64(value), true
+			}
+		case wireLen:
+			length, next, err := getVarint(data, i)
+			if err != nil {
+				return nil, 0, 0, err
+			}
+			i = next
+			if uint64(len(data)-i) < length {
+				return nil, 0, 0, errors.New("gcache: length-delimited field runs past the end")
+			}
+			if field == 4 {
+				payload, havePayload = data[i:i+int(length)], true
+			}
+			i += int(length)
+		case wire64Bit:
+			i += 8
+		case wire32Bit:
+			i += 4
+		default:
+			// Wire types 3 and 4 are proto2 groups. proto3 never emits them, so a value
+			// carrying one was not written by any gcache client.
+			return nil, 0, 0, fmt.Errorf("gcache: unsupported wire type %d on field %d", wire, field)
+		}
+		if i > len(data) {
+			return nil, 0, 0, errors.New("gcache: field runs past the end")
+		}
+	}
+
+	// GREATER than, not !=. A strict check makes every added field a flag day: an old reader
+	// would reject an entry it could otherwise parse, because the loop above already skips
+	// fields it does not know.
+	if !haveVersion || version > uint64(envelopeVersion) {
+		return nil, 0, 0, fmt.Errorf("gcache: unsupported envelope version %d", version)
+	}
+	if !haveCreated || !haveExpires || !havePayload {
+		return nil, 0, 0, fmt.Errorf(
+			"gcache: incomplete PROTO envelope (createdAtMs=%t expiresAtMs=%t payload=%t)",
+			haveCreated, haveExpires, havePayload)
+	}
+	return payload, createdAtMs, expiresAtMs, nil
+}
+
 // decodeEnvelope unframes a stored value, returning the payload, its write timestamp and its
 // expiry -- together those give Cache.Get the declared lifetime that closes the resurrection
 // gap. Sniffs the framing, so a key mid-migration or written by the other client still works.
 func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs int64, err error) {
 	if len(raw) == 0 {
 		return nil, 0, 0, errors.New("gcache: empty value")
+	}
+	if raw[0] >= protoFirstByteMin && raw[0] <= protoFirstByteMax {
+		return decodeProtoEnvelope(raw)
 	}
 	if raw[0] == picklePROTO {
 		return nil, 0, 0, ErrPickleEnvelope

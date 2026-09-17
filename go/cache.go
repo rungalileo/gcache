@@ -94,7 +94,7 @@ type Options[V any] struct {
 	Timeout time.Duration
 	// Recorder receives cache events. Optional.
 	Recorder Recorder
-	// Codec serializes the value. Defaults to encoding/json; use protocodec.ProtoJSON
+	// Codec serializes the value. Defaults to encoding/json; use protocodec.Proto
 	// for a payload shared with another language. The envelope records the framing, not
 	// the payload's encoding, so a mismatch is undetected -- it yields a zero value.
 	Codec Codec[V]

@@ -42,7 +42,7 @@ from gcache.exceptions import (
 def _serializer_identity(serializer: Serializer | None) -> Any:
     """What makes two serializers interchangeable on the wire.
 
-    Type alone is not enough: two ProtoJsonSerializers carrying different messages share a
+    Type alone is not enough: two ProtoSerializers carrying different messages share a
     type, and reading one's payload as the other yields an empty message with no error,
     because load() passes ignore_unknown_fields=True.
 
@@ -55,7 +55,7 @@ def _serializer_identity(serializer: Serializer | None) -> Any:
 
     So the decision belongs to the serializer. ``Serializer.wire_identity`` defaults to the
     class, which keeps every stateless implementation behaving exactly as before, and
-    ProtoJsonSerializer overrides it rather than being reached into from here.
+    ProtoSerializer overrides it rather than being reached into from here.
     """
     if serializer is None:
         return None
@@ -522,7 +522,7 @@ class GCache:
         if declared is not None and declared != key.envelope:
             raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
 
-        # By (type, message type): type alone accepted two ProtoJsonSerializers carrying
+        # By (type, message type): type alone accepted two ProtoSerializers carrying
         # DIFFERENT messages, and ignore_unknown_fields=True makes that silent -- the wrong
         # payload yields an empty message. Never by identity: two JsonSerializer()s differ.
         if _serializer_identity(self._use_case_serializers.get(key.use_case)) != _serializer_identity(key.serializer):

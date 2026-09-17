@@ -81,6 +81,18 @@ func (jsonCodec[V]) Unmarshal(b []byte, v *V) error { return json.Unmarshal(b, v
 // Options configures a Cache. It carries the value type so Codec can be typed; New
 // infers V, so callers name the type once:
 // gcache.New(gcache.Options[*cachev1.SessionIdentity]{...}).
+// Envelope is the framing a Cache writes. Reads never need it -- see Options.Envelope.
+type Envelope int
+
+const (
+	// EnvelopeJSON is the cross-language JSON envelope: readable from redis-cli and
+	// parseable by Redis's Lua cjson, at ~102 bytes of overhead. The default.
+	EnvelopeJSON Envelope = iota
+	// EnvelopePROTO is the binary envelope: 18 bytes of overhead, no base64, and opaque to
+	// redis-cli, jq and cjson alike. Pair it with protocodec.Proto.
+	EnvelopePROTO
+)
+
 type Options[V any] struct {
 	// Client is the Redis client. Required.
 	Client Client
@@ -98,6 +110,15 @@ type Options[V any] struct {
 	// for a payload shared with another language. The envelope records the framing, not
 	// the payload's encoding, so a mismatch is undetected -- it yields a zero value.
 	Codec Codec[V]
+	// Envelope is the framing written. Defaults to EnvelopeJSON, which is what a caller
+	// sharing entries with a JSON-envelope Python key needs. EnvelopePROTO stores the
+	// payload raw in a binary envelope -- 69 bytes against 204 for a small message -- and
+	// MUST match the Python key's `envelope=`, or the two write framings that the other
+	// reads but never produces.
+	//
+	// Reads do not consult this: every framing identifies itself by first byte, so a reader
+	// handles whatever the writer left. It only selects what THIS client writes.
+	Envelope Envelope
 	// Logger receives degradation warnings. Defaults to slog.Default().
 	Logger *slog.Logger
 	// now is a test seam for the clock.
@@ -116,6 +137,7 @@ type Cache[V any] struct {
 	log       *slog.Logger
 	now       func() time.Time
 	codec     Codec[V]
+	envelope  Envelope
 }
 
 // New builds a Cache.
@@ -163,7 +185,7 @@ func New[V any](o Options[V]) (*Cache[V], error) {
 	return &Cache[V]{
 		client: o.Client, urnPrefix: o.URNPrefix, ttl: o.TTL,
 		timeout: o.Timeout, recorder: o.Recorder, log: o.Logger, now: o.now,
-		codec: o.Codec,
+		codec: o.Codec, envelope: o.Envelope,
 	}, nil
 }
 
@@ -264,7 +286,12 @@ func (c *Cache[V]) Put(ctx context.Context, key Key, value V) error {
 	if err != nil {
 		return fmt.Errorf("gcache: marshaling value for %s: %w", key.UseCase, err)
 	}
-	raw, err := encodeEnvelope(c.now(), c.ttl, payload)
+	var raw []byte
+	if c.envelope == EnvelopePROTO {
+		raw, err = encodeProtoEnvelope(c.now(), c.ttl, payload)
+	} else {
+		raw, err = encodeEnvelope(c.now(), c.ttl, payload)
+	}
 	if err != nil {
 		return fmt.Errorf("gcache: encoding envelope for %s: %w", key.UseCase, err)
 	}

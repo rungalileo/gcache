@@ -992,3 +992,44 @@ func TestATrackedEntryCannotBeServedOlderThanTheWatermarkLifetime(t *testing.T) 
 		t.Error("served a pickle entry, which carries no timestamps for either guard to check")
 	}
 }
+
+func TestPutWritesTheDeclaredEnvelope(t *testing.T) {
+	// Options.Envelope selects what THIS client writes, and it must match the Python key's
+	// `envelope=` or the two write framings the other reads but never produces. Caught in
+	// review: Put called encodeEnvelope unconditionally, so a PROTO-configured Go cache
+	// would have written JSON while Python wrote PROTO for the same key.
+	for _, tc := range []struct {
+		name      string
+		envelope  Envelope
+		wantFirst func(byte) bool
+		desc      string
+	}{
+		{"json is the default", EnvelopeJSON, func(b byte) bool { return b == '{' }, "'{'"},
+		{"proto when declared", EnvelopePROTO,
+			func(b byte) bool { return b >= protoFirstByteMin && b <= protoFirstByteMax }, "the PROTO range"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := newFakeClient()
+			c, err := New(Options[map[string]string]{
+				Client: fake, URNPrefix: "urn:galileo:test", TTL: time.Minute, Envelope: tc.envelope,
+			})
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if err := c.Put(context.Background(), Key{KeyType: "kt", ID: "i", UseCase: "u"},
+				map[string]string{"a": "b"}); err != nil {
+				t.Fatalf("Put: %v", err)
+			}
+			if len(fake.data) != 1 {
+				t.Fatalf("expected one write, got %d", len(fake.data))
+			}
+			var got []byte
+			for _, v := range fake.data {
+				got = v
+			}
+			if len(got) == 0 || !tc.wantFirst(got[0]) {
+				t.Fatalf("first byte 0x%02x, want %s", got[0], tc.desc)
+			}
+		})
+	}
+}

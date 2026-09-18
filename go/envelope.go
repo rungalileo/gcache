@@ -130,6 +130,12 @@ func getVarint(data []byte, i int) (uint64, int, error) {
 		}
 		b := data[i]
 		i++
+		// The tenth byte carries only bit 63, so anything above 0x01 encodes a value wider
+		// than uint64. Go silently WRAPS such a value while Python (which has unbounded
+		// ints) keeps it, so the same bytes decoded to different numbers. Refuse it in both.
+		if shift == 63 && b > 0x01 {
+			return 0, 0, fmt.Errorf("gcache: varint wider than 64 bits (tenth byte %#02x)", b)
+		}
 		value |= uint64(b&0x7F) << shift
 		if b&0x80 == 0 {
 			return value, i, nil

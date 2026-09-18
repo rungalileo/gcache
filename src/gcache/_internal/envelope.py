@@ -139,6 +139,13 @@ def _get_varint(data: bytes, i: int) -> tuple[int, int]:
             raise EnvelopeDecodeError("truncated varint")
         byte = data[i]
         i += 1
+        # The TENTH byte carries only bit 63, so anything above 0x01 there encodes a value
+        # wider than uint64. Bounding the LENGTH at 10 is not enough: 3<<63 fits in ten bytes,
+        # and _to_signed64 then subtracts 2^64 and returns a POSITIVE 2^63 -- sailing past the
+        # negative-timestamp guard as a plausible-looking number. Go's getVarint wraps at 64
+        # bits instead, so the same bytes give the two clients different values again.
+        if shift == 63 and byte > 0x01:
+            raise EnvelopeDecodeError(f"varint wider than 64 bits (tenth byte {byte:#04x})")
         value |= (byte & 0x7F) << shift
         if not byte & 0x80:
             return value, i

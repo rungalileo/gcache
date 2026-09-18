@@ -453,6 +453,11 @@
         "name": "proto-negative-expires",
         "envelopeBase64": "CAEQgNCV/7wxGP///////////wEiBQoDYWJj",
         "why": "the dangerous half: a plausible created_at with a negative expiry. Read as unsigned it is ~584 million years in the future, so the entry never expires and is served as a fresh hit forever -- on one client only."
+      },
+      {
+        "name": "proto-varint-wider-than-64-bits",
+        "envelopeBase64": "CAEQgICAgICAgICAAxiA0JX/vDEiBQoDYWJj",
+        "why": "a ten-byte varint whose tenth byte exceeds 0x01 encodes past uint64. Go WRAPS it, Python keeps it, so the same bytes decode to different numbers -- and after signed conversion it lands as a large POSITIVE value that sails past the negative-timestamp guard."
       }
     ]
   }

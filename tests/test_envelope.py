@@ -2389,6 +2389,7 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
     large payload they cost about what decode costs -- and a write is where the whole
     payload is in hand.
     """
+    import json as _json
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
@@ -2396,7 +2397,7 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
 
     key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
 
-    async def run(value: object) -> list[object]:
+    async def run(value: object, use_key: GCacheKey = key) -> list[object]:
         seen: list[object] = []
         real = RedisCache._async_encode
 
@@ -2416,8 +2417,32 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
             patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
             patch.object(GCacheMetrics, "SIZE_HISTOGRAM", MagicMock(), create=True),
         ):
-            await RedisCache.put(cache, key, value)
+            await RedisCache.put(cache, use_key, value)
         return seen
 
     assert await run({"v": "x"}) == [], "a small payload must stay inline"
     assert len(await run({"v": "x" * (ASYNC_DECODE_THRESHOLD_BYTES * 2)})) == 1, "a large payload must be offloaded"
+
+    # MULTIBYTE, which needs a CUSTOM serializer to reach. len() on a str counts code
+    # points, so a non-ASCII payload read as a fraction of its size and a 200 KB value
+    # stayed on the event loop at four times the threshold -- and a payload dense in astral
+    # characters is exactly the expensive one for the divergence check.
+    #
+    # The default JsonSerializer cannot produce this: json.dumps with ensure_ascii emits
+    # escapes, so its output is always ASCII and its character count IS its byte count. Only
+    # a serializer that keeps the characters gets there, which is the narrow shape of the
+    # bug and the reason no existing test covered it.
+    class NonAsciiSerializer(Serializer):
+        async def dump(self, obj: object) -> str:
+            return _json.dumps(obj, ensure_ascii=False)
+
+        async def load(self, data: bytes | str) -> object:
+            return _json.loads(data)
+
+    emoji_key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=NonAsciiSerializer())
+    payload = "\U0001f600" * (ASYNC_DECODE_THRESHOLD_BYTES // 2)
+    dumped = await NonAsciiSerializer().dump({"v": payload})
+    assert not dumped.isascii()
+    assert len(dumped) < ASYNC_DECODE_THRESHOLD_BYTES, "under the threshold by CHARACTER count"
+    assert len(dumped.encode()) > ASYNC_DECODE_THRESHOLD_BYTES, "over it in BYTES, which is what counts"
+    assert len(await run({"v": payload}, emoji_key)) == 1, "a multibyte payload over the BYTE threshold must offload"

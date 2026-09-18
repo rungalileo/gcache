@@ -228,6 +228,25 @@ class RedisCache(CacheInterface):
         return await loop.run_in_executor(RedisCache._executor, partial(decode, data, allow_pickle=allow_pickle))
 
     @staticmethod
+    def _payload_bytes(payload: str | bytes) -> int:
+        """UTF-8 byte length, which is what ASYNC_DECODE_THRESHOLD_BYTES measures.
+
+        ``len()`` on a ``str`` counts CODE POINTS, so a payload of emoji read as a quarter of
+        its size and a 200 KB value stayed on the event loop at four times the threshold --
+        and an emoji-dense payload is exactly the expensive one for the divergence check. The
+        read path never had this: it measures the raw envelope, which is already bytes.
+
+        ``str.isascii()`` is O(1) in CPython (a flag on the object, not a scan), so the
+        encode happens only for a non-ASCII ``str``. That is rare on this path: the default
+        JsonSerializer emits ``ensure_ascii`` output, so only a custom serializer returning
+        non-ASCII text pays for it, and only to decide whether to offload work that is larger
+        still.
+        """
+        if isinstance(payload, bytes) or payload.isascii():
+            return len(payload)
+        return len(payload.encode("utf-8"))
+
+    @staticmethod
     async def _async_encode(encode: Callable[..., bytes], created_at_ms: int, ttl: int, payload: str | bytes) -> bytes:
         """Off the event loop, on the same threshold and for the same reason as _async_decode.
 
@@ -525,7 +544,7 @@ class RedisCache(CacheInterface):
                 )
             encoded = (
                 encode_json(current_time_ms, ttl, serialized_value)
-                if len(serialized_value) < ASYNC_DECODE_THRESHOLD_BYTES
+                if RedisCache._payload_bytes(serialized_value) < ASYNC_DECODE_THRESHOLD_BYTES
                 else await RedisCache._async_encode(encode_json, current_time_ms, ttl, serialized_value)
             )
         elif key.envelope == Envelope.PROTO:
@@ -542,7 +561,7 @@ class RedisCache(CacheInterface):
                 )
             encoded = (
                 encode_proto(current_time_ms, ttl, serialized_value)
-                if len(serialized_value) < ASYNC_DECODE_THRESHOLD_BYTES
+                if RedisCache._payload_bytes(serialized_value) < ASYNC_DECODE_THRESHOLD_BYTES
                 else await RedisCache._async_encode(encode_proto, current_time_ms, ttl, serialized_value)
             )
         else:

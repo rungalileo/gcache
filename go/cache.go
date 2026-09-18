@@ -309,6 +309,15 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		}
 	}
 
+	// A REVERSED envelope -- expires before created -- is malformed, and the lifetime guard
+	// below cannot catch it: the difference is negative, so the `>` comparison is false and
+	// it passes as a plausible entry. Not extended to a negative AGE: a future createdAt is
+	// clock skew, which both clients trust here by design.
+	if expiresAtMs < createdAtMs {
+		c.record(key.UseCase, ResultDistrusted)
+		return value, false
+	}
+
 	// maxEntryTTL, NOT watermarkTTL. Raising the watermark to 5h while the write cap stayed
 	// at 4h opened an hour-wide band: an entry declaring a 4h30m lifetime passed this guard
 	// even though New refuses to build a cache that could write one. The correct threshold is

@@ -233,7 +233,24 @@ class JsonSerializer(Serializer):
         # the max tick delay 0.007s -> 0.007-0.014s and starved getaddrinfo in the default
         # pool. (ProtoSerializer.load does NOT offload: ParseFromString is C and blocks the
         # loop once -- 0.5ms measured at 1.24MB, against protojson's 104ms at 1.18MB.)
-        return json.loads(data)
+        loaded = json.loads(data)
+        # On READ as well as write. The write guard stops this client creating a divergent
+        # entry; it does nothing about one ALREADY in Redis -- written by a pre-3.x pod, or
+        # by any other writer sharing the key space. Reading it is where the harm actually
+        # lands: Python returns U+D800 and Go returns U+FFFD for the same bytes, both
+        # reporting a hit. Every other integrity failure in this envelope (an unknown
+        # version, a negative timestamp, an over-width varint) is refused on read for the
+        # same reason, so this is the consistent treatment rather than a new policy.
+        #
+        # The consequence is a permanent miss for a poisoned key rather than a silent
+        # disagreement: the read degrades to the fallback, and re-writing the same value is
+        # refused by the write guard. That is the intended trade.
+        if "\\ud" in data:
+            try:
+                json.dumps(loaded, ensure_ascii=False).encode("utf-8")
+            except UnicodeEncodeError as exc:
+                raise UnserializableValue("a lone surrogate in a stored entry") from exc
+        return loaded
 
 
 def hash_component(value: str) -> str:

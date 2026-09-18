@@ -1897,6 +1897,21 @@ class TestLoneSurrogateIsRefused:
             encode_json(created_at_ms=1, ttl_sec=60, payload='{"v":"' + chr(0xD800) + '"}')
 
     @pytest.mark.asyncio
+    async def test_a_poisoned_entry_already_in_redis_is_refused_on_READ(self) -> None:
+        # The write guard stops THIS client creating a divergent entry; it does nothing
+        # about one already stored by a pre-3.x pod or any other writer sharing the key
+        # space. Reading it is where the harm lands -- Python returns U+D800, Go returns
+        # U+FFFD, both reporting a hit -- so the read refuses it too.
+        with pytest.raises(UnserializableValue):
+            await JsonSerializer().load('{"v":"\\ud800"}')
+
+    @pytest.mark.asyncio
+    async def test_reading_an_emoji_entry_still_works(self) -> None:
+        # The read guard must not repeat the write guard's original mistake: a stored emoji
+        # is two escapes and must load normally.
+        assert await JsonSerializer().load('{"v":"\\ud83d\\ude00"}') == {"v": "\U0001f600"}
+
+    @pytest.mark.asyncio
     async def test_the_error_does_not_carry_the_value(self) -> None:
         # The message reaches the logs through CacheController, and the payload is cached
         # application data -- tokens, PII, whatever the caller stored.
@@ -2021,3 +2036,55 @@ class TestEnvelopeRequiresSerializerCoversProto:
         assert JsonEnvelopeRequiresSerializer is EnvelopeRequiresSerializer
         with pytest.raises(JsonEnvelopeRequiresSerializer):
             GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.PROTO)
+
+
+@pytest.mark.asyncio
+async def test_a_reversed_envelope_is_distrusted() -> None:
+    """expires before created is malformed, and the lifetime guard cannot see it.
+
+    The lifetime guard compares `expires - created > cap`. On a reversed envelope that
+    difference is NEGATIVE, so the comparison is false and the entry passes as plausible --
+    the guard is structurally unable to catch the case, which is why this is a separate
+    check rather than a tweak to that comparison.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        invalidation_tracking=True,
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    now = int(time.time() * 1000)
+
+    async def fallback() -> dict:
+        return {"v": "fresh"}
+
+    # Both timestamps in the FUTURE, so the expiry guard cannot catch it either -- only the
+    # ordering is wrong.
+    reversed_blob = encode_json(created_at_ms=now + 60_000, ttl_sec=1, payload='{"v":1}')
+    import json as _json
+
+    frame = _json.loads(reversed_blob)
+    frame["expiresAtMs"] = frame["createdAtMs"] - 1000
+    blob = _json.dumps(frame).encode()
+
+    fake = MagicMock(mget=AsyncMock(return_value=[blob, None]), setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    rec = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", rec),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        out = await RedisCache.get(cache, key, fallback)
+
+    assert out == {"v": "fresh"}, "a reversed envelope must be a miss"
+    assert "reversed_envelope_timestamps" in [c.args[-1] for c in rec.call_args_list]

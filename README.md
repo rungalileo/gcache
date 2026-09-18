@@ -696,8 +696,8 @@ invalidation is keyed on
 
 `gcache_miss_counter`: empty for an ordinary miss, otherwise `undecodable`,
 `json_without_serializer`, `lifetime_exceeds_watermark`, `envelope_expired`,
-`age_exceeds_watermark`, `unloadable_payload`, `unreadable_watermark`,
-`non_finite_watermark`.
+`age_exceeds_watermark`, `reversed_envelope_timestamps`, `unloadable_payload`,
+`unreadable_watermark`, `non_finite_watermark`.
 
 `unreadable_watermark` self-heals **in this client**: a watermark that is not a number at
 all is deleted, so the next Python read caches again. The Go client's `Client` interface has
@@ -747,6 +747,7 @@ Add `reason=""` where you want the old population, not to make the selector work
 | `lifetime_exceeds_watermark` | A tracked JSON **or PROTO** entry whose envelope declares a lifetime longer than the watermark TTL, so no watermark can vouch for it |
 | `envelope_expired` | Present in Redis but past the writer's own `expiresAtMs`. Both clients trust the writer's clock here, so hosts must be NTP-synced; there is no skew tolerance. |
 | `age_exceeds_watermark` | A tracked entry of either framing that is itself older than the watermark TTL — the same invariant by age, and the only one that reaches the pickle path |
+| `reversed_envelope_timestamps` | The envelope expires *before* it was created. Malformed rather than stale, and the lifetime guard cannot see it: the difference is negative, so `> cap` is false and it would pass as a plausible entry |
 | `unloadable_payload` | The envelope parsed, but the `Serializer` could not load the payload — e.g. another language changed the payload schema |
 | `unreadable_watermark` | The watermark is not a number at all. Suppresses the entry, then deletes the watermark so the next Python read recovers (the Go client cannot delete) |
 | `non_finite_watermark` | The watermark is `nan` or `inf`. Suppresses every entry for that `(key_type, id)` until the watermark's own TTL expires |

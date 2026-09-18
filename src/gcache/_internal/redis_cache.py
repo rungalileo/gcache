@@ -293,6 +293,28 @@ class RedisCache(CacheInterface):
             # Honour the envelope's expiry, not just Redis's TTL: Go calls a past
             # expiresAtMs a miss. No skew tolerance, so clocks must agree within the
             # shortest JSON TTL; a writer lagging further pins the hit rate at zero.
+            # A REVERSED envelope -- expires before it was created -- is malformed, and the
+            # lifetime guard below cannot see it: the difference is negative, so `> cap` is
+            # False and it sails through as a plausible entry. Checked separately rather than
+            # by folding it into that comparison, because the two mean different things: one
+            # is "this entry claims too long a life", the other is "these numbers are not a
+            # lifetime at all".
+            #
+            # Deliberately NOT extended to a negative AGE. A created_at in the future is
+            # clock skew, not corruption, and both clients already trust the writer's clock
+            # here by design; refusing it would turn a skewed host into a wave of misses. The
+            # age guard simply not firing for an entry that is not old is correct.
+            if (
+                deserialized_value.expires_at_ms is not None
+                and deserialized_value.created_at_ms is not None
+                and deserialized_value.expires_at_ms < deserialized_value.created_at_ms
+            ):
+                _GLOBAL_GCACHE_STATE.logger.warning(
+                    "Cache value for %s expires before it was created; distrusting it", key.urn
+                )
+                self._record_degraded_read(key, "reversed_envelope_timestamps")
+                return await self._exec_fallback(key, watermark_ms, fallback)
+
             if (
                 key.invalidation_tracking
                 and deserialized_value.expires_at_ms is not None

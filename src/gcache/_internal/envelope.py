@@ -341,6 +341,18 @@ def lone_surrogate_reason(payload: str | bytes) -> str | None:
     # payload written under ensure_ascii, which is most of them.
     if "\\ud" not in body and "\\uD" not in body:
         return None
+    # BEFORE the parse, and the reason is determinism rather than safety. Relying on the
+    # interpreter to tell us when a payload is too deep makes the ANSWER depend on the
+    # machine: depth 4000 parses on a developer laptop and raises RecursionError in CI, so
+    # the same payload was written on one host and refused on another. Two Python pods
+    # disagreeing about an entry is the same defect as Python and Go disagreeing about one.
+    #
+    # An explicit limit, counted identically in both clients and pinned by the corpus,
+    # replaces that. 500 is far under the lowest interpreter limit in any environment and far
+    # over any real payload -- and it is only ever reached by a payload that already contains
+    # a surrogate escape, since the substring gate runs first.
+    if _exceeds_nesting(body):
+        return f"a payload nested deeper than the {_MAX_JSON_NESTING}-level limit"
     try:
         # object_pairs_hook=list keeps DUPLICATE keys. Without it json.loads silently drops
         # all but the last, so `{"a":"\ud800","a":"ok"}` lost the surrogate before the walk
@@ -357,17 +369,10 @@ def lone_surrogate_reason(payload: str | bytes) -> str | None:
         # the entry to fail every read for its full TTL.
         parsed = json.loads(body, object_pairs_hook=list, parse_constant=_refuse_json_constant)
     except RecursionError:
-        # Fails CLOSED, unlike a plain parse failure. json.loads gives up past the
-        # interpreter's nesting limit, which sits near depth 2000, while Go's json.Valid
-        # scanner goes to 10000 -- so between those two depths Go refuses a poisoned payload
-        # and an open failure here would serve it. Refusing keeps the two agreeing across
-        # that band, at the cost of a permanent miss for a payload nested thousands deep AND
-        # carrying a surrogate escape.
-        #
-        # Deeper than 10000 the two disagree the other way: Go's scanner gives up too, reads
-        # the payload as non-JSON and accepts it. Pinned in the corpus rather than left to be
-        # discovered, because closing it needs a shared depth counter in both clients and no
-        # real cache payload is nested that deep.
+        # Unreachable while _MAX_JSON_NESTING stays well under the interpreter's limit, and
+        # kept because "unreachable" is a property of a constant someone can raise. Fails
+        # CLOSED, unlike a plain parse failure: an open failure here would serve a payload
+        # this client could not inspect.
         return "a payload too deeply nested to check"
     except ValueError:
         # Not strict JSON. Neither client unescapes it, so neither can disagree about it.
@@ -375,6 +380,44 @@ def lone_surrogate_reason(payload: str | bytes) -> str | None:
     if _holds_lone_surrogate(parsed):
         return "a lone surrogate escape"
     return None
+
+
+#: Maximum JSON nesting either client will inspect. Shared with Go's maxJSONNesting and
+#: pinned by the conformance corpus. See _exceeds_nesting for why it is explicit.
+_MAX_JSON_NESTING = 500
+
+
+def _exceeds_nesting(body: str) -> bool:
+    """Report whether ``body`` nests deeper than ``_MAX_JSON_NESTING``, string-aware.
+
+    A raw count of ``[`` and ``{`` would refuse an ordinary flat array of 500 objects, so
+    this tracks NET depth, and skips brackets inside string literals -- a value containing
+    ``"[[[["`` is not nesting.
+
+    Identical in Go (``exceedsNesting``), deliberately, and over the same text: the two
+    clients must refuse the same payloads, and a scan is the only way to decide that without
+    inheriting each parser's own private limit.
+    """
+    depth = 0
+    in_string = False
+    escaped = False
+    for ch in body:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in "[{":
+            depth += 1
+            if depth > _MAX_JSON_NESTING:
+                return True
+        elif ch in "]}":
+            depth -= 1
+    return False
 
 
 def _refuse_json_constant(name: str) -> object:

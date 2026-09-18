@@ -1913,22 +1913,29 @@ class TestLoneSurrogateIsRefused:
         with pytest.raises(UnserializableValue):
             encode_json(created_at_ms=1, ttl_sec=60, payload='{"\\ud800":"v"}')
 
-    def test_deep_nesting_does_not_blow_the_stack(self) -> None:
-        # Iterative, not recursive: nothing bounds a payload's nesting depth, and a
-        # RecursionError raised out of a guard whose job is to refuse things WITHOUT failing
-        # the read would be worse than the divergence it is looking for.
-        #
-        # The surrogate is at the BOTTOM of the nesting on purpose. A version of this test
-        # without it was vacuous twice over: the `\ud` gate short-circuited before the parse,
-        # and even past the gate, a walk that never descended would have returned "no
-        # surrogate" and looked correct.
-        deep = "[" * 4000 + r'"\ud800"' + "]" * 4000
-        with pytest.raises(UnserializableValue):
-            encode_json(created_at_ms=1, ttl_sec=60, payload=deep)
+    def test_nesting_is_bounded_by_an_EXPLICIT_limit_not_the_interpreter(self) -> None:
+        # This test is the reason the limit exists. An earlier version asserted that a
+        # 4000-deep emoji payload writes; it passed locally and failed in CI, because
+        # json.loads raises RecursionError at a depth that depends on the interpreter's
+        # stack. So the PRODUCT was machine-dependent too -- the same payload written on a
+        # laptop and refused on a CI runner -- which is the same defect as the two clients
+        # disagreeing, with the pods harder to tell apart.
+        from gcache._internal.envelope import _MAX_JSON_NESTING
 
-        # The other direction, so the depth is not simply being refused wholesale.
-        deep_ok = "[" * 4000 + r'"\ud83d\ude00"' + "]" * 4000
-        assert encode_json(created_at_ms=1, ttl_sec=60, payload=deep_ok)
+        # Inside the limit: inspected, and the surrogate at the BOTTOM of the nesting is
+        # found. A walk that never descended would return "no surrogate" and look correct.
+        inside = "[" * _MAX_JSON_NESTING + r'"\ud800"' + "]" * _MAX_JSON_NESTING
+        with pytest.raises(UnserializableValue):
+            encode_json(created_at_ms=1, ttl_sec=60, payload=inside)
+
+        # Inside the limit, no lone surrogate: served, so depth alone is not a refusal.
+        inside_ok = "[" * _MAX_JSON_NESTING + r'"\ud83d\ude00"' + "]" * _MAX_JSON_NESTING
+        assert encode_json(created_at_ms=1, ttl_sec=60, payload=inside_ok)
+
+        # Past it: refused for being uninspectable, deterministically, on every machine.
+        beyond = "[" * (_MAX_JSON_NESTING + 1) + r'"\ud83d\ude00"' + "]" * (_MAX_JSON_NESTING + 1)
+        with pytest.raises(UnserializableValue, match="nested deeper"):
+            encode_json(created_at_ms=1, ttl_sec=60, payload=beyond)
 
     def test_a_payload_that_is_not_JSON_is_left_alone(self) -> None:
         # Neither client unescapes a non-JSON payload, so neither can disagree about it.

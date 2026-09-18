@@ -509,27 +509,28 @@ def test_the_watermark_and_envelope_bounds_match_the_corpus() -> None:
 def test_the_nesting_limits_match_the_corpus() -> None:
     """Where the two parsers give up, including the one depth at which they disagree.
 
-    Python's ``json.loads`` raises ``RecursionError`` near depth 2000 while Go's
-    ``json.Valid`` scanner runs to 10000, so an open failure here would serve across that
-    band a payload Go refuses. Failing closed keeps them agreeing from 1 to 10000.
-
-    The ``disagree`` case is recorded rather than hidden. Past 10000 Go reads the payload as
-    non-JSON and accepts it; Python still refuses, which is the safe side, so the failure
-    mode there is a miss rather than a wrong value.
+    The limit is explicit because each parser's own is not portable: Go's scanner stops at
+    10000, CPython's follows the interpreter stack, and depth 4000 parsed on a laptop while
+    raising ``RecursionError`` in CI. The same payload was therefore written on one host and
+    refused on another -- two Python pods disagreeing about an entry, which is the same
+    defect as the two clients disagreeing about one.
     """
-    from gcache._internal.envelope import lone_surrogate_reason
+    from gcache._internal.envelope import _MAX_JSON_NESTING, _exceeds_nesting, lone_surrogate_reason
 
     section = _DATA["payloadDivergence"]["nesting"]
+    assert _MAX_JSON_NESTING == section["maxNesting"]
     cases = section["cases"]
     assert len(cases) == section["caseCount"] > 0
 
     for case in cases:
         depth = case["depth"]
         body = "[" * depth + '"\\ud800"' + "]" * depth
-        reason = lone_surrogate_reason(body)
-        # Python refuses at every depth here, including the one Go accepts -- which is what
-        # makes "disagree" a statement about GO, asserted on the Go side.
-        assert reason is not None, f"depth {depth}: accepted -- {case['why']}"
+        assert lone_surrogate_reason(body) is not None, f"depth {depth}: accepted -- {case['why']}"
+
+    # NET depth, and blind to brackets inside strings. A raw count of `[` and `{` would
+    # refuse both of these, and the second is why the scan tracks string state at all.
+    assert not _exceeds_nesting(json.dumps([{"a": "x"} for _ in range(_MAX_JSON_NESTING + 100)]))
+    assert not _exceeds_nesting('{"a":"' + "[" * (_MAX_JSON_NESTING + 100) + '"}')
 
 
 @pytest.mark.asyncio

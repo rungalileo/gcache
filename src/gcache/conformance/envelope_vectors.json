@@ -635,47 +635,59 @@
     ],
     "nesting": {
       "$comment": [
-        "Where the two parsers give up, which is not the same depth. Built rather than stored,",
-        "because a 10000-deep payload has no business in this file.",
+        "An EXPLICIT nesting limit, counted identically in both clients, replacing each parser's",
+        "own private one. Built rather than stored, because a 4000-deep payload has no business in",
+        "this file.",
         "",
-        "Python's json.loads raises RecursionError near depth 2000; Go's json.Valid scanner runs",
-        "to 10000. An OPEN failure in Python across that band would serve a poisoned payload that",
-        "Go refuses, so Python fails CLOSED there instead and the two agree from 1 to 10000.",
+        "The limit exists for determinism, not safety. Go's scanner stops at 10000 and CPython's",
+        "depends on the interpreter's stack -- depth 4000 parsed on a laptop and raised",
+        "RecursionError in CI, so the same payload was written on one host and refused on another.",
+        "Two Python pods disagreeing about an entry is the same defect as Python and Go disagreeing",
+        "about one, and a test caught it only because CI happened to have the smaller stack.",
         "",
-        "Past 10000 they disagree and this records it rather than hiding it: Go's scanner gives up,",
-        "reads the payload as non-JSON and accepts, while Python still refuses. Closing it needs a",
-        "shared depth counter in both clients, and no real cache payload is nested that deep --",
-        "Python's answer is also the safe one, so the failure mode is a miss, not a wrong value."
+        "Past the limit both clients refuse, which is the closed direction: a payload this client",
+        "cannot inspect must not be served. It is only ever reached by a payload that already",
+        "contains a surrogate escape, since the substring gate runs first.",
+        "",
+        "The count is NET depth and skips brackets inside string literals, so a flat array of 600",
+        "objects and a value containing the characters '[[[[' both stay under it. A raw count of",
+        "'[' and '{' would refuse the first of those."
       ],
       "payloadTemplate": "'['*depth + '\"\\\\ud800\"' + ']'*depth",
-      "caseCount": 5,
+      "caseCount": 6,
       "cases": [
         {
-          "depth": 100,
+          "depth": 1,
           "expect": "reject",
-          "why": "Both parsers handle it comfortably."
+          "why": "The ordinary case, nowhere near the limit."
         },
         {
-          "depth": 2000,
+          "depth": 499,
           "expect": "reject",
-          "why": "Just past Python's recursion limit: the fail-closed branch, not the parse."
+          "why": "Just inside: still inspected, and the surrogate is found."
         },
         {
-          "depth": 5000,
+          "depth": 500,
           "expect": "reject",
-          "why": "Mid-band. Python fails closed, Go still parses; they agree."
+          "why": "Exactly at the limit, which is inclusive. Pins which side the boundary falls on."
         },
         {
-          "depth": 10000,
+          "depth": 501,
           "expect": "reject",
-          "why": "Go's scanner limit, still agreeing."
+          "why": "Just past: refused for being uninspectable rather than for the surrogate. Both are a refusal, so the reason strings matter and both clients emit the same one."
+        },
+        {
+          "depth": 4000,
+          "expect": "reject",
+          "why": "The depth that used to parse on a laptop and raise RecursionError in CI."
         },
         {
           "depth": 50000,
-          "expect": "disagree",
-          "why": "Beyond Go's scanner: Go accepts, Python refuses. Recorded, not hidden."
+          "expect": "reject",
+          "why": "Past Go's own scanner limit too. Previously the one recorded disagreement; the shared limit removed it."
         }
-      ]
+      ],
+      "maxNesting": 500
     }
   },
   "futureCreatedAt": {

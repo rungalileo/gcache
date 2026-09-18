@@ -472,6 +472,14 @@ func loneSurrogateReason(body string) string {
 	if !strings.Contains(body, `\ud`) && !strings.Contains(body, `\uD`) {
 		return ""
 	}
+	// BEFORE json.Valid, and for determinism rather than safety. Each parser has its own
+	// private nesting limit -- Go's scanner stops at 10000, CPython's depends on the
+	// interpreter's stack and differs between a laptop and CI -- so leaving the depth
+	// question to them made the ANSWER depend on the machine. An explicit shared limit,
+	// counted the same way here and in Python's _exceeds_nesting, replaces that.
+	if exceedsNesting(body) {
+		return fmt.Sprintf("a payload nested deeper than the %d-level limit", maxJSONNesting)
+	}
 	// A payload that is not JSON is left alone: neither client unescapes it, so neither can
 	// disagree about it. This also makes the linear walk below correct -- in valid JSON a
 	// backslash appears only inside a string literal and always starts an escape, so a scan
@@ -516,4 +524,42 @@ func hexEscapeAt(body string, i int) (int, bool) {
 		return 0, false
 	}
 	return int(v), true
+}
+
+// maxJSONNesting is the deepest JSON either client will inspect. Shared with Python's
+// _MAX_JSON_NESTING and pinned by the conformance corpus.
+const maxJSONNesting = 500
+
+// exceedsNesting reports whether body nests deeper than maxJSONNesting, string-aware.
+//
+// A raw count of `[` and `{` would refuse an ordinary flat array of 500 objects, so this
+// tracks NET depth and skips brackets inside string literals -- a value containing "[[[["
+// is not nesting. Identical to Python's _exceeds_nesting, deliberately: the two clients must
+// refuse the same payloads rather than each inheriting its own parser's limit.
+func exceedsNesting(body string) bool {
+	depth, inString, escaped := 0, false, false
+	for i := 0; i < len(body); i++ {
+		c := body[i]
+		switch {
+		case inString:
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == '"':
+				inString = false
+			}
+		case c == '"':
+			inString = true
+		case c == '[' || c == '{':
+			depth++
+			if depth > maxJSONNesting {
+				return true
+			}
+		case c == ']' || c == '}':
+			depth--
+		}
+	}
+	return false
 }

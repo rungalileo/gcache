@@ -646,15 +646,19 @@ func TestConformanceWatermarkVsEnvelopeBoundsMatchTheCorpus(t *testing.T) {
 	}
 }
 
-// TestConformanceNestingLimitsMatchTheCorpus is the Go half, and the half that actually
-// pins the disagreement: Python refuses at every depth in the corpus, so only Go can say
-// where it stops refusing.
+// TestConformanceNestingLimitsMatchTheCorpus is the Go half of the shared nesting limit.
+//
+// The limit is explicit because each parser's own is not portable: this scanner stops at
+// 10000, CPython's follows the interpreter stack, and depth 4000 parsed on a laptop while
+// raising RecursionError in CI. Leaving the depth question to the parsers made the answer
+// depend on the machine.
 func TestConformanceNestingLimitsMatchTheCorpus(t *testing.T) {
 	var corpus struct {
 		PayloadDivergence struct {
 			Nesting struct {
-				CaseCount int `json:"caseCount"`
-				Cases     []struct {
+				MaxNesting int `json:"maxNesting"`
+				CaseCount  int `json:"caseCount"`
+				Cases      []struct {
 					Depth  int    `json:"depth"`
 					Expect string `json:"expect"`
 					Why    string `json:"why"`
@@ -671,26 +675,26 @@ func TestConformanceNestingLimitsMatchTheCorpus(t *testing.T) {
 		t.Fatalf("shared conformance vectors are not valid JSON: %v", err)
 	}
 	s := corpus.PayloadDivergence.Nesting
+	if s.MaxNesting != maxJSONNesting {
+		t.Fatalf("maxJSONNesting = %d, corpus says %d", maxJSONNesting, s.MaxNesting)
+	}
 	if len(s.Cases) != s.CaseCount || s.CaseCount == 0 {
 		t.Fatalf("corpus declares %d nesting cases, found %d", s.CaseCount, len(s.Cases))
 	}
 	for _, c := range s.Cases {
 		body := strings.Repeat("[", c.Depth) + `"\ud800"` + strings.Repeat("]", c.Depth)
-		reason := loneSurrogateReason(body)
-		switch c.Expect {
-		case "reject":
-			if reason == "" {
-				t.Errorf("depth %d: accepted, so the two clients no longer agree here -- %s", c.Depth, c.Why)
-			}
-		case "disagree":
-			// Asserted in the direction the corpus records. If Go starts refusing here the
-			// two now AGREE, which is good news that must not pass silently as a stale note.
-			if reason != "" {
-				t.Errorf("depth %d: Go now refuses, so the recorded disagreement is stale -- "+
-					"update the corpus, this is an improvement -- %s", c.Depth, c.Why)
-			}
-		default:
-			t.Errorf("depth %d: unknown expect %q", c.Depth, c.Expect)
+		if reason := loneSurrogateReason(body); reason == "" {
+			t.Errorf("depth %d: accepted -- %s", c.Depth, c.Why)
 		}
+	}
+
+	// NET depth, and blind to brackets inside strings. A raw count of `[` and `{` would
+	// refuse both of these, and the second is why the scan tracks string state at all.
+	flat := "[" + strings.Repeat(`{"a":"x"},`, maxJSONNesting+100) + `{"a":"x"}]`
+	if exceedsNesting(flat) {
+		t.Error("a flat array of objects must not read as deep nesting")
+	}
+	if exceedsNesting(`{"a":"` + strings.Repeat("[", maxJSONNesting+100) + `"}`) {
+		t.Error("brackets inside a string literal are not nesting")
 	}
 }

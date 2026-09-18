@@ -461,8 +461,15 @@ class GCache:
 
         :param key_type: The type of cache key to invalidate.
         :param id: The ID of the entity to invalidate.
-        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the future.
-        :raises ValueError: if ``key_type`` or ``id`` is empty.
+        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the
+            future. Defaults to 0, which invalidates as of now.
+        :raises ValueError: if ``key_type`` or ``id`` is empty; if ``future_buffer_ms`` is not
+            an ``int`` (a ``bool`` or a ``float`` included -- ``nan`` passes every range check
+            and reaches Redis); if it is negative, which would move the watermark into the
+            PAST and leave anything written after that instant fresh; or if it exceeds
+            ``MAX_FUTURE_BUFFER_SECONDS`` (1 hour). That ceiling is the watermark lifetime
+            minus the tracked-TTL cap, and it is a fifth of the watermark lifetime, which an
+            earlier version of this docstring named instead.
         """
         # HERE, not in RedisCache.invalidate. Down there the guard fires only when a Redis
         # layer exists, so a NoopCache deployment -- documented, and what local runs and many
@@ -477,9 +484,11 @@ class GCache:
 
         :param key_type: The type of cache key to invalidate.
         :param id: The ID of the entity to invalidate.
-        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the future.
-        :raises ValueError: if ``key_type`` or ``id`` is empty, or ``future_buffer_ms`` is
-            negative or exceeds the watermark lifetime -- via ``ainvalidate``.
+        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the
+            future. Defaults to 0, which invalidates as of now.
+        :raises ValueError: on any of the four conditions ``ainvalidate`` documents -- see
+            there rather than restating them, which is how this one came to name a bound the
+            code had replaced.
         """
         return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, future_buffer_ms))
 

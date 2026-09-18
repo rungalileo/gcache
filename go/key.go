@@ -7,7 +7,12 @@
 //	read        MGET <value key> <watermark key>
 //	stale iff   watermark_ms >= envelope.createdAtMs      (inclusive)
 //	write       SETEX <value key> <ttl_sec> <envelope>
-//	invalidate  SETEX <watermark key> 14400 <now_ms + future_buffer_ms>
+//	invalidate  SETEX <watermark key> 18000 <now_ms + future_buffer_ms>
+//
+// 18000 is the watermark lifetime (5h). It is the entry TTL cap (4h) plus the
+// invalidation buffer ceiling (1h), and a third client must honour all three: a
+// watermark has to outlive every entry it can suppress, or an invalidated value
+// becomes readable again the moment the watermark expires.
 //
 // Braces cover urn_prefix:key_type:id only, so a value and its watermark share one Cluster
 // hash slot and the MGET is legal. Timestamps are epoch ms. Options.Codec handles the

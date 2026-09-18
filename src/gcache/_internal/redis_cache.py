@@ -14,6 +14,7 @@ from redis.asyncio import Redis, RedisCluster
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import (
     ASYNC_DECODE_THRESHOLD_BYTES,
+    MAX_FUTURE_BUFFER_SECONDS,
     MAX_TRACKED_TTL_SECONDS,
     WATERMARK_TTL_SECONDS,
     validate_invalidation_args,
@@ -26,6 +27,7 @@ from gcache._internal.envelope import (
     decode,
     encode_json,
     encode_proto,
+    lone_surrogate_reason,
 )
 from gcache._internal.metrics import DEGRADED_REASON, GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
@@ -300,10 +302,9 @@ class RedisCache(CacheInterface):
             # is "this entry claims too long a life", the other is "these numbers are not a
             # lifetime at all".
             #
-            # Deliberately NOT extended to a negative AGE. A created_at in the future is
-            # clock skew, not corruption, and both clients already trust the writer's clock
-            # here by design; refusing it would turn a skewed host into a wave of misses. The
-            # age guard simply not firing for an entry that is not old is correct.
+            # A future created_at is handled by its own guard below, not by this one: the
+            # two are different faults. Reversed timestamps are not a lifetime at all; a
+            # future stamp is a credible lifetime placed out of the watermark's reach.
             if (
                 deserialized_value.expires_at_ms is not None
                 and deserialized_value.created_at_ms is not None
@@ -315,6 +316,38 @@ class RedisCache(CacheInterface):
                 self._record_degraded_read(key, "reversed_envelope_timestamps")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
+            # A created_at far enough in the FUTURE makes a tracked entry immune to
+            # invalidation, which is not the clock skew this envelope tolerates elsewhere.
+            # Staleness is `watermark_ms >= created_at_ms` and a watermark carries a real
+            # clock time, so a stamp beyond every reachable watermark can never be suppressed
+            # -- the entry survives every invalidate call for its whole Redis TTL. The expiry
+            # and lifetime guards both pass, because a future created_at with a legal
+            # declared lifetime is a perfectly plausible entry.
+            #
+            # The bound is the exact frontier rather than "not in the future". An invalidation
+            # issued NOW writes a watermark of at most now + MAX_FUTURE_BUFFER, so an entry
+            # created at or before that instant is still suppressible and one created after it
+            # is not. That it also grants an hour of skew tolerance is a consequence, not the
+            # reason: a zero-tolerance test would turn a one-millisecond clock lead into a
+            # permanent miss-and-rewrite loop for every entry the leading pod writes.
+            #
+            # Tracked entries only, like the lifetime and age guards. An untracked entry has
+            # no watermark to be out of reach of, so refusing one would cost a skewed writer
+            # its hit rate and buy nothing.
+            if (
+                key.invalidation_tracking
+                and deserialized_value.created_at_ms is not None
+                and deserialized_value.created_at_ms > time.time() * 1000 + MAX_FUTURE_BUFFER_SECONDS * 1000
+            ):
+                _GLOBAL_GCACHE_STATE.logger.warning(
+                    "Cache value for %s was created beyond the %ss invalidation buffer, so no "
+                    "watermark can reach it; distrusting it",
+                    key.urn,
+                    MAX_FUTURE_BUFFER_SECONDS,
+                )
+                self._record_degraded_read(key, "created_at_beyond_future_buffer")
+                return await self._exec_fallback(key, watermark_ms, fallback)
+
             if (
                 key.invalidation_tracking
                 and deserialized_value.expires_at_ms is not None
@@ -322,8 +355,12 @@ class RedisCache(CacheInterface):
                 and deserialized_value.expires_at_ms - deserialized_value.created_at_ms > MAX_TRACKED_TTL_SECONDS * 1000
             ):
                 _GLOBAL_GCACHE_STATE.logger.warning(
-                    "Cache value for %s declares a lifetime longer than the watermark TTL; distrusting it",
+                    # The CAP, not the watermark lifetime, and the constant is interpolated so
+                    # the two cannot drift again: an operator who read "watermark TTL" here
+                    # checked 5h against a guard comparing 4h and concluded it had misfired.
+                    "Cache value for %s declares a lifetime longer than the %ss tracked-TTL cap; distrusting it",
                     key.urn,
+                    MAX_TRACKED_TTL_SECONDS,
                 )
                 self._record_degraded_read(key, "lifetime_exceeds_watermark")
                 return await self._exec_fallback(key, watermark_ms, fallback)
@@ -344,15 +381,42 @@ class RedisCache(CacheInterface):
                 and time.time() * 1000 - deserialized_value.created_at_ms > MAX_TRACKED_TTL_SECONDS * 1000
             ):
                 _GLOBAL_GCACHE_STATE.logger.warning(
-                    "Cache value for %s is older than the watermark TTL, so no watermark can still "
-                    "vouch for it; distrusting it",
+                    "Cache value for %s is older than the %ss tracked-TTL cap, so no watermark can "
+                    "still vouch for it; distrusting it",
                     key.urn,
+                    MAX_TRACKED_TTL_SECONDS,
                 )
                 self._record_degraded_read(key, "age_exceeds_watermark")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
             # Load payload using custom serializer if present.
             payload = deserialized_value.payload
+
+            # The same rule the write path enforces, asked on the way in. encode_json stops
+            # THIS client creating an entry the two decode differently; it says nothing about
+            # one already in Redis, written by a foreign client, by a custom Serializer in an
+            # older build, or by an intermediate build of this branch. Reading it is where the
+            # harm lands, and it is the harm with no symptom: both clients report a hit and
+            # return different values.
+            #
+            # Before the serializer, not after: the question is about the stored TEXT, and a
+            # custom load() has already resolved the escape by the time it returns. Asking
+            # here also covers a serializer whose load does not go through json at all.
+            #
+            # The consequence is a permanent miss for a poisoned key rather than a silent
+            # disagreement -- the read degrades to the fallback, and re-writing the same value
+            # is refused by the write guard. That is the intended trade.
+            if isinstance(payload, str):
+                divergence = lone_surrogate_reason(payload)
+                if divergence is not None:
+                    _GLOBAL_GCACHE_STATE.logger.warning(
+                        "Cache payload for %s contains %s, which this client and Go decode "
+                        "differently; treating as miss",
+                        key.urn,
+                        divergence,
+                    )
+                    self._record_degraded_read(key, "divergent_payload_encoding")
+                    return await self._exec_fallback(key, watermark_ms, fallback)
             if key.serializer is not None:
                 try:
                     payload = await key.serializer.load(payload)

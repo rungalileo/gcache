@@ -877,9 +877,20 @@ func TestInvalidateRejectsAFutureBufferThatOverflowsTheGuard(t *testing.T) {
 }
 
 func TestWatermarkOutranksTheDeclaredLifetimeGuard(t *testing.T) {
-	// The two tracked guards can both fire, and the order decides what an operator sees:
-	// the declared-lifetime guard used to run first, masking a corrupt or stale watermark
-	// behind ResultDistrusted. All four outcomes below are a miss; what's pinned is the CLASSIFICATION, which no earlier test covered in combination.
+	// The two tracked guards can both fire, and the order decides what an operator sees. All
+	// four outcomes below are a miss; what is pinned is the CLASSIFICATION.
+	//
+	// Precedence is PYTHON's, measured rather than chosen. For an entry created 30m ago
+	// declaring a 6h lifetime under a stale watermark, RedisCache.get records
+	// lifetime_exceeds_watermark and never reaches its watermark comparison -- so an earlier
+	// version of this test, which pinned ResultStale there, was pinning a cross-client
+	// divergence rather than a decision. Blaming the malformation is also the more useful
+	// half: "stale" is a routine outcome, "distrusted" says a writer is broken.
+	//
+	// The corrupt-watermark rows still report ResultError, because the watermark is now
+	// PARSED before the envelope guards and only COMPARED after them. Python does the same
+	// split and records BOTH unreadable_watermark and lifetime_exceeds_watermark; Go has one
+	// Result per read, and the corrupt key is the one a rewrite cannot repair.
 	build := func(t *testing.T, lifetime time.Duration, watermark string) (*recordingRecorder, bool) {
 		t.Helper()
 		client := newFakeClient()
@@ -915,7 +926,7 @@ func TestWatermarkOutranksTheDeclaredLifetimeGuard(t *testing.T) {
 	}{
 		{"long lifetime, no watermark", longLife, "", ResultDistrusted, 0},
 		{"long lifetime, corrupt watermark", longLife, "abc", ResultError, 1},
-		{"long lifetime, stale watermark", longLife, stale, ResultStale, 0},
+		{"long lifetime, stale watermark", longLife, stale, ResultDistrusted, 0},
 		{"ok lifetime, corrupt watermark", okLife, "abc", ResultError, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1083,4 +1094,136 @@ func TestNewRejectsAnUnsupportedEnvelope(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A tracked entry stamped far ahead is immune to invalidation, and every other guard passes.
+//
+// Staleness is `watermarkMs >= createdAtMs` and a watermark carries a real clock time, so it
+// never reaches a stamp far enough ahead. The expiry guard passes because expiresAtMs is
+// ahead too, and the lifetime guard passes because the declared lifetime is legal -- so the
+// entry survives every Invalidate call for its whole Redis TTL.
+//
+// Both sides of the boundary are pinned. The bound is the frontier of what an invalidation
+// issued NOW can reach, not "not in the future": refusing the reachable side would turn a
+// slightly fast clock into a permanent miss-and-rewrite loop. Mirrors Python's
+// test_a_future_created_at_cannot_put_an_entry_out_of_invalidations_reach.
+func TestAFutureCreatedAtCannotPutAnEntryOutOfInvalidationsReach(t *testing.T) {
+	now := time.Now()
+	serve := func(t *testing.T, createdAt time.Time, tracked bool, watermark string) (*recordingRecorder, bool) {
+		t.Helper()
+		client := newFakeClient()
+		rec := &recordingRecorder{}
+		cache, err := New(Options[sessionIdentity]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+			now: func() time.Time { return now },
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := Key{KeyType: "session_id", ID: "future", UseCase: "test::future", Tracked: tracked}
+		raw, err := encodeEnvelope(createdAt, time.Hour, []byte(`{"session_id":"s"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.data[ValueKey(testPrefix, key)] = raw
+		if watermark != "" {
+			client.data[WatermarkKey(testPrefix, "session_id", "future")] = []byte(watermark)
+		}
+		_, ok := cache.Get(context.Background(), key)
+		return rec, ok
+	}
+
+	atNow := strconv.FormatInt(now.UnixMilli(), 10)
+	withBuffer := strconv.FormatInt(now.Add(maxFutureBuffer).UnixMilli(), 10)
+
+	t.Run("a year ahead survives an invalidation issued now", func(t *testing.T) {
+		rec, ok := serve(t, now.AddDate(1, 0, 0), true, atNow)
+		if ok {
+			t.Fatal("Get served an entry beyond every reachable watermark")
+		}
+		if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+			t.Errorf("recorded %v, want [distrusted]", rec.results)
+		}
+	})
+
+	t.Run("just past the frontier", func(t *testing.T) {
+		rec, ok := serve(t, now.Add(maxFutureBuffer+time.Minute), true, "")
+		if ok {
+			t.Fatal("Get served an entry past the frontier")
+		}
+		if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+			t.Errorf("recorded %v, want [distrusted]", rec.results)
+		}
+	})
+
+	t.Run("just inside it is a hit", func(t *testing.T) {
+		_, ok := serve(t, now.Add(maxFutureBuffer-time.Minute), true, "")
+		if !ok {
+			t.Error("an entry a watermark can still reach must be served")
+		}
+	})
+
+	t.Run("and really is still reachable", func(t *testing.T) {
+		// The property the bound is derived from: a watermark written now with the full
+		// buffer suppresses an entry just inside the frontier.
+		if _, ok := serve(t, now.Add(maxFutureBuffer-time.Minute), true, withBuffer); ok {
+			t.Error("a watermark written with the full buffer must still suppress it")
+		}
+	})
+
+	t.Run("untracked keeps its clock-skew tolerance", func(t *testing.T) {
+		// No watermark to be out of reach of, so refusing a future stamp would cost a skewed
+		// writer its hit rate and buy nothing.
+		if _, ok := serve(t, now.Add(maxFutureBuffer+time.Minute), false, ""); !ok {
+			t.Error("an untracked future-stamped entry is clock skew, not corruption")
+		}
+	})
+}
+
+// A payload the two clients decode differently is refused on both sides of the wire.
+//
+// The escape form is the one that hides: the stored envelope is pure ASCII, so the utf8.Valid
+// gate cannot see it, and the surrogate only reappears when the caller's codec unescapes the
+// payload. Python keeps U+D800, encoding/json here substitutes U+FFFD, and both report a hit.
+func TestADivergentPayloadIsRefusedOnWriteAndOnRead(t *testing.T) {
+	t.Run("write", func(t *testing.T) {
+		_, err := encodeEnvelope(time.Now(), time.Hour, []byte(`{"v":"\ud800"}`))
+		if err == nil {
+			t.Fatal("encodeEnvelope stored a payload the two clients read differently")
+		}
+		if strings.Contains(err.Error(), `\ud800`) {
+			t.Errorf("the payload leaked into the error: %v", err)
+		}
+	})
+
+	t.Run("an emoji still writes", func(t *testing.T) {
+		// A valid PAIR is also two escapes. Refusing these was the first version's bug.
+		if _, err := encodeEnvelope(time.Now(), time.Hour, []byte(`{"v":"\ud83d\ude00"}`)); err != nil {
+			t.Errorf("a valid surrogate pair must write: %v", err)
+		}
+	})
+
+	t.Run("read", func(t *testing.T) {
+		// Hand-built, because encodeEnvelope now refuses to produce one -- which is the
+		// point: only a foreign writer or an older build can leave this in Redis.
+		raw := []byte(fmt.Sprintf(
+			`{"version":1,"createdAtMs":%d,"expiresAtMs":%d,"encoding":"utf8","payload":"{\"session_id\":\"\\ud800\"}"}`,
+			time.Now().UnixMilli(), time.Now().Add(time.Hour).UnixMilli()))
+		client := newFakeClient()
+		rec := &recordingRecorder{}
+		cache, err := New(Options[sessionIdentity]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := Key{KeyType: "session_id", ID: "poisoned", UseCase: "test::poisoned"}
+		client.data[ValueKey(testPrefix, key)] = raw
+		if _, ok := cache.Get(context.Background(), key); ok {
+			t.Fatal("Get served an entry Python would decode differently")
+		}
+		if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+			t.Errorf("recorded %v, want [distrusted]", rec.results)
+		}
+	})
 }

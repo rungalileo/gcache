@@ -192,11 +192,18 @@ class TrackedTTLExceedsWatermark(GCacheError, ValueError):
     to outlive and may use any TTL.
     """
 
-    def __init__(self, use_case: str, ttl_sec: int, watermark_ttl_sec: int) -> None:
+    def __init__(self, use_case: str, ttl_sec: int, max_tracked_ttl_sec: int) -> None:
+        # max_tracked_ttl_sec, NOT the watermark lifetime -- the caller passes
+        # MAX_TRACKED_TTL_SECONDS, and a parameter named watermark_ttl_sec made the message
+        # state something false: a 16200s TTL does not outlive the 18000s watermark, it
+        # exceeds the 14400s cap, which is a different rule. The class name predates the
+        # split into two caps and is kept for callers catching it.
         super().__init__(
             f"use case {use_case!r} tracks invalidation but declares ttl_sec={ttl_sec}, which "
-            f"outlives the {watermark_ttl_sec}s watermark. The entry would resurrect after an "
-            f"invalidation. Shorten the TTL, or turn off invalidation_tracking for this key."
+            f"exceeds the {max_tracked_ttl_sec}s tracked-TTL cap. That cap is the watermark "
+            f"lifetime minus the invalidation buffer ceiling, so an entry above it can outlive "
+            f"the watermark that suppressed it and RESURRECT. Shorten the TTL, or turn off "
+            f"invalidation_tracking for this key."
         )
 
 

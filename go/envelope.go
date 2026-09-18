@@ -51,6 +51,12 @@ func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]b
 	encoding, body := "utf8", string(payload)
 	if !utf8.Valid(payload) {
 		encoding, body = "base64", base64.StdEncoding.EncodeToString(payload)
+	} else if reason := loneSurrogateReason(body); reason != "" {
+		// Refuse the write rather than store a value the two clients read differently. The
+		// payload itself is not in the message: it is cached application data and this
+		// reaches the logs.
+		return nil, fmt.Errorf("gcache: payload contains %s, which this client and the Python "+
+			"client decode to different values; refusing to store a cross-client divergence", reason)
 	}
 	return json.Marshal(envelope{
 		Version:     envelopeVersion,
@@ -425,3 +431,74 @@ func clampToInt64(f float64) int64 {
 // matching Python: a value written in the same millisecond as an invalidation is
 // discarded. Loosening it to `>` would let a write that raced the invalidation survive.
 func isStale(watermarkMs, createdAtMs int64) bool { return watermarkMs >= createdAtMs }
+
+// loneSurrogateReason names the divergence in a TEXT payload, or "" if the two clients agree
+// about it. Mirrors Python's envelope.lone_surrogate_reason, and the shared corpus pins that
+// the two agree on which payloads are refused.
+//
+// The hazard is the ESCAPE form. Any serializer calling Python's json.dumps with the default
+// ensure_ascii turns U+D800 into the six ASCII characters \ud800, so the stored envelope is
+// pure ASCII and the utf8.Valid gate above cannot see it -- the surrogate only reappears when
+// the CALLER's codec unescapes the payload. Python then returns a string holding U+D800 while
+// encoding/json here substitutes U+FFFD. Both clients report a hit and return different
+// values, with nothing raised and no metric moved.
+//
+// The literal-CHARACTER form needs no check here: a []byte holding an unpaired surrogate is
+// not valid UTF-8, so encodeEnvelope already routes it to base64, where it is opaque to both
+// clients and cannot diverge.
+//
+// Python answers this with json.loads plus a re-dump; Go's encoding/json substitutes rather
+// than erroring, so it cannot be asked the same way and this walks the escapes instead. Two
+// mechanisms, one rule, pinned by the corpus -- which is what the corpus is for.
+func loneSurrogateReason(body string) string {
+	// Both spellings: JSON permits \uD800 as readily as \ud800, and every surrogate escape
+	// starts with those three characters. Gating on a bare `\u` would validate every
+	// non-ASCII payload written under ensure_ascii, which is most of them.
+	if !strings.Contains(body, `\ud`) && !strings.Contains(body, `\uD`) {
+		return ""
+	}
+	// A payload that is not JSON is left alone: neither client unescapes it, so neither can
+	// disagree about it. This also makes the linear walk below correct -- in valid JSON a
+	// backslash appears only inside a string literal and always starts an escape, so a scan
+	// that consumes each escape in order can never mistake an escaped backslash for one.
+	if !json.Valid([]byte(body)) {
+		return ""
+	}
+	for i := 0; i < len(body); {
+		if body[i] != '\\' {
+			i++
+			continue
+		}
+		hi, ok := hexEscapeAt(body, i)
+		if !ok {
+			// Some other escape (\n, \\, \") -- two bytes, and stepping over both is what
+			// stops `\\ud800`, a literal backslash followed by text, reading as an escape.
+			i += 2
+			continue
+		}
+		i += 6
+		switch {
+		case hi >= 0xDC00 && hi <= 0xDFFF:
+			return "a lone surrogate escape"
+		case hi >= 0xD800 && hi <= 0xDBFF:
+			lo, ok := hexEscapeAt(body, i)
+			if !ok || lo < 0xDC00 || lo > 0xDFFF {
+				return "a lone surrogate escape"
+			}
+			i += 6
+		}
+	}
+	return ""
+}
+
+// hexEscapeAt reports the code unit of the \uXXXX escape starting at i, if there is one.
+func hexEscapeAt(body string, i int) (int, bool) {
+	if i+6 > len(body) || body[i] != '\\' || body[i+1] != 'u' {
+		return 0, false
+	}
+	v, err := strconv.ParseUint(body[i+2:i+6], 16, 32)
+	if err != nil {
+		return 0, false
+	}
+	return int(v), true
+}

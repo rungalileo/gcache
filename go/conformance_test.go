@@ -2,8 +2,10 @@ package gcache
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -189,6 +191,11 @@ func TestConformanceVectors(t *testing.T) {
 
 func TestConformanceKeyRendering(t *testing.T) {
 	f := loadConformance(t)
+	// A `for` over an empty slice passes silently, which is how a section that pins nothing
+	// ships. Python's suite asserts the same thing; this is the missing half of that pair.
+	if len(f.KeyRendering.Cases) == 0 {
+		t.Fatal("keyRendering.cases is empty -- it pins nothing")
+	}
 	for _, c := range f.KeyRendering.Cases {
 		t.Run(c.Name, func(t *testing.T) {
 			// What this client ACTUALLY renders, against what the file records for it.
@@ -475,5 +482,166 @@ func TestConformanceWatermarkTimingMatchesTheCorpus(t *testing.T) {
 	if w.MaxTrackedTTLSeconds+w.MaxFutureBufferSeconds > w.WatermarkTTLSeconds {
 		t.Errorf("the corpus itself breaks the invariant: %d + %d > %d",
 			w.MaxTrackedTTLSeconds, w.MaxFutureBufferSeconds, w.WatermarkTTLSeconds)
+	}
+}
+
+// TestConformancePayloadDivergenceMatchesTheCorpus is the Go half of the surrogate rule.
+//
+// The two clients answer the question with DIFFERENT mechanisms and must still agree: Python
+// asks json.loads and re-dumps without ensure_ascii, while encoding/json here substitutes
+// U+FFFD rather than erroring, so loneSurrogateReason walks the escapes instead. Two
+// implementations of one rule is exactly the shape the shared corpus exists to police.
+//
+// The accepts carry as much weight as the rejects. Two earlier versions of this rule were
+// regexes and each was wrong in a different direction -- one refused every emoji, the other
+// refused ordinary text containing the characters \ud800.
+func TestConformancePayloadDivergenceMatchesTheCorpus(t *testing.T) {
+	var corpus struct {
+		PayloadDivergence struct {
+			CaseCount int `json:"caseCount"`
+			Cases     []struct {
+				Name    string `json:"name"`
+				Payload string `json:"payload"`
+				Expect  string `json:"expect"`
+				Why     string `json:"why"`
+			} `json:"cases"`
+		} `json:"payloadDivergence"`
+	}
+	path := filepath.Join("..", "src", "gcache", "conformance", "envelope_vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("shared conformance vectors unreadable at %s: %v", path, err)
+	}
+	if err := json.Unmarshal(raw, &corpus); err != nil {
+		t.Fatalf("shared conformance vectors are not valid JSON: %v", err)
+	}
+	s := corpus.PayloadDivergence
+	// An empty list would make this test vacuous rather than failing, which is how a section
+	// that pins nothing gets shipped. Python's half asserts the same count.
+	if len(s.Cases) != s.CaseCount || s.CaseCount == 0 {
+		t.Fatalf("corpus declares %d payloadDivergence cases, found %d", s.CaseCount, len(s.Cases))
+	}
+	for _, c := range s.Cases {
+		reason := loneSurrogateReason(c.Payload)
+		switch c.Expect {
+		case "reject":
+			if reason == "" {
+				t.Errorf("%s: accepted a divergent payload -- %s", c.Name, c.Why)
+			}
+		case "accept":
+			if reason != "" {
+				t.Errorf("%s: refused %q -- %s", c.Name, reason, c.Why)
+			}
+		default:
+			t.Errorf("%s: unknown expect %q", c.Name, c.Expect)
+		}
+	}
+}
+
+// TestConformanceFutureCreatedAtMatchesTheCorpus is the Go half of the invalidation frontier.
+//
+// Clock-relative, so the corpus carries offsets and this builds the envelope. The accepts are
+// the half that stops the guard becoming a permanent miss-and-rewrite loop for a writer whose
+// clock runs slightly fast.
+func TestConformanceFutureCreatedAtMatchesTheCorpus(t *testing.T) {
+	var corpus struct {
+		FutureCreatedAt struct {
+			BoundSeconds int `json:"boundSeconds"`
+			CaseCount    int `json:"caseCount"`
+			Cases        []struct {
+				Name                   string `json:"name"`
+				CreatedAtOffsetSeconds int64  `json:"createdAtOffsetSeconds"`
+				Tracked                bool   `json:"tracked"`
+				Expect                 string `json:"expect"`
+				Why                    string `json:"why"`
+			} `json:"cases"`
+		} `json:"futureCreatedAt"`
+	}
+	path := filepath.Join("..", "src", "gcache", "conformance", "envelope_vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("shared conformance vectors unreadable at %s: %v", path, err)
+	}
+	if err := json.Unmarshal(raw, &corpus); err != nil {
+		t.Fatalf("shared conformance vectors are not valid JSON: %v", err)
+	}
+	s := corpus.FutureCreatedAt
+	if s.BoundSeconds != int(maxFutureBuffer.Seconds()) {
+		t.Fatalf("corpus bound %ds, maxFutureBuffer %ds", s.BoundSeconds, int(maxFutureBuffer.Seconds()))
+	}
+	if len(s.Cases) != s.CaseCount || s.CaseCount == 0 {
+		t.Fatalf("corpus declares %d futureCreatedAt cases, found %d", s.CaseCount, len(s.Cases))
+	}
+	now := time.Now()
+	for _, c := range s.Cases {
+		client := newFakeClient()
+		cache, err := New(Options[sessionIdentity]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
+			now: func() time.Time { return now },
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := Key{KeyType: "session_id", ID: c.Name, UseCase: "test::corpus", Tracked: c.Tracked}
+		env, err := encodeEnvelope(now.Add(time.Duration(c.CreatedAtOffsetSeconds)*time.Second),
+			time.Hour, []byte(`{"session_id":"s"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.data[ValueKey(testPrefix, key)] = env
+		_, ok := cache.Get(context.Background(), key)
+		if (c.Expect == "accept") != ok {
+			t.Errorf("%s: served=%v, expected %s -- %s", c.Name, ok, c.Expect, c.Why)
+		}
+	}
+}
+
+// TestConformanceWatermarkVsEnvelopeBoundsMatchTheCorpus is the Go half of that section.
+//
+// The whole argument for the watermark keeping an int64 bound while envelope timestamps stop
+// at the safe-integer range is that above 2^53 the two clients ALREADY agree on the
+// watermark -- Python reaches it through float() and Go through float64 -- and disagreed only
+// on the envelope. Nothing compared them; the section was prose neither suite read.
+func TestConformanceWatermarkVsEnvelopeBoundsMatchTheCorpus(t *testing.T) {
+	var corpus struct {
+		WatermarkVsEnvelope struct {
+			CaseCount int `json:"caseCount"`
+			Cases     []struct {
+				Name            string `json:"name"`
+				Raw             string `json:"raw"`
+				GoParsed        int64  `json:"goParsed"`
+				EnvelopeAccepts bool   `json:"envelopeAccepts"`
+				Why             string `json:"why"`
+			} `json:"cases"`
+		} `json:"watermarkVsEnvelope"`
+	}
+	path := filepath.Join("..", "src", "gcache", "conformance", "envelope_vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("shared conformance vectors unreadable at %s: %v", path, err)
+	}
+	if err := json.Unmarshal(raw, &corpus); err != nil {
+		t.Fatalf("shared conformance vectors are not valid JSON: %v", err)
+	}
+	s := corpus.WatermarkVsEnvelope
+	if len(s.Cases) != s.CaseCount || s.CaseCount == 0 {
+		t.Fatalf("corpus declares %d watermarkVsEnvelope cases, found %d", s.CaseCount, len(s.Cases))
+	}
+	for _, c := range s.Cases {
+		got, err := parseWatermark([]byte(c.Raw))
+		if err != nil {
+			t.Errorf("%s: parseWatermark(%s): %v", c.Name, c.Raw, err)
+			continue
+		}
+		if got != c.GoParsed {
+			t.Errorf("%s: watermark parsed %d, corpus says %d -- %s", c.Name, got, c.GoParsed, c.Why)
+		}
+		env := []byte(fmt.Sprintf(
+			`{"version":1,"createdAtMs":%s,"expiresAtMs":%s,"encoding":"utf8","payload":"{}"}`, c.Raw, c.Raw))
+		_, _, _, decErr := decodeEnvelope(env)
+		if c.EnvelopeAccepts != (decErr == nil) {
+			t.Errorf("%s: decodeEnvelope err=%v, corpus says accepts=%v -- %s",
+				c.Name, decErr, c.EnvelopeAccepts, c.Why)
+		}
 	}
 }

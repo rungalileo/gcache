@@ -276,28 +276,72 @@ def _decode_proto(data: bytes) -> DecodedValue:
 
 
 def _reject_lone_surrogate(body: str) -> None:
-    """Refuse a payload the two clients would decode differently.
+    """Refuse a text payload the two clients would decode to different values.
 
     HERE, at the framing boundary, not in one serializer: every serializer's output passes
-    through encode_json, so a CUSTOM serializer bypassed a check that lived in the default
-    one. The rule is a property of the envelope.
+    through ``encode_json``, so a check living in ``JsonSerializer`` was bypassed by any
+    CUSTOM ``Serializer`` -- and ``serializer=`` is public, documented API, so that is a
+    supported path rather than an exotic one. The rule is a property of the envelope.
 
-    This catches a LITERAL lone surrogate character in a text payload -- a serializer that
-    does not go through json.dumps can produce one, and it is unencodable by definition. The
-    JSON path's own escapes are handled in JsonSerializer.dump, where the original object is
-    still in scope and the question can be answered exactly.
+    Two shapes, because a lone surrogate reaches the payload two ways.
 
-    NO REGEX over the serialized text. Two attempts at one were both wrong: the first matched
-    the high half of every surrogate PAIR and so refused every emoji, and the second matched
-    the literal characters `\\ud800` appearing inside ordinary text -- a value mentioning an
-    escape sequence serializes to `\\\\ud800`, and the pattern hit starting at the second
-    backslash. Distinguishing an escape from escaped text means counting preceding
-    backslashes, which is the point at which a regex stops being the right tool.
+    A literal surrogate CHARACTER, from a serializer that does not go through ``json.dumps``.
+    Unencodable by definition, so utf-8 answers it.
+
+    A surrogate ESCAPE -- the six ASCII characters ``\\ud800`` -- from any serializer calling
+    ``json.dumps`` with the default ``ensure_ascii``. This is the one that hides: the stored
+    envelope is pure ASCII, so ``go/envelope.go``'s ``utf8.Valid`` gate cannot see it, and the
+    surrogate only reappears when the CALLER's codec unescapes the payload. Python then
+    returns a ``str`` holding U+D800 while Go's ``encoding/json`` substitutes U+FFFD. Both
+    report a hit, nothing raises, nothing logs, no metric moves.
+
+    Answered by the JSON PARSER, not by a pattern over the text. Two regex attempts were both
+    wrong -- the first matched the high half of every surrogate PAIR and so refused every
+    emoji, the second matched the characters ``\\ud800`` inside ordinary text, since a value
+    mentioning an escape serializes to ``\\\\ud800`` and the pattern hit from the second
+    backslash. Telling an escape from escaped text means counting preceding backslashes,
+    which is where a regex stops being the right tool and ``json.loads`` starts being it.
+
+    A payload that is not JSON is left alone: neither client unescapes it, so neither can
+    disagree about it. A payload that is JSON but holds no surrogate escape never reaches the
+    parse, because the substring gate excludes it.
+    """
+    reason = lone_surrogate_reason(body)
+    if reason is not None:
+        raise UnserializableValue(reason)
+
+
+def lone_surrogate_reason(body: str) -> str | None:
+    """Name the divergence in ``body``, or ``None`` if the two clients agree about it.
+
+    Split out from the raise so the READ path can ask the same question. The write guard
+    stops this client creating a divergent entry; it says nothing about one already in Redis,
+    written by a foreign client or by an intermediate build of this branch. Reading it is
+    where the harm lands, and it is the harm that has no symptom -- both clients report a hit
+    and return different values.
+
+    The names are the message the write path raises with, so the two directions cannot drift
+    into describing the same byte sequence differently.
     """
     try:
         body.encode("utf-8")
-    except UnicodeEncodeError as exc:
-        raise UnserializableValue("an unencodable code point (a lone surrogate)") from exc
+    except UnicodeEncodeError:
+        return "an unencodable code point (a lone surrogate)"
+
+    # Both cases: JSON permits \uD800 as readily as \ud800, and every surrogate escape
+    # starts with those three characters. Gating on the bare `\u` instead would parse every
+    # non-ASCII payload under ensure_ascii, which is most of them.
+    if "\\ud" not in body and "\\uD" not in body:
+        return None
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        return None
+    try:
+        json.dumps(parsed, ensure_ascii=False).encode("utf-8")
+    except UnicodeEncodeError:
+        return "a lone surrogate escape"
+    return None
 
 
 def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes:

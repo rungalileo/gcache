@@ -67,9 +67,12 @@ const (
 	// ResultError so a client disconnect -- or load shedding, when these arrive in bulk --
 	// does not read as the cache breaking.
 	ResultCancelled Result = "cancelled"
-	// ResultDistrusted is a TRACKED entry declaring a lifetime longer than the watermark's,
-	// so it could outlive the watermark that suppressed it. Separate from ResultMiss/Stale
-	// because the fix is a use case's TTL in another language, not an invalidation.
+	// ResultDistrusted is an entry no watermark can vouch for, in any of four ways: a
+	// TRACKED entry declaring a lifetime longer than maxEntryTTL (4h -- NOT watermarkTTL,
+	// which is 5h), a tracked entry stamped more than maxFutureBuffer ahead and so out of
+	// every reachable watermark's range, a reversed envelope, or a payload the two clients
+	// would decode differently. Separate from ResultMiss/Stale because the fix is a writer
+	// somewhere else -- a use case's TTL, a clock, a serializer -- not an invalidation.
 	ResultDistrusted Result = "distrusted"
 )
 
@@ -284,38 +287,56 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		return zero, false
 	}
 
-	// Honour the writer's own expiry, not just Redis's TTL -- Python has no TTL ceiling and
-	// any writer can PERSIST a key. No sign test: both other readers compare the raw value
-	// with no sign check, and decodeEnvelope already rejects an absent expiresAtMs.
-	if c.now().UnixMilli() >= expiresAtMs {
-		c.record(key.UseCase, ResultMiss)
-		return zero, false
-	}
-
-	// Distrust a TRACKED entry declaring a lifetime longer than the watermark's: the expiry
-	// check alone does not close the resurrection gap, since Python's per-use-case TTL has
-	// no ceiling. Runs AFTER the watermark check below so diagnosis blames the real cause.
+	// PARSE the watermark here, but COMPARE it last. Python splits the two the same way, and
+	// for the same reason: an unreadable watermark is an operational fault in its own right,
+	// so it must be reported whichever envelope guard fires afterwards. Reading it late meant
+	// a malformed entry with a corrupt watermark reported only the malformation, and the
+	// corrupt key -- the one a rewrite cannot repair -- went unrecorded.
+	//
+	// Failing closed on it, rather than treating unreadable as "no watermark", which would
+	// serve an entry someone tried to invalidate. Python fails closed by substituting a
+	// suppress-everything sentinel and carrying on; the effect for the caller is the same
+	// here, and one Result per read is the Go model.
+	var watermarkMs int64
+	haveWatermark := false
 	if key.Tracked && vals[1] != nil {
-		watermarkMs, err := parseWatermark(vals[1])
+		parsed, err := parseWatermark(vals[1])
 		if err != nil {
-			// An unreadable watermark must not be treated as "no watermark" -- that would
-			// serve an entry someone tried to invalidate. Fail to a miss instead.
 			c.fail(callerCtx, key.UseCase, "watermark", err)
 			return zero, false
 		}
-		if isStale(watermarkMs, createdAtMs) {
-			c.record(key.UseCase, ResultStale)
-			return zero, false
-		}
+		watermarkMs, haveWatermark = parsed, true
 	}
 
+	// ENVELOPE INTEGRITY FIRST, then expiry, then the watermark -- the order Python uses, and
+	// it decides which outcome a reader sees when several conditions hold at once. These two
+	// guards used to sit below both, so a reversed envelope that had also expired was
+	// recorded as ResultMiss here and as reversed_envelope_timestamps in Python. Same bytes,
+	// two diagnoses, and the one that says "malformed" is the one worth having.
+	//
 	// A REVERSED envelope -- expires before created -- is malformed, and the lifetime guard
 	// below cannot catch it: the difference is negative, so the `>` comparison is false and
-	// it passes as a plausible entry. Not extended to a negative AGE: a future createdAt is
-	// clock skew, which both clients trust here by design.
+	// it passes as a plausible entry.
 	if expiresAtMs < createdAtMs {
 		c.record(key.UseCase, ResultDistrusted)
-		return value, false
+		return zero, false
+	}
+
+	// A createdAt far enough in the FUTURE makes a tracked entry immune to invalidation,
+	// which is not the clock skew this envelope tolerates elsewhere. Staleness is
+	// `watermarkMs >= createdAtMs` and a watermark carries a real clock time, so a stamp
+	// beyond every reachable watermark can never be suppressed -- the entry survives every
+	// Invalidate call for its whole Redis TTL, while the expiry and lifetime guards both pass
+	// because a future createdAt with a legal declared lifetime is a plausible entry.
+	//
+	// The bound is the exact frontier, not "not in the future". An invalidation issued NOW
+	// writes a watermark of at most now+maxFutureBuffer, so an entry created at or before
+	// that instant is still suppressible and one created after it is not. The hour of skew
+	// tolerance is a consequence, not the reason: a zero-tolerance test would turn a
+	// one-millisecond clock lead into a permanent miss-and-rewrite loop.
+	if key.Tracked && createdAtMs > c.now().UnixMilli()+maxFutureBuffer.Milliseconds() {
+		c.record(key.UseCase, ResultDistrusted)
+		return zero, false
 	}
 
 	// maxEntryTTL, NOT watermarkTTL. Raising the watermark to 5h while the write cap stayed
@@ -325,6 +346,32 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 	// suppressed by a watermark written as early as C-B, and that watermark dies at C+(W-B),
 	// so past that age no watermark can still vouch for it.
 	if key.Tracked && float64(expiresAtMs)-float64(createdAtMs) > float64(maxEntryTTL.Milliseconds()) {
+		c.record(key.UseCase, ResultDistrusted)
+		return zero, false
+	}
+
+	// Honour the writer's own expiry, not just Redis's TTL -- Python has no TTL ceiling and
+	// any writer can PERSIST a key. No sign test: both other readers compare the raw value
+	// with no sign check, and decodeEnvelope already rejects an absent expiresAtMs.
+	if c.now().UnixMilli() >= expiresAtMs {
+		c.record(key.UseCase, ResultMiss)
+		return zero, false
+	}
+
+	if haveWatermark && isStale(watermarkMs, createdAtMs) {
+		c.record(key.UseCase, ResultStale)
+		return zero, false
+	}
+
+	// The same rule the write path enforces, asked on the way in -- encodeEnvelope stops THIS
+	// client creating a divergent entry and says nothing about one already in Redis, written
+	// by a Python pod with a custom Serializer or by any other writer sharing the key space.
+	// Reading it is where the harm lands, and it is the harm with no symptom.
+	//
+	// Before the codec, not after: the question is about the stored TEXT, and Unmarshal has
+	// already substituted U+FFFD by the time it returns. Distrusted rather than a decode
+	// failure -- the entry is well-formed, it just cannot be agreed upon.
+	if reason := loneSurrogateReason(string(payload)); reason != "" {
 		c.record(key.UseCase, ResultDistrusted)
 		return zero, false
 	}

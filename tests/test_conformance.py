@@ -118,6 +118,7 @@ def test_the_key_rendering_divergences_are_still_what_the_file_says() -> None:
 
     original = _GLOBAL_GCACHE_STATE.urn_prefix
     try:
+        assert _DATA["keyRendering"]["cases"], "keyRendering.cases is empty -- it pins nothing"
         for case in _DATA["keyRendering"]["cases"]:
             _GLOBAL_GCACHE_STATE.urn_prefix = case["urnPrefix"]
             rendered = render_prefix(case["keyType"], case["id"], tracked=False)
@@ -332,6 +333,13 @@ def test_the_proto_first_byte_range_is_disjoint_from_the_other_framings() -> Non
     assert (16 << 3) | 0 == others["pickle"]
 
 
+def test_the_proto_reject_list_is_not_empty() -> None:
+    # pytest turns an empty parametrize set into a SKIP, not a failure, so the parametrized
+    # test below would go green on a corpus that pins nothing. Go's suite fails on an empty
+    # list; this is the missing half of that pair.
+    assert _DATA["protoEnvelope"]["rejects"], "protoEnvelope.rejects is empty -- it pins nothing"
+
+
 @pytest.mark.parametrize("case", _DATA["protoEnvelope"]["rejects"], ids=lambda c: c["name"])
 def test_the_proto_envelope_rejects_what_go_rejects(case: dict) -> None:
     # Each of these is a value no gcache client writes. Accepting one means answering a hit
@@ -365,3 +373,133 @@ def test_the_watermark_timing_constants_match_the_corpus() -> None:
     # And the invariant itself, on the corpus's own numbers rather than the imports, so a
     # corpus edit that breaks it fails here too.
     assert timing["maxTrackedTtlSeconds"] + timing["maxFutureBufferSeconds"] <= timing["watermarkTtlSeconds"]
+
+
+def test_every_payload_divergence_case_in_the_corpus() -> None:
+    """The payloads the two clients would read differently, and the near-misses they must not.
+
+    The accepts carry as much weight as the rejects: two earlier versions of this rule were
+    regexes, and each was wrong in a different direction -- one refused every emoji, the
+    other refused ordinary text containing the characters \\ud800.
+
+    The two clients answer the question with different mechanisms (json.loads here, an escape
+    walk in Go), so this section is what holds them to the same answer.
+    """
+    from gcache._internal.envelope import lone_surrogate_reason
+
+    section = _DATA["payloadDivergence"]
+    cases = section["cases"]
+    # An empty list would make this test vacuous rather than failing, which is how a section
+    # that pins nothing gets shipped. Go's half asserts the same count.
+    assert len(cases) == section["caseCount"] > 0, f"expected {section['caseCount']} cases, found {len(cases)}"
+    for case in cases:
+        reason = lone_surrogate_reason(case["payload"])
+        if case["expect"] == "reject":
+            assert reason is not None, f"{case['name']}: accepted a divergent payload -- {case['why']}"
+        else:
+            assert reason is None, f"{case['name']}: refused {reason} -- {case['why']}"
+
+
+@pytest.mark.asyncio
+async def test_every_future_created_at_case_in_the_corpus() -> None:
+    """A tracked entry stamped past the invalidation frontier is refused; one inside it is not.
+
+    Clock-relative, so the corpus carries offsets and this builds the envelope. The accepts
+    are the half that stops the guard from being a permanent miss-and-rewrite loop for a
+    writer whose clock runs slightly fast.
+    """
+    import time
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import MAX_FUTURE_BUFFER_SECONDS
+    from gcache._internal.envelope import encode_json
+    from gcache._internal.metrics import GCacheMetrics
+    from gcache._internal.redis_cache import RedisCache
+    from gcache.config import Envelope, GCacheKey, JsonSerializer
+
+    section = _DATA["futureCreatedAt"]
+    assert section["boundSeconds"] == MAX_FUTURE_BUFFER_SECONDS
+    cases = section["cases"]
+    assert len(cases) == section["caseCount"] > 0, f"expected {section['caseCount']} cases, found {len(cases)}"
+
+    for case in cases:
+        key = GCacheKey(
+            key_type="kt",
+            id="i",
+            use_case="u",
+            invalidation_tracking=case["tracked"],
+            envelope=Envelope.JSON,
+            serializer=JsonSerializer(),
+        )
+        created = int(time.time() * 1000) + case["createdAtOffsetSeconds"] * 1000
+        raw = encode_json(created_at_ms=created, ttl_sec=3600, payload='{"v":1}')
+        fake = MagicMock(
+            get=AsyncMock(return_value=raw),
+            mget=AsyncMock(return_value=[raw, None]),
+            setex=AsyncMock(),
+            set=AsyncMock(),
+            delete=AsyncMock(),
+        )
+        cache = object.__new__(RedisCache)
+        rec = MagicMock()
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", rec),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            out = await RedisCache.get(cache, key, AsyncMock(return_value={"v": "fallback"}))
+        reasons = [c.args[-1] for c in rec.call_args_list]
+        if case["expect"] == "reject":
+            assert reasons == ["created_at_beyond_future_buffer"], f"{case['name']}: {reasons} -- {case['why']}"
+        else:
+            assert out == {"v": 1} and reasons == [], f"{case['name']}: {out} {reasons} -- {case['why']}"
+
+
+def test_the_watermark_and_envelope_bounds_match_the_corpus() -> None:
+    """The measured triples in ``watermarkVsEnvelope``, asserted rather than recited.
+
+    That section was prose no suite read, which is a comment with extra steps -- and the
+    watermarkTiming section was exactly that until a mutation showed the numbers it claimed
+    to pin were free.
+
+    Asserting it immediately falsified it. The prose claimed Python's rounded watermark was
+    identical to Go's; Go tries ``ParseInt`` before ``ParseFloat``, so an integer-formatted
+    watermark is EXACT there at any int64 magnitude and the two differ by one millisecond
+    above 2^53. Each client's own value is pinned here, and the corpus now records both.
+
+    What makes that unreachable rather than lucky is asserted too: both clients cap
+    ``createdAtMs`` at 2^53-1 on read, so any watermark at or above 2^53 exceeds every
+    ``created_at`` either client will accept and the two answer "stale" together regardless
+    of which side of the rounding they landed on.
+    """
+    from unittest.mock import MagicMock
+
+    from gcache._internal.envelope import _MAX_SAFE_INTEGER, EnvelopeDecodeError, decode
+    from gcache._internal.redis_cache import _parse_watermark
+
+    section = _DATA["watermarkVsEnvelope"]
+    cases = section["cases"]
+    assert len(cases) == section["caseCount"] > 0, f"expected {section['caseCount']}, found {len(cases)}"
+
+    for case in cases:
+        parsed = _parse_watermark(case["raw"].encode(), MagicMock(urn="u"), lambda _reason: None)
+        assert parsed == case["pythonParsed"], f"{case['name']}: watermark parsed {parsed} -- {case['why']}"
+
+        # The property that makes the Python/Go difference unreachable, rather than trusting
+        # the prose for it: whichever value each client landed on, it still outranks every
+        # created_at the envelope guard will accept, so both decide "stale" the same way.
+        if not case["envelopeAccepts"]:
+            assert min(case["pythonParsed"], case["goParsed"]) > _MAX_SAFE_INTEGER, case["name"]
+
+        envelope = (
+            f'{{"version":1,"createdAtMs":{case["raw"]},"expiresAtMs":{case["raw"]},'
+            f'"encoding":"utf8","payload":"{{}}"}}'
+        ).encode()
+        if case["envelopeAccepts"]:
+            assert decode(envelope).created_at_ms == int(case["raw"]), case["name"]
+        else:
+            with pytest.raises(EnvelopeDecodeError):
+                decode(envelope)

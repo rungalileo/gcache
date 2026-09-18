@@ -1867,6 +1867,11 @@ class TestLoneSurrogateIsRefused:
     from the second one.
     """
 
+    @staticmethod
+    async def _write(obj: object) -> bytes:
+        """Write obj the way a caller does: serialize, then frame. The guard is in the frame."""
+        return encode_json(created_at_ms=1, ttl_sec=60, payload=await JsonSerializer().dump(obj))
+
     @pytest.mark.parametrize(
         ("cp", "half"),
         [(0xD800, "high-min"), (0xDBFF, "high-max"), (0xDC00, "low-min"), (0xDFFF, "low-max")],
@@ -1874,53 +1879,217 @@ class TestLoneSurrogateIsRefused:
     @pytest.mark.asyncio
     async def test_every_lone_surrogate_is_refused(self, cp: int, half: str) -> None:
         with pytest.raises(UnserializableValue):
-            await JsonSerializer().dump({"v": chr(cp)})
+            await self._write({"v": chr(cp)})
+
+    @pytest.mark.asyncio
+    async def test_a_CUSTOM_serializer_cannot_slip_one_past(self) -> None:
+        # The reason the rule lives in encode_json rather than in JsonSerializer. `serializer=`
+        # is public, documented API, so a caller's own dump() is a supported write path -- and
+        # one calling json.dumps with the default ensure_ascii emits the escape just as the
+        # built-in serializer does. A check inside JsonSerializer saw none of it.
+        payload = json.dumps({"v": "\ud800"})
+        assert "\\ud800" in payload, "ensure_ascii should have produced the escape form"
+        with pytest.raises(UnserializableValue):
+            encode_json(created_at_ms=1, ttl_sec=60, payload=payload)
 
     @pytest.mark.asyncio
     async def test_a_valid_surrogate_PAIR_is_fine(self) -> None:
         # Every non-BMP character is a pair under ensure_ascii. Refusing these would break
         # any cached value containing an emoji, which the first version of this guard did.
         for pair in ("\U0001f600", "\U00020000", "\U0001d11e"):
-            assert await JsonSerializer().dump({"v": pair})
+            assert await self._write({"v": pair})
 
     @pytest.mark.asyncio
     async def test_text_that_merely_CONTAINS_an_escape_sequence_is_fine(self) -> None:
         # Serializes to \\ud800 -- an escaped backslash then literal characters. A pattern
         # matching \ud[89ab].. hits starting at the second backslash, so prose about unicode
-        # or any JSON-inside-JSON was refused.
-        assert await JsonSerializer().dump({"note": r"the escape \ud800 means a high surrogate"})
+        # or any JSON-inside-JSON was refused. json.loads tells the two apart exactly.
+        assert await self._write({"note": r"the escape \ud800 means a high surrogate"})
+
+    def test_a_payload_that_is_not_JSON_is_left_alone(self) -> None:
+        # Neither client unescapes a non-JSON payload, so neither can disagree about it.
+        # Refusing it would fail writes for a serializer that is not JSON at all.
+        assert encode_json(created_at_ms=1, ttl_sec=60, payload=r"plain text mentioning \ud800")
 
     def test_a_literal_lone_surrogate_is_refused_at_the_boundary(self) -> None:
-        # The route a check living only in JsonSerializer leaves open: a custom serializer
-        # returning text with a real lone surrogate in it.
+        # The other shape: a serializer that does not go through json.dumps at all and hands
+        # over a real surrogate CHARACTER. Unencodable by definition.
         with pytest.raises(UnserializableValue):
             encode_json(created_at_ms=1, ttl_sec=60, payload='{"v":"' + chr(0xD800) + '"}')
 
     @pytest.mark.asyncio
     async def test_a_poisoned_entry_already_in_redis_is_refused_on_READ(self) -> None:
-        # The write guard stops THIS client creating a divergent entry; it does nothing
-        # about one already stored by a pre-3.x pod or any other writer sharing the key
-        # space. Reading it is where the harm lands -- Python returns U+D800, Go returns
-        # U+FFFD, both reporting a hit -- so the read refuses it too.
-        with pytest.raises(UnserializableValue):
-            await JsonSerializer().load('{"v":"\\ud800"}')
+        # The write guard stops THIS client creating a divergent entry; it does nothing about
+        # one already stored by a foreign writer or by an older build. Reading it is where the
+        # harm lands -- Python returns U+D800, Go returns U+FFFD, both reporting a hit.
+        #
+        # Driven through RedisCache.get, not JsonSerializer.load: the guard deliberately sits
+        # before any serializer, so a custom load() cannot get past it. Asking the serializer
+        # would pass even with the guard deleted.
+        raw = json.dumps(
+            {
+                "version": 1,
+                "createdAtMs": int(time.time() * 1000),
+                "expiresAtMs": int(time.time() * 1000) + 60_000,
+                "encoding": "utf8",
+                "payload": '{"v":"\\ud800"}',
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+        out, reasons = await _serve_raw(raw)
+        assert out == {"v": "fresh"}, "a poisoned entry must degrade to the fallback"
+        assert reasons == ["divergent_payload_encoding"], reasons
 
     @pytest.mark.asyncio
     async def test_reading_an_emoji_entry_still_works(self) -> None:
         # The read guard must not repeat the write guard's original mistake: a stored emoji
-        # is two escapes and must load normally.
-        assert await JsonSerializer().load('{"v":"\\ud83d\\ude00"}') == {"v": "\U0001f600"}
+        # is two escapes and must be served normally.
+        raw = encode_json(
+            created_at_ms=int(time.time() * 1000),
+            ttl_sec=60,
+            payload=await JsonSerializer().dump({"v": "\U0001f600"}),
+        )
+        out, reasons = await _serve_raw(raw)
+        assert out == {"v": "\U0001f600"}, out
+        assert reasons == [], reasons
 
     @pytest.mark.asyncio
     async def test_the_error_does_not_carry_the_value(self) -> None:
         # The message reaches the logs through CacheController, and the payload is cached
         # application data -- tokens, PII, whatever the caller stored.
         try:
-            await JsonSerializer().dump({"secret": "hunter2" + chr(0xD800)})
+            await self._write({"secret": "hunter2" + chr(0xD800)})
         except UnserializableValue as exc:
             assert "hunter2" not in str(exc), f"the cached value leaked into the error: {exc}"
         else:
             pytest.fail("expected UnserializableValue")
+
+
+async def _serve_raw(raw: bytes) -> tuple[object, list[str]]:
+    """Drive RedisCache.get over one stored blob, returning the value and degraded reasons."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.metrics import GCacheMetrics
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
+    fake = MagicMock(get=AsyncMock(return_value=raw), setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    rec = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", rec),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        out = await RedisCache.get(cache, key, AsyncMock(return_value={"v": "fresh"}))
+    return out, [c.args[-1] for c in rec.call_args_list]
+
+
+@pytest.mark.asyncio
+async def test_a_future_created_at_cannot_put_an_entry_out_of_invalidations_reach() -> None:
+    """A tracked entry stamped far ahead is immune to invalidation, and every other guard passes.
+
+    Staleness is ``watermark_ms >= created_at_ms`` and a watermark carries a real clock time,
+    so it never reaches a stamp far enough ahead. The expiry guard passes because expiresAtMs
+    is ahead too, and the lifetime guard passes because the declared lifetime is legal. The
+    entry therefore survives every invalidate call for its whole Redis TTL.
+
+    The bound is the frontier of what an invalidation issued NOW can reach, not "not in the
+    future": a watermark written now carries at most now + MAX_FUTURE_BUFFER, so an entry at
+    or before that instant is still suppressible and one past it is not. Both sides of the
+    boundary are pinned, because a guard that refused the reachable side would turn a slightly
+    fast clock into a permanent miss-and-rewrite loop.
+    """
+    from gcache._internal.constants import MAX_FUTURE_BUFFER_SECONDS
+
+    now = int(time.time() * 1000)
+    buffer_ms = MAX_FUTURE_BUFFER_SECONDS * 1000
+
+    async def serve_tracked(created_at_ms: int, watermark: bytes | None) -> tuple[object, list[str]]:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from gcache._internal.metrics import GCacheMetrics
+        from gcache._internal.redis_cache import RedisCache
+
+        key = GCacheKey(
+            key_type="kt",
+            id="i",
+            use_case="u",
+            invalidation_tracking=True,
+            envelope=Envelope.JSON,
+            serializer=JsonSerializer(),
+        )
+        raw = encode_json(created_at_ms=created_at_ms, ttl_sec=3600, payload='{"v":1}')
+        fake = MagicMock(
+            mget=AsyncMock(return_value=[raw, watermark]), setex=AsyncMock(), set=AsyncMock(), delete=AsyncMock()
+        )
+        cache = object.__new__(RedisCache)
+        rec = MagicMock()
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", rec),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            out = await RedisCache.get(cache, key, AsyncMock(return_value={"v": "fresh"}))
+        return out, [c.args[-1] for c in rec.call_args_list]
+
+    # The fault itself: created a year ahead, invalidated at this instant, still served.
+    out, reasons = await serve_tracked(now + 365 * 24 * 3600 * 1000, str(now).encode())
+    assert out == {"v": "fresh"}, "an entry beyond every reachable watermark must not be served"
+    assert reasons == ["created_at_beyond_future_buffer"], reasons
+
+    # Just PAST the frontier. No watermark at all, so nothing else can explain the miss.
+    out, reasons = await serve_tracked(now + buffer_ms + 60_000, None)
+    assert reasons == ["created_at_beyond_future_buffer"], reasons
+
+    # Just INSIDE it: a clock running fast is tolerated, and an invalidation issued now can
+    # still reach this entry, so refusing it would cost a hit and buy nothing.
+    out, reasons = await serve_tracked(now + buffer_ms - 60_000, None)
+    assert out == {"v": 1}, "an entry a watermark can still reach must be served"
+    assert reasons == [], reasons
+
+    # ...and it really is still reachable: the same entry under a watermark carrying the full
+    # buffer is suppressed, which is the property the bound is derived from.
+    out, _ = await serve_tracked(now + buffer_ms - 60_000, str(now + buffer_ms).encode())
+    assert out == {"v": "fresh"}, "a watermark written with the full buffer must still suppress it"
+
+
+@pytest.mark.asyncio
+async def test_an_untracked_entry_keeps_its_clock_skew_tolerance() -> None:
+    """The future-stamp guard is tracked-only, like the lifetime and age guards.
+
+    An untracked entry has no watermark to be out of reach of, so refusing a future stamp
+    would cost a skewed writer its hit rate and buy nothing.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import MAX_FUTURE_BUFFER_SECONDS
+    from gcache._internal.metrics import GCacheMetrics
+    from gcache._internal.redis_cache import RedisCache
+
+    now = int(time.time() * 1000)
+    key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
+    raw = encode_json(created_at_ms=now + MAX_FUTURE_BUFFER_SECONDS * 1000 + 60_000, ttl_sec=3600, payload='{"v":1}')
+    fake = MagicMock(get=AsyncMock(return_value=raw), setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    rec = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", rec),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        out = await RedisCache.get(cache, key, AsyncMock(return_value={"v": "fresh"}))
+    assert out == {"v": 1}, "an untracked future-stamped entry is clock skew, not corruption"
+    assert [c.args[-1] for c in rec.call_args_list] == []
 
 
 @pytest.mark.asyncio
@@ -2036,6 +2205,37 @@ class TestEnvelopeRequiresSerializerCoversProto:
         assert JsonEnvelopeRequiresSerializer is EnvelopeRequiresSerializer
         with pytest.raises(JsonEnvelopeRequiresSerializer):
             GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.PROTO)
+
+    def test_the_DECORATOR_guard_refuses_proto_too(self, gcache: GCache) -> None:
+        # A SECOND guard, on a different route, and the one whose failure is silent. Proven
+        # by mutation: narrowing this one back to `envelope == Envelope.JSON` left the whole
+        # suite green, because every test of it used GCacheKey directly.
+        #
+        # The two fail at different times, which is why one test cannot cover both. With the
+        # guard, a developer meets EnvelopeRequiresSerializer at decoration -- import time.
+        # Without it, GCacheKey raises inside async_wrapped, the broad `except Exception`
+        # catches it, should_cache becomes False, and the function runs UNCACHED for the life
+        # of the deployment with only gcache_error_counter moving. That shape is the reason
+        # the guard exists at all.
+        with pytest.raises(EnvelopeRequiresSerializer) as exc:
+
+            @gcache.cached(key_type="kt", id_arg="i", use_case="decorator::proto", envelope=Envelope.PROTO)
+            async def _fn(i: str) -> str:
+                return i
+
+        assert "PROTO" in str(exc.value), f"the message must name the framing: {exc.value}"
+
+    def test_the_decorator_still_refuses_json(self, gcache: GCache) -> None:
+        with pytest.raises(EnvelopeRequiresSerializer):
+
+            @gcache.cached(key_type="kt", id_arg="i", use_case="decorator::json", envelope=Envelope.JSON)
+            async def _fn(i: str) -> str:
+                return i
+
+    def test_the_decorator_leaves_pickle_alone(self, gcache: GCache) -> None:
+        @gcache.cached(key_type="kt", id_arg="i", use_case="decorator::pickle", envelope=Envelope.PICKLE)
+        async def _fn(i: str) -> str:
+            return i
 
 
 @pytest.mark.asyncio

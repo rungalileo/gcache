@@ -345,15 +345,60 @@
       "  9007199254740995  envelope 9007199254740995   watermark 9007199254740996",
       "  9007199254740991  envelope 9007199254740991   watermark 9007199254740991",
       "",
-      "The watermark values are identical to Go's. So above 2^53 Python and Go ALREADY agree",
-      "on the watermark and disagreed only on the envelope. Tightening the watermark would",
-      "introduce a divergence rather than close one.",
+      "CORRECTION, found by the cases below when they were first asserted: the watermark values",
+      "are NOT identical to Go's. Go's parseWatermark tries ParseInt BEFORE ParseFloat, so an",
+      "integer-formatted watermark is exact at any int64 magnitude:",
+      "",
+      "  9007199254740993  python 9007199254740992   go 9007199254740993",
+      "  9007199254740995  python 9007199254740996   go 9007199254740995",
+      "  9007199254740991  python 9007199254740991   go 9007199254740991",
+      "",
+      "The divergence is unreachable rather than harmless-by-luck, and that is the part worth",
+      "keeping. Staleness is `watermark_ms >= created_at_ms`, and BOTH clients cap created_at at",
+      "2^53-1 on read, so any watermark at or above 2^53 exceeds every createdAtMs either client",
+      "will accept -- the two answer 'stale' together no matter which side of the rounding they",
+      "landed on. Write-back is suppressed for both for the same reason. So the numbers differ",
+      "and no decision does.",
+      "",
+      "This is why the section is asserted now: it previously said the opposite, in prose no",
+      "suite read, and the claim would have been used to justify a change to one of the parsers.",
       "",
       "Consequence to know before anyone 'fixes' this: within Python, above 2^53, a rounded",
       "watermark is compared against an exact created_at, so `watermark_ms >= created_at_ms`",
       "can be off by one millisecond. Unreachable in practice -- 2^53 ms is year 287396 -- and",
       "now doubly so, since the envelope side rejects those values outright. Do not align the",
-      "two parsers without re-measuring Go first."
+      "two parsers without re-measuring Go first.",
+      "",
+      "The cases below are the measured triples above, asserted rather than recited. Prose in",
+      "this file that no suite reads is a comment with extra steps -- the watermarkTiming",
+      "section was exactly that until a mutation showed the numbers it 'pinned' were free."
+    ],
+    "caseCount": 3,
+    "cases": [
+      {
+        "name": "just-above-2^53",
+        "raw": "9007199254740993",
+        "pythonParsed": 9007199254740992,
+        "goParsed": 9007199254740993,
+        "envelopeAccepts": false,
+        "why": "float64 cannot represent it, so Python rounds down; Go's ParseInt keeps it exact."
+      },
+      {
+        "name": "two-above-2^53",
+        "raw": "9007199254740995",
+        "pythonParsed": 9007199254740996,
+        "goParsed": 9007199254740995,
+        "envelopeAccepts": false,
+        "why": "Python rounds the OTHER way here, so a test using only the first case would pass on a floor()."
+      },
+      {
+        "name": "2^53-minus-one",
+        "raw": "9007199254740991",
+        "pythonParsed": 9007199254740991,
+        "goParsed": 9007199254740991,
+        "envelopeAccepts": true,
+        "why": "The last exactly-representable value: both agree, and the envelope still accepts it. Pins where the divergence starts."
+      }
     ]
   },
   "hashedComponents": {
@@ -384,7 +429,7 @@
         "_why": "the shape this exists for -- PII that must not sit in a key in the clear"
       },
       {
-        "input": "unicode-\u2713-and-:colons:",
+        "input": "unicode-✓-and-:colons:",
         "digest": "d522491de4bfab70ba2d2ee455d42c4a9176278432c10de2ce18bbe455b5e8ed",
         "_why": "non-ASCII and the key delimiter: hashing happens BEFORE rendering, so a colon in the input cannot split a component"
       },
@@ -484,5 +529,129 @@
     "watermarkTtlSeconds": 18000,
     "maxTrackedTtlSeconds": 14400,
     "maxFutureBufferSeconds": 3600
+  },
+  "payloadDivergence": {
+    "$comment": [
+      "Payloads the two clients would decode to DIFFERENT values, and near-misses that they",
+      "must both accept. Refused on write (encode_json / encodeEnvelope) and on read, so a",
+      "poisoned entry from a foreign writer degrades to the fallback instead of being served.",
+      "",
+      "The hazard is the ESCAPE form. json.dumps with ensure_ascii writes U+D800 as the six",
+      "ASCII characters \\ud800, so the stored envelope is pure ASCII and Go's utf8.Valid gate",
+      "cannot see it -- the surrogate only reappears when the CALLER's codec unescapes the",
+      "payload. Python then returns a str holding U+D800 and Go substitutes U+FFFD. Both",
+      "clients report a hit, nothing raises, no metric moves.",
+      "",
+      "The accepts matter as much as the rejects. Two earlier versions of this rule were",
+      "regexes and each was wrong in a different direction: the first refused every emoji,",
+      "because a valid surrogate PAIR is also two escapes; the second refused ordinary text",
+      "containing the characters \\ud800, because an escaped backslash makes \\\\ud800 and the",
+      "pattern matched from the second one.",
+      "",
+      "The two clients answer this with DIFFERENT mechanisms and must still agree. Python asks",
+      "json.loads and re-dumps without ensure_ascii; Go's encoding/json substitutes rather",
+      "than erroring, so it walks the escapes instead. That is what this section is for."
+    ],
+    "caseCount": 8,
+    "cases": [
+      {
+        "name": "lone-high-escape",
+        "payload": "{\"a\":\"\\ud800\"}",
+        "expect": "reject",
+        "why": "The escape form, from any serializer using ensure_ascii."
+      },
+      {
+        "name": "lone-low-escape",
+        "payload": "{\"a\":\"\\udc00\"}",
+        "expect": "reject",
+        "why": "The low half alone. An early matcher covered [89ab] only and let this through."
+      },
+      {
+        "name": "lone-high-escape-uppercase",
+        "payload": "{\"a\":\"\\uD800\"}",
+        "expect": "reject",
+        "why": "JSON permits \\uD800 as readily as \\ud800, so a case-sensitive gate misses half of them."
+      },
+      {
+        "name": "trailing-high-escape",
+        "payload": "{\"a\":\"x\\ud800\"}",
+        "expect": "reject",
+        "why": "A high surrogate with nothing after it. The pair lookahead must not run off the end."
+      },
+      {
+        "name": "valid-surrogate-pair",
+        "payload": "{\"a\":\"😀\"}",
+        "expect": "accept",
+        "why": "An emoji under ensure_ascii. Refusing these was the first version's bug."
+      },
+      {
+        "name": "escaped-backslash-then-text",
+        "payload": "{\"a\":\"\\\\ud800\"}",
+        "expect": "accept",
+        "why": "A literal backslash followed by the characters ud800 -- prose about unicode, or JSON inside JSON. Refusing it was the second version's bug."
+      },
+      {
+        "name": "no-surrogate",
+        "payload": "{\"a\":\"plain\"}",
+        "expect": "accept",
+        "why": "The common payload, which must not pay a parse."
+      },
+      {
+        "name": "not-json",
+        "payload": "plain text mentioning \\ud800",
+        "expect": "accept",
+        "why": "Neither client unescapes a non-JSON payload, so neither can disagree about it."
+      }
+    ]
+  },
+  "futureCreatedAt": {
+    "$comment": [
+      "A tracked entry stamped far enough ahead is immune to invalidation, in both clients.",
+      "Staleness is `watermarkMs >= createdAtMs` and a watermark carries a real clock time, so",
+      "it never reaches a stamp far enough ahead -- while the expiry guard passes (expiresAtMs",
+      "is ahead too) and the lifetime guard passes (the declared lifetime is legal). The entry",
+      "survives every invalidate call for its whole Redis TTL.",
+      "",
+      "Clock-relative, so these are offsets rather than bytes: each suite builds an envelope at",
+      "now + createdAtOffsetSeconds and reads it back.",
+      "",
+      "boundSeconds is maxFutureBufferSeconds, and that is the whole derivation: an invalidation",
+      "issued NOW writes a watermark of at most now + maxFutureBuffer, so an entry created at or",
+      "before that instant is still suppressible and one created after it is not. The accepts are",
+      "as load-bearing as the rejects -- a guard refusing the reachable side would turn a",
+      "one-millisecond clock lead into a permanent miss-and-rewrite loop."
+    ],
+    "boundSeconds": 3600,
+    "caseCount": 4,
+    "cases": [
+      {
+        "name": "inside-the-frontier",
+        "createdAtOffsetSeconds": 3540,
+        "tracked": true,
+        "expect": "accept",
+        "why": "A watermark written now with the full buffer can still reach it, so it is served."
+      },
+      {
+        "name": "past-the-frontier",
+        "createdAtOffsetSeconds": 3660,
+        "tracked": true,
+        "expect": "reject",
+        "why": "No watermark any invalidation can write now reaches this stamp."
+      },
+      {
+        "name": "a-year-ahead",
+        "createdAtOffsetSeconds": 31536000,
+        "tracked": true,
+        "expect": "reject",
+        "why": "The shape a broken clock or a foreign writer actually produces."
+      },
+      {
+        "name": "untracked-past-the-frontier",
+        "createdAtOffsetSeconds": 3660,
+        "tracked": false,
+        "expect": "accept",
+        "why": "No watermark to be out of reach of, so refusing it costs a skewed writer its hit rate and buys nothing."
+      }
+    ]
   }
 }

@@ -651,7 +651,7 @@ window.
 
 Ramping a use case to 0%, or leaving the `enable()` context, stops reads and writes but does
 **not** clear watermarks — an invalidation written just before the switch survives in Redis
-for the watermark key's own 4-hour TTL. Only `flushall()` or that TTL expiring removes it.
+for the watermark key's own 5-hour TTL. Only `flushall()` or that TTL expiring removes it.
 
 It is usually harmless: the watermark suppresses entries created at or before it, so each
 affected entity costs one miss and then repopulates. `future_buffer_ms` is the case to know
@@ -696,12 +696,13 @@ invalidation is keyed on
 
 `gcache_miss_counter`: empty for an ordinary miss, otherwise `undecodable`,
 `json_without_serializer`, `lifetime_exceeds_watermark`, `envelope_expired`,
-`age_exceeds_watermark`, `reversed_envelope_timestamps`, `unloadable_payload`,
-`unreadable_watermark`, `non_finite_watermark`.
+`age_exceeds_watermark`, `reversed_envelope_timestamps`, `created_at_beyond_future_buffer`,
+`divergent_payload_encoding`, `unloadable_payload`, `unreadable_watermark`,
+`non_finite_watermark`.
 
 `unreadable_watermark` self-heals **in this client**: a watermark that is not a number at
 all is deleted, so the next Python read caches again. The Go client's `Client` interface has
-no delete, so a Go-only deployment keeps missing for the watermark key's own 4-hour TTL — in
+no delete, so a Go-only deployment keeps missing for the watermark key's own 5-hour TTL — in
 a mixed deployment one Python read repairs the key for both. `non_finite_watermark` heals in
 neither: `nan`/`inf` parse as numbers, so they could be a format this client does not
 understand yet, and deleting one could resurrect what a newer writer had invalidated.
@@ -744,10 +745,12 @@ Add `reason=""` where you want the old population, not to make the selector work
 |---|---|
 | `undecodable` | The envelope itself could not be parsed (corrupt, or an unknown version) |
 | `json_without_serializer` | A JSON **or PROTO** entry on a key that declares no `Serializer` — typically a rolling deploy where new pods have started writing an encoded framing. (`_decode_proto` sets `is_json=True`, so a PROTO entry reaches this guard too; the label predates the framing.) |
-| `lifetime_exceeds_watermark` | A tracked JSON **or PROTO** entry whose envelope declares a lifetime longer than the watermark TTL, so no watermark can vouch for it |
+| `lifetime_exceeds_watermark` | A tracked JSON **or PROTO** entry whose envelope declares a lifetime longer than the **4-hour tracked-TTL cap** (`MAX_TRACKED_TTL_SECONDS`), so no watermark can still vouch for it. Not the 5-hour watermark lifetime: the cap is `WATERMARK_TTL - MAX_FUTURE_BUFFER`, and comparing against the larger number left an hour-wide band that served malformed entries |
 | `envelope_expired` | Present in Redis but past the writer's own `expiresAtMs`. Both clients trust the writer's clock here, so hosts must be NTP-synced; there is no skew tolerance. |
-| `age_exceeds_watermark` | A tracked entry of either framing that is itself older than the watermark TTL — the same invariant by age, and the only one that reaches the pickle path |
+| `age_exceeds_watermark` | A tracked entry of either framing that is itself older than the **4-hour tracked-TTL cap** — the same invariant by age, against the same bound, and the only one that reaches the pickle path |
 | `reversed_envelope_timestamps` | The envelope expires *before* it was created. Malformed rather than stale, and the lifetime guard cannot see it: the difference is negative, so `> cap` is false and it would pass as a plausible entry |
+| `created_at_beyond_future_buffer` | A tracked entry stamped more than **1 hour** (`MAX_FUTURE_BUFFER_SECONDS`) in the future. Staleness is `watermark_ms >= created_at_ms`, so a stamp beyond every reachable watermark can never be suppressed — the entry is immune to invalidation for its whole Redis TTL while every other guard passes. The bound is the exact frontier: an invalidation issued now writes a watermark of at most `now + MAX_FUTURE_BUFFER`. An hour of clock-skew tolerance falls out of it |
+| `divergent_payload_encoding` | The payload holds a lone surrogate — as a character, or as the JSON escape `\ud800` that `ensure_ascii` produces. Python keeps it, Go substitutes U+FFFD, and both report a hit, so the entry is refused on read rather than served as a silent disagreement. Refused on write too (`encode_json`), so this can only be an entry from a foreign writer or an older build |
 | `unloadable_payload` | The envelope parsed, but the `Serializer` could not load the payload — e.g. another language changed the payload schema |
 | `unreadable_watermark` | The watermark is not a number at all. Suppresses the entry, then deletes the watermark so the next Python read recovers (the Go client cannot delete) |
 | `non_finite_watermark` | The watermark is `nan` or `inf`. Suppresses every entry for that `(key_type, id)` until the watermark's own TTL expires |

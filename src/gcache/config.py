@@ -14,18 +14,12 @@ from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.exceptions import (
     EnvelopeRequiresSerializer,
     UnhashableKeyComponent,
-    UnserializableValue,
     UseCaseNameIsReserved,
 )
 
 #: Async callable that fetches the value on a miss. Zero-argument: ``Callable[..., ...]``
 #: deferred the TypeError to the first cache miss. Bind args with functools.partial.
 Fallback = Callable[[], Awaitable[Any]]
-
-
-# Matches the six-character JSON escape for a surrogate code point, which is what
-# json.dumps emits for one under ensure_ascii. Checked on the ENCODED text rather than the
-# input object, so it catches a surrogate at any depth without walking the structure.
 
 
 class CacheLayer(Enum):
@@ -167,6 +161,14 @@ class Serializer(ABC):
     async def load(self, data: bytes | str) -> Any:
         pass
 
+    # One constraint on dump's output, enforced at the framing boundary rather than trusted:
+    # a TEXT payload must not carry a lone surrogate, as a character or as the JSON escape
+    # \ud800. Both are cross-client divergences -- Python keeps the surrogate, Go substitutes
+    # U+FFFD -- and the escape form is invisible in the stored entry, which is pure ASCII.
+    # encode_json refuses either, and RedisCache.get refuses one already in Redis. A payload
+    # this client hands over as BYTES is opaque to the envelope, so a serializer producing
+    # bytes owns that question itself.
+
     def wire_identity(self) -> Any:
         """What makes this instance interchangeable with another on the wire.
 
@@ -205,26 +207,11 @@ class JsonSerializer(Serializer):
         # write would succeed and the entry would be
         # unreadable from every non-Python client until its TTL ran out. Failing the write
         # is the rule the rest of this envelope follows.
-        payload = json.dumps(obj, separators=(",", ":"), allow_nan=False)
-        # A lone surrogate survives ensure_ascii as the escape \ud800, so the stored envelope
-        # is valid ASCII and go/envelope.go's utf8.Valid gate cannot see it -- the surrogate
-        # only reappears after the JSON unescape. Python then returns a str holding U+D800
-        # while Go's encoding/json substitutes U+FFFD, and both report a hit.
-        #
-        # Answered from the OBJECT, not by pattern-matching the serialized text: re-dumping
-        # without ensure_ascii puts any lone surrogate back as a real character, where utf-8
-        # refuses it. That is exact, where a regex was twice wrong -- once refusing every
-        # emoji (a valid PAIR is also two escapes) and once refusing text that merely
-        # contains the characters "\ud800".
-        #
-        # Gated on a cheap substring so the common payload pays one scan rather than a second
-        # serialization: no `\ud` escape at all means no surrogate, paired or lone.
-        if "\\ud" in payload:
-            try:
-                json.dumps(obj, ensure_ascii=False).encode("utf-8")
-            except UnicodeEncodeError as exc:
-                raise UnserializableValue("a lone surrogate") from exc
-        return payload
+        # The lone-surrogate rule is NOT here. It lives at the framing boundary
+        # (envelope.encode_json) because every serializer's output passes through it, and a
+        # check in this one was bypassed by any custom Serializer -- which `serializer=`
+        # makes a supported path.
+        return json.dumps(obj, separators=(",", ":"), allow_nan=False)
 
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, bytes):
@@ -233,24 +220,10 @@ class JsonSerializer(Serializer):
         # the max tick delay 0.007s -> 0.007-0.014s and starved getaddrinfo in the default
         # pool. (ProtoSerializer.load does NOT offload: ParseFromString is C and blocks the
         # loop once -- 0.5ms measured at 1.24MB, against protojson's 104ms at 1.18MB.)
-        loaded = json.loads(data)
-        # On READ as well as write. The write guard stops this client creating a divergent
-        # entry; it does nothing about one ALREADY in Redis -- written by a pre-3.x pod, or
-        # by any other writer sharing the key space. Reading it is where the harm actually
-        # lands: Python returns U+D800 and Go returns U+FFFD for the same bytes, both
-        # reporting a hit. Every other integrity failure in this envelope (an unknown
-        # version, a negative timestamp, an over-width varint) is refused on read for the
-        # same reason, so this is the consistent treatment rather than a new policy.
-        #
-        # The consequence is a permanent miss for a poisoned key rather than a silent
-        # disagreement: the read degrades to the fallback, and re-writing the same value is
-        # refused by the write guard. That is the intended trade.
-        if "\\ud" in data:
-            try:
-                json.dumps(loaded, ensure_ascii=False).encode("utf-8")
-            except UnicodeEncodeError as exc:
-                raise UnserializableValue("a lone surrogate in a stored entry") from exc
-        return loaded
+        # The read-side half of the lone-surrogate rule is not here either. RedisCache.get
+        # asks it of the stored TEXT before any serializer sees it, so a custom load() --
+        # which may resolve the escape, or not use json at all -- cannot get past it.
+        return json.loads(data)
 
 
 def hash_component(value: str) -> str:

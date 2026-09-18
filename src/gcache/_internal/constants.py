@@ -33,6 +33,17 @@ def validate_invalidation_args(key_type: str, id: str, future_buffer_ms: int) ->
     """
     if not key_type or not id:
         raise ValueError("gcache: invalidate requires both key_type and id")
+    # An INTEGER, checked before the comparisons below rather than left to them. The public
+    # contract is integer milliseconds, and the two range checks cannot enforce it: every
+    # comparison against NaN is False, so a NaN passes both and reaches SETEX, where Redis
+    # raises on a Noop-backed deployment's silent success. A float like 0.5 slips through and
+    # is coerced later; a bool is an int subclass in Python, so True arrives as 1 and reads as
+    # a deliberate one-millisecond buffer nobody wrote.
+    if isinstance(future_buffer_ms, bool) or not isinstance(future_buffer_ms, int):
+        raise ValueError(
+            f"gcache: future_buffer_ms must be an int of milliseconds, got "
+            f"{type(future_buffer_ms).__name__} {future_buffer_ms!r}"
+        )
     if future_buffer_ms < 0:
         # A watermark in the PAST suppresses only part of the key type -- anything written
         # after that instant stays fresh -- while the call still reports success.

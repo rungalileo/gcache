@@ -186,6 +186,19 @@ def encode_proto(created_at_ms: int, ttl_sec: int, payload: bytes) -> bytes:
     return bytes(out)
 
 
+def _to_signed64(value: int) -> int:
+    """Reinterpret a varint as the signed int64 the schema declares.
+
+    `created_at_ms` and `expires_at_ms` are `int64` in envelope.proto, and protobuf encodes a
+    negative int64 as a 10-byte varint of its two's complement -- so reading the varint as
+    unsigned turns -1 into 18446744073709551615. Go does `int64(value)` and gets -1, so the
+    two clients disagreed about the same bytes: an entry with a negative expires_at_ms was
+    long expired in Go and roughly 584 million years in the future in Python, which served it
+    as a fresh hit forever.
+    """
+    return value - (1 << 64) if value >= (1 << 63) else value
+
+
 def _decode_proto(data: bytes) -> DecodedValue:
     """Parse the PROTO envelope. Fields in any order, unknown fields skipped."""
     version: int | None = None
@@ -202,9 +215,9 @@ def _decode_proto(data: bytes) -> DecodedValue:
             if field == 1:
                 version = value
             elif field == 2:
-                created_at_ms = value
+                created_at_ms = _to_signed64(value)
             elif field == 3:
-                expires_at_ms = value
+                expires_at_ms = _to_signed64(value)
         elif wire == _WIRE_LEN:
             length, i = _get_varint(data, i)
             if i + length > len(data):
@@ -238,6 +251,13 @@ def _decode_proto(data: bytes) -> DecodedValue:
     # carries it. Zero here means an absent field -- a writer that did not set it.
     if version is None or version < 1 or version > ENVELOPE_VERSION:
         raise EnvelopeDecodeError(f"unsupported envelope version {version!r}")
+    # Negative is not a timestamp. Both clients now READ these identically, so this is no
+    # longer about divergence -- it is that a negative epoch-ms is meaningless and, unchecked,
+    # is the shape the divergence above turned into a permanent hit. Refuse it as a miss.
+    if (created_at_ms is not None and created_at_ms < 0) or (expires_at_ms is not None and expires_at_ms < 0):
+        raise EnvelopeDecodeError(
+            f"negative envelope timestamp (createdAtMs={created_at_ms} expiresAtMs={expires_at_ms})"
+        )
     if created_at_ms is None or expires_at_ms is None or payload is None:
         raise EnvelopeDecodeError(
             f"incomplete PROTO envelope (version={version} createdAtMs={created_at_ms} "

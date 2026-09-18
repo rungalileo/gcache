@@ -1788,3 +1788,51 @@ class TestProtoEnvelopeVersionZero:
     def test_the_current_version_still_decodes(self) -> None:
         good = encode_proto(created_at_ms=1_700_000_000_000, ttl_sec=60, payload=b"ok")
         assert decode(self._reframe(good, 1), allow_pickle=False).payload == b"ok"
+
+
+class TestProtoNegativeTimestamps:
+    """int64 fields read as signed, and a negative refused -- the same on both clients.
+
+    envelope.proto declares created_at_ms/expires_at_ms as int64, and protobuf encodes a
+    negative int64 as the 10-byte varint of its two's complement. Python read that varint as
+    UNSIGNED, so -1 became 18446744073709551615 while Go's int64(value) gave -1. An entry
+    with a negative expires_at_ms was therefore long expired in Go and ~584 million years in
+    the future in Python, which served it as a fresh hit forever.
+    """
+
+    @staticmethod
+    def _varint(n: int) -> bytes:
+        if n < 0:
+            n += 1 << 64
+        out = bytearray()
+        while True:
+            b, n = n & 0x7F, n >> 7
+            out.append(b | (0x80 if n else 0))
+            if not n:
+                return bytes(out)
+
+    def _frame(self, created: int, expires: int) -> bytes:
+        return (
+            bytes([0x08, 1])
+            + bytes([0x10])
+            + self._varint(created)
+            + bytes([0x18])
+            + self._varint(expires)
+            + bytes([0x22, 2])
+            + b"hi"
+        )
+
+    def test_a_negative_timestamp_is_refused(self) -> None:
+        with pytest.raises(EnvelopeDecodeError, match="negative envelope timestamp"):
+            decode(self._frame(-1, -1), allow_pickle=False)
+
+    def test_a_negative_expiry_alone_is_refused(self) -> None:
+        # The dangerous one: a plausible created_at with a negative expiry is what Python
+        # turned into an entry that never expires.
+        with pytest.raises(EnvelopeDecodeError, match="negative envelope timestamp"):
+            decode(self._frame(1_700_000_000_000, -1), allow_pickle=False)
+
+    def test_a_normal_frame_still_decodes(self) -> None:
+        dv = decode(self._frame(1_700_000_000_000, 1_700_000_060_000), allow_pickle=False)
+        assert dv.created_at_ms == 1_700_000_000_000
+        assert dv.expires_at_ms == 1_700_000_060_000

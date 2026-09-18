@@ -240,6 +240,14 @@ func decodeProtoEnvelope(data []byte) (payload []byte, createdAtMs int64, expire
 	if !haveVersion || version < 1 || version > uint64(envelopeVersion) {
 		return nil, 0, 0, fmt.Errorf("gcache: unsupported envelope version %d", version)
 	}
+	// Negative is not a timestamp. Go already read these as signed int64, so it never had
+	// Python's uint64 misreading -- but it accepted the nonsense value, and an unchecked
+	// negative is exactly what that misreading turned into a permanent hit on the other side.
+	// Both clients refuse it now, so neither can serve what the other discards.
+	if createdAtMs < 0 || expiresAtMs < 0 {
+		return nil, 0, 0, fmt.Errorf(
+			"gcache: negative envelope timestamp (createdAtMs=%d expiresAtMs=%d)", createdAtMs, expiresAtMs)
+	}
 	if !haveCreated || !haveExpires || !havePayload {
 		return nil, 0, 0, fmt.Errorf(
 			"gcache: incomplete PROTO envelope (createdAtMs=%t expiresAtMs=%t payload=%t)",

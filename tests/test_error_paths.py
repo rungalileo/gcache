@@ -209,3 +209,17 @@ class TestInvalidationBufferBounds:
     def test_an_empty_identifier_is_still_refused(self, kt: str, id_: str) -> None:
         with pytest.raises(ValueError, match="requires both"):
             validate_invalidation_args(kt, id_, 0)
+
+    @pytest.mark.parametrize("bad", [0.5, float("nan"), float("inf"), "5", None])
+    def test_a_non_integer_buffer_is_refused(self, bad: object) -> None:
+        # NaN is the one the range checks cannot catch: every comparison against it is
+        # False, so it passes `< 0` AND `> ceiling` and reaches SETEX, where Redis raises --
+        # but only on a Redis-backed deployment, so a Noop-backed test suite reports success.
+        with pytest.raises(ValueError, match="must be an int of milliseconds"):
+            validate_invalidation_args("kt", "id", bad)  # type: ignore[arg-type]
+
+    def test_a_bool_is_refused_despite_being_an_int(self) -> None:
+        # bool subclasses int in Python, so True would otherwise arrive as a deliberate
+        # one-millisecond buffer that nobody wrote.
+        with pytest.raises(ValueError, match="must be an int of milliseconds"):
+            validate_invalidation_args("kt", "id", True)  # type: ignore[arg-type]

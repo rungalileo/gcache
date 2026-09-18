@@ -262,11 +262,24 @@ class RedisCache(CacheInterface):
     async def _async_lone_surrogate_reason(payload: str | bytes) -> str | None:
         """Off the event loop, on the same threshold and for the same reason as _async_decode.
 
-        The check parses the payload's own JSON, so on a large payload it costs about what
-        decode costs -- measured at 1.31x a bare json.loads for one holding an emoji, 0.99ms
-        on 0.58 MB. decode is offloaded above ASYNC_DECODE_THRESHOLD_BYTES precisely so a
-        payload that size does not block the loop; leaving this one inline at every size put
-        the work straight back.
+        Cost is driven by ESCAPE COUNT, not by size, and not by the parse. Since the scan was
+        moved ahead of the parse, an ordinary payload is answered without parsing at all;
+        what is left is one loop iteration per `\\u` escape. Measured against a bare
+        json.loads, which JsonSerializer.load pays anyway:
+
+            20000 records, no astral character   1.6 MB    0.41x
+            20000 records, one emoji each        2.1 MB    1.44x
+            500 records, one emoji each           32 KiB   1.72x
+            2000 emoji in ONE string              23 KiB  56.75x
+
+        That last row is the one to know when tuning ASYNC_DECODE_THRESHOLD_BYTES: it is the
+        most expensive shape and it is 23 KiB, so it sits UNDER the threshold and runs
+        inline. A byte threshold is the wrong axis for this cost; it is kept because it is
+        the axis decode already uses, and because the absolute time there is still small.
+
+        An earlier version of this docstring said the check "parses the payload's own JSON"
+        and cited 1.31x. Both were retracted by the commit that reordered the check -- 1.31x
+        was one payload shape, and misleading as a summary.
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(RedisCache._executor, partial(lone_surrogate_reason, payload))

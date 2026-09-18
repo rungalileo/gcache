@@ -1906,6 +1906,30 @@ class TestLoneSurrogateIsRefused:
         # or any JSON-inside-JSON was refused. json.loads tells the two apart exactly.
         assert await self._write({"note": r"the escape \ud800 means a high surrogate"})
 
+    def test_a_lone_surrogate_in_a_KEY_is_refused_too(self) -> None:
+        # A key diverges exactly as a value does, and the walk has to visit both. The
+        # re-serialization this replaced covered keys for free; an implementation walking
+        # only .values() would pass every other test in this class.
+        with pytest.raises(UnserializableValue):
+            encode_json(created_at_ms=1, ttl_sec=60, payload='{"\\ud800":"v"}')
+
+    def test_deep_nesting_does_not_blow_the_stack(self) -> None:
+        # Iterative, not recursive: nothing bounds a payload's nesting depth, and a
+        # RecursionError raised out of a guard whose job is to refuse things WITHOUT failing
+        # the read would be worse than the divergence it is looking for.
+        #
+        # The surrogate is at the BOTTOM of the nesting on purpose. A version of this test
+        # without it was vacuous twice over: the `\ud` gate short-circuited before the parse,
+        # and even past the gate, a walk that never descended would have returned "no
+        # surrogate" and looked correct.
+        deep = "[" * 4000 + r'"\ud800"' + "]" * 4000
+        with pytest.raises(UnserializableValue):
+            encode_json(created_at_ms=1, ttl_sec=60, payload=deep)
+
+        # The other direction, so the depth is not simply being refused wholesale.
+        deep_ok = "[" * 4000 + r'"\ud83d\ude00"' + "]" * 4000
+        assert encode_json(created_at_ms=1, ttl_sec=60, payload=deep_ok)
+
     def test_a_payload_that_is_not_JSON_is_left_alone(self) -> None:
         # Neither client unescapes a non-JSON payload, so neither can disagree about it.
         # Refusing it would fail writes for a serializer that is not JSON at all.
@@ -2288,3 +2312,56 @@ async def test_a_reversed_envelope_is_distrusted() -> None:
 
     assert out == {"v": "fresh"}, "a reversed envelope must be a miss"
     assert "reversed_envelope_timestamps" in [c.args[-1] for c in rec.call_args_list]
+
+
+@pytest.mark.asyncio
+async def test_the_divergence_check_is_offloaded_for_a_large_payload() -> None:
+    """Above ASYNC_DECODE_THRESHOLD_BYTES the check runs in the executor, as decode does.
+
+    decode is offloaded at that size precisely so a large payload does not block the event
+    loop; the check parses the payload's own JSON and costs about as much, so leaving it
+    inline at every size put the work straight back. Asserted on the executor actually being
+    used, because "it is fast enough" is not something a test can hold.
+    """
+    import json as _json
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
+
+    async def run(payload: str) -> list[object]:
+        now = int(time.time() * 1000)
+        raw = _json.dumps(
+            {"version": 1, "createdAtMs": now, "expiresAtMs": now + 60_000, "encoding": "utf8", "payload": payload},
+            separators=(",", ":"),
+        ).encode()
+        fake = MagicMock(get=AsyncMock(return_value=raw), setex=AsyncMock(), set=AsyncMock())
+        cache = object.__new__(RedisCache)
+        seen: list[object] = []
+        real = RedisCache._async_lone_surrogate_reason
+
+        async def spy(p: str | bytes) -> str | None:
+            seen.append(p)
+            return await real(p)
+
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", MagicMock()),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(RedisCache, "_async_lone_surrogate_reason", staticmethod(spy)),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            await RedisCache.get(cache, key, AsyncMock(return_value={"v": "fallback"}))
+        return seen
+
+    small = _json.dumps({"v": "x"})
+    assert len(small) < ASYNC_DECODE_THRESHOLD_BYTES
+    assert await run(small) == [], "a small payload must stay inline; a thread hop costs more than the work"
+
+    large = _json.dumps({"v": "x" * (ASYNC_DECODE_THRESHOLD_BYTES * 2)})
+    assert len(large) > ASYNC_DECODE_THRESHOLD_BYTES
+    assert len(await run(large)) == 1, "a large payload must be offloaded, as decode is"

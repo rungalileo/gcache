@@ -550,9 +550,21 @@
       "",
       "The two clients answer this with DIFFERENT mechanisms and must still agree. Python asks",
       "json.loads and re-dumps without ensure_ascii; Go's encoding/json substitutes rather",
-      "than erroring, so it walks the escapes instead. That is what this section is for."
+      "than erroring, so it walks the escapes instead. That is what this section is for.",
+      "",
+      "The last three cases are where the two mechanisms diverged on inputs the first eight did",
+      "not reach, each found by running both implementations over the same strings:",
+      "",
+      "  duplicate keys   json.loads kept only the LAST, so the surrogate left the parsed tree",
+      "                   and Python accepted what Go's escape scan refused. Fixed with",
+      "                   object_pairs_hook=list, which also makes the walk visit keys.",
+      "  NaN              json.loads accepts it by default and Go's json.Valid does not, so the",
+      "                   two disagreed about whether the payload was JSON at all, and therefore",
+      "                   about whether this rule applied. Fixed with parse_constant.",
+      "",
+      "Both needed a writer other than JsonSerializer, which is why nothing else caught them."
     ],
-    "caseCount": 8,
+    "caseCount": 11,
     "cases": [
       {
         "name": "lone-high-escape",
@@ -601,8 +613,70 @@
         "payload": "plain text mentioning \\ud800",
         "expect": "accept",
         "why": "Neither client unescapes a non-JSON payload, so neither can disagree about it."
+      },
+      {
+        "name": "duplicate-key-hides-the-surrogate",
+        "payload": "{\"a\":\"\\ud800\",\"a\":\"ok\"}",
+        "expect": "reject",
+        "why": "A later duplicate must not launder an earlier surrogate out of the payload."
+      },
+      {
+        "name": "non-strict-json-nan",
+        "payload": "{\"a\":NaN,\"b\":\"\\ud800\"}",
+        "expect": "accept",
+        "why": "NaN is not JSON. Both clients must agree this payload is outside the rule, not just both end at a miss."
+      },
+      {
+        "name": "surrogate-in-a-key",
+        "payload": "{\"\\ud800\":\"v\"}",
+        "expect": "reject",
+        "why": "A key diverges exactly as a value does, and a walk over .values() alone misses it."
       }
-    ]
+    ],
+    "nesting": {
+      "$comment": [
+        "Where the two parsers give up, which is not the same depth. Built rather than stored,",
+        "because a 10000-deep payload has no business in this file.",
+        "",
+        "Python's json.loads raises RecursionError near depth 2000; Go's json.Valid scanner runs",
+        "to 10000. An OPEN failure in Python across that band would serve a poisoned payload that",
+        "Go refuses, so Python fails CLOSED there instead and the two agree from 1 to 10000.",
+        "",
+        "Past 10000 they disagree and this records it rather than hiding it: Go's scanner gives up,",
+        "reads the payload as non-JSON and accepts, while Python still refuses. Closing it needs a",
+        "shared depth counter in both clients, and no real cache payload is nested that deep --",
+        "Python's answer is also the safe one, so the failure mode is a miss, not a wrong value."
+      ],
+      "payloadTemplate": "'['*depth + '\"\\\\ud800\"' + ']'*depth",
+      "caseCount": 5,
+      "cases": [
+        {
+          "depth": 100,
+          "expect": "reject",
+          "why": "Both parsers handle it comfortably."
+        },
+        {
+          "depth": 2000,
+          "expect": "reject",
+          "why": "Just past Python's recursion limit: the fail-closed branch, not the parse."
+        },
+        {
+          "depth": 5000,
+          "expect": "reject",
+          "why": "Mid-band. Python fails closed, Go still parses; they agree."
+        },
+        {
+          "depth": 10000,
+          "expect": "reject",
+          "why": "Go's scanner limit, still agreeing."
+        },
+        {
+          "depth": 50000,
+          "expect": "disagree",
+          "why": "Beyond Go's scanner: Go accepts, Python refuses. Recorded, not hidden."
+        }
+      ]
+    }
   },
   "futureCreatedAt": {
     "$comment": [

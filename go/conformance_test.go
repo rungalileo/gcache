@@ -645,3 +645,52 @@ func TestConformanceWatermarkVsEnvelopeBoundsMatchTheCorpus(t *testing.T) {
 		}
 	}
 }
+
+// TestConformanceNestingLimitsMatchTheCorpus is the Go half, and the half that actually
+// pins the disagreement: Python refuses at every depth in the corpus, so only Go can say
+// where it stops refusing.
+func TestConformanceNestingLimitsMatchTheCorpus(t *testing.T) {
+	var corpus struct {
+		PayloadDivergence struct {
+			Nesting struct {
+				CaseCount int `json:"caseCount"`
+				Cases     []struct {
+					Depth  int    `json:"depth"`
+					Expect string `json:"expect"`
+					Why    string `json:"why"`
+				} `json:"cases"`
+			} `json:"nesting"`
+		} `json:"payloadDivergence"`
+	}
+	path := filepath.Join("..", "src", "gcache", "conformance", "envelope_vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("shared conformance vectors unreadable at %s: %v", path, err)
+	}
+	if err := json.Unmarshal(raw, &corpus); err != nil {
+		t.Fatalf("shared conformance vectors are not valid JSON: %v", err)
+	}
+	s := corpus.PayloadDivergence.Nesting
+	if len(s.Cases) != s.CaseCount || s.CaseCount == 0 {
+		t.Fatalf("corpus declares %d nesting cases, found %d", s.CaseCount, len(s.Cases))
+	}
+	for _, c := range s.Cases {
+		body := strings.Repeat("[", c.Depth) + `"\ud800"` + strings.Repeat("]", c.Depth)
+		reason := loneSurrogateReason(body)
+		switch c.Expect {
+		case "reject":
+			if reason == "" {
+				t.Errorf("depth %d: accepted, so the two clients no longer agree here -- %s", c.Depth, c.Why)
+			}
+		case "disagree":
+			// Asserted in the direction the corpus records. If Go starts refusing here the
+			// two now AGREE, which is good news that must not pass silently as a stale note.
+			if reason != "" {
+				t.Errorf("depth %d: Go now refuses, so the recorded disagreement is stale -- "+
+					"update the corpus, this is an improvement -- %s", c.Depth, c.Why)
+			}
+		default:
+			t.Errorf("depth %d: unknown expect %q", c.Depth, c.Expect)
+		}
+	}
+}

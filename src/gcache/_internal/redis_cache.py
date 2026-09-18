@@ -227,6 +227,19 @@ class RedisCache(CacheInterface):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(RedisCache._executor, partial(decode, data, allow_pickle=allow_pickle))
 
+    @staticmethod
+    async def _async_lone_surrogate_reason(payload: str | bytes) -> str | None:
+        """Off the event loop, on the same threshold and for the same reason as _async_decode.
+
+        The check parses the payload's own JSON, so on a large payload it costs about what
+        decode costs -- measured at 1.31x a bare json.loads for one holding an emoji, 0.99ms
+        on 0.58 MB. decode is offloaded above ASYNC_DECODE_THRESHOLD_BYTES precisely so a
+        payload that size does not block the loop; leaving this one inline at every size put
+        the work straight back.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(RedisCache._executor, partial(lone_surrogate_reason, payload))
+
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         _GLOBAL_GCACHE_STATE.logger.debug("Calling Redis Cache")
 
@@ -406,8 +419,18 @@ class RedisCache(CacheInterface):
             # The consequence is a permanent miss for a poisoned key rather than a silent
             # disagreement -- the read degrades to the fallback, and re-writing the same value
             # is refused by the write guard. That is the intended trade.
-            if isinstance(payload, str):
-                divergence = lone_surrogate_reason(payload)
+            # is_json, NOT the Python type. `decode` returns the UNPICKLED object for a
+            # pickle entry, so `isinstance(payload, str)` refused a cached string under the
+            # DEFAULT envelope -- written happily, then refused on every read, and on the one
+            # framing Go cannot read at all, so there was never a divergence to prevent. It
+            # also missed a bytes payload, which Go checks after base64-decoding. is_json is
+            # true for JSON and PROTO and false for pickle, which is exactly the set.
+            if deserialized_value.is_json:
+                divergence = (
+                    lone_surrogate_reason(payload)
+                    if len(raw) < ASYNC_DECODE_THRESHOLD_BYTES
+                    else await RedisCache._async_lone_surrogate_reason(payload)
+                )
                 if divergence is not None:
                     _GLOBAL_GCACHE_STATE.logger.warning(
                         "Cache payload for %s contains %s, which this client and Go decode "

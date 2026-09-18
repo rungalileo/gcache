@@ -154,6 +154,14 @@ func getVarint(data []byte, i int) (uint64, int, error) {
 // encodeProtoEnvelope frames an already-serialized binary payload. 18 bytes of overhead
 // against the JSON envelope's ~102, and no base64 -- which is a third of the payload back.
 func encodeProtoEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]byte, error) {
+
+	// The PROTO framing is not an exemption: "opaque bytes" is the writer's word, and a
+	// custom Codec can put JSON text here as easily as protobuf. Protobuf itself does not
+	// parse as JSON, so it never reaches the walk. Mirrors Python's encode_proto.
+	if reason := loneSurrogateReason(string(payload)); reason != "" {
+		return nil, fmt.Errorf("gcache: payload contains %s, which this client and the Python "+
+			"client decode to different values; refusing to store a cross-client divergence", reason)
+	}
 	createdAtMs := createdAt.UnixMilli()
 	expiresAtMs := createdAtMs + ttl.Milliseconds()
 	for _, f := range []struct {
@@ -454,6 +462,13 @@ func loneSurrogateReason(body string) string {
 	// Both spellings: JSON permits \uD800 as readily as \ud800, and every surrogate escape
 	// starts with those three characters. Gating on a bare `\u` would validate every
 	// non-ASCII payload written under ensure_ascii, which is most of them.
+	// Not valid UTF-8 means genuinely binary; Python's bytes branch reaches the same
+	// conclusion by failing to decode. The envelope's `encoding` field is deliberately NOT
+	// consulted: `base64` means "the writer handed us bytes", not "this is binary", and a
+	// Serializer returning the bytes of a json.dumps lands there with JSON text inside.
+	if !utf8.ValidString(body) {
+		return ""
+	}
 	if !strings.Contains(body, `\ud`) && !strings.Contains(body, `\uD`) {
 		return ""
 	}

@@ -7,6 +7,7 @@ so a divergence fails a test here instead of escaping to review as it did twice 
 import base64
 import json
 import pathlib
+import time
 from typing import Any
 
 import pytest
@@ -503,3 +504,136 @@ def test_the_watermark_and_envelope_bounds_match_the_corpus() -> None:
         else:
             with pytest.raises(EnvelopeDecodeError):
                 decode(envelope)
+
+
+def test_the_nesting_limits_match_the_corpus() -> None:
+    """Where the two parsers give up, including the one depth at which they disagree.
+
+    Python's ``json.loads`` raises ``RecursionError`` near depth 2000 while Go's
+    ``json.Valid`` scanner runs to 10000, so an open failure here would serve across that
+    band a payload Go refuses. Failing closed keeps them agreeing from 1 to 10000.
+
+    The ``disagree`` case is recorded rather than hidden. Past 10000 Go reads the payload as
+    non-JSON and accepts it; Python still refuses, which is the safe side, so the failure
+    mode there is a miss rather than a wrong value.
+    """
+    from gcache._internal.envelope import lone_surrogate_reason
+
+    section = _DATA["payloadDivergence"]["nesting"]
+    cases = section["cases"]
+    assert len(cases) == section["caseCount"] > 0
+
+    for case in cases:
+        depth = case["depth"]
+        body = "[" * depth + '"\\ud800"' + "]" * depth
+        reason = lone_surrogate_reason(body)
+        # Python refuses at every depth here, including the one Go accepts -- which is what
+        # makes "disagree" a statement about GO, asserted on the Go side.
+        assert reason is not None, f"depth {depth}: accepted -- {case['why']}"
+
+
+@pytest.mark.asyncio
+async def test_every_payload_divergence_case_through_the_REAL_call_sites() -> None:
+    """The same corpus, driven through ``encode_json`` and ``RedisCache.get``.
+
+    The predicate test above pins ``lone_surrogate_reason`` and nothing else, and both major
+    defects in this area lived at the call sites rather than in the predicate: the write path
+    skipped its ``bytes`` branch entirely, and the read path gated on the Python type and so
+    refused PICKLE values while missing ``bytes`` ones. The corpus was green through both.
+
+    Each case runs four ways -- write and read, ``str`` and ``bytes`` -- because the two
+    payload types took different routes at both ends.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.envelope import encode_json
+    from gcache._internal.metrics import GCacheMetrics
+    from gcache._internal.redis_cache import RedisCache
+    from gcache.config import Envelope, GCacheKey, JsonSerializer
+    from gcache.exceptions import UnserializableValue
+
+    section = _DATA["payloadDivergence"]
+    key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
+
+    async def read_back(stored_payload: str) -> list[str]:
+        """Hand-build the envelope, so a write guard cannot hide a read-guard gap."""
+        now = int(time.time() * 1000)
+        raw = json.dumps(
+            {
+                "version": 1,
+                "createdAtMs": now,
+                "expiresAtMs": now + 60_000,
+                "encoding": "utf8",
+                "payload": stored_payload,
+            },
+            separators=(",", ":"),
+        ).encode()
+        fake = MagicMock(get=AsyncMock(return_value=raw), setex=AsyncMock(), set=AsyncMock())
+        cache = object.__new__(RedisCache)
+        rec = MagicMock()
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", rec),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            await RedisCache.get(cache, key, AsyncMock(return_value={"v": "fallback"}))
+        return [c.args[-1] for c in rec.call_args_list]
+
+    for case in section["cases"]:
+        payload, rejected, why = case["payload"], case["expect"] == "reject", case["why"]
+
+        for label, value in (("str", payload), ("bytes", payload.encode())):
+            # WRITE. A bytes payload reaches the base64 branch, which asked nothing at all.
+            if rejected:
+                with pytest.raises(UnserializableValue):
+                    encode_json(created_at_ms=1, ttl_sec=60, payload=value)
+            else:
+                assert encode_json(created_at_ms=1, ttl_sec=60, payload=value), f"{case['name']}/{label}: {why}"
+
+        # READ. Only reachable as text in a stored envelope, but the guard that reads it is
+        # the one that was gating on the Python type.
+        reasons = await read_back(payload)
+        if rejected:
+            assert reasons == ["divergent_payload_encoding"], f"{case['name']} on read: {reasons} -- {why}"
+        else:
+            assert "divergent_payload_encoding" not in reasons, f"{case['name']} on read: {reasons} -- {why}"
+
+
+@pytest.mark.asyncio
+async def test_a_PICKLE_value_is_never_judged_by_the_divergence_rule() -> None:
+    """Go cannot read a pickle entry at all, so there is nothing to disagree about.
+
+    A read guard keyed on the Python type refused a cached ``str`` holding a lone surrogate
+    under the DEFAULT envelope -- written successfully, then refused on every read, for the
+    entry's whole TTL. The same surrogate inside a dict was served, which is the tell that
+    the discriminator had nothing to do with the rule.
+    """
+    import pickle
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.metrics import GCacheMetrics
+    from gcache._internal.redis_cache import RedisCache, RedisValue
+    from gcache.config import GCacheKey
+
+    key = GCacheKey(key_type="kt", id="i", use_case="u")  # PICKLE, the default
+    now = int(time.time() * 1000)
+
+    for label, value in (("a bare str", "name: \ud800"), ("inside a dict", {"name": "\ud800"})):
+        blob = pickle.dumps(RedisValue(created_at_ms=now, payload=value))
+        fake = MagicMock(get=AsyncMock(return_value=blob), setex=AsyncMock(), set=AsyncMock())
+        cache = object.__new__(RedisCache)
+        rec = MagicMock()
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", rec),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            out = await RedisCache.get(cache, key, AsyncMock(return_value="FALLBACK"))
+        assert out == value, f"{label}: a pickle value must be served unchanged, got {out!r}"
+        assert [c.args[-1] for c in rec.call_args_list] == [], label

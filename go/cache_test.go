@@ -2,6 +2,7 @@ package gcache
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1226,4 +1227,125 @@ func TestADivergentPayloadIsRefusedOnWriteAndOnRead(t *testing.T) {
 			t.Errorf("recorded %v, want [distrusted]", rec.results)
 		}
 	})
+}
+
+// A payload is judged by its CONTENT, not by how the envelope transported it.
+//
+// Two wrong discriminators were tried and each broke one direction. Python used the Python
+// TYPE, which caught pickle values. Go used the envelope's `encoding` field, which exempted
+// base64 -- but base64 means "the writer handed us bytes", and a Serializer returning the
+// bytes of a json.dumps lands there with JSON text inside, which is precisely the payload
+// the two clients decode differently. What decides it is whether the bytes parse as strict
+// JSON, and that gate keeps real binary out on its own.
+func TestAPayloadIsJudgedByItsContentNotItsTransport(t *testing.T) {
+	envelopeAround := func(t *testing.T, encoding string, payload string) []byte {
+		t.Helper()
+		return []byte(fmt.Sprintf(
+			`{"version":1,"createdAtMs":%d,"expiresAtMs":%d,"encoding":%q,"payload":%q}`,
+			time.Now().UnixMilli(), time.Now().Add(time.Hour).UnixMilli(), encoding, payload))
+	}
+
+	t.Run("base64 carrying poisoned JSON is refused", func(t *testing.T) {
+		// The reproduction: Python's JsonSerializer-alike returning bytes. Both clients must
+		// refuse, or one writes what the other will not read.
+		raw := envelopeAround(t, "base64", base64.StdEncoding.EncodeToString([]byte(`{"a":"\ud800"}`)))
+		payload, _, _, err := decodeEnvelope(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reason := loneSurrogateReason(string(payload)); reason == "" {
+			t.Error("a base64 payload carrying a lone surrogate escape must be refused")
+		}
+	})
+
+	t.Run("real binary is left alone", func(t *testing.T) {
+		// Protobuf does not parse as JSON, so the strict-JSON gate excludes it without any
+		// need to consult the framing. Bytes that merely CONTAIN the characters \ud800 are
+		// the interesting case, since they pass the substring gate.
+		binary := append([]byte{0x08, 0x96, 0x01, 0xff, 0xfe}, []byte(`\ud800`)...)
+		env, err := encodeProtoEnvelope(time.Now(), time.Hour, binary)
+		if err != nil {
+			t.Fatalf("real binary must still write: %v", err)
+		}
+		payload, _, _, err := decodeEnvelope(env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reason := loneSurrogateReason(string(payload)); reason != "" {
+			t.Errorf("real binary was refused as %q", reason)
+		}
+	})
+
+	t.Run("and Get serves it end to end", func(t *testing.T) {
+		client := newFakeClient()
+		rec := &recordingRecorder{}
+		cache, err := New(Options[[]byte]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
+			Recorder: rec, Codec: rawBytesCodec{},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		binary := append([]byte{0x08, 0x96, 0x01, 0xff, 0xfe}, []byte(`\ud800`)...)
+		key := Key{KeyType: "session_id", ID: "binary", UseCase: "test::binary"}
+		env, err := encodeProtoEnvelope(time.Now(), time.Hour, binary)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.data[ValueKey(testPrefix, key)] = env
+		got, ok := cache.Get(context.Background(), key)
+		if !ok {
+			t.Fatalf("real binary was refused; recorded %v", rec.results)
+		}
+		if string(got) != string(binary) {
+			t.Errorf("got %q, want %q", got, binary)
+		}
+	})
+}
+
+// rawBytesCodec hands the payload through untouched, which is what a binary codec does.
+type rawBytesCodec struct{}
+
+func (rawBytesCodec) Marshal(v []byte) ([]byte, error) { return v, nil }
+func (rawBytesCodec) Unmarshal(b []byte, v *[]byte) error {
+	*v = append([]byte(nil), b...)
+	return nil
+}
+
+// A corrupt watermark is reported even when there is no value to serve.
+//
+// Python parses the watermark the moment the MGET unpacks, so it records unreadable_watermark
+// regardless; Go read it after the value checks and so stayed silent on exactly the reads
+// where nothing else would mention it. A corrupt watermark is the one corruption a rewrite
+// cannot repair.
+func TestACorruptWatermarkIsReportedWithNoValuePresent(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value []byte
+	}{
+		{"value absent", nil},
+		{"value undecodable", []byte("not an envelope at all")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := newFakeClient()
+			rec := &recordingRecorder{}
+			cache, err := New(Options[sessionIdentity]{
+				Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			key := Key{KeyType: "session_id", ID: "wm", UseCase: "test::wm", Tracked: true}
+			if tc.value != nil {
+				client.data[ValueKey(testPrefix, key)] = tc.value
+			}
+			client.data[WatermarkKey(testPrefix, "session_id", "wm")] = []byte("abc")
+			if _, ok := cache.Get(context.Background(), key); ok {
+				t.Fatal("Get served something")
+			}
+			if len(rec.errs) != 1 {
+				t.Errorf("recorded %d errors, want 1 (the corrupt watermark): %v", len(rec.errs), rec.errs)
+			}
+		})
+	}
 }

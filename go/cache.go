@@ -269,6 +269,28 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		c.fail(callerCtx, key.UseCase, "get", fmt.Errorf("MGet returned %d values for %d keys", len(vals), len(keys)))
 		return zero, false
 	}
+	// PARSE the watermark FIRST, before the value is even looked at, and COMPARE it last.
+	// Python parses it the moment the MGET unpacks, so it reports a corrupt watermark whether
+	// or not there is a value to serve; Go read it late and so stayed silent about one on
+	// exactly the reads where nothing else would mention it -- an absent value, or an
+	// undecodable one. A corrupt watermark is the one corruption a rewrite cannot repair, so
+	// going unrecorded is the worst place for it.
+	//
+	// Failing closed on it, rather than treating unreadable as "no watermark", which would
+	// serve an entry someone tried to invalidate. Python fails closed by substituting a
+	// suppress-everything sentinel and carrying on; the effect for the caller is the same
+	// here, and one Result per read is the Go model.
+	var watermarkMs int64
+	haveWatermark := false
+	if key.Tracked && vals[1] != nil {
+		parsed, err := parseWatermark(vals[1])
+		if err != nil {
+			c.fail(callerCtx, key.UseCase, "watermark", err)
+			return zero, false
+		}
+		watermarkMs, haveWatermark = parsed, true
+	}
+
 	if vals[0] == nil {
 		c.record(key.UseCase, ResultMiss)
 		return zero, false
@@ -297,17 +319,6 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 	// serve an entry someone tried to invalidate. Python fails closed by substituting a
 	// suppress-everything sentinel and carrying on; the effect for the caller is the same
 	// here, and one Result per read is the Go model.
-	var watermarkMs int64
-	haveWatermark := false
-	if key.Tracked && vals[1] != nil {
-		parsed, err := parseWatermark(vals[1])
-		if err != nil {
-			c.fail(callerCtx, key.UseCase, "watermark", err)
-			return zero, false
-		}
-		watermarkMs, haveWatermark = parsed, true
-	}
-
 	// ENVELOPE INTEGRITY FIRST, then expiry, then the watermark -- the order Python uses, and
 	// it decides which outcome a reader sees when several conditions hold at once. These two
 	// guards used to sit below both, so a reversed envelope that had also expired was
@@ -371,6 +382,12 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 	// Before the codec, not after: the question is about the stored TEXT, and Unmarshal has
 	// already substituted U+FFFD by the time it returns. Distrusted rather than a decode
 	// failure -- the entry is well-formed, it just cannot be agreed upon.
+	// Every framing Go can read, which is JSON and PROTO -- pickle already returned above,
+	// and pickle is the one framing no other client reads, so nothing can disagree about it.
+	// Deliberately NOT gated on the envelope's `encoding`: that says how the payload was
+	// TRANSPORTED, not what it is, and a Serializer returning the bytes of a json.dumps
+	// arrives base64-encoded with JSON text inside. The strict-JSON gate inside
+	// loneSurrogateReason is what keeps protobuf and other binary out.
 	if reason := loneSurrogateReason(string(payload)); reason != "" {
 		c.record(key.UseCase, ResultDistrusted)
 		return zero, false

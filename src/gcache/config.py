@@ -1,6 +1,5 @@
 import hashlib
 import json
-import re
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
@@ -15,7 +14,6 @@ from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.exceptions import (
     EnvelopeRequiresSerializer,
     UnhashableKeyComponent,
-    UnserializableValue,
     UseCaseNameIsReserved,
 )
 
@@ -27,7 +25,6 @@ Fallback = Callable[[], Awaitable[Any]]
 # Matches the six-character JSON escape for a surrogate code point, which is what
 # json.dumps emits for one under ensure_ascii. Checked on the ENCODED text rather than the
 # input object, so it catches a surrogate at any depth without walking the structure.
-_LONE_SURROGATE = re.compile(r"\\ud[89ab][0-9a-f]{2}", re.IGNORECASE)
 
 
 class CacheLayer(Enum):
@@ -207,26 +204,10 @@ class JsonSerializer(Serializer):
         # write would succeed and the entry would be
         # unreadable from every non-Python client until its TTL ran out. Failing the write
         # is the rule the rest of this envelope follows.
-        payload = json.dumps(obj, separators=(",", ":"), allow_nan=False)
-        # A lone surrogate survives json.dumps as the ASCII escape \ud800 (ensure_ascii is on
-        # by default), so the stored envelope is valid ASCII and nothing downstream objects --
-        # but the two clients then decode the same bytes to DIFFERENT values. Python returns a
-        # str holding U+D800; Go's encoding/json substitutes U+FFFD and returns ef bf bd. Both
-        # report a hit, nothing raises, nothing logs, and no metric moves.
-        #
-        # go/envelope.go's utf8.Valid gate cannot catch it, because the stored bytes are
-        # already valid ASCII -- the surrogate only reappears after the JSON unescape.
-        #
-        # Fail the write, exactly as allow_nan=False above does for the same class of value:
-        # encodable by Python, not representable for the other client. hash_component already
-        # refuses this input for the same reason, via UnhashableKeyComponent.
-        try:
-            payload.encode("utf-8").decode("utf-8")
-        except UnicodeDecodeError:  # pragma: no cover - defensive; the encode below is the real gate
-            raise UnserializableValue(payload) from None
-        if _LONE_SURROGATE.search(payload):
-            raise UnserializableValue(payload)
-        return payload
+        # The lone-surrogate rule lives at the framing boundary (envelope.encode_json), not
+        # here: every serializer's output passes through it, so a CUSTOM serializer bypassed
+        # a check that lived in this one.
+        return json.dumps(obj, separators=(",", ":"), allow_nan=False)
 
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, bytes):

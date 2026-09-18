@@ -223,9 +223,14 @@ class UnserializableValue(GCacheError, ValueError):
     hash_component refuses a lone surrogate in a key via UnhashableKeyComponent.
     """
 
-    def __init__(self, payload: str) -> None:
+    def __init__(self, reason: str) -> None:
+        # DIAGNOSTIC ONLY -- never the value. This used to append the first 120 characters of
+        # the serialized payload, which is cached application data: tokens, PII, whatever the
+        # caller put in the cache. CacheController catches a failed Redis write and logs
+        # str(e) at error level, so every rejected value was copied into the logs.
         super().__init__(
-            "gcache: value contains a lone surrogate, which this client and the Go client "
-            "decode to different values (U+D800 vs U+FFFD). Refusing the write rather than "
-            f"storing a cross-client divergence: {payload[:120]}"
+            f"gcache: value contains {reason}, which this client and the Go client decode to "
+            "different values (Python keeps the surrogate, Go substitutes U+FFFD). Refusing "
+            "the write rather than storing a cross-client divergence. The value is not "
+            "included here: it is cached application data and this message reaches the logs."
         )

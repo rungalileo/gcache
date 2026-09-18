@@ -47,6 +47,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from gcache.exceptions import UnserializableValue
+
 ENVELOPE_VERSION = 1
 
 # Exactly the six ASCII bytes Go's normalizeBase64 strips. Not \s, which on a str pattern
@@ -273,6 +275,49 @@ def _decode_proto(data: bytes) -> DecodedValue:
     return DecodedValue(created_at_ms=created_at_ms, payload=payload, is_json=True, expires_at_ms=expires_at_ms)
 
 
+# An UNPAIRED surrogate escape -- which is not the same thing as "any surrogate escape".
+#
+# json.dumps with ensure_ascii writes every non-BMP character as a surrogate PAIR: U+1F600
+# becomes \ud83d\ude00. So a pattern matching surrogates in general rejects every emoji and
+# most non-BMP text. Two earlier versions of this guard did exactly that -- first matching
+# [89ab] (the high half of every pair) and then [89a-f] (both halves) -- and no test noticed,
+# because none of them used an emoji. Valid pairs must pass; only an unpaired half is the
+# cross-client hazard.
+#
+# Two alternatives: a HIGH (D800-DBFF) not followed by a LOW, or a LOW (DC00-DFFF) not
+# preceded by a HIGH. Both escape forms are exactly six characters, so the lookbehind is
+# fixed-width and legal.
+_SURROGATE_HI = r"\\ud[89ab][0-9a-f]{2}"
+_SURROGATE_LO = r"\\ud[c-f][0-9a-f]{2}"
+_LONE_SURROGATE_ESCAPE = re.compile(
+    rf"(?:{_SURROGATE_HI}(?!{_SURROGATE_LO}))|(?:(?<!{_SURROGATE_HI}){_SURROGATE_LO})",
+    re.IGNORECASE,
+)
+
+
+def _reject_lone_surrogate(body: str) -> None:
+    """Refuse a payload the two clients would decode differently.
+
+    HERE, at the framing boundary, not in JsonSerializer: every serializer's output passes
+    through encode_json, so a CUSTOM serializer bypassed a check that lived in the default
+    one. That was the gap -- the rule is a property of the envelope, not of one serializer.
+
+    A lone surrogate survives json.dumps as the ASCII escape \\ud800 (ensure_ascii is on),
+    so the stored envelope is valid ASCII and go/envelope.go's utf8.Valid gate cannot see it
+    -- the surrogate only reappears after the JSON unescape. Python then returns a str
+    holding U+D800 while Go's encoding/json substitutes U+FFFD. Both report a hit, nothing
+    raises, nothing logs, no metric moves.
+    """
+    if _LONE_SURROGATE_ESCAPE.search(body):
+        raise UnserializableValue("a lone surrogate escape")
+    try:
+        body.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        # A literal lone surrogate in a str payload, rather than its JSON escape: a custom
+        # serializer returning text can produce this without going through json.dumps.
+        raise UnserializableValue("an unencodable code point") from exc
+
+
 def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes:
     """Frame ``payload`` in the cross-language JSON envelope.
 
@@ -286,6 +331,7 @@ def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes
     else:
         encoding = "utf8"
         body = payload
+        _reject_lone_surrogate(body)
 
     # The writer honours the reader's bound, or a large ttl_sec pushes expiresAtMs past
     # 2^53 and every subsequent read rejects it -- rewritten and rejected forever.

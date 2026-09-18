@@ -18,7 +18,7 @@ from gcache._internal.envelope import (
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.redis_cache import RedisValue
 from gcache.config import GCacheKey
-from gcache.exceptions import JsonEnvelopeRequiresSerializer
+from gcache.exceptions import JsonEnvelopeRequiresSerializer, UnserializableValue
 from tests.conftest import FakeCacheConfigProvider
 
 
@@ -1839,3 +1839,44 @@ class TestProtoNegativeTimestamps:
         dv = decode(self._frame(1_700_000_000_000, 1_700_000_060_000), allow_pickle=False)
         assert dv.created_at_ms == 1_700_000_000_000
         assert dv.expires_at_ms == 1_700_000_060_000
+
+
+class TestLoneSurrogateAtTheFramingBoundary:
+    """Both surrogate ranges, and at encode_json rather than in one serializer.
+
+    The first version of this guard matched [89ab] only -- the HIGH range, D800-DBFF -- so a
+    lone LOW surrogate (DC00-DFFF) passed straight through: half the class, silently. It also
+    lived in JsonSerializer.dump, so any CUSTOM serializer bypassed it entirely. The rule is
+    a property of the envelope, so it belongs where every serializer's output converges.
+    """
+
+    @pytest.mark.parametrize(
+        ("cp", "half"),
+        [(0xD800, "high-min"), (0xDBFF, "high-max"), (0xDC00, "low-min"), (0xDFFF, "low-max")],
+    )
+    def test_every_lone_surrogate_is_refused(self, cp: int, half: str) -> None:
+        body = json.dumps({"v": chr(cp)})
+        with pytest.raises(UnserializableValue):
+            encode_json(created_at_ms=1, ttl_sec=60, payload=body)
+
+    def test_a_custom_serializer_cannot_bypass_it(self) -> None:
+        # The payload never goes near JsonSerializer -- this is the route the old placement
+        # left open.
+        with pytest.raises(UnserializableValue):
+            encode_json(created_at_ms=1, ttl_sec=60, payload='{"v":"\\ud800"}')
+
+    def test_a_valid_surrogate_PAIR_is_fine(self) -> None:
+        # An emoji is an encodable pair, not a lone surrogate. Rejecting it would break
+        # ordinary payloads, so the guard must distinguish them.
+        body = json.dumps({"v": "\U0001f600"})
+        assert encode_json(created_at_ms=1, ttl_sec=60, payload=body)
+
+    def test_the_error_does_not_carry_the_value(self) -> None:
+        # The message reaches the logs via CacheController, and the payload is cached
+        # application data -- tokens, PII, whatever the caller stored.
+        try:
+            encode_json(created_at_ms=1, ttl_sec=60, payload=json.dumps({"secret": "hunter2\ud800"}))
+        except UnserializableValue as exc:
+            assert "hunter2" not in str(exc), f"the cached value leaked into the error: {exc}"
+        else:
+            pytest.fail("expected UnserializableValue")

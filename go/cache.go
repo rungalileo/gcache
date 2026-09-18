@@ -10,9 +10,13 @@ import (
 	"time"
 )
 
-// watermarkTTL is how long an invalidation watermark lives. It is 4h because that is what
-// Python's gcache hardcodes (WATERMARK_TTL_SECONDS); both languages write into the same key
-// space and must agree.
+// watermarkTTL is how long an invalidation watermark lives. 5h, matching Python's
+// WATERMARK_TTL_SECONDS: both languages write into the same key space and must agree, and
+// the shared conformance corpus pins this number and the two caps below in both.
+//
+// This comment said 4h for a while after the constant became 5h, in the one file whose whole
+// premise is that the two clients agree on it -- which is why the corpus pin exists now
+// rather than a comment asserting the agreement.
 const watermarkTTL = 5 * time.Hour
 
 // The resurrection invariant is `futureBuffer + entryTTL <= watermarkTTL`: a watermark must
@@ -305,7 +309,13 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		}
 	}
 
-	if key.Tracked && float64(expiresAtMs)-float64(createdAtMs) > float64(watermarkTTL.Milliseconds()) {
+	// maxEntryTTL, NOT watermarkTTL. Raising the watermark to 5h while the write cap stayed
+	// at 4h opened an hour-wide band: an entry declaring a 4h30m lifetime passed this guard
+	// even though New refuses to build a cache that could write one. The correct threshold is
+	// watermarkTTL - maxFutureBuffer, which IS maxEntryTTL -- an entry created at C can be
+	// suppressed by a watermark written as early as C-B, and that watermark dies at C+(W-B),
+	// so past that age no watermark can still vouch for it.
+	if key.Tracked && float64(expiresAtMs)-float64(createdAtMs) > float64(maxEntryTTL.Milliseconds()) {
 		c.record(key.UseCase, ResultDistrusted)
 		return zero, false
 	}

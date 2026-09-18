@@ -342,3 +342,26 @@ def test_the_proto_envelope_rejects_what_go_rejects(case: dict) -> None:
 
     with pytest.raises(EnvelopeDecodeError):
         decode(base64.b64decode(case["envelopeBase64"]), allow_pickle=False)
+
+
+def test_the_watermark_timing_constants_match_the_corpus() -> None:
+    """The three numbers the resurrection invariant rests on, pinned across both languages.
+
+    Each language declares them by hand -- constants.py and go/cache.go -- and nothing
+    compared them. Proven by mutation: setting WATERMARK_TTL_SECONDS to 6h left the whole
+    Python suite green, because every other test is written relative to the constants and so
+    holds for any pair of numbers. A comment claimed the corpus pinned them; it did not.
+    """
+    from gcache._internal.constants import (
+        MAX_FUTURE_BUFFER_SECONDS,
+        MAX_TRACKED_TTL_SECONDS,
+        WATERMARK_TTL_SECONDS,
+    )
+
+    timing = _DATA["watermarkTiming"]
+    assert WATERMARK_TTL_SECONDS == timing["watermarkTtlSeconds"]
+    assert MAX_TRACKED_TTL_SECONDS == timing["maxTrackedTtlSeconds"]
+    assert MAX_FUTURE_BUFFER_SECONDS == timing["maxFutureBufferSeconds"]
+    # And the invariant itself, on the corpus's own numbers rather than the imports, so a
+    # corpus edit that breaks it fails here too.
+    assert timing["maxTrackedTtlSeconds"] + timing["maxFutureBufferSeconds"] <= timing["watermarkTtlSeconds"]

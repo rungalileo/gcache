@@ -176,7 +176,9 @@ Do not wire the Go module into python-semantic-release. It emits bare `v{version
 - GCache is singleton - second instantiation raises `GCacheAlreadyInstantiated`
 - "watermark" is reserved use_case name - rejected by both `@cached` and `GCacheKey`
 - Local cache cannot be invalidated across instances (TTL-only)
-- `WATERMARK_TTL_SECONDS` (4 hours) must exceed your longest cache TTL for invalidation to work
+- `WATERMARK_TTL_SECONDS` (5 hours) must exceed any entry it can suppress. It is not a number to
+  tune alone: it equals `MAX_TRACKED_TTL_SECONDS` (4h) plus `MAX_FUTURE_BUFFER_SECONDS` (1h), and the
+  shared corpus pins all three in both languages
 - uvloop is optional - falls back to asyncio on Windows/PyPy
 
 ## Dependencies

@@ -438,3 +438,42 @@ func TestConformanceEveryTestInThisFileCarriesThePrefix(t *testing.T) {
 			"does not run them: %v -- rename them with the TestConformance prefix", stray)
 	}
 }
+
+// TestConformanceWatermarkTimingMatchesTheCorpus is the Go half of the pin.
+//
+// watermarkTTL, maxEntryTTL and maxFutureBuffer are declared by hand here and again in
+// Python's constants.py, and nothing compared them. The whole safety argument for the
+// resurrection invariant rests on the two agreeing: Python writing a 6h watermark while Go
+// assumes 5h breaks it in both directions, and every other test in both suites is written
+// RELATIVE to the constants, so all of them hold for any pair of numbers.
+func TestConformanceWatermarkTimingMatchesTheCorpus(t *testing.T) {
+	var corpus struct {
+		WatermarkTiming struct {
+			WatermarkTTLSeconds    int `json:"watermarkTtlSeconds"`
+			MaxTrackedTTLSeconds   int `json:"maxTrackedTtlSeconds"`
+			MaxFutureBufferSeconds int `json:"maxFutureBufferSeconds"`
+		} `json:"watermarkTiming"`
+	}
+	path := filepath.Join("..", "src", "gcache", "conformance", "envelope_vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("shared conformance vectors unreadable at %s: %v", path, err)
+	}
+	if err := json.Unmarshal(raw, &corpus); err != nil {
+		t.Fatalf("shared conformance vectors are not valid JSON: %v", err)
+	}
+	w := corpus.WatermarkTiming
+	if got := int(watermarkTTL.Seconds()); got != w.WatermarkTTLSeconds {
+		t.Errorf("watermarkTTL = %ds, corpus says %ds", got, w.WatermarkTTLSeconds)
+	}
+	if got := int(maxEntryTTL.Seconds()); got != w.MaxTrackedTTLSeconds {
+		t.Errorf("maxEntryTTL = %ds, corpus says %ds", got, w.MaxTrackedTTLSeconds)
+	}
+	if got := int(maxFutureBuffer.Seconds()); got != w.MaxFutureBufferSeconds {
+		t.Errorf("maxFutureBuffer = %ds, corpus says %ds", got, w.MaxFutureBufferSeconds)
+	}
+	if w.MaxTrackedTTLSeconds+w.MaxFutureBufferSeconds > w.WatermarkTTLSeconds {
+		t.Errorf("the corpus itself breaks the invariant: %d + %d > %d",
+			w.MaxTrackedTTLSeconds, w.MaxFutureBufferSeconds, w.WatermarkTTLSeconds)
+	}
+}

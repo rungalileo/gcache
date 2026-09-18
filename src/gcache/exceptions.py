@@ -174,7 +174,8 @@ class TrackedTTLExceedsWatermark(GCacheError, ValueError):
     """Raised when a tracked key's TTL would outlive the watermark that invalidates it.
 
     Invalidation works by writing a watermark that marks every older entry stale. The
-    watermark lives ``WATERMARK_TTL_SECONDS`` (4 hours). If the entry outlives it, the
+    watermark lives ``WATERMARK_TTL_SECONDS`` (5 hours), while a tracked entry is capped at
+    ``MAX_TRACKED_TTL_SECONDS`` (4 hours). If the entry outlives its watermark, the
     watermark expires, the entry stops looking stale, and an invalidated value RESURRECTS --
     silently, and for the rest of its own TTL.
 

@@ -159,10 +159,10 @@ This enables:
 - **Gradual rollout** — Start at 10%, monitor metrics, increase to 100%
 - **Per-use-case tuning** — Different TTLs and ramp percentages for different use cases
 
-### ⚠️ Breaking: a tracked key's TTL is now capped at 4 hours
+### ⚠️ Breaking: a tracked key's TTL is capped at 4 hours, and `future_buffer_ms` at 1 hour
 
 If a use case sets `invalidation_tracking=True` **and** a remote `ttl_sec` above
-`WATERMARK_TTL_SECONDS` (4 hours), writes now raise `TrackedTTLExceedsWatermark` (also a
+`MAX_TRACKED_TTL_SECONDS` (4 hours), writes now raise `TrackedTTLExceedsWatermark` (also a
 `ValueError`). This was previously accepted, and `GCacheKeyConfig` still types `ttl_sec` as a
 plain `int` — the bound is a property of invalidation, not of the type.
 
@@ -181,15 +181,15 @@ hides the misconfiguration from the read guards below, so it would surface nowhe
 **Reads are guarded too, in two ways**, because a write cap only binds entries this process
 writes and the keyspace is shared:
 
-- a tracked JSON entry whose envelope *declares* a lifetime over 4 hours is a miss
+- a tracked JSON entry whose envelope *declares* a lifetime over 4 hours (`MAX_TRACKED_TTL_SECONDS`) is a miss
   (`gcache_miss_counter{reason="lifetime_exceeds_watermark"}`)
-- a tracked entry of **either** framing that is *older* than 4 hours is a miss
+- a tracked entry of **either** framing that is *older* than 4 hours (`MAX_TRACKED_TTL_SECONDS`) is a miss
   (`reason="age_exceeds_watermark"`). This is the one that covers legacy pickle entries,
   which carry no `expiresAtMs` for the first check to read. An entry can only reach that age
   if its TTL exceeded 4 hours, so a correctly configured key never triggers it.
 
 **The invariant behind all of this:** invalidation marks entries stale by writing a watermark
-that lives 4 hours. An entry outliving its watermark stops looking stale the moment the
+that lives 5 hours (`WATERMARK_TTL_SECONDS`). An entry outliving its watermark stops looking stale the moment the
 watermark expires, and an invalidated value **resurrects** for the rest of its own TTL —
 silently. Go has enforced both halves from the start (`maxEntryTTL` on write,
 `ResultDistrusted` on read); Python previously enforced neither, so the two clients disagreed
@@ -633,6 +633,19 @@ await gcache.ainvalidate(
     future_buffer_ms=5000,  # Also invalidate anything cached in the next 5 seconds
 )
 ```
+
+**The buffer is capped at one hour** (`MAX_FUTURE_BUFFER_SECONDS`); a larger value raises
+`ValueError`, as does a negative one or anything that is not an `int` of milliseconds.
+
+The ceiling is not arbitrary — it pairs with the 4-hour tracked-TTL cap so that
+`buffer + ttl` always fits inside the 5-hour watermark lifetime. A watermark has to outlive
+every entry it suppresses; if it expires first, an entry written inside the buffer window
+becomes readable again. Splitting the sum into two caps means each is enforced locally
+against a value its own caller owns — the write path checks the TTL, `invalidate` checks the
+buffer — so neither needs to know the other's number at call time.
+
+Seconds is the intended scale here: the buffer covers replication lag, not a maintenance
+window.
 
 ### A watermark outlives the kill switch
 

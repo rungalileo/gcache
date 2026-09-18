@@ -297,7 +297,7 @@ class RedisCache(CacheInterface):
                 key.invalidation_tracking
                 and deserialized_value.expires_at_ms is not None
                 and deserialized_value.created_at_ms is not None
-                and deserialized_value.expires_at_ms - deserialized_value.created_at_ms > WATERMARK_TTL_SECONDS * 1000
+                and deserialized_value.expires_at_ms - deserialized_value.created_at_ms > MAX_TRACKED_TTL_SECONDS * 1000
             ):
                 _GLOBAL_GCACHE_STATE.logger.warning(
                     "Cache value for %s declares a lifetime longer than the watermark TTL; distrusting it",
@@ -319,7 +319,7 @@ class RedisCache(CacheInterface):
             if (
                 key.invalidation_tracking
                 and deserialized_value.created_at_ms is not None
-                and time.time() * 1000 - deserialized_value.created_at_ms > WATERMARK_TTL_SECONDS * 1000
+                and time.time() * 1000 - deserialized_value.created_at_ms > MAX_TRACKED_TTL_SECONDS * 1000
             ):
                 _GLOBAL_GCACHE_STATE.logger.warning(
                     "Cache value for %s is older than the watermark TTL, so no watermark can still "

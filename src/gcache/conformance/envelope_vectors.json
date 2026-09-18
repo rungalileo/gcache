@@ -458,7 +458,31 @@
         "name": "proto-varint-wider-than-64-bits",
         "envelopeBase64": "CAEQgICAgICAgICAAxiA0JX/vDEiBQoDYWJj",
         "why": "a ten-byte varint whose tenth byte exceeds 0x01 encodes past uint64. Go WRAPS it, Python keeps it, so the same bytes decode to different numbers -- and after signed conversion it lands as a large POSITIVE value that sails past the negative-timestamp guard."
+      },
+      {
+        "name": "proto-varint-wider-than-64-bits-in-version",
+        "envelopeBase64": "CIGAgICAgICAgAIQ+5iRvpIzGNvtlL6SMyIFCgNhYmM=",
+        "why": "the over-width varint in VERSION rather than a timestamp. In created_at_ms the wrapped value comes out as -2^63 and the negative-timestamp guard rejects it first, so that vector never reached the varint guard on the Go side -- it passed with the guard deleted. Here nothing else catches it: without the guard Go wraps the version to 1 and returns a HIT while Python refuses the same bytes."
       }
     ]
+  },
+  "watermarkTiming": {
+    "$comment": [
+      "The three numbers the resurrection invariant rests on, declared by hand in each",
+      "language: constants.py and go/cache.go. Nothing compared them before -- setting",
+      "WATERMARK_TTL_SECONDS to 6h left all 268 Python tests green, because every test is",
+      "written relative to the constants and therefore holds for any pair of numbers.",
+      "",
+      "The invariant: a watermark must outlive every entry it can suppress, so",
+      "  maxTrackedTtlSeconds + maxFutureBufferSeconds <= watermarkTtlSeconds",
+      "and the two caps are enforced locally -- the write path against the TTL, invalidate",
+      "against the buffer -- so neither party needs the other's number at call time.",
+      "",
+      "Python writing a 6h watermark while Go assumes 5h breaks the argument in BOTH",
+      "directions and nothing else would report it."
+    ],
+    "watermarkTtlSeconds": 18000,
+    "maxTrackedTtlSeconds": 14400,
+    "maxFutureBufferSeconds": 3600
   }
 }

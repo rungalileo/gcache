@@ -18,7 +18,11 @@ from gcache._internal.envelope import (
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.redis_cache import RedisValue
 from gcache.config import GCacheKey
-from gcache.exceptions import JsonEnvelopeRequiresSerializer, UnserializableValue
+from gcache.exceptions import (
+    EnvelopeRequiresSerializer,
+    JsonEnvelopeRequiresSerializer,
+    UnserializableValue,
+)
 from tests.conftest import FakeCacheConfigProvider
 
 
@@ -1479,7 +1483,7 @@ async def test_a_tracked_entry_outliving_the_watermark_is_distrusted() -> None:
     # since the shared keyspace holds entries this process never wrote.
     from unittest.mock import AsyncMock, MagicMock, patch
 
-    from gcache._internal.constants import WATERMARK_TTL_SECONDS
+    from gcache._internal.constants import MAX_TRACKED_TTL_SECONDS
     from gcache._internal.redis_cache import RedisCache
 
     key = GCacheKey(
@@ -1495,9 +1499,11 @@ async def test_a_tracked_entry_outliving_the_watermark_is_distrusted() -> None:
     async def fallback() -> dict:
         return {"v": "fresh"}
 
-    # Declares a lifetime one second beyond the watermark's -- unexpired, so only the
-    # lifetime guard can catch it.
-    too_long = encode_json(created_at_ms=now, ttl_sec=WATERMARK_TTL_SECONDS + 1, payload='{"v":1}')
+    # Declares a lifetime one second beyond the ENTRY CAP -- unexpired, so only the lifetime
+    # guard can catch it. The bound is MAX_TRACKED_TTL_SECONDS, not the watermark lifetime:
+    # the two stopped being the same number when the watermark went to 5h and the cap stayed
+    # at 4h, and the guard follows the cap (see the band test below).
+    too_long = encode_json(created_at_ms=now, ttl_sec=MAX_TRACKED_TTL_SECONDS + 1, payload='{"v":1}')
     fake = MagicMock(mget=AsyncMock(return_value=[too_long, None]), setex=AsyncMock(), set=AsyncMock())
     cache = object.__new__(RedisCache)
     recorder = MagicMock()
@@ -1513,8 +1519,8 @@ async def test_a_tracked_entry_outliving_the_watermark_is_distrusted() -> None:
     assert result == {"v": "fresh"}, "a distrusted entry must be a miss"
     assert "lifetime_exceeds_watermark" in [c.args[-1] for c in recorder.call_args_list]
 
-    # Exactly at the watermark TTL is fine -- the bound is pinned, not approximate.
-    at_bound = encode_json(created_at_ms=now, ttl_sec=WATERMARK_TTL_SECONDS, payload='{"v":1}')
+    # Exactly at the entry cap is fine -- the bound is pinned, not approximate.
+    at_bound = encode_json(created_at_ms=now, ttl_sec=MAX_TRACKED_TTL_SECONDS, payload='{"v":1}')
     fake = MagicMock(mget=AsyncMock(return_value=[at_bound, None]), setex=AsyncMock(), set=AsyncMock())
     cache = object.__new__(RedisCache)
     recorder = MagicMock()
@@ -1841,42 +1847,177 @@ class TestProtoNegativeTimestamps:
         assert dv.expires_at_ms == 1_700_000_060_000
 
 
-class TestLoneSurrogateAtTheFramingBoundary:
-    """Both surrogate ranges, and at encode_json rather than in one serializer.
+class TestLoneSurrogateIsRefused:
+    r"""A lone surrogate must never be stored: the two clients decode it differently.
 
-    The first version of this guard matched [89ab] only -- the HIGH range, D800-DBFF -- so a
-    lone LOW surrogate (DC00-DFFF) passed straight through: half the class, silently. It also
-    lived in JsonSerializer.dump, so any CUSTOM serializer bypassed it entirely. The rule is
-    a property of the envelope, so it belongs where every serializer's output converges.
+    Checked in TWO places, because the question is answerable exactly in each and nowhere
+    else in one:
+
+      JsonSerializer.dump  the object is still in scope, so re-dumping without ensure_ascii
+                           puts a lone surrogate back as a real character and utf-8 refuses
+                           it. This is the ESCAPE case -- \ud800 in the stored ASCII text.
+      encode_json          the framing boundary every serializer's output crosses, catching a
+                           LITERAL lone surrogate character from a serializer that never went
+                           through json.dumps.
+
+    Deliberately NOT a regex over the serialized text. Two attempts were each wrong in a
+    different direction, and both are pinned below: the first refused every emoji, because a
+    valid PAIR is also two escapes; the second refused ordinary text containing the
+    characters \ud800, because an escaped backslash makes \\ud800 and the pattern matched
+    from the second one.
     """
 
     @pytest.mark.parametrize(
         ("cp", "half"),
         [(0xD800, "high-min"), (0xDBFF, "high-max"), (0xDC00, "low-min"), (0xDFFF, "low-max")],
     )
-    def test_every_lone_surrogate_is_refused(self, cp: int, half: str) -> None:
-        body = json.dumps({"v": chr(cp)})
+    @pytest.mark.asyncio
+    async def test_every_lone_surrogate_is_refused(self, cp: int, half: str) -> None:
         with pytest.raises(UnserializableValue):
-            encode_json(created_at_ms=1, ttl_sec=60, payload=body)
+            await JsonSerializer().dump({"v": chr(cp)})
 
-    def test_a_custom_serializer_cannot_bypass_it(self) -> None:
-        # The payload never goes near JsonSerializer -- this is the route the old placement
-        # left open.
+    @pytest.mark.asyncio
+    async def test_a_valid_surrogate_PAIR_is_fine(self) -> None:
+        # Every non-BMP character is a pair under ensure_ascii. Refusing these would break
+        # any cached value containing an emoji, which the first version of this guard did.
+        for pair in ("\U0001f600", "\U00020000", "\U0001d11e"):
+            assert await JsonSerializer().dump({"v": pair})
+
+    @pytest.mark.asyncio
+    async def test_text_that_merely_CONTAINS_an_escape_sequence_is_fine(self) -> None:
+        # Serializes to \\ud800 -- an escaped backslash then literal characters. A pattern
+        # matching \ud[89ab].. hits starting at the second backslash, so prose about unicode
+        # or any JSON-inside-JSON was refused.
+        assert await JsonSerializer().dump({"note": r"the escape \ud800 means a high surrogate"})
+
+    def test_a_literal_lone_surrogate_is_refused_at_the_boundary(self) -> None:
+        # The route a check living only in JsonSerializer leaves open: a custom serializer
+        # returning text with a real lone surrogate in it.
         with pytest.raises(UnserializableValue):
-            encode_json(created_at_ms=1, ttl_sec=60, payload='{"v":"\\ud800"}')
+            encode_json(created_at_ms=1, ttl_sec=60, payload='{"v":"' + chr(0xD800) + '"}')
 
-    def test_a_valid_surrogate_PAIR_is_fine(self) -> None:
-        # An emoji is an encodable pair, not a lone surrogate. Rejecting it would break
-        # ordinary payloads, so the guard must distinguish them.
-        body = json.dumps({"v": "\U0001f600"})
-        assert encode_json(created_at_ms=1, ttl_sec=60, payload=body)
-
-    def test_the_error_does_not_carry_the_value(self) -> None:
-        # The message reaches the logs via CacheController, and the payload is cached
+    @pytest.mark.asyncio
+    async def test_the_error_does_not_carry_the_value(self) -> None:
+        # The message reaches the logs through CacheController, and the payload is cached
         # application data -- tokens, PII, whatever the caller stored.
         try:
-            encode_json(created_at_ms=1, ttl_sec=60, payload=json.dumps({"secret": "hunter2\ud800"}))
+            await JsonSerializer().dump({"secret": "hunter2" + chr(0xD800)})
         except UnserializableValue as exc:
             assert "hunter2" not in str(exc), f"the cached value leaked into the error: {exc}"
         else:
             pytest.fail("expected UnserializableValue")
+
+
+@pytest.mark.asyncio
+async def test_the_read_guards_use_the_entry_cap_not_the_watermark_lifetime() -> None:
+    """The band between the write cap (4h) and the watermark lifetime (5h) must be refused.
+
+    Raising WATERMARK_TTL_SECONDS to 5h while the tracked-TTL cap stayed at 4h silently
+    loosened both read guards by an hour: an entry declaring a 4h30m lifetime, or one 4h30m
+    old, passed with no degraded reason -- although no compliant writer can produce either,
+    since the write path caps at 4h.
+
+    The correct threshold is WATERMARK - MAX_FUTURE_BUFFER, which IS MAX_TRACKED_TTL: an
+    entry created at C can be suppressed by a watermark written as early as C-B, and that
+    watermark dies at C+(W-B). Past that age nothing can vouch for it.
+
+    Every pre-existing case sat outside the band, so none of them could see the gap.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import MAX_TRACKED_TTL_SECONDS
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(
+        key_type="kt",
+        id="i",
+        use_case="u",
+        invalidation_tracking=True,
+        envelope=Envelope.JSON,
+        serializer=JsonSerializer(),
+    )
+    now = int(time.time() * 1000)
+    band = MAX_TRACKED_TTL_SECONDS + 1800  # 4h30m: above the write cap, below the watermark
+
+    async def fallback() -> dict:
+        return {"v": "fresh"}
+
+    async def serve(blob: bytes) -> tuple[object, list[str]]:
+        fake = MagicMock(mget=AsyncMock(return_value=[blob, None]), setex=AsyncMock(), set=AsyncMock())
+        cache = object.__new__(RedisCache)
+        rec = MagicMock()
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_record_degraded_read", rec),
+            patch.object(RedisCache, "put", AsyncMock()),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+        ):
+            out = await RedisCache.get(cache, key, fallback)
+        return out, [c.args[-1] for c in rec.call_args_list]
+
+    # 1. A DECLARED lifetime inside the band.
+    out, reasons = await serve(encode_json(created_at_ms=now, ttl_sec=band, payload='{"v":1}'))
+    assert out == {"v": "fresh"}, "an entry declaring more than the entry cap must be a miss"
+    assert "lifetime_exceeds_watermark" in reasons, reasons
+
+    # 2. An AGE inside the band. This has to be a PICKLE entry: the age guard is unreachable
+    #    for JSON, because an entry old enough to trip it and declaring a lifetime within the
+    #    cap is necessarily EXPIRED, and the expiry guard fires first. Pickle carries no
+    #    expires_at_ms, so age is the only thing that can catch it -- which is exactly why
+    #    the loosened threshold mattered there.
+    pickle_key = GCacheKey(key_type="kt", id="i", use_case="u", invalidation_tracking=True)
+    old_pickle = pickle.dumps(RedisValue(created_at_ms=now - band * 1000, payload={"v": 1}))
+    fake = MagicMock(mget=AsyncMock(return_value=[old_pickle, None]), setex=AsyncMock(), set=AsyncMock())
+    cache = object.__new__(RedisCache)
+    rec = MagicMock()
+    with (
+        patch.object(RedisCache, "client", property(lambda _self: fake)),
+        patch.object(RedisCache, "_record_degraded_read", rec),
+        patch.object(RedisCache, "put", AsyncMock()),
+        patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "MISS_COUNTER", MagicMock(), create=True),
+        patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+    ):
+        out = await RedisCache.get(cache, pickle_key, fallback)
+    reasons = [c.args[-1] for c in rec.call_args_list]
+    assert out == {"v": "fresh"}, "a pickle entry older than the entry cap must be a miss"
+    assert "age_exceeds_watermark" in reasons, reasons
+
+    # 3. Exactly at the cap is still served -- the bound is pinned, not approximate.
+    out, _ = await serve(encode_json(created_at_ms=now, ttl_sec=MAX_TRACKED_TTL_SECONDS, payload='{"v":1}'))
+    assert out == {"v": 1}, "an entry at the cap must still be served"
+
+
+class TestEnvelopeRequiresSerializerCoversProto:
+    """The PROTO half of the guard, and the alias that keeps old catches working.
+
+    The guard was widened from JSON-only to both encoded framings, but every existing test
+    used the JSON path -- so the half that was actually broken had no coverage. A PROTO key
+    with no serializer used to construct fine and then fail every write, with
+    CacheController swallowing the error and the local layer masking it in-process.
+    """
+
+    def test_a_proto_key_without_a_serializer_is_refused_at_construction(self) -> None:
+        with pytest.raises(EnvelopeRequiresSerializer) as exc:
+            GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.PROTO)
+        assert "PROTO" in str(exc.value), f"the message must name the framing: {exc.value}"
+
+    def test_a_json_key_without_a_serializer_is_still_refused(self) -> None:
+        with pytest.raises(EnvelopeRequiresSerializer):
+            GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON)
+
+    def test_pickle_needs_no_serializer(self) -> None:
+        # PICKLE serialises the object itself, so it is the one framing that works without.
+        # Widening the guard to "any envelope" would have broken it.
+        GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.PICKLE)
+
+    def test_the_old_name_still_catches_a_proto_failure(self) -> None:
+        # An ALIAS, not a subclass -- the two must be the same class, or a consumer whose
+        # `except JsonEnvelopeRequiresSerializer` predates the rename would stop catching a
+        # PROTO failure raised under the new name. That is the whole reason for the alias,
+        # and nothing asserted it.
+        assert JsonEnvelopeRequiresSerializer is EnvelopeRequiresSerializer
+        with pytest.raises(JsonEnvelopeRequiresSerializer):
+            GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.PROTO)

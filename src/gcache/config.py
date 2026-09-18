@@ -14,6 +14,7 @@ from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.exceptions import (
     EnvelopeRequiresSerializer,
     UnhashableKeyComponent,
+    UnserializableValue,
     UseCaseNameIsReserved,
 )
 
@@ -204,10 +205,26 @@ class JsonSerializer(Serializer):
         # write would succeed and the entry would be
         # unreadable from every non-Python client until its TTL ran out. Failing the write
         # is the rule the rest of this envelope follows.
-        # The lone-surrogate rule lives at the framing boundary (envelope.encode_json), not
-        # here: every serializer's output passes through it, so a CUSTOM serializer bypassed
-        # a check that lived in this one.
-        return json.dumps(obj, separators=(",", ":"), allow_nan=False)
+        payload = json.dumps(obj, separators=(",", ":"), allow_nan=False)
+        # A lone surrogate survives ensure_ascii as the escape \ud800, so the stored envelope
+        # is valid ASCII and go/envelope.go's utf8.Valid gate cannot see it -- the surrogate
+        # only reappears after the JSON unescape. Python then returns a str holding U+D800
+        # while Go's encoding/json substitutes U+FFFD, and both report a hit.
+        #
+        # Answered from the OBJECT, not by pattern-matching the serialized text: re-dumping
+        # without ensure_ascii puts any lone surrogate back as a real character, where utf-8
+        # refuses it. That is exact, where a regex was twice wrong -- once refusing every
+        # emoji (a valid PAIR is also two escapes) and once refusing text that merely
+        # contains the characters "\ud800".
+        #
+        # Gated on a cheap substring so the common payload pays one scan rather than a second
+        # serialization: no `\ud` escape at all means no surrogate, paired or lone.
+        if "\\ud" in payload:
+            try:
+                json.dumps(obj, ensure_ascii=False).encode("utf-8")
+            except UnicodeEncodeError as exc:
+                raise UnserializableValue("a lone surrogate") from exc
+        return payload
 
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, bytes):

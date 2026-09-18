@@ -10,9 +10,9 @@ LOCAL_CACHE_MAX_SIZE = 10_000
 ASYNC_DECODE_THRESHOLD_BYTES = 50_000
 
 # TTLs (seconds)
-# Watermark TTL must be longer than any invalidatable cache's TTL to ensure
-# invalidation works correctly. 4 hours is a heuristic that covers most use cases.
-# If your cache TTLs exceed 4 hours, consider making this configurable.
+# The watermark must outlive every entry it can suppress. It is 5 hours, which is the
+# tracked-TTL cap (4h) plus the invalidation buffer ceiling (1h) -- see the block below for
+# why the sum is split into two locally-enforced caps rather than checked in one place.
 WATERMARK_TTL_SECONDS = 3600 * 5  # 5 hours
 
 # The resurrection invariant is `future_buffer + entry_ttl <= WATERMARK_TTL_SECONDS`: a

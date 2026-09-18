@@ -975,6 +975,12 @@ func TestATrackedEntryCannotBeServedOlderThanTheWatermarkLifetime(t *testing.T) 
 		// Inside both bounds, so served -- and necessarily younger than watermarkTTL.
 		{"1h old, 3h30m declared", time.Hour, 3*time.Hour + 30*time.Minute, true, ResultHit},
 		{"3h54m old, 4h declared", 3*time.Hour + 54*time.Minute, 4 * time.Hour, true, ResultHit},
+		// THE BAND between the write cap and the old read threshold. Raising watermarkTTL to
+		// 5h while maxEntryTTL stayed at 4h left an hour in which a declared lifetime passed
+		// the guard even though New refuses to build a cache that could write one. Every
+		// other row here sits outside that band, so none of them could see the gap.
+		{"1h old, 4h30m declared", time.Hour, 4*time.Hour + 30*time.Minute, false, ResultDistrusted},
+		{"1h old, 4h declared (the cap itself)", time.Hour, 4 * time.Hour, true, ResultHit},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ok, results := serve(t, tc.age, tc.declared)
@@ -984,9 +990,11 @@ func TestATrackedEntryCannotBeServedOlderThanTheWatermarkLifetime(t *testing.T) 
 			if len(results) != 1 || results[0] != tc.wantResult {
 				t.Errorf("recorded %v, want exactly [%s]", results, tc.wantResult)
 			}
-			if ok && tc.age >= watermarkTTL {
-				t.Errorf("INVARIANT BROKEN: served an entry %s old, at or past watermarkTTL (%s)",
-					tc.age, watermarkTTL)
+			// maxEntryTTL, not watermarkTTL: the loose bound could not fail while the read
+			// guard was itself loose, so the invariant agreed with the bug.
+			if ok && tc.age >= maxEntryTTL {
+				t.Errorf("INVARIANT BROKEN: served an entry %s old, at or past maxEntryTTL (%s)",
+					tc.age, maxEntryTTL)
 			}
 		})
 	}

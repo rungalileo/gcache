@@ -1349,3 +1349,35 @@ func TestACorruptWatermarkIsReportedWithNoValuePresent(t *testing.T) {
 		})
 	}
 }
+
+// A poisoned entry reports as poisoned even when a watermark also covers it.
+//
+// Both are a miss, so this is diagnostic rather than a wrong value -- but `stale` reads as
+// routine while `distrusted` says a poisoned entry is in the keyspace and someone has to
+// find the writer. Python asks the divergence question before its watermark comparison, so
+// ordering it after here hid the signal whenever a watermark happened to cover the entry.
+func TestAPoisonedEntryOutranksStaleness(t *testing.T) {
+	client := newFakeClient()
+	rec := &recordingRecorder{}
+	cache, err := New(Options[sessionIdentity]{
+		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := Key{KeyType: "session_id", ID: "both", UseCase: "test::both", Tracked: true}
+	now := time.Now()
+	raw := []byte(fmt.Sprintf(
+		`{"version":1,"createdAtMs":%d,"expiresAtMs":%d,"encoding":"utf8","payload":"{\"s\":\"\\ud800\"}"}`,
+		now.Add(-time.Minute).UnixMilli(), now.Add(time.Hour).UnixMilli()))
+	client.data[ValueKey(testPrefix, key)] = raw
+	// A watermark that covers the entry, so the stale branch would fire if it ran first.
+	client.data[WatermarkKey(testPrefix, "session_id", "both")] = []byte(strconv.FormatInt(now.UnixMilli(), 10))
+
+	if _, ok := cache.Get(context.Background(), key); ok {
+		t.Fatal("Get served a poisoned entry")
+	}
+	if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+		t.Errorf("recorded %v, want [distrusted] -- stale hides that a writer is broken", rec.results)
+	}
+}

@@ -341,45 +341,111 @@ def lone_surrogate_reason(payload: str | bytes) -> str | None:
     # payload written under ensure_ascii, which is most of them.
     if "\\ud" not in body and "\\uD" not in body:
         return None
-    # BEFORE the parse, and the reason is determinism rather than safety. Relying on the
-    # interpreter to tell us when a payload is too deep makes the ANSWER depend on the
+    # SCAN FIRST, and only then establish that the payload is JSON. The scan needs no parse
+    # and no tree, so a payload whose surrogates are all PAIRED -- which is every emoji
+    # payload, the overwhelmingly common case -- is answered here and pays neither the
+    # validation parse nor the nesting count.
+    #
+    # That ordering also removes a duplicate parse on the read path, where JsonSerializer
+    # then parses the same bytes again. It costs nothing in exactness: the scan is only
+    # MEANINGFUL on JSON, and its answer is only ACTED on below, after JSON is established.
+    # A false positive on non-JSON text is discarded there.
+    if not _has_unpaired_surrogate_escape(body):
+        return None
+
+    # Only a payload that already looks poisoned reaches here.
+    #
+    # Nesting BEFORE the parse, and the reason is determinism rather than safety. Relying on
+    # the interpreter to say when a payload is too deep makes the ANSWER depend on the
     # machine: depth 4000 parses on a developer laptop and raises RecursionError in CI, so
     # the same payload was written on one host and refused on another. Two Python pods
     # disagreeing about an entry is the same defect as Python and Go disagreeing about one.
     #
-    # An explicit limit, counted identically in both clients and pinned by the corpus,
-    # replaces that. 500 is far under the lowest interpreter limit in any environment and far
-    # over any real payload -- and it is only ever reached by a payload that already contains
-    # a surrogate escape, since the substring gate runs first.
+    # The consequence, which is narrow and fails closed: a payload that is NOT JSON, nests
+    # deeper than the limit, AND carries an unpaired surrogate escape is refused here rather
+    # than passed as "not JSON". Establishing JSON first would invert the problem, since the
+    # parse is the thing the limit exists to keep bounded.
     if _exceeds_nesting(body):
         return f"a payload nested deeper than the {_MAX_JSON_NESTING}-level limit"
     try:
-        # object_pairs_hook=list keeps DUPLICATE keys. Without it json.loads silently drops
-        # all but the last, so `{"a":"\ud800","a":"ok"}` lost the surrogate before the walk
-        # and Python accepted what Go's escape scan refused.
+        # Strict JSON is the rule that keeps protobuf and other binary out, and json.loads is
+        # the only way to ask it in Python; Go asks json.Valid for the same reason. The
+        # RESULT is discarded -- the scan above already has the answer.
         #
         # parse_constant refuses NaN/Infinity, which json.loads accepts by default and Go's
         # json.Valid does not. Without it the two clients disagreed about whether such a
         # payload was JSON at all, and so about whether this rule applied to it.
         #
-        # RecursionError as well as ValueError: json.loads raises it past the interpreter's
-        # nesting limit, and it is not a ValueError. Escaping here would put an exception
-        # through a guard whose whole job is to refuse an entry WITHOUT failing the read --
-        # the caller would log an error, re-run the fallback and never write back, leaving
-        # the entry to fail every read for its full TTL.
-        parsed = json.loads(body, object_pairs_hook=list, parse_constant=_refuse_json_constant)
+        # No object_pairs_hook. An earlier version used one to keep DUPLICATE keys, which
+        # json.loads otherwise drops -- the scan reads the raw text and sees every escape,
+        # duplicates included, so the hook is gone and the C parser's fast path is back.
+        #
+        # RecursionError is unreachable while _MAX_JSON_NESTING holds, and caught anyway,
+        # because "unreachable" is a property of a constant someone can raise.
+        json.loads(body, parse_constant=_refuse_json_constant)
     except RecursionError:
-        # Unreachable while _MAX_JSON_NESTING stays well under the interpreter's limit, and
-        # kept because "unreachable" is a property of a constant someone can raise. Fails
-        # CLOSED, unlike a plain parse failure: an open failure here would serve a payload
-        # this client could not inspect.
         return "a payload too deeply nested to check"
     except ValueError:
-        # Not strict JSON. Neither client unescapes it, so neither can disagree about it.
+        # Not strict JSON. Neither client unescapes it, so neither can disagree about it --
+        # this is where a scan hit on non-JSON text is discarded.
         return None
-    if _holds_lone_surrogate(parsed):
-        return "a lone surrogate escape"
-    return None
+    return "a lone surrogate escape"
+
+
+def _has_unpaired_surrogate_escape(body: str) -> bool:
+    r"""Scan validated JSON text for a surrogate escape with no partner.
+
+    The SAME algorithm as Go's loneSurrogateReason, which is the point: one rule implemented
+    twice is what the conformance corpus exists to hold together, and two different
+    algorithms gave it more to hold than it needed to.
+
+    It replaced a walk over the parsed value, which was correct but paid for the whole tree:
+    on a 2 MB payload of 20,000 records it spent 80 ms of 87 ms pushing 120,000 keys and
+    values through a Python loop. The text is already in hand and an escape is a local fact,
+    so the tree was never needed to answer this.
+
+    Only BACKSLASH positions are visited, via str.find, so the C library does the scanning
+    between escapes and this loop runs once per escape rather than once per character.
+    Consuming each escape in order is also what distinguishes a real `\uXXXX` from the
+    characters `\\ud800` -- a literal backslash followed by text -- because the `\\` pair is
+    consumed as one escape and its second backslash never starts another. That distinction
+    is the one two earlier regex attempts got wrong.
+
+    Safe on any input, but only MEANINGFUL on text already known to be JSON: outside a
+    string literal a backslash is not an escape, and valid JSON has none there.
+    """
+    i = body.find("\\")
+    while i != -1:
+        if body[i + 1 : i + 2] != "u":
+            # Any other escape is two characters, `\\` included. Stepping over both is what
+            # stops the second backslash reading as the start of an escape.
+            i = body.find("\\", i + 2)
+            continue
+        code = _hex4(body, i + 2)
+        if code is None:
+            i = body.find("\\", i + 2)
+            continue
+        i += 6
+        if 0xDC00 <= code <= 0xDFFF:
+            return True  # a low surrogate with no high before it
+        if 0xD800 <= code <= 0xDBFF:
+            low = _hex4(body, i + 2) if body[i : i + 2] == "\\u" else None
+            if low is None or not (0xDC00 <= low <= 0xDFFF):
+                return True  # a high surrogate with no low after it
+            i += 6
+        i = body.find("\\", i)
+    return False
+
+
+def _hex4(body: str, at: int) -> int | None:
+    """The four hex digits at ``at``, or None if they are not four hex digits."""
+    digits = body[at : at + 4]
+    if len(digits) != 4:
+        return None
+    try:
+        return int(digits, 16)
+    except ValueError:
+        return None
 
 
 #: Maximum JSON nesting either client will inspect. Shared with Go's maxJSONNesting and
@@ -394,9 +460,12 @@ def _exceeds_nesting(body: str) -> bool:
     this tracks NET depth, and skips brackets inside string literals -- a value containing
     ``"[[[["`` is not nesting.
 
-    Identical in Go (``exceedsNesting``), deliberately, and over the same text: the two
-    clients must refuse the same payloads, and a scan is the only way to decide that without
-    inheriting each parser's own private limit.
+    Identical in Go (``exceedsNesting``), deliberately, and over the same text. The limit is
+    explicit because each parser's own is not portable: Go's scanner stops at 10000,
+    CPython's follows the interpreter stack, and depth 4000 parsed on a laptop while raising
+    RecursionError in CI -- so the same payload was written on one host and refused on
+    another. Two Python pods disagreeing about an entry is the same defect as the two
+    clients disagreeing about one.
     """
     depth = 0
     in_string = False
@@ -423,39 +492,6 @@ def _exceeds_nesting(body: str) -> bool:
 def _refuse_json_constant(name: str) -> object:
     """Make json.loads reject NaN/Infinity, as Go's json.Valid does."""
     raise ValueError(f"not strict JSON: {name}")
-
-
-def _holds_lone_surrogate(value: object) -> bool:
-    """Walk a parsed JSON value for an unpaired surrogate, stopping at the first one.
-
-    The PARSED value, not a re-serialization of it. json.loads combines a valid pair into the
-    single non-BMP character it denotes, so any surrogate code point still present afterwards
-    is by definition unpaired -- which makes utf-8 the exact test, on strings this walk can
-    short-circuit out of. Re-dumping with ``ensure_ascii=False`` answered the same question
-    and measured 2.35x a bare ``json.loads`` on a 40 KB emoji payload, because it built a
-    whole second copy before testing any of it.
-
-    Iterative rather than recursive: nothing bounds a payload's nesting depth, and a
-    RecursionError raised out of this guard would be worse than the divergence it looks for.
-
-    Tuples as well as lists, because ``object_pairs_hook=list`` renders every object as a
-    list of ``(key, value)`` tuples -- so this walk visits KEYS too, which diverge exactly as
-    values do.
-    """
-    stack: list[object] = [value]
-    while stack:
-        item = stack.pop()
-        if isinstance(item, str):
-            try:
-                item.encode("utf-8")
-            except UnicodeEncodeError:
-                return True
-        elif isinstance(item, list | tuple):
-            stack.extend(item)
-        elif isinstance(item, dict):
-            stack.extend(item.keys())
-            stack.extend(item.values())
-    return False
 
 
 def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes:

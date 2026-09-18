@@ -228,6 +228,18 @@ class RedisCache(CacheInterface):
         return await loop.run_in_executor(RedisCache._executor, partial(decode, data, allow_pickle=allow_pickle))
 
     @staticmethod
+    async def _async_encode(encode: Callable[..., bytes], created_at_ms: int, ttl: int, payload: str | bytes) -> bytes:
+        """Off the event loop, on the same threshold and for the same reason as _async_decode.
+
+        The encoders run the divergence check, which validates the payload's own JSON, so on
+        a large payload they cost about what decode costs. The READ path was offloaded first
+        and the write path was not, which left the larger of the two exposures open: a write
+        is where the whole payload is in hand.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(RedisCache._executor, partial(encode, created_at_ms, ttl, payload))
+
+    @staticmethod
     async def _async_lone_surrogate_reason(payload: str | bytes) -> str | None:
         """Off the event loop, on the same threshold and for the same reason as _async_decode.
 
@@ -511,7 +523,11 @@ class RedisCache(CacheInterface):
                     f"Envelope.JSON requires a Serializer producing str or bytes for use case "
                     f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=JsonSerializer()."
                 )
-            encoded = encode_json(current_time_ms, ttl, serialized_value)
+            encoded = (
+                encode_json(current_time_ms, ttl, serialized_value)
+                if len(serialized_value) < ASYNC_DECODE_THRESHOLD_BYTES
+                else await RedisCache._async_encode(encode_json, current_time_ms, ttl, serialized_value)
+            )
         elif key.envelope == Envelope.PROTO:
             # bytes only. A str payload would be silently utf-8 encoded here and read back as
             # bytes by the other client, so the two would disagree about the value's type
@@ -524,7 +540,11 @@ class RedisCache(CacheInterface):
                     f"Envelope.PROTO requires a Serializer producing bytes for use case "
                     f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=ProtoSerializer(YourMessage)."
                 )
-            encoded = encode_proto(current_time_ms, ttl, serialized_value)
+            encoded = (
+                encode_proto(current_time_ms, ttl, serialized_value)
+                if len(serialized_value) < ASYNC_DECODE_THRESHOLD_BYTES
+                else await RedisCache._async_encode(encode_proto, current_time_ms, ttl, serialized_value)
+            )
         else:
             encoded = pickle.dumps(
                 RedisValue(created_at_ms=current_time_ms, payload=serialized_value), protocol=pickle.HIGHEST_PROTOCOL

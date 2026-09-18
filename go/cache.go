@@ -369,6 +369,23 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		return zero, false
 	}
 
+	// BEFORE the staleness comparison, which is where Python asks it. An entry that is both
+	// stale and poisoned is a miss either way, so this is diagnostic: `stale` reads as
+	// routine, while `distrusted` says a poisoned entry is sitting in the keyspace and
+	// someone has to find the writer. Ordering it below meant Go hid that signal whenever a
+	// watermark happened to cover the entry.
+	//
+	// Every framing Go can read, which is JSON and PROTO -- pickle already returned above,
+	// and pickle is the one framing no other client reads, so nothing can disagree about it.
+	// Deliberately NOT gated on the envelope's `encoding`: that says how the payload was
+	// TRANSPORTED, not what it is, and a Serializer returning the bytes of a json.dumps
+	// arrives base64-encoded with JSON text inside. The strict-JSON gate inside
+	// loneSurrogateReason is what keeps protobuf and other binary out.
+	if reason := loneSurrogateReason(string(payload)); reason != "" {
+		c.record(key.UseCase, ResultDistrusted)
+		return zero, false
+	}
+
 	if haveWatermark && isStale(watermarkMs, createdAtMs) {
 		c.record(key.UseCase, ResultStale)
 		return zero, false
@@ -382,17 +399,6 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 	// Before the codec, not after: the question is about the stored TEXT, and Unmarshal has
 	// already substituted U+FFFD by the time it returns. Distrusted rather than a decode
 	// failure -- the entry is well-formed, it just cannot be agreed upon.
-	// Every framing Go can read, which is JSON and PROTO -- pickle already returned above,
-	// and pickle is the one framing no other client reads, so nothing can disagree about it.
-	// Deliberately NOT gated on the envelope's `encoding`: that says how the payload was
-	// TRANSPORTED, not what it is, and a Serializer returning the bytes of a json.dumps
-	// arrives base64-encoded with JSON text inside. The strict-JSON gate inside
-	// loneSurrogateReason is what keeps protobuf and other binary out.
-	if reason := loneSurrogateReason(string(payload)); reason != "" {
-		c.record(key.UseCase, ResultDistrusted)
-		return zero, false
-	}
-
 	if err := c.codec.Unmarshal(payload, &value); err != nil {
 		c.fail(callerCtx, key.UseCase, "unmarshal", err)
 		return zero, false

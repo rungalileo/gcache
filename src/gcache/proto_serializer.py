@@ -66,9 +66,19 @@ class ProtoSerializer(Serializer):
 
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, str):
-            # The PROTO envelope always yields bytes, so this is only reachable for a key
-            # whose envelope was changed without its serializer. Encode rather than reject:
-            # a parse failure here is a miss the caller heals, and that is the same outcome.
+            # Two ways to arrive here, and the second was missing from this comment. One is
+            # a key whose envelope was changed without its serializer -- the PROTO envelope
+            # itself always yields bytes.
+            #
+            # The other is the JSON envelope written by GO. Its writer sniffs the payload and
+            # stores valid UTF-8 as `encoding: "utf8"`, where Python base64s any bytes
+            # payload unconditionally -- so the same []byte round-trips as `bytes` when
+            # Python wrote it and as `str` when Go did. `encoding` is a TRANSPORT field, not
+            # a type declaration, which is why Serializer.load is typed `bytes | str` and why
+            # every implementation must accept both.
+            #
+            # Encode rather than reject: a parse failure here is a miss the caller heals, and
+            # that is the same outcome.
             data = data.encode("utf-8")
         msg = self._message_type()
         # No offload, unlike the protojson serializer this replaced. That one needed it

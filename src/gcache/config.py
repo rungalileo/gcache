@@ -161,6 +161,13 @@ class Serializer(ABC):
     async def load(self, data: bytes | str) -> Any:
         pass
 
+    # load must accept BOTH bytes and str, and the annotation is not a formality. Go's JSON
+    # writer sniffs its payload and stores valid UTF-8 as `encoding: "utf8"`, where Python
+    # base64s any bytes payload unconditionally -- so the same []byte comes back as `bytes`
+    # when Python wrote it and as `str` when Go did. `encoding` records how the payload was
+    # TRANSPORTED, not what type it is. A codec whose payload is genuinely binary belongs on
+    # Envelope.PROTO, where there is no such field and bytes stay bytes.
+    #
     # One constraint on dump's output, enforced at the framing boundary rather than trusted:
     # a TEXT payload must not carry a lone surrogate, as a character or as the JSON escape
     # \ud800. Both are cross-client divergences -- Python keeps the surrogate, Go substitutes

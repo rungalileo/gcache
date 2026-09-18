@@ -459,9 +459,6 @@ func isStale(watermarkMs, createdAtMs int64) bool { return watermarkMs >= create
 // than erroring, so it cannot be asked the same way and this walks the escapes instead. Two
 // mechanisms, one rule, pinned by the corpus -- which is what the corpus is for.
 func loneSurrogateReason(body string) string {
-	// Both spellings: JSON permits \uD800 as readily as \ud800, and every surrogate escape
-	// starts with those three characters. Gating on a bare `\u` would validate every
-	// non-ASCII payload written under ensure_ascii, which is most of them.
 	// Not valid UTF-8 means genuinely binary; Python's bytes branch reaches the same
 	// conclusion by failing to decode. The envelope's `encoding` field is deliberately NOT
 	// consulted: `base64` means "the writer handed us bytes", not "this is binary", and a
@@ -469,24 +466,48 @@ func loneSurrogateReason(body string) string {
 	if !utf8.ValidString(body) {
 		return ""
 	}
+	// Both spellings: JSON permits \uD800 as readily as \ud800, and every surrogate escape
+	// starts with those three characters. Gating on a bare `\u` would validate every
+	// non-ASCII payload written under ensure_ascii, which is most of them.
 	if !strings.Contains(body, `\ud`) && !strings.Contains(body, `\uD`) {
 		return ""
 	}
-	// BEFORE json.Valid, and for determinism rather than safety. Each parser has its own
-	// private nesting limit -- Go's scanner stops at 10000, CPython's depends on the
-	// interpreter's stack and differs between a laptop and CI -- so leaving the depth
-	// question to them made the ANSWER depend on the machine. An explicit shared limit,
-	// counted the same way here and in Python's _exceeds_nesting, replaces that.
+	// SCAN FIRST, and only then establish that the payload is JSON -- the order Python uses,
+	// for the reason it uses it: a payload whose surrogates are all PAIRED, which is every
+	// emoji payload, is answered without validating or counting anything. The scan is only
+	// MEANINGFUL on JSON, and its answer is only ACTED on below, after JSON is established,
+	// so a false positive on non-JSON text is discarded there.
+	if !hasUnpairedSurrogateEscape(body) {
+		return ""
+	}
+	// Only a payload that already looks poisoned reaches here.
+	//
+	// Nesting BEFORE json.Valid, and for determinism rather than safety. Each parser has its
+	// own private limit -- this scanner stops at 10000, CPython's follows the interpreter
+	// stack and differs between a laptop and CI -- so leaving the depth question to them
+	// made the ANSWER depend on the machine.
 	if exceedsNesting(body) {
 		return fmt.Sprintf("a payload nested deeper than the %d-level limit", maxJSONNesting)
 	}
 	// A payload that is not JSON is left alone: neither client unescapes it, so neither can
-	// disagree about it. This also makes the linear walk below correct -- in valid JSON a
-	// backslash appears only inside a string literal and always starts an escape, so a scan
-	// that consumes each escape in order can never mistake an escaped backslash for one.
+	// disagree about it. This is where a scan hit on non-JSON text is discarded.
 	if !json.Valid([]byte(body)) {
 		return ""
 	}
+	return "a lone surrogate escape"
+}
+
+// hasUnpairedSurrogateEscape scans JSON text for a surrogate escape with no partner.
+//
+// Consuming each escape in order is what distinguishes a real `\uXXXX` from the characters
+// `\\ud800` -- a literal backslash followed by text -- because the `\\` pair is consumed as
+// one escape and its second backslash never starts another. That distinction is the one two
+// earlier regex attempts got wrong.
+//
+// Safe on any input, but only MEANINGFUL on text already known to be JSON: outside a string
+// literal a backslash is not an escape, and valid JSON has none there. Callers establish
+// that after this returns true, not before, so the common payload never pays for it.
+func hasUnpairedSurrogateEscape(body string) bool {
 	for i := 0; i < len(body); {
 		if body[i] != '\\' {
 			i++
@@ -502,16 +523,16 @@ func loneSurrogateReason(body string) string {
 		i += 6
 		switch {
 		case hi >= 0xDC00 && hi <= 0xDFFF:
-			return "a lone surrogate escape"
+			return true
 		case hi >= 0xD800 && hi <= 0xDBFF:
 			lo, ok := hexEscapeAt(body, i)
 			if !ok || lo < 0xDC00 || lo > 0xDFFF {
-				return "a lone surrogate escape"
+				return true
 			}
 			i += 6
 		}
 	}
-	return ""
+	return false
 }
 
 // hexEscapeAt reports the code unit of the \uXXXX escape starting at i, if there is one.

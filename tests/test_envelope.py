@@ -1932,8 +1932,15 @@ class TestLoneSurrogateIsRefused:
         inside_ok = "[" * _MAX_JSON_NESTING + r'"\ud83d\ude00"' + "]" * _MAX_JSON_NESTING
         assert encode_json(created_at_ms=1, ttl_sec=60, payload=inside_ok)
 
-        # Past it: refused for being uninspectable, deterministically, on every machine.
-        beyond = "[" * (_MAX_JSON_NESTING + 1) + r'"\ud83d\ude00"' + "]" * (_MAX_JSON_NESTING + 1)
+        # Past the limit, but all surrogates PAIRED: still served. The scan runs before the
+        # nesting count and answers this without parsing or counting anything, so depth only
+        # matters for a payload that already looks poisoned. Both clients order it that way.
+        deep_ok = "[" * (_MAX_JSON_NESTING + 1) + r'"\ud83d\ude00"' + "]" * (_MAX_JSON_NESTING + 1)
+        assert encode_json(created_at_ms=1, ttl_sec=60, payload=deep_ok)
+
+        # Past it AND unpaired: refused for being uninspectable, deterministically, on every
+        # machine -- which is the case the limit exists for.
+        beyond = "[" * (_MAX_JSON_NESTING + 1) + r'"\ud800"' + "]" * (_MAX_JSON_NESTING + 1)
         with pytest.raises(UnserializableValue, match="nested deeper"):
             encode_json(created_at_ms=1, ttl_sec=60, payload=beyond)
 
@@ -2372,3 +2379,45 @@ async def test_the_divergence_check_is_offloaded_for_a_large_payload() -> None:
     large = _json.dumps({"v": "x" * (ASYNC_DECODE_THRESHOLD_BYTES * 2)})
     assert len(large) > ASYNC_DECODE_THRESHOLD_BYTES
     assert len(await run(large)) == 1, "a large payload must be offloaded, as decode is"
+
+
+@pytest.mark.asyncio
+async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
+    """The WRITE path too, which was the larger of the two exposures and had no offload.
+
+    The encoders run the divergence check, which validates the payload's own JSON, so on a
+    large payload they cost about what decode costs -- and a write is where the whole
+    payload is in hand.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
+    from gcache._internal.redis_cache import RedisCache
+
+    key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
+
+    async def run(value: object) -> list[object]:
+        seen: list[object] = []
+        real = RedisCache._async_encode
+
+        async def spy(encode, created, ttl, payload):  # type: ignore[no-untyped-def]
+            seen.append(payload)
+            return await real(encode, created, ttl, payload)
+
+        fake = MagicMock(setex=AsyncMock(), set=AsyncMock(), get=AsyncMock(return_value=None))
+        cache = object.__new__(RedisCache)
+        with (
+            patch.object(RedisCache, "client", property(lambda _self: fake)),
+            patch.object(RedisCache, "_async_encode", staticmethod(spy)),
+            patch.object(
+                RedisCache, "_resolve_config", AsyncMock(return_value=MagicMock(ttl_sec={CacheLayer.REMOTE: 60}))
+            ),
+            patch.object(GCacheMetrics, "SERIALIZATION_TIMER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "REQUEST_COUNTER", MagicMock(), create=True),
+            patch.object(GCacheMetrics, "SIZE_HISTOGRAM", MagicMock(), create=True),
+        ):
+            await RedisCache.put(cache, key, value)
+        return seen
+
+    assert await run({"v": "x"}) == [], "a small payload must stay inline"
+    assert len(await run({"v": "x" * (ASYNC_DECODE_THRESHOLD_BYTES * 2)})) == 1, "a large payload must be offloaded"

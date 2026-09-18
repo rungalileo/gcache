@@ -543,7 +543,9 @@ async def test_every_payload_divergence_case_through_the_REAL_call_sites() -> No
     refused PICKLE values while missing ``bytes`` ones. The corpus was green through both.
 
     Each case runs four ways -- write and read, ``str`` and ``bytes`` -- because the two
-    payload types took different routes at both ends.
+    payload types take different routes at both ends: on write, the base64 branch versus the
+    utf8 one; on read, ``decode`` hands back ``bytes`` for a base64 envelope and ``str`` for
+    a utf8 one.
     """
     from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -556,16 +558,23 @@ async def test_every_payload_divergence_case_through_the_REAL_call_sites() -> No
     section = _DATA["payloadDivergence"]
     key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
 
-    async def read_back(stored_payload: str) -> list[str]:
-        """Hand-build the envelope, so a write guard cannot hide a read-guard gap."""
+    async def read_back(stored_payload: str, encoding: str) -> list[str]:
+        """Hand-build the envelope, so a write guard cannot hide a read-guard gap.
+
+        BOTH encodings. A `bytes` payload reaches encode_json's base64 branch, so `decode`
+        hands the read guard `bytes` rather than `str` -- which is a different route through
+        the guard, and the exact route whose absence was the last defect here. An earlier
+        version of this test claimed to run four ways and ran four on write and one on read.
+        """
         now = int(time.time() * 1000)
+        body = stored_payload if encoding == "utf8" else base64.b64encode(stored_payload.encode()).decode("ascii")
         raw = json.dumps(
             {
                 "version": 1,
                 "createdAtMs": now,
                 "expiresAtMs": now + 60_000,
-                "encoding": "utf8",
-                "payload": stored_payload,
+                "encoding": encoding,
+                "payload": body,
             },
             separators=(",", ":"),
         ).encode()
@@ -594,13 +603,13 @@ async def test_every_payload_divergence_case_through_the_REAL_call_sites() -> No
             else:
                 assert encode_json(created_at_ms=1, ttl_sec=60, payload=value), f"{case['name']}/{label}: {why}"
 
-        # READ. Only reachable as text in a stored envelope, but the guard that reads it is
-        # the one that was gating on the Python type.
-        reasons = await read_back(payload)
-        if rejected:
-            assert reasons == ["divergent_payload_encoding"], f"{case['name']} on read: {reasons} -- {why}"
-        else:
-            assert "divergent_payload_encoding" not in reasons, f"{case['name']} on read: {reasons} -- {why}"
+            # READ, under both encodings: `utf8` hands the guard a str and `base64` hands it
+            # bytes, and gating on that difference is what broke it last time.
+            reasons = await read_back(payload, "utf8" if label == "str" else "base64")
+            if rejected:
+                assert reasons == ["divergent_payload_encoding"], f"{case['name']}/{label} read: {reasons} -- {why}"
+            else:
+                assert "divergent_payload_encoding" not in reasons, f"{case['name']}/{label} read: {reasons} -- {why}"
 
 
 @pytest.mark.asyncio

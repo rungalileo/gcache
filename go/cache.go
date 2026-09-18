@@ -170,6 +170,19 @@ func New[V any](o Options[V]) (*Cache[V], error) {
 			"gcache: Options.TTL %s exceeds the %s watermark lifetime; an entry outliving its "+
 				"watermark would resurrect after invalidation", o.TTL, maxEntryTTL)
 	}
+	// Reject an Envelope this client cannot write. Put branches on `== EnvelopePROTO` and
+	// treats everything else as JSON, so an out-of-range value -- Envelope(99), or a zero
+	// value from a future constant the caller's build does not have -- would SILENTLY write
+	// the wrong framing. A reader sniffs, so it would even decode; the mismatch would only
+	// show as a cache that writes one shape and a peer that expects another.
+	switch o.Envelope {
+	case EnvelopeJSON, EnvelopePROTO:
+	default:
+		return nil, fmt.Errorf(
+			"gcache: Options.Envelope %d is not a supported framing (EnvelopeJSON or EnvelopePROTO)",
+			o.Envelope)
+	}
+
 	if o.Timeout <= 0 {
 		o.Timeout = defaultTimeout
 	}

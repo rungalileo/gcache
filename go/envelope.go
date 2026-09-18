@@ -230,7 +230,14 @@ func decodeProtoEnvelope(data []byte) (payload []byte, createdAtMs int64, expire
 	// GREATER than, not !=. A strict check makes every added field a flag day: an old reader
 	// would reject an entry it could otherwise parse, because the loop above already skips
 	// fields it does not know.
-	if !haveVersion || version > uint64(envelopeVersion) {
+	//
+	// `version < 1` as well, and it is not redundant with !haveVersion: proto3 omits a zero
+	// scalar, so an EXPLICIT zero and an absent field are the same bytes here -- but a frame
+	// could also carry field 1 with value 0 from a writer that set it wrongly, and
+	// haveVersion would be true. Both mean "no usable version" and both must miss. The JSON
+	// envelope already refuses version zero (`version-zero` in the shared corpus expects
+	// reject); this path did not, and one-sided divergence is what the corpus exists to stop.
+	if !haveVersion || version < 1 || version > uint64(envelopeVersion) {
 		return nil, 0, 0, fmt.Errorf("gcache: unsupported envelope version %d", version)
 	}
 	if !haveCreated || !haveExpires || !havePayload {

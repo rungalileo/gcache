@@ -6,6 +6,7 @@ import pytest
 import redislite
 
 from gcache import CacheLayer, GCache, GCacheConfig, GCacheKey, GCacheKeyConfig, RedisConfig
+from gcache._internal.constants import WATERMARK_TTL_SECONDS, validate_invalidation_args
 from gcache._internal.local_cache import LocalCache
 from gcache._internal.noop_cache import NoopCache
 from gcache._internal.redis_cache import RedisCache, create_default_redis_client_factory
@@ -175,3 +176,36 @@ def test_sync_flushall(gcache: GCache, redis_server: redislite.Redis) -> None:
 
         gcache.flushall()
         assert len(redis_server.keys()) == 0
+
+
+class TestInvalidationBufferBounds:
+    """The Go client refused both of these and Python refused neither.
+
+    A negative buffer puts the watermark in the PAST, so it suppresses only entries written
+    before that instant and reports success. A buffer past the watermark's own lifetime lets
+    an entry written inside the window outlive the thing suppressing it and resurrect. Go
+    named both; the divergence is the kind the shared corpus exists to prevent, and it sat on
+    the side with no test.
+    """
+
+    @pytest.mark.parametrize("buffer_ms", [-1, -1000])
+    def test_a_negative_buffer_is_refused(self, buffer_ms: int) -> None:
+        with pytest.raises(ValueError, match="negative"):
+            validate_invalidation_args("kt", "id", buffer_ms)
+
+    def test_a_buffer_past_the_watermark_lifetime_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="watermark lifetime"):
+            validate_invalidation_args("kt", "id", WATERMARK_TTL_SECONDS * 1000 + 1)
+
+    def test_the_boundary_itself_is_allowed(self) -> None:
+        # Exactly the watermark lifetime is legal: the entry expires as the watermark does,
+        # so nothing outlives it. An off-by-one here would reject a valid call.
+        validate_invalidation_args("kt", "id", WATERMARK_TTL_SECONDS * 1000)
+
+    def test_zero_is_allowed(self) -> None:
+        validate_invalidation_args("kt", "id", 0)
+
+    @pytest.mark.parametrize(("kt", "id_"), [("", "id"), ("kt", "")])
+    def test_an_empty_identifier_is_still_refused(self, kt: str, id_: str) -> None:
+        with pytest.raises(ValueError, match="requires both"):
+            validate_invalidation_args(kt, id_, 0)

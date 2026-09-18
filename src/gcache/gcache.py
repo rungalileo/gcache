@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from functools import partial
 from typing import Any
 
+from gcache._internal.constants import validate_invalidation_args
 from gcache._internal.event_loop_thread import EventLoopThread, EventLoopThreadPool
 from gcache._internal.local_cache import LocalCache
 from gcache._internal.metrics import GCacheMetrics
@@ -467,8 +468,7 @@ class GCache:
         # layer exists, so a NoopCache deployment -- documented, and what local runs and many
         # consumer test suites use -- accepted the malformed call while production rejected
         # it. A caller met the bug in the environment where it costs most.
-        if not key_type or not id:
-            raise ValueError("gcache: invalidate requires both key_type and id")
+        validate_invalidation_args(key_type, id, future_buffer_ms)
         await self._redis_cache.invalidate(key_type, id, future_buffer_ms)
 
     def invalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
@@ -478,6 +478,8 @@ class GCache:
         :param key_type: The type of cache key to invalidate.
         :param id: The ID of the entity to invalidate.
         :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the future.
+        :raises ValueError: if ``key_type`` or ``id`` is empty, or ``future_buffer_ms`` is
+            negative or exceeds the watermark lifetime -- via ``ainvalidate``.
         """
         return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, future_buffer_ms))
 

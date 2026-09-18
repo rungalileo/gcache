@@ -11,13 +11,25 @@ on:
         required: true
         type: string
 
+# THREE jobs, not one, and the split is a security boundary rather than tidiness.
+# Validation runs dependency installs and the two test suites -- `go test`, `poetry install`,
+# `inv test-conformance` -- all of which execute code from the repo and its dependency tree.
+# Running that in the same job that later holds GALILEO_AUTOMATION_SSH_PRIVATE_KEY and
+# GALILEO_AUTOMATION_GITHUB_TOKEN means a compromised test or transitive dependency can
+# prepend to PATH via $GITHUB_PATH, or rewrite .git/config or a hook, and be waiting when the
+# next step runs a bare `git tag -s` / `git push` with both credentials in the environment.
+#
+# Jobs get a fresh runner, a fresh filesystem and a fresh environment, so `tag` inherits
+# nothing the validation steps touched. It also carries no dependency installs of its own --
+# only checkout and git -- which is what makes "nothing mutable ran before the secrets
+# appeared" checkable by reading the job rather than by trusting the test suite.
 jobs:
-  release:
+  validate:
     runs-on: ubuntu-latest
-    # READ, not write. The tag push authenticates with GALILEO_AUTOMATION_GITHUB_TOKEN via a
-    # one-shot credential helper, so GITHUB_TOKEN never performs a write -- and setup-go and
-    # setup-python both default their `token` input to github.token, so a write-scoped one
-    # would reach two third-party actions for nothing.
+    # No secrets in this job AT ALL. The checkout below deliberately uses the default
+    # GITHUB_TOKEN rather than the automation one: a same-repo checkout does not need a
+    # push-capable credential, and the whole point of the split is that the token capable of
+    # pushing a permanent tag is never present while third-party code runs.
     permissions:
       contents: read
 
@@ -41,12 +53,11 @@ jobs:
       # and replaced. The trailing comment records the version each SHA was.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # fetch-depth 0: the tag-collision check below reads refs/tags.
           fetch-depth: 0
-          token: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
-          # Do not leave the push-capable token in .git/config. The default is true, which
-          # stores it as an http.extraheader readable by every later step in the job -- and
-          # several of those run third-party code (go test, pipx/poetry install). The
-          # tag push authenticates explicitly instead; see step 4.
+          # No `token:` -- the default GITHUB_TOKEN reads this repo fine, and this job runs
+          # third-party code. persist-credentials: false on top, so even that token is not
+          # left in .git/config as an http.extraheader for the test steps to read.
           persist-credentials: false
 
       # ---------------------------------------------------------------------
@@ -137,9 +148,48 @@ jobs:
           poetry install --with dev,test --no-root
           inv test-conformance
 
+  # =======================================================================
+  # Nothing above this line has run in the same job as a secret, and nothing
+  # below it installs a dependency or runs a test. That is the invariant.
+  # =======================================================================
+  tag:
+    needs: validate
+    runs-on: ubuntu-latest
+    # READ. The tag push authenticates with GALILEO_AUTOMATION_GITHUB_TOKEN via a one-shot
+    # credential helper, so GITHUB_TOKEN never performs a write.
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          # The automation token appears ONLY in this job, which runs no third-party code
+          # beyond checkout itself. persist-credentials: false still applies -- the push
+          # below authenticates explicitly rather than through .git/config.
+          persist-credentials: false
+
+      # Re-checked on this runner, cheaply. `needs: validate` already gated the format and
+      # the collision, but those ran against a different checkout: re-verifying here means
+      # the job that actually creates the permanent tag does not take another job's word for
+      # what it is about to name. A tag collision in particular can appear between the two.
+      - name: Re-assert the version and tag absence on the signing runner
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::version must be canonical SemVer with no leading zeroes, got '$VERSION'"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/go/$VERSION" >/dev/null; then
+            echo "::error::tag go/$VERSION appeared after validation; refusing to retag"
+            exit 1
+          fi
+
       # ---------------------------------------------------------------------
-      # 4. Tag. Annotated and signed with the same automation key release.yaml
-      #    uses -- never bypass signing.
+      # Tag. Annotated and signed with the same automation key release.yaml
+      # uses -- never bypass signing.
       # ---------------------------------------------------------------------
       - name: Create and push the signed tag
         env:
@@ -191,9 +241,26 @@ jobs:
               -c credential.helper='!f() { test "$1" = get && echo "password=${TAG_PUSH_TOKEN}"; }; f' \
               push "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/go/$VERSION"
 
+  verify:
+    needs: tag
+    runs-on: ubuntu-latest
+    # No secrets: by this point the tag is public, and confirming the proxy serves it needs
+    # no credential. Kept out of `tag` so the signing job ends the moment the push does.
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
       # ---------------------------------------------------------------------
-      # 5. Confirm the proxy serves it, which also warms the cache so a consumer's
-      #    first fetch is not the one that populates it.
+      # Confirm the proxy serves it, which also warms the cache so a consumer's
+      # first fetch is not the one that populates it.
       # ---------------------------------------------------------------------
       - name: Verify the module proxy resolves the new version
         env:

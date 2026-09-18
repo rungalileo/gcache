@@ -13,6 +13,7 @@ from gcache._internal.envelope import (
     EnvelopeDecodeError,
     decode,
     encode_json,
+    encode_proto,
 )
 from gcache._internal.metrics import GCacheMetrics
 from gcache._internal.redis_cache import RedisValue
@@ -1747,3 +1748,43 @@ async def test_invalidate_requires_both_key_type_and_id() -> None:
     for key_type, id_ in (("", "id"), ("kt", ""), ("", "")):
         with pytest.raises(ValueError, match="requires both key_type and id"):
             await _Bare().invalidate(key_type, id_, 0)
+
+
+class TestProtoEnvelopeVersionZero:
+    """A PROTO frame with no usable version must MISS, as the JSON envelope already made it.
+
+    The check was `version > ENVELOPE_VERSION` alone, so an explicit-or-absent zero slipped
+    through -- ``0 > 1`` is false -- and a frame carrying no usable version decoded as a hit.
+    The JSON side refuses it (the ``version-zero`` corpus vector expects ``reject``), so this
+    was a one-sided divergence between the two framings of the same envelope.
+    """
+
+    @staticmethod
+    def _reframe(blob: bytes, version: int) -> bytes:
+        """Rewrite field 1 (version) of a canonical proto envelope.
+
+        Field 1 varint is tag 0x08. Setting it to 0 is the case under test; proto3 would
+        normally OMIT a zero, and an absent field decodes as 0 too, so both spellings of
+        "no version" land on the same branch.
+        """
+        assert blob[0] == 0x08, f"expected field 1 varint first, got 0x{blob[0]:02x}"
+        return bytes([0x08, version]) + blob[2:]
+
+    def test_version_zero_is_rejected(self) -> None:
+        good = encode_proto(created_at_ms=1_700_000_000_000, ttl_sec=60, payload=b"hi")
+        assert decode(good, allow_pickle=False).payload == b"hi", "the canonical frame must decode"
+
+        with pytest.raises(EnvelopeDecodeError, match="unsupported envelope version"):
+            decode(self._reframe(good, 0), allow_pickle=False)
+
+    def test_an_absent_version_field_is_rejected(self) -> None:
+        # proto3 omits a zero scalar, so a writer that never set the field produces bytes
+        # with no field 1 at all -- the shape a real non-compliant writer would emit.
+        good = encode_proto(created_at_ms=1_700_000_000_000, ttl_sec=60, payload=b"hi")
+        assert good[0] == 0x08
+        with pytest.raises(EnvelopeDecodeError, match="unsupported envelope version"):
+            decode(good[2:], allow_pickle=False)
+
+    def test_the_current_version_still_decodes(self) -> None:
+        good = encode_proto(created_at_ms=1_700_000_000_000, ttl_sec=60, payload=b"ok")
+        assert decode(self._reframe(good, 1), allow_pickle=False).payload == b"ok"

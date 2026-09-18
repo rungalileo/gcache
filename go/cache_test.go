@@ -1033,3 +1033,37 @@ func TestPutWritesTheDeclaredEnvelope(t *testing.T) {
 		})
 	}
 }
+
+// TestNewRejectsAnUnsupportedEnvelope guards the framing choice at construction.
+//
+// Put branches on `== EnvelopePROTO` and treats everything else as JSON, so an out-of-range
+// Envelope silently wrote the WRONG framing rather than failing. It is invisible downstream
+// too: a reader sniffs the leading byte, so the entry decodes fine and only a peer expecting
+// the declared framing ever notices.
+func TestNewRejectsAnUnsupportedEnvelope(t *testing.T) {
+	base := func() Options[string] {
+		return Options[string]{Client: newFakeClient(), URNPrefix: "urn:galileo:test", TTL: time.Hour}
+	}
+	for _, tc := range []struct {
+		name string
+		env  Envelope
+		ok   bool
+	}{
+		{"json is supported", EnvelopeJSON, true},
+		{"proto is supported", EnvelopePROTO, true},
+		{"an out-of-range value is refused", Envelope(99), false},
+		{"a negative value is refused", Envelope(-1), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o := base()
+			o.Envelope = tc.env
+			_, err := New(o)
+			if tc.ok && err != nil {
+				t.Fatalf("expected %v to be accepted, got %v", tc.env, err)
+			}
+			if !tc.ok && err == nil {
+				t.Fatalf("Envelope(%d) was accepted; Put would silently write JSON framing", tc.env)
+			}
+		})
+	}
+}

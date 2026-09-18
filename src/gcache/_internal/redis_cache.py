@@ -12,7 +12,11 @@ from typing import Any
 from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
-from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES, WATERMARK_TTL_SECONDS
+from gcache._internal.constants import (
+    ASYNC_DECODE_THRESHOLD_BYTES,
+    WATERMARK_TTL_SECONDS,
+    validate_invalidation_args,
+)
 from gcache._internal.envelope import (
     _INT64_MAX,
     _INT64_MIN,
@@ -205,8 +209,7 @@ class RedisCache(CacheInterface):
         # malformed key -- suppressing nothing, while reporting success. Kept as well as the
         # public-API guard: this class is constructed directly in tests and by a consumer
         # reaching past GCache, and it is the layer Go's Invalidate corresponds to.
-        if not key_type or not id:
-            raise ValueError("gcache: invalidate requires both key_type and id")
+        validate_invalidation_args(key_type, id, future_buffer_ms)
 
         GCacheMetrics.INVALIDATION_COUNTER.labels(key_type, self.layer().name).inc()
 

@@ -227,7 +227,16 @@ def _decode_proto(data: bytes) -> DecodedValue:
     # would reject an entry it could otherwise parse, because protobuf already skips fields
     # it does not know. Rejecting only a HIGHER version keeps that forward compatibility and
     # still refuses a deliberate incompatible break.
-    if version is None or version > ENVELOPE_VERSION:
+    # `< 1` as well as `> ENVELOPE_VERSION`. Rejecting only a HIGHER version let an
+    # explicit-or-absent zero through, because 0 > 1 is false -- so a frame carrying no
+    # usable version decoded as a HIT. The JSON envelope already refuses it (the
+    # `version-zero` corpus vector expects `reject`), and this path did not, which is the
+    # kind of one-sided divergence the shared corpus exists to prevent.
+    #
+    # No legitimate writer is excluded: both clients set version explicitly to
+    # ENVELOPE_VERSION (1), and proto3 encodes a non-zero scalar, so a real frame always
+    # carries it. Zero here means an absent field -- a writer that did not set it.
+    if version is None or version < 1 or version > ENVELOPE_VERSION:
         raise EnvelopeDecodeError(f"unsupported envelope version {version!r}")
     if created_at_ms is None or expires_at_ms is None or payload is None:
         raise EnvelopeDecodeError(

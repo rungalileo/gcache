@@ -16,9 +16,10 @@ from collections.abc import AsyncGenerator, Callable, Generator
 import pytest
 import pytest_asyncio
 import redislite
+from google.protobuf import descriptor_pb2
 from redis.asyncio import Redis
 
-from gcache import CacheLayer, Envelope, GCache, GCacheConfig, GCacheKeyConfig, JsonSerializer
+from gcache import CacheLayer, Envelope, GCache, GCacheConfig, GCacheKeyConfig, JsonSerializer, ProtoSerializer
 
 from .conftest import REDIS_PORT
 
@@ -66,11 +67,11 @@ class GoClient:
         env = {**os.environ, "GALILEO_REDIS_HOST": "localhost", "GALILEO_REDIS_PORT": str(REDIS_PORT)}
         return subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
 
-    def put(self, sid: str, value: dict) -> subprocess.CompletedProcess:
-        return self._run(*self._key_flags(sid), "-op", "put", "-value", json.dumps(value))
+    def put(self, sid: str, value: dict, envelope: str = "json") -> subprocess.CompletedProcess:
+        return self._run(*self._key_flags(sid), "-op", "put", "-value", json.dumps(value), "-envelope", envelope)
 
-    def get(self, sid: str) -> subprocess.CompletedProcess:
-        return self._run(*self._key_flags(sid), "-op", "get")
+    def get(self, sid: str, envelope: str = "json") -> subprocess.CompletedProcess:
+        return self._run(*self._key_flags(sid), "-op", "get", "-envelope", envelope)
 
     def invalidate(self, sid: str) -> subprocess.CompletedProcess:
         return self._run("-op", "invalidate", "-key-type", KEY_TYPE, "-id", sid)
@@ -288,3 +289,123 @@ def test_go_and_python_render_identical_keys(go: GoClient, urn_prefix: str) -> N
 
     assert go_keys["value_key"] == py_value_key
     assert go_keys["watermark_key"] == py_watermark_key
+
+
+# --- PROTO envelope -------------------------------------------------------------------
+#
+# The tests above run entirely on Envelope.JSON. PROTO is the envelope orbit's
+# session-identity cache actually ships, so leaving it out meant the framing in production
+# use had never been round-tripped between the two languages through a real Redis -- the
+# corpus pins the bytes and the keys separately, but nothing exercised the composition.
+#
+# descriptor_pb2.FileOptions rather than a schema of our own: gcache deliberately has no
+# .proto and no codegen pipeline, and FileOptions is already compiled into both languages.
+
+
+def assert_stored_framing(redis_server: redislite.Redis, value_key: str, expect: str) -> None:
+    """Assert the FRAMING actually in Redis, by its leading byte.
+
+    Necessary because gcache reads by sniffing the leading byte rather than trusting the
+    key's declared envelope, so a reader happily accepts either framing. A value-level
+    assertion therefore passes no matter which envelope the writer used -- verified: making
+    the Go side write EnvelopeJSON instead of PROTO left every value assertion green. Only
+    the stored bytes distinguish them.
+
+    Ranges are gcache's own dispatch table: 0x08..0x75 protobuf (fields 1-14, any wire
+    type), 0x7b '{' JSON, 0x80 pickle.
+    """
+    raw = redis_server.get(value_key)
+    assert raw is not None, f"nothing stored at {value_key}"
+    first = raw[0]
+    if expect == "proto":
+        assert 0x08 <= first <= 0x75, f"expected a protobuf envelope, got first byte 0x{first:02x}"
+    elif expect == "json":
+        assert first == 0x7B, f"expected a JSON envelope, got first byte 0x{first:02x}"
+    else:
+        raise AssertionError(f"unknown framing {expect!r}")
+
+
+def proto_reader(gc: GCache, sentinel: descriptor_pb2.FileOptions) -> tuple[Callable, dict]:
+    """The PROTO counterpart of python_reader, including its fallback counter.
+
+    The counter is what separates "read Go's entry" from "ran the fallback and produced an
+    equal value" -- for proto especially, comparing the returned message alone would pass
+    against an empty cache.
+    """
+    config = GCacheKeyConfig.enabled(3600)
+    config.ramp[CacheLayer.LOCAL] = 0  # force every read through the shared Redis layer
+
+    calls = {"n": 0}
+
+    @gc.cached(
+        key_type=KEY_TYPE,
+        id_arg="sid",
+        use_case=USE_CASE,
+        track_for_invalidation=True,
+        envelope=Envelope.PROTO,
+        serializer=ProtoSerializer(descriptor_pb2.FileOptions),
+        default_config=config,
+    )
+    async def read(sid: str) -> descriptor_pb2.FileOptions:
+        calls["n"] += 1
+        return sentinel
+
+    return read, calls
+
+
+@pytest.mark.asyncio
+async def test_python_reads_a_proto_value_written_by_go(
+    go: GoClient, py_cache: GCache, redis_server: redislite.Redis
+) -> None:
+    sid = "sid-proto-go-to-py"
+    written = {"goPackage": "from-go", "javaPackage": "com.galileo.x"}
+
+    result = go.put(sid, written, envelope="proto")
+    assert result.returncode == 0, result.stderr
+    assert_stored_framing(redis_server, go.render_keys(sid)["value_key"], "proto")
+
+    # A sentinel that differs in BOTH fields, so a fallback result cannot be mistaken for
+    # Go's entry on a partial match.
+    sentinel = descriptor_pb2.FileOptions(go_package="python-fallback", java_package="com.galileo.fallback")
+    read, calls = proto_reader(py_cache, sentinel=sentinel)
+    with py_cache.enable():
+        got = await read(sid)
+
+    assert calls["n"] == 0, "Python ran its fallback instead of reading Go's PROTO entry"
+    assert got.go_package == "from-go"
+    assert got.java_package == "com.galileo.x"
+
+
+@pytest.mark.asyncio
+async def test_go_reads_a_proto_value_written_by_python(
+    go: GoClient, py_cache: GCache, redis_server: redislite.Redis
+) -> None:
+    sid = "sid-proto-py-to-go"
+    written = descriptor_pb2.FileOptions(go_package="from-python", java_package="com.galileo.py")
+
+    read, _ = proto_reader(py_cache, sentinel=written)
+    with py_cache.enable():
+        await read(sid)  # populates Redis via the fallback
+    assert_stored_framing(redis_server, go.render_keys(sid)["value_key"], "proto")
+
+    result = go.get(sid, envelope="proto")
+    assert result.returncode == 0, f"Go missed Python's PROTO entry: {result.stderr}"
+    # PARSED, not the raw bytes: Go's protojson injects randomised whitespace
+    # (internal/detrand), so its output is not byte-stable even for one message.
+    assert json.loads(result.stdout) == {"goPackage": "from-python", "javaPackage": "com.galileo.py"}
+
+
+@pytest.mark.asyncio
+async def test_a_proto_entry_is_not_readable_as_json(go: GoClient) -> None:
+    """The two framings must not silently cross over.
+
+    gcache dispatches on the leading byte, so a PROTO entry (0x08..0x75) read by a
+    JSON-declared caller must degrade to a MISS, not to a half-parsed value. Without this,
+    an envelope mismatch between the two services would surface as corrupt data rather than
+    as a cache that simply never hits.
+    """
+    sid = "sid-proto-not-json"
+    assert go.put(sid, {"goPackage": "from-go"}, envelope="proto").returncode == 0
+
+    result = go.get(sid, envelope="json")
+    assert result.returncode != 0, f"a JSON reader accepted a PROTO entry: {result.stdout!r}"

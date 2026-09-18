@@ -508,9 +508,11 @@ protobuf itself rather than by an option each language has to remember to set.
 
 **What you give up is inspectability.** A JSON-enveloped entry can be read with `redis-cli
 GET`, piped through `jq`, or parsed inside Redis by a Lua script using `cjson`. A PROTO entry
-is opaque to all three — payload *and* metadata. `go/cmd/gcachectl` is the way to look at one.
-If being able to eyeball an entry matters more than its size, use `Envelope.JSON` with a text
-serializer.
+is opaque to all three — payload *and* metadata. **No general inspector exists yet**:
+`go/cmd/gcachectl` round-trips only the fixed `descriptorpb.FileOptions` the cross-language
+suite uses, and prints no envelope metadata, so pointed at any other message it prints an
+empty or wrong value. If being able to eyeball an entry matters more than its size, use
+`Envelope.JSON` with a text serializer.
 
 ## Redis Configuration
 
@@ -720,15 +722,17 @@ writing back — so the bad entry stayed for its whole TTL and failed every read
 a miss that rewrites the entry, counted as `gcache_miss_counter{reason="..."}`.
 
 **An operator alerting on `gcache_error_counter` loses those two signals**; the equivalent
-alert is a non-empty `reason` on the miss counter. This also means every existing exact-match
-query on `gcache_miss_counter` needs `reason=""` adding, or it will match nothing.
+alert is a non-empty `reason` on the miss counter. Existing queries keep matching — Prometheus
+leaves unnamed labels unconstrained, so `gcache_miss_counter{use_case="x"}` still selects the
+new series. What changes is what they *mean*: such a query now also counts degraded misses.
+Add `reason=""` where you want the old population, not to make the selector work.
 
 | `reason` | What was found |
 |---|---|
 | `undecodable` | The envelope itself could not be parsed (corrupt, or an unknown version) |
-| `json_without_serializer` | A JSON entry on a key that declares no `Serializer` — typically a rolling deploy where new pods have started writing JSON |
-| `lifetime_exceeds_watermark` | A tracked JSON entry whose envelope declares a lifetime longer than the 4-hour watermark TTL, so no watermark can vouch for it |
-| `envelope_expired` | Present in Redis but past the writer's own `expiresAtMs` (see the clock-skew requirement under interop) |
+| `json_without_serializer` | A JSON **or PROTO** entry on a key that declares no `Serializer` — typically a rolling deploy where new pods have started writing an encoded framing. (`_decode_proto` sets `is_json=True`, so a PROTO entry reaches this guard too; the label predates the framing.) |
+| `lifetime_exceeds_watermark` | A tracked JSON **or PROTO** entry whose envelope declares a lifetime longer than the watermark TTL, so no watermark can vouch for it |
+| `envelope_expired` | Present in Redis but past the writer's own `expiresAtMs`. Both clients trust the writer's clock here, so hosts must be NTP-synced; there is no skew tolerance. |
 | `age_exceeds_watermark` | A tracked entry of either framing that is itself older than the watermark TTL — the same invariant by age, and the only one that reaches the pickle path |
 | `unloadable_payload` | The envelope parsed, but the `Serializer` could not load the payload — e.g. another language changed the payload schema |
 | `unreadable_watermark` | The watermark is not a number at all. Suppresses the entry, then deletes the watermark so the next Python read recovers (the Go client cannot delete) |

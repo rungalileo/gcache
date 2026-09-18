@@ -26,10 +26,10 @@ from gcache.config import (
 from gcache.exceptions import (
     EmptyUrnPrefixNotSupported,
     EnvelopeMismatchWithRegisteredUseCase,
+    EnvelopeRequiresSerializer,
     GCacheAlreadyInstantiated,
     GCacheError,
     GCacheKeyPrefixMismatch,
-    JsonEnvelopeRequiresSerializer,
     KeyArgDoesNotExist,
     RedisConfigConflict,
     ReentrantSyncFunctionDetected,
@@ -323,12 +323,12 @@ class GCache:
             if use_case is None:
                 use_case = f"{func.__module__}.{func.__name__}"
 
-            if envelope == Envelope.JSON and serializer is None:
-                # JsonEnvelopeRequiresSerializer, not a bare ValueError: GCacheKey raises that
+            if envelope in (Envelope.JSON, Envelope.PROTO) and serializer is None:
+                # EnvelopeRequiresSerializer, not a bare ValueError: GCacheKey raises that
                 # for the identical condition, so a caller wrapping both in `except GCacheError`
                 # caught one route and not the other.
-                raise JsonEnvelopeRequiresSerializer(
-                    key_type, id_arg if isinstance(id_arg, str) else id_arg[0], use_case
+                raise EnvelopeRequiresSerializer(
+                    key_type, id_arg if isinstance(id_arg, str) else id_arg[0], use_case, envelope.name
                 )
 
             if use_case in self._use_case_registry:

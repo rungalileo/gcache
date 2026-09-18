@@ -64,19 +64,39 @@ class GCacheKeyPrefixMismatch(GCacheError):
         )
 
 
-class JsonEnvelopeRequiresSerializer(GCacheError, ValueError):
-    """Envelope.JSON was declared with no Serializer to produce its string payload.
+class EnvelopeRequiresSerializer(GCacheError, ValueError):
+    """A framing that carries an encoded payload was declared with no Serializer.
+
+    JSON needs one to produce its string payload and PROTO needs one to produce its bytes.
+    PICKLE is the only framing that works without: it serialises the object itself.
+
+    Named for the envelope in general rather than JSON, because the guard originally covered
+    only JSON and PROTO slipped through it -- a PROTO key with no serializer constructed
+    fine and then failed EVERY write, with CacheController swallowing the error and the
+    local layer masking it in-process, so Redis stayed empty for that use case for the life
+    of the deployment. JsonEnvelopeRequiresSerializer remains as an alias.
 
     Also a ValueError, so it stays catchable the same way as the Envelope coercion two
     lines above it in __post_init__ -- a caller validating key construction should not
     need to know which of the two adjacent failures it hit.
     """
 
-    def __init__(self, key_type: str, id: str, use_case: str) -> None:
-        super().__init__(
-            f"GCacheKey {key_type}:{id}#{use_case} uses Envelope.JSON, which requires a "
-            "serializer producing str or bytes (e.g. JsonSerializer())"
+    def __init__(self, key_type: str, id: str, use_case: str, envelope: str = "JSON") -> None:
+        want = (
+            "bytes (e.g. ProtoSerializer(YourMessage))"
+            if envelope == "PROTO"
+            else "str or bytes (e.g. JsonSerializer())"
         )
+        super().__init__(
+            f"GCacheKey {key_type}:{id}#{use_case} uses Envelope.{envelope}, which requires a "
+            f"serializer producing {want}"
+        )
+
+
+# The old name, kept so `except JsonEnvelopeRequiresSerializer` in a consumer keeps working.
+# An alias rather than a subclass: the two must be the same class, or a caller catching the
+# old name would miss a PROTO failure raised as the new one.
+JsonEnvelopeRequiresSerializer = EnvelopeRequiresSerializer
 
 
 class SerializerMismatchWithRegisteredUseCase(GCacheError):
@@ -188,3 +208,24 @@ class UnhashableKeyComponent(GCacheError, ValueError):
     different key spaces. The caller decides what to do with such a value; the one thing this
     must not do is return a digest the other client disagrees with.
     """
+
+
+class UnserializableValue(GCacheError, ValueError):
+    """A value Python can encode but the other client cannot read back identically.
+
+    So far: a lone surrogate. json.dumps emits it as the ASCII escape \\ud800, so the stored
+    envelope is valid ASCII and every layer downstream accepts it -- but Python decodes it to
+    a str holding U+D800 while Go's encoding/json substitutes U+FFFD. Both clients report a
+    hit and return different values, with nothing raised, logged or counted.
+
+    Failing the write is the rule this envelope already follows for the same class of value:
+    allow_nan=False refuses NaN and Infinity because Go's encoding/json rejects them, and
+    hash_component refuses a lone surrogate in a key via UnhashableKeyComponent.
+    """
+
+    def __init__(self, payload: str) -> None:
+        super().__init__(
+            "gcache: value contains a lone surrogate, which this client and the Go client "
+            "decode to different values (U+D800 vs U+FFFD). Refusing the write rather than "
+            f"storing a cross-client divergence: {payload[:120]}"
+        )

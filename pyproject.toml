@@ -24,7 +24,7 @@ classifiers = [
 ]
 dynamic = ["dependencies"]
 
-# protobuf is optional on purpose. Only callers using ProtoJsonSerializer need
+# protobuf is optional on purpose. Only callers using ProtoSerializer need
 # it, and gcache is a widely-imported library -- forcing a protobuf runtime on
 # every consumer to serve a minority of them is the wrong trade. The range is
 # wide because the caller's own protobuf pin, not gcache's, has to win: the

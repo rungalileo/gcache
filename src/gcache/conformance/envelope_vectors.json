@@ -443,6 +443,16 @@
         "name": "group-wire-type",
         "envelopeBase64": "CwEQ+5iRvpIzGNvtlL6SMyIFCgNhYmM=",
         "why": "wire type 3 is a proto2 group. proto3 never emits one, so no client wrote this."
+      },
+      {
+        "name": "proto-negative-created",
+        "envelopeBase64": "CAEQ////////////ARiA0JX/vDEiBQoDYWJj",
+        "why": "created_at_ms is int64 in the schema, so a negative encodes as a 10-byte two's-complement varint. Python read it as UNSIGNED and got 18446744073709551615 while Go read -1: the same bytes, two values. A negative epoch-ms is not a timestamp either way."
+      },
+      {
+        "name": "proto-negative-expires",
+        "envelopeBase64": "CAEQgNCV/7wxGP///////////wEiBQoDYWJj",
+        "why": "the dangerous half: a plausible created_at with a negative expiry. Read as unsigned it is ~584 million years in the future, so the entry never expires and is served as a fresh hit forever -- on one client only."
       }
     ]
   }

@@ -35,7 +35,7 @@ go/                          # Go client (module github.com/rungalileo/gcache/go
 ├── key.go                   # Key grammar, ValueKey, WatermarkKey
 ├── rueidis_client.go        # Client impl over rueidis, with OTel spans
 ├── conformance_test.go      # Go half of the shared corpus
-├── protocodec/              # protojson Codec, kept out of the core import graph
+├── protocodec/              # BINARY protobuf Codec (proto.Marshal), not protojson
 ├── redislive/               # Live-Redis tests, in their own package to keep core hermetic
 └── cmd/gcachectl/           # CLI; also what the Go<->Python suite drives
 ```
@@ -100,7 +100,8 @@ behaviour and key rendering. It is read by BOTH suites: `tests/test_conformance.
 `go/conformance_test.go`.
 
 Run them together with `inv test-conformance`. CI runs it on **every** PR with no path filter,
-unlike the per-language workflows -- it is the only job that checks both clients agree,
+unlike the Go workflow (`test.yaml` is unfiltered too) -- it is the only job that checks both
+clients agree,
 and filtering it would recreate the hole that bringing the Go client in-repo closed.
 
 **Do not copy a case into either suite.** Parity used to be asserted by hand-mirrored literals

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -304,7 +305,7 @@ func TestConformanceArgOrderingCorpusCouldDetectAnUnsortedClient(t *testing.T) {
 // TestHashedComponentsMatchTheSharedDigests pins HashComponent against Python's
 // hash_component. A digest the two disagree on makes a hashed component unfindable by the
 // other language -- a cache that writes fine and never hits, with no error on either side.
-func TestHashedComponentsMatchTheSharedDigests(t *testing.T) {
+func TestConformanceHashedComponentsMatchTheSharedDigests(t *testing.T) {
 	data := loadConformance(t)
 	if data.HashedComponents.Algorithm != "sha256" || data.HashedComponents.Encoding != "hex-lower" {
 		t.Fatalf("unexpected hashing contract: %s/%s",
@@ -327,7 +328,7 @@ func TestHashedComponentsMatchTheSharedDigests(t *testing.T) {
 // TestProtoEnvelopeMatchesTheSharedBytes pins the PROTO framing against Python. Both sides
 // hand-write it, so nothing but these bytes stops them drifting -- and a drift is silent: one
 // client writes an entry the other cannot read, with no error on the write side.
-func TestProtoEnvelopeMatchesTheSharedBytes(t *testing.T) {
+func TestConformanceProtoEnvelopeMatchesTheSharedBytes(t *testing.T) {
 	data := loadConformance(t)
 	c := data.ProtoEnvelope.Canonical
 
@@ -364,7 +365,7 @@ func TestProtoEnvelopeMatchesTheSharedBytes(t *testing.T) {
 // TestProtoFirstByteRangeIsDisjointFromTheOtherFramings is why the framing needs no magic
 // prefix. Asserted over the RANGE, not one example: the guarantee is about every field the
 // schema may ever use, and it only holds while field numbers stay <= 14.
-func TestProtoFirstByteRangeIsDisjointFromTheOtherFramings(t *testing.T) {
+func TestConformanceProtoFirstByteRangeIsDisjointFromTheOtherFramings(t *testing.T) {
 	data := loadConformance(t)
 	lo, hi := data.ProtoEnvelope.FirstByteRange.Min, data.ProtoEnvelope.FirstByteRange.Max
 	if lo != protoFirstByteMin || hi != protoFirstByteMax {
@@ -392,7 +393,7 @@ func TestProtoFirstByteRangeIsDisjointFromTheOtherFramings(t *testing.T) {
 
 // TestProtoEnvelopeRejectsWhatPythonRejects -- each is a value no gcache client writes.
 // Accepting one means answering a hit with data the other client would refuse.
-func TestProtoEnvelopeRejectsWhatPythonRejects(t *testing.T) {
+func TestConformanceProtoEnvelopeRejectsWhatPythonRejects(t *testing.T) {
 	data := loadConformance(t)
 	if len(data.ProtoEnvelope.Rejects) == 0 {
 		t.Fatal("the PROTO reject cases are gone")
@@ -407,5 +408,33 @@ func TestProtoEnvelopeRejectsWhatPythonRejects(t *testing.T) {
 				t.Fatalf("accepted %x, which should be rejected: %s", raw, c.Why)
 			}
 		})
+	}
+}
+
+// TestConformanceEveryTestInThisFileCarriesThePrefix keeps the name-based gate honest.
+//
+// `inv test-conformance` and .github/workflows/conformance.yaml both select Go tests with
+// `-run TestConformance`, so a function in this file without that prefix is silently not run
+// by the job that is described as the only check that the two clients agree. Four were:
+// the hashed-component digests and all three PROTO envelope tests. The job passed while
+// skipping them, which is worse than not having it.
+//
+// A name convention that nothing enforces is a comment. This reads the file and fails if any
+// test function drifts back out of the filter.
+func TestConformanceEveryTestInThisFileCarriesThePrefix(t *testing.T) {
+	src, err := os.ReadFile("conformance_test.go")
+	if err != nil {
+		t.Fatalf("cannot read own source: %v", err)
+	}
+	re := regexp.MustCompile(`(?m)^func (Test\w+)\(`)
+	var stray []string
+	for _, m := range re.FindAllStringSubmatch(string(src), -1) {
+		if !strings.HasPrefix(m[1], "TestConformance") {
+			stray = append(stray, m[1])
+		}
+	}
+	if len(stray) > 0 {
+		t.Fatalf("these tests are skipped by `-run TestConformance`, so the conformance job "+
+			"does not run them: %v -- rename them with the TestConformance prefix", stray)
 	}
 }

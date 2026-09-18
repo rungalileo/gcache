@@ -30,7 +30,7 @@ from gcache._internal.envelope import (
 from gcache._internal.metrics import DEGRADED_REASON, GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
 from gcache.config import CacheConfigProvider, CacheLayer, Envelope, GCacheKey, RedisConfig, render_prefix
-from gcache.exceptions import MissingKeyConfig, TrackedTTLExceedsWatermark
+from gcache.exceptions import EnvelopeRequiresSerializer, MissingKeyConfig, TrackedTTLExceedsWatermark
 
 
 @dataclass(frozen=True, slots=True)
@@ -391,7 +391,13 @@ class RedisCache(CacheInterface):
             # already returns str passes a type check with no serializer and stores
             # non-JSON text in a JSON envelope, which every other language's reader then
             # fails to parse -- the exact breakage this envelope exists to prevent.
-            if key.serializer is None or not isinstance(serialized_value, str | bytes):
+            # The two causes are reported SEPARATELY. As one OR-ed condition the message
+            # always named the payload type, so a missing serializer read as
+            # "requires ... str or bytes, got bytes" -- a type that already matches, leaving
+            # the reader with nothing to change.
+            if key.serializer is None:
+                raise EnvelopeRequiresSerializer(key.key_type, key.id, key.use_case, "JSON")
+            if not isinstance(serialized_value, str | bytes):
                 raise TypeError(
                     f"Envelope.JSON requires a Serializer producing str or bytes for use case "
                     f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=JsonSerializer()."
@@ -401,7 +407,10 @@ class RedisCache(CacheInterface):
             # bytes only. A str payload would be silently utf-8 encoded here and read back as
             # bytes by the other client, so the two would disagree about the value's type
             # with nothing raising.
-            if key.serializer is None or not isinstance(serialized_value, bytes):
+            # Separate causes, separate errors -- see the JSON branch above.
+            if key.serializer is None:
+                raise EnvelopeRequiresSerializer(key.key_type, key.id, key.use_case, "PROTO")
+            if not isinstance(serialized_value, bytes):
                 raise TypeError(
                     f"Envelope.PROTO requires a Serializer producing bytes for use case "
                     f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=ProtoSerializer(YourMessage)."

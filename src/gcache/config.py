@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
@@ -11,11 +12,22 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.state import _GLOBAL_GCACHE_STATE
-from gcache.exceptions import JsonEnvelopeRequiresSerializer, UnhashableKeyComponent, UseCaseNameIsReserved
+from gcache.exceptions import (
+    EnvelopeRequiresSerializer,
+    UnhashableKeyComponent,
+    UnserializableValue,
+    UseCaseNameIsReserved,
+)
 
 #: Async callable that fetches the value on a miss. Zero-argument: ``Callable[..., ...]``
 #: deferred the TypeError to the first cache miss. Bind args with functools.partial.
 Fallback = Callable[[], Awaitable[Any]]
+
+
+# Matches the six-character JSON escape for a surrogate code point, which is what
+# json.dumps emits for one under ensure_ascii. Checked on the ENCODED text rather than the
+# input object, so it catches a surrogate at any depth without walking the structure.
+_LONE_SURROGATE = re.compile(r"\\ud[89ab][0-9a-f]{2}", re.IGNORECASE)
 
 
 class CacheLayer(Enum):
@@ -195,7 +207,26 @@ class JsonSerializer(Serializer):
         # write would succeed and the entry would be
         # unreadable from every non-Python client until its TTL ran out. Failing the write
         # is the rule the rest of this envelope follows.
-        return json.dumps(obj, separators=(",", ":"), allow_nan=False)
+        payload = json.dumps(obj, separators=(",", ":"), allow_nan=False)
+        # A lone surrogate survives json.dumps as the ASCII escape \ud800 (ensure_ascii is on
+        # by default), so the stored envelope is valid ASCII and nothing downstream objects --
+        # but the two clients then decode the same bytes to DIFFERENT values. Python returns a
+        # str holding U+D800; Go's encoding/json substitutes U+FFFD and returns ef bf bd. Both
+        # report a hit, nothing raises, nothing logs, and no metric moves.
+        #
+        # go/envelope.go's utf8.Valid gate cannot catch it, because the stored bytes are
+        # already valid ASCII -- the surrogate only reappears after the JSON unescape.
+        #
+        # Fail the write, exactly as allow_nan=False above does for the same class of value:
+        # encodable by Python, not representable for the other client. hash_component already
+        # refuses this input for the same reason, via UnhashableKeyComponent.
+        try:
+            payload.encode("utf-8").decode("utf-8")
+        except UnicodeDecodeError:  # pragma: no cover - defensive; the encode below is the real gate
+            raise UnserializableValue(payload) from None
+        if _LONE_SURROGATE.search(payload):
+            raise UnserializableValue(payload)
+        return payload
 
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, bytes):
@@ -281,11 +312,15 @@ class GCacheKey:
         # decorator path, so coerce here too and let an unrecognized value raise.
         object.__setattr__(self, "envelope", Envelope(self.envelope))
 
-        # JSON needs a serializer to produce its string payload. cached() rejects the pair
-        # at decoration; a directly-built key was the route left open, failing per request
-        # with Redis silently empty. GCacheError, so `except GCacheError` catches it.
-        if self.envelope is Envelope.JSON and self.serializer is None:
-            raise JsonEnvelopeRequiresSerializer(self.key_type, self.id, self.use_case)
+        # BOTH encoded framings, not just JSON. JSON needs a serializer for its string
+        # payload and PROTO needs one for its bytes; PICKLE is the only framing that works
+        # without, because it serialises the object itself. The guard covered JSON alone, so
+        # a PROTO key with no serializer constructed fine and then failed EVERY write --
+        # CacheController swallows the write error and the local layer masks it in-process,
+        # so Redis stayed empty for that use case for the life of the deployment, which is
+        # exactly the failure this check exists to prevent for JSON.
+        if self.envelope in (Envelope.JSON, Envelope.PROTO) and self.serializer is None:
+            raise EnvelopeRequiresSerializer(self.key_type, self.id, self.use_case, self.envelope.name)
 
         # "watermark" is reserved. cached() rejects it at decoration time; a key built
         # directly for aget/aput skipped that. With invalidation_tracking the urn is then

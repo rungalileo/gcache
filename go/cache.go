@@ -13,12 +13,38 @@ import (
 // watermarkTTL is how long an invalidation watermark lives. It is 4h because that is what
 // Python's gcache hardcodes (WATERMARK_TTL_SECONDS); both languages write into the same key
 // space and must agree.
-const watermarkTTL = 4 * time.Hour
+const watermarkTTL = 5 * time.Hour
 
-// maxEntryTTL caps how long a cached value may live: it must never outlive the watermark
-// that invalidated it, or the invalidated entry resurrects once the watermark expires.
-// Python has no such ceiling, so Get also enforces this on read, not just on write here.
-const maxEntryTTL = watermarkTTL
+// The resurrection invariant is `futureBuffer + entryTTL <= watermarkTTL`: a watermark must
+// outlive every entry it suppresses, or the entry becomes readable again when the tombstone
+// expires. Those two numbers are chosen by DIFFERENT parties -- the buffer by whoever
+// invalidates, the TTL by each writer -- across every use case and both languages. So no
+// single check can see both: an invalidate-time check must guess about writers it cannot
+// see, and a write-time check must guess about invalidations that have not happened.
+//
+// Rather than guess, the sum is split into two caps that hold BY CONSTRUCTION:
+//
+//	maxEntryTTL + maxFutureBuffer <= watermarkTTL      (4h + 1h <= 5h)
+//
+// The watermark lifetime was raised from 4h to 5h rather than lowering the entry cap to 3h.
+// The entry TTL is what consumers configure per use case, so capping it lower would break
+// existing callers; the buffer is a settling window for replication lag, measured in seconds
+// in practice and defaulting to zero, so a 1h ceiling costs nobody anything. The price is one
+// extra hour of tombstone lifetime per invalidated key.
+//
+// Each is then enforced locally against a value its own caller owns -- Put against the TTL,
+// Invalidate against the buffer -- and neither needs the other party's number. The previous
+// bound here (`futureBuffer > watermarkTTL - c.ttl`) only covered entries THIS cache wrote;
+// another cache, or the Python client, could still write a longer-lived entry under the same
+// key type and resurrect past the watermark.
+//
+// Mirrored exactly in Python (constants.py) and pinned by the shared conformance corpus, so
+// the two clients cannot drift on the numbers this contract rests on.
+const maxEntryTTL = 4 * time.Hour
+
+// maxFutureBuffer caps Invalidate's settling window. See maxEntryTTL for why this and the
+// entry TTL are capped separately rather than checked as a sum.
+const maxFutureBuffer = watermarkTTL - maxEntryTTL
 
 // defaultTimeout bounds every Redis call. 300ms, matching what Galileo's ingest service
 // already uses for Redis, so a cache degrades to a miss well before the caller's own
@@ -167,8 +193,10 @@ func New[V any](o Options[V]) (*Cache[V], error) {
 		// Refuse rather than silently clamp: a caller asking for a longer TTL has a
 		// resurrection bug in mind that they should see, not have quietly papered over.
 		return nil, fmt.Errorf(
-			"gcache: Options.TTL %s exceeds the %s watermark lifetime; an entry outliving its "+
-				"watermark would resurrect after invalidation", o.TTL, maxEntryTTL)
+			"gcache: Options.TTL %s exceeds the %s entry-TTL cap; paired with the %s buffer "+
+				"ceiling that keeps buffer+TTL inside the %s watermark lifetime, so an entry "+
+				"cannot outlive the watermark and resurrect after invalidation",
+			o.TTL, maxEntryTTL, maxFutureBuffer, watermarkTTL)
 	}
 	// Reject an Envelope this client cannot write. Put branches on `== EnvelopePROTO` and
 	// treats everything else as JSON, so an out-of-range value -- Envelope(99), or a zero
@@ -343,11 +371,17 @@ func (c *Cache[V]) Invalidate(ctx context.Context, keyType, id string, futureBuf
 	// The watermark must outlive every entry it suppresses, so futureBuffer+TTL is the real
 	// ceiling. Compared rather than summed: the sum overflows time.Duration and comes out
 	// NEGATIVE -- time.Duration(math.MaxInt64) once passed on a 2h-TTL cache this way.
-	if futureBuffer > watermarkTTL-c.ttl {
+	// Against maxFutureBuffer, NOT watermarkTTL-c.ttl. The old form used this cache's own
+	// TTL, so it protected only entries this cache wrote -- Invalidate covers every use case
+	// and both languages, and a longer-lived entry written elsewhere under the same key type
+	// escaped it entirely. The constant pairs with maxEntryTTL to make the sum safe for every
+	// writer, not just this one.
+	if futureBuffer > maxFutureBuffer {
 		return fmt.Errorf(
-			"gcache: futureBuffer %s plus TTL %s exceeds the %s watermark lifetime; an entry "+
-				"written inside the buffer would outlive the watermark and resurrect",
-			futureBuffer, c.ttl, watermarkTTL)
+			"gcache: futureBuffer %s exceeds the %s ceiling; with the %s entry-TTL cap that "+
+				"keeps buffer+TTL inside the %s watermark lifetime, so an entry written inside "+
+				"the buffer cannot outlive the watermark and resurrect",
+			futureBuffer, maxFutureBuffer, maxEntryTTL, watermarkTTL)
 	}
 
 	callerCtx := ctx

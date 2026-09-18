@@ -1548,12 +1548,15 @@ async def test_a_tracked_entry_outliving_the_watermark_is_distrusted() -> None:
 
 @pytest.mark.asyncio
 async def test_a_tracked_write_longer_than_the_watermark_is_refused() -> None:
-    # The write half of the same invariant. Go rejects at construction (maxEntryTTL); Python's
-    # TTL arrives from a runtime provider, so the write is the first point that knows it.
-    # Raises rather than caps: a cap would silently shorten the TTL and hide the misconfig.
+    # The write half of the resurrection invariant, now capped at MAX_TRACKED_TTL_SECONDS
+    # rather than the full watermark lifetime: the TTL cap pairs with the buffer cap so
+    # buffer+TTL stays inside the watermark by construction (see constants.py). Go rejects
+    # at construction (maxEntryTTL); Python's TTL arrives from a runtime provider, so the
+    # write is the first point that knows it. Raises rather than caps: a cap would silently
+    # shorten the TTL and hide the misconfig.
     from unittest.mock import AsyncMock, MagicMock, patch
 
-    from gcache._internal.constants import WATERMARK_TTL_SECONDS
+    from gcache._internal.constants import MAX_TRACKED_TTL_SECONDS
     from gcache._internal.redis_cache import RedisCache
     from gcache.exceptions import TrackedTTLExceedsWatermark
 
@@ -1568,8 +1571,8 @@ async def test_a_tracked_write_longer_than_the_watermark_is_refused() -> None:
     untracked = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
     fake = MagicMock(setex=AsyncMock(), set=AsyncMock())
     cache = object.__new__(RedisCache)
-    over = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: WATERMARK_TTL_SECONDS + 1}, ramp={CacheLayer.REMOTE: 100})
-    at = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: WATERMARK_TTL_SECONDS}, ramp={CacheLayer.REMOTE: 100})
+    over = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: MAX_TRACKED_TTL_SECONDS + 1}, ramp={CacheLayer.REMOTE: 100})
+    at = GCacheKeyConfig(ttl_sec={CacheLayer.REMOTE: MAX_TRACKED_TTL_SECONDS}, ramp={CacheLayer.REMOTE: 100})
 
     with (
         patch.object(RedisCache, "client", property(lambda _self: fake)),

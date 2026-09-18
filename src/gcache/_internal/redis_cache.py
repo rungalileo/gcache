@@ -14,6 +14,7 @@ from redis.asyncio import Redis, RedisCluster
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import (
     ASYNC_DECODE_THRESHOLD_BYTES,
+    MAX_TRACKED_TTL_SECONDS,
     WATERMARK_TTL_SECONDS,
     validate_invalidation_args,
 )
@@ -374,8 +375,11 @@ class RedisCache(CacheInterface):
         # Refuse a tracked write outliving its watermark. Raising, not capping: a cap
         # silently shortens the configured TTL and the read guard then never fires, so the
         # misconfiguration stays invisible. gcache swallows write errors, so this is safe.
-        if key.invalidation_tracking and ttl > WATERMARK_TTL_SECONDS:
-            raise TrackedTTLExceedsWatermark(key.use_case, ttl, WATERMARK_TTL_SECONDS)
+        # MAX_TRACKED_TTL_SECONDS, not the full watermark lifetime: the cap pairs with
+        # MAX_FUTURE_BUFFER_SECONDS so buffer+TTL stays inside the watermark by construction.
+        # See constants.py for why the sum is split rather than checked in one place.
+        if key.invalidation_tracking and ttl > MAX_TRACKED_TTL_SECONDS:
+            raise TrackedTTLExceedsWatermark(key.use_case, ttl, MAX_TRACKED_TTL_SECONDS)
 
         start_time = time.monotonic()
         serialized_value = value if key.serializer is None else await key.serializer.dump(value)

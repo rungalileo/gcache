@@ -6,7 +6,12 @@ import pytest
 import redislite
 
 from gcache import CacheLayer, GCache, GCacheConfig, GCacheKey, GCacheKeyConfig, RedisConfig
-from gcache._internal.constants import WATERMARK_TTL_SECONDS, validate_invalidation_args
+from gcache._internal.constants import (
+    MAX_FUTURE_BUFFER_SECONDS,
+    MAX_TRACKED_TTL_SECONDS,
+    WATERMARK_TTL_SECONDS,
+    validate_invalidation_args,
+)
 from gcache._internal.local_cache import LocalCache
 from gcache._internal.noop_cache import NoopCache
 from gcache._internal.redis_cache import RedisCache, create_default_redis_client_factory
@@ -193,14 +198,38 @@ class TestInvalidationBufferBounds:
         with pytest.raises(ValueError, match="negative"):
             validate_invalidation_args("kt", "id", buffer_ms)
 
-    def test_a_buffer_past_the_watermark_lifetime_is_refused(self) -> None:
-        with pytest.raises(ValueError, match="watermark lifetime"):
-            validate_invalidation_args("kt", "id", WATERMARK_TTL_SECONDS * 1000 + 1)
+    def test_a_buffer_past_the_ceiling_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="ceiling"):
+            validate_invalidation_args("kt", "id", MAX_FUTURE_BUFFER_SECONDS * 1000 + 1)
 
     def test_the_boundary_itself_is_allowed(self) -> None:
-        # Exactly the watermark lifetime is legal: the entry expires as the watermark does,
-        # so nothing outlives it. An off-by-one here would reject a valid call.
-        validate_invalidation_args("kt", "id", WATERMARK_TTL_SECONDS * 1000)
+        # Exactly MAX_FUTURE_BUFFER_SECONDS is legal, and this is the case the earlier version
+        # of this test got WRONG. It pinned the full watermark lifetime as the boundary and
+        # justified it with "the entry expires as the watermark does" -- which is false. The
+        # watermark expires 4h after the INVALIDATION, not 4h after the entry, so a 4h buffer
+        # plus a legal 1h TTL let an entry live an hour past its own tombstone.
+        validate_invalidation_args("kt", "id", MAX_FUTURE_BUFFER_SECONDS * 1000)
+
+    def test_raising_the_ttl_cap_cannot_silently_eliminate_the_buffer(self) -> None:
+        # NOT `sum <= WATERMARK`. That assertion is vacuous: MAX_FUTURE_BUFFER_SECONDS is
+        # DERIVED as WATERMARK - MAX_TRACKED_TTL, so the sum is always exactly WATERMARK and
+        # the check can never fail. Verified by mutation -- raising the TTL cap to 5h left it
+        # green, because the buffer silently collapsed to 0.
+        #
+        # A zero buffer is the real regression hiding behind that: invalidate would still
+        # "work", but every settling window would be refused, so a caller papering over
+        # replication lag would start getting ValueError with no constant obviously wrong.
+        assert MAX_FUTURE_BUFFER_SECONDS > 0, (
+            "the buffer allowance has been squeezed to nothing; MAX_TRACKED_TTL_SECONDS was "
+            "raised to meet WATERMARK_TTL_SECONDS, leaving no room for any settling window"
+        )
+        assert MAX_TRACKED_TTL_SECONDS + MAX_FUTURE_BUFFER_SECONDS == WATERMARK_TTL_SECONDS
+
+    def test_the_old_unsafe_buffer_is_now_refused(self) -> None:
+        # The concrete case that was accepted before: a 4h buffer, with a tracked entry of a
+        # legal 1h TTL written just before it elapses, outlived its watermark by an hour.
+        with pytest.raises(ValueError, match="ceiling"):
+            validate_invalidation_args("kt", "id", WATERMARK_TTL_SECONDS * 1000)
 
     def test_zero_is_allowed(self) -> None:
         validate_invalidation_args("kt", "id", 0)

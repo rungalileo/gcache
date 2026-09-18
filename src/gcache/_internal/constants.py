@@ -13,7 +13,36 @@ ASYNC_DECODE_THRESHOLD_BYTES = 50_000
 # Watermark TTL must be longer than any invalidatable cache's TTL to ensure
 # invalidation works correctly. 4 hours is a heuristic that covers most use cases.
 # If your cache TTLs exceed 4 hours, consider making this configurable.
-WATERMARK_TTL_SECONDS = 3600 * 4  # 4 hours
+WATERMARK_TTL_SECONDS = 3600 * 5  # 5 hours
+
+# The resurrection invariant is `future_buffer + entry_ttl <= WATERMARK_TTL_SECONDS`: a
+# watermark must outlive every entry it suppresses, or the entry becomes readable again once
+# the tombstone expires. Those two numbers are chosen by DIFFERENT parties -- the buffer by
+# whoever invalidates, the TTL by each writer -- across every use case and both languages, so
+# no single check can see both. An invalidate-time check must guess about writers it cannot
+# see; a write-time check must guess about invalidations that have not happened yet.
+#
+# Rather than guess, the sum is split into two caps that hold BY CONSTRUCTION:
+#
+#     MAX_TRACKED_TTL_SECONDS + MAX_FUTURE_BUFFER_SECONDS <= WATERMARK_TTL_SECONDS
+#                        4h   +                        1h  <=                    5h
+#
+# The watermark lifetime was RAISED from 4h to 5h rather than lowering the entry cap to 3h.
+# The entry TTL is what consumers configure per use case, so capping it lower would break
+# existing callers; the buffer is a settling window for replication lag, measured in seconds
+# in practice and defaulting to zero, so a 1h ceiling costs nobody anything. The price is one
+# extra hour of tombstone lifetime per invalidated key.
+#
+# Each is enforced locally against a value its own caller owns -- the write path against the
+# TTL, invalidate against the buffer -- and neither needs the other party's number.
+#
+# This replaces two checks that were each wrong in a different direction: Python bounded the
+# buffer only by the full watermark lifetime (so buffer=4h with a legal 1h TTL let an entry
+# outlive its tombstone by an hour), and Go bounded it by watermarkTTL minus the CALLING
+# cache's TTL, which protected only that cache's own entries. Mirrored exactly in Go
+# (cache.go) and pinned by the shared conformance corpus.
+MAX_TRACKED_TTL_SECONDS = 3600 * 4  # 4 hours
+MAX_FUTURE_BUFFER_SECONDS = WATERMARK_TTL_SECONDS - MAX_TRACKED_TTL_SECONDS  # 1 hour
 
 # Thread pool
 # Default thread pool size for running async operations from sync code.
@@ -50,17 +79,17 @@ def validate_invalidation_args(key_type: str, id: str, future_buffer_ms: int) ->
         raise ValueError(
             f"gcache: future_buffer_ms {future_buffer_ms} is negative; it moves the watermark into the past"
         )
-    if future_buffer_ms > WATERMARK_TTL_SECONDS * 1000:
-        # The watermark would expire before the buffer it is meant to span, so entries
-        # written inside the window outlive the thing suppressing them and resurrect.
-        #
-        # Go bounds this more tightly, at watermarkTTL MINUS the cache's TTL, because a Go
-        # Cache has one TTL for every key. Python's TTL is per key and is not in scope here,
-        # so this enforces the unconditional ceiling instead. The gap is covered from the
-        # other side: a tracked write whose TTL exceeds the watermark already raises
-        # TrackedTTLExceedsWatermark, so ttl <= WATERMARK_TTL_SECONDS always holds.
+    if future_buffer_ms > MAX_FUTURE_BUFFER_SECONDS * 1000:
+        # Against MAX_FUTURE_BUFFER_SECONDS, not the full watermark lifetime. The earlier
+        # ceiling accepted a 4h buffer and justified it with "a tracked TTL can never exceed
+        # the watermark, so the gap is closed" -- which is the wrong inequality. The gap needs
+        # buffer + ttl <= WATERMARK, not ttl <= WATERMARK: invalidate with a 4h buffer, then
+        # write a tracked entry with a perfectly legal 1h TTL just before the buffer elapses,
+        # and the watermark dies at T0+4h while the entry lives to T0+5h and reads fresh.
         raise ValueError(
             f"gcache: future_buffer_ms {future_buffer_ms} exceeds the "
-            f"{WATERMARK_TTL_SECONDS}s watermark lifetime; an entry written inside the "
-            f"buffer would outlive the watermark and resurrect"
+            f"{MAX_FUTURE_BUFFER_SECONDS * 1000}ms ceiling; with the "
+            f"{MAX_TRACKED_TTL_SECONDS}s tracked-TTL cap that keeps buffer+TTL inside the "
+            f"{WATERMARK_TTL_SECONDS}s watermark lifetime, so an entry written inside the "
+            f"buffer cannot outlive the watermark and resurrect"
         )

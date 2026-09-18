@@ -282,12 +282,18 @@ func TestPutReportsWriteFailures(t *testing.T) {
 }
 
 func TestNewRejectsATTLThatWouldOutliveItsWatermark(t *testing.T) {
-	_, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix, TTL: watermarkTTL + time.Second})
+	// maxEntryTTL, NOT watermarkTTL: the two are no longer the same number. The entry cap
+	// pairs with maxFutureBuffer so buffer+TTL stays inside the watermark, so a TTL equal to
+	// the whole watermark lifetime must now be refused.
+	_, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix, TTL: maxEntryTTL + time.Second})
 	if err == nil {
-		t.Fatal("New accepted a TTL longer than the watermark lifetime")
+		t.Fatal("New accepted a TTL longer than the entry cap")
 	}
-	if _, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix, TTL: watermarkTTL}); err != nil {
-		t.Errorf("New rejected a TTL exactly at the limit: %v", err)
+	if _, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix, TTL: watermarkTTL}); err == nil {
+		t.Error("New accepted a TTL equal to the whole watermark lifetime; that leaves no room for any buffer")
+	}
+	if _, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix, TTL: maxEntryTTL}); err != nil {
+		t.Errorf("New rejected a TTL exactly at the cap: %v", err)
 	}
 }
 
@@ -312,11 +318,14 @@ func TestInvalidateRejectsAFutureBufferTheWatermarkCannotOutlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cache.Invalidate(context.Background(), "kt", "id", 2*time.Hour+time.Second); err == nil {
-		t.Error("Invalidate accepted a futureBuffer that outlives the watermark")
+	// The ceiling is the CONSTANT maxFutureBuffer now, not watermarkTTL minus this cache's
+	// TTL. The old form only protected entries this cache wrote -- Invalidate spans every use
+	// case and both languages, so a longer-lived entry written elsewhere escaped it.
+	if err := cache.Invalidate(context.Background(), "kt", "id", maxFutureBuffer+time.Second); err == nil {
+		t.Error("Invalidate accepted a futureBuffer above the ceiling")
 	}
-	if err := cache.Invalidate(context.Background(), "kt", "id", 2*time.Hour); err != nil {
-		t.Errorf("Invalidate rejected a futureBuffer exactly at the limit: %v", err)
+	if err := cache.Invalidate(context.Background(), "kt", "id", maxFutureBuffer); err != nil {
+		t.Errorf("Invalidate rejected a futureBuffer exactly at the ceiling: %v", err)
 	}
 }
 
@@ -861,8 +870,8 @@ func TestInvalidateRejectsAFutureBufferThatOverflowsTheGuard(t *testing.T) {
 	}
 
 	// The largest buffer that genuinely fits must still be accepted, so the guard is not
-	// simply refusing everything: watermarkTTL - ttl = 2h here.
-	if err := cache.Invalidate(context.Background(), "session_id", "sid-2", 2*time.Hour); err != nil {
+	// simply refusing everything: maxFutureBuffer, independent of this cache's TTL.
+	if err := cache.Invalidate(context.Background(), "session_id", "sid-2", maxFutureBuffer); err != nil {
 		t.Errorf("Invalidate rejected the largest valid buffer: %v", err)
 	}
 }

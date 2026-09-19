@@ -271,7 +271,7 @@ class RedisCache(CacheInterface):
         payload carries no ``\\u`` escapes at all, so the substring gate answers it in
         0.022ms; the expensive shape is escape-dense ASCII at 5.1ms, whose code-point count
         already equals its byte count and was never mis-measured. That shape is what
-        ASYNC_CHECK_THRESHOLD_ESCAPES exists for.
+        ASYNC_CHECK_THRESHOLD_BACKSLASHES exists for.
 
         What this fixes is simpler and still worth fixing: the offload moves the whole
         encoder off the loop, not only the check, and a threshold named in bytes must

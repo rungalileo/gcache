@@ -9,17 +9,24 @@ LOCAL_CACHE_MAX_SIZE = 10_000
 # just as a large pickle does.
 ASYNC_DECODE_THRESHOLD_BYTES = 50_000
 
-# The SECOND axis, because the cross-client divergence check does not scale with size. Its
-# cost is one loop iteration per `\u` escape -- measured at ~0.2us each -- so a payload can
-# be small and still expensive. The densest payload that slips under the byte threshold is
-# 49,209 bytes of emoji: 8,200 escapes, 1.73ms, against 0.03ms to parse the same bytes. That
-# is 59x the work it sits beside, all of it on the event loop.
+# The SECOND axis, because the cross-client divergence check does not scale with size.
 #
-# A byte gate cannot see that, and the inline bound it does give is accidental -- the product
-# of the byte threshold and the bytes-per-escape ratio, which moves if either changes. 1,000
-# escapes is ~0.21ms, chosen to match the implied inline budget of the byte threshold rather
-# than picked for its own sake.
-ASYNC_CHECK_THRESHOLD_ESCAPES = 1_000
+# Its expensive half runs only when the payload holds a `\ud` escape at all -- without one,
+# lone_surrogate_reason exits at a C-level substring scan. Past that gate it walks
+# body.find("\\"), so the cost is one Python-level iteration per BACKSLASH, not per escape
+# and not per byte. Measured 0.07us for a plain escape and 0.21us for a `\uXXXX` one, which
+# parses four hex digits and may look ahead for a pair.
+#
+# Counted in backslashes for that reason. An earlier version counted `\u` and was wrong in
+# both directions: 20 KiB of Japanese carries 3,400 `\u` escapes and no surrogates, so the
+# check exits in 0.049ms and the gate offloaded it anyway -- an executor round trip costs
+# ~0.064ms, more than the work it avoids, on every read of any CJK, Cyrillic, Greek, Hebrew,
+# Arabic or accented-Latin payload under the byte threshold. Meanwhile one surrogate pair
+# beside 6,000 `\n` escapes measured 0.436ms and stayed inline, because it holds two `\u`.
+#
+# 1,000 backslashes is 0.07-0.21ms, matching the implied inline budget of the byte threshold
+# rather than picked for its own sake.
+ASYNC_CHECK_THRESHOLD_BACKSLASHES = 1_000
 
 # TTLs (seconds)
 # The watermark must outlive every entry it can suppress. It is 5 hours, which is the

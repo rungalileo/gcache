@@ -13,7 +13,7 @@ from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import (
-    ASYNC_CHECK_THRESHOLD_ESCAPES,
+    ASYNC_CHECK_THRESHOLD_BACKSLASHES,
     ASYNC_DECODE_THRESHOLD_BYTES,
     MAX_FUTURE_BUFFER_SECONDS,
     MAX_TRACKED_TTL_SECONDS,
@@ -232,19 +232,32 @@ class RedisCache(CacheInterface):
     def _should_offload(payload: str | bytes) -> bool:
         """Whether the divergence check on ``payload`` belongs in the executor.
 
-        TWO axes, because the check does not scale with size. Its cost is one loop iteration
-        per ``\\u`` escape, so a payload can be small and still expensive: 49,209 bytes of
-        emoji is 8,200 escapes and 1.73ms, against 0.03ms to parse the same bytes. A byte
-        gate alone left that inline, and the bound it gave was accidental -- the product of
-        the threshold and the bytes-per-escape ratio.
+        TWO axes, because the check does not scale with size. Its expensive half runs only
+        when the payload holds a ``\\ud`` escape at all -- without one, lone_surrogate_reason
+        exits at a C-level substring scan. Past that gate it walks ``body.find("\\\\")``, so
+        the cost is one Python-level iteration per BACKSLASH.
 
-        The escape count is only taken for a payload already under the byte threshold, so
-        the extra scan is bounded by that threshold and is a single C-level ``count``.
+        Both halves of that sentence are load-bearing, and an earlier version of this gate
+        counted ``\\u`` and got both wrong. It over-triggered on ordinary non-ASCII text: 20
+        KiB of Japanese is 3,400 ``\\u`` escapes and no surrogates, so the check exits in
+        0.049ms while an executor round trip costs ~0.064ms -- paying more than it saves on
+        every read of any non-Latin payload, since JsonSerializer's ensure_ascii turns every
+        such character into one escape. And it under-triggered on the shape the gate exists
+        for: one surrogate pair beside 6,000 ``\\n`` escapes measured 0.436ms and stayed
+        inline, because it holds two ``\\u``.
+
+        Counted only for a payload already under the byte threshold, so the extra scan is
+        bounded by that threshold and is a single C-level ``count``.
         """
         if RedisCache._payload_bytes(payload) >= ASYNC_DECODE_THRESHOLD_BYTES:
             return True
-        needle = b"\\u" if isinstance(payload, bytes) else "\\u"
-        return payload.count(needle) >= ASYNC_CHECK_THRESHOLD_ESCAPES  # type: ignore[arg-type]
+        if isinstance(payload, bytes):
+            if b"\\ud" not in payload and b"\\uD" not in payload:
+                return False
+            return payload.count(b"\\") >= ASYNC_CHECK_THRESHOLD_BACKSLASHES
+        if "\\ud" not in payload and "\\uD" not in payload:
+            return False
+        return payload.count("\\") >= ASYNC_CHECK_THRESHOLD_BACKSLASHES
 
     @staticmethod
     def _payload_bytes(payload: str | bytes) -> int:

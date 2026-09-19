@@ -2392,7 +2392,7 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
     import json as _json
     from unittest.mock import AsyncMock, MagicMock, patch
 
-    from gcache._internal.constants import ASYNC_CHECK_THRESHOLD_ESCAPES, ASYNC_DECODE_THRESHOLD_BYTES
+    from gcache._internal.constants import ASYNC_CHECK_THRESHOLD_BACKSLASHES, ASYNC_DECODE_THRESHOLD_BYTES
     from gcache._internal.redis_cache import RedisCache
     from gcache.exceptions import GCacheError
 
@@ -2454,14 +2454,35 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
     assert len(dumped.encode()) > ASYNC_DECODE_THRESHOLD_BYTES, "over it in BYTES, which is what counts"
     assert len(await run({"v": payload}, emoji_key)) == 1, "a multibyte payload over the BYTE threshold must offload"
 
-    # ESCAPE-DENSE but SMALL, which the byte gate alone cannot see. The check costs one loop
-    # iteration per escape, so 49 KB of emoji is 8,200 escapes and 1.73ms -- 59x the 0.03ms
-    # to parse the same bytes, and it slipped under the byte threshold entirely.
-    dense = "\U0001f600" * (ASYNC_CHECK_THRESHOLD_ESCAPES // 2 + 100)
+    # The SECOND axis, and three cases that separate what it counts from what it must not.
+    # The check's expensive half runs only when a `\ud` escape is present, and then costs one
+    # iteration per BACKSLASH -- so a gate counting `\u` is wrong in both directions, and a
+    # single emoji case cannot tell the two units apart because it satisfies both.
+
+    # (a) ESCAPE-DENSE and small: under the byte gate, over the backslash gate. 49 KB of
+    #     emoji is 8,200 escapes and 1.73ms, against 0.03ms to parse the same bytes.
+    dense = "\U0001f600" * (ASYNC_CHECK_THRESHOLD_BACKSLASHES // 2 + 100)
     dumped_dense = _json.dumps({"v": dense})
     assert len(dumped_dense.encode()) < ASYNC_DECODE_THRESHOLD_BYTES, "must be UNDER the byte gate"
-    assert dumped_dense.count("\\u") >= ASYNC_CHECK_THRESHOLD_ESCAPES, "and over the escape gate"
     assert len(await run({"v": dense})) == 1, "an escape-dense payload must offload on the second axis"
+
+    # (b) MANY `\u` escapes, NO surrogates: ordinary non-ASCII text. ensure_ascii turns every
+    #     such character into an escape, so any CJK/Cyrillic/Greek/accented payload lands
+    #     here -- and the check exits at its substring gate in 0.049ms, less than the ~0.064ms
+    #     an executor round trip costs. A gate counting `\u` offloaded all of it.
+    japanese = "\u65e5\u672c\u8a9e\u306e\u30c6\u30ad\u30b9\u30c8" * 425
+    dumped_jp = _json.dumps({"v": japanese})
+    assert dumped_jp.count("\\u") > ASYNC_CHECK_THRESHOLD_BACKSLASHES, "many escapes..."
+    assert "\\ud" not in dumped_jp, "...but no surrogates, so the check exits immediately"
+    assert await run({"v": japanese}) == [], "ordinary non-ASCII text must NOT pay a thread hop"
+
+    # (c) FEW `\u` escapes, MANY backslashes, with a surrogate present: 0.436ms inline, nine
+    #     times case (b), and a `\u` count of 2 left it inline.
+    backslashy = "\U0001f600" + "\n" * (ASYNC_CHECK_THRESHOLD_BACKSLASHES * 6)
+    dumped_bs = _json.dumps({"v": backslashy})
+    assert dumped_bs.count("\\u") < 10, "few \\u escapes..."
+    assert dumped_bs.count("\\") >= ASYNC_CHECK_THRESHOLD_BACKSLASHES, "...but many backslashes"
+    assert len(await run({"v": backslashy})) == 1, "cost follows backslashes, so this must offload"
 
     # A LITERAL lone surrogate, through put() rather than through encode_json. This route is
     # how a regression reached HEAD green: the size check ran before the guard and its plain

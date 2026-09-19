@@ -1,0 +1,289 @@
+name: Go Module Release
+
+# A Go release is a git tag and nothing else. proxy.golang.org caches versions IMMUTABLY, so
+# a broken go/v0.1.0 cannot be re-tagged -- it is burned and replaced by go/v0.1.1.
+# Everything therefore validates BEFORE the tag. The only irreversible step in the repo.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Module version, e.g. v0.1.0 (the git tag becomes go/v0.1.0)"
+        required: true
+        type: string
+
+# THREE jobs, not one, and the split is a security boundary rather than tidiness.
+# Validation runs dependency installs and the two test suites -- `go test`, `poetry install`,
+# `inv test-conformance` -- all of which execute code from the repo and its dependency tree.
+# Running that in the same job that later holds GALILEO_AUTOMATION_SSH_PRIVATE_KEY and
+# GALILEO_AUTOMATION_GITHUB_TOKEN means a compromised test or transitive dependency can
+# prepend to PATH via $GITHUB_PATH, or rewrite .git/config or a hook, and be waiting when the
+# next step runs a bare `git tag -s` / `git push` with both credentials in the environment.
+#
+# Jobs get a fresh runner, a fresh filesystem and a fresh environment, so `tag` inherits
+# nothing the validation steps touched. It also carries no dependency installs of its own --
+# only checkout and git -- which is what makes "nothing mutable ran before the secrets
+# appeared" checkable by reading the job rather than by trusting the test suite.
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    # No secrets in this job AT ALL. The checkout below deliberately uses the default
+    # GITHUB_TOKEN rather than the automation one: a same-repo checkout does not need a
+    # push-capable credential, and the whole point of the split is that the token capable of
+    # pushing a permanent tag is never present while third-party code runs.
+    permissions:
+      contents: read
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      # Every third-party action here is pinned to a full commit SHA, not a major tag.
+      # This job is privileged in a way the other workflows are not: it holds the SSH
+      # signing key and can push a signed tag, and a Go module version is PERMANENT once
+      # proxy.golang.org caches it. A moved @v4 would run unreviewed code with both of
+      # those in reach, and the resulting release could not be withdrawn -- only burned
+      # and replaced. The trailing comment records the version each SHA was.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # fetch-depth 0: the tag-collision check below reads refs/tags.
+          fetch-depth: 0
+          # No `token:` -- the default GITHUB_TOKEN reads this repo fine, and this job runs
+          # third-party code. persist-credentials: false on top, so even that token is not
+          # left in .git/config as an http.extraheader for the test steps to read.
+          persist-credentials: false
+
+      # ---------------------------------------------------------------------
+      # 1. Validate the input before anything else touches the repo.
+      # ---------------------------------------------------------------------
+      - name: Validate the version and check for tag collisions
+        env:
+          VERSION: ${{ inputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          # Each component is 0 or has no leading zero: v01.02.03 is not canonical SemVer,
+          # and the proxy would cache it permanently as a version nobody would ever write.
+          if ! printf '%s' "$VERSION" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::version must be canonical SemVer with no leading zeroes, got '$VERSION'"
+            exit 1
+          fi
+
+          # workflow_dispatch accepts ANY ref, and this job tags that ref's HEAD. A version
+          # published to proxy.golang.org is permanent, so dispatching from a feature branch
+          # by mistake burns the version rather than producing a fixable release. Releases
+          # come from the default branch only.
+          if [ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]; then
+            echo "::error::refusing to release from '$GITHUB_REF_NAME'; dispatch from '$DEFAULT_BRANCH'."
+            echo "::error::proxy.golang.org caches a version immutably, so a wrong tag burns it."
+            exit 1
+          fi
+
+          # The module lives in go/, so Go requires a go/-prefixed tag. Consumers still
+          # write the bare version in go.mod; Go maps between them.
+          if git rev-parse -q --verify "refs/tags/go/$VERSION" >/dev/null; then
+            echo "::error::tag go/$VERSION already exists. proxy.golang.org caches versions"
+            echo "::error::immutably, so this one cannot be replaced -- pick the next patch."
+            exit 1
+          fi
+
+          # A BARE tag of the same name is the mistake this repo's history makes easy:
+          # v0.1.0 already exists from the Python package (0bc6951, 2025-02-24). Creating one
+          # would attach to entirely the wrong thing.
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::notice::bare tag $VERSION exists (Python package history). That is"
+            echo "::notice::expected and irrelevant -- this release creates go/$VERSION."
+          fi
+
+          echo "will create tag: go/$VERSION"
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.10"
+
+
+
+      # ---------------------------------------------------------------------
+      # 2. The module must build and its own tests must pass. A release tag that
+      #    does not build is the one failure the proxy makes permanent.
+      # ---------------------------------------------------------------------
+      - name: gofmt, vet, test
+        run: |
+          set -euo pipefail
+          cd go
+          out=$(gofmt -l . 2>&1) || { printf "%s\n" "$out"; exit 1; }; test -z "$out" || { echo "unformatted:"; printf "%s\n" "$out"; exit 1; }
+          go vet ./...
+          go test -count=1 ./...
+
+      # ---------------------------------------------------------------------
+      # 3. The gate that actually matters. A Go release that disagrees with the
+      #    Python client on the wire is the defect this repo has spent the most
+      #    effort on -- five cross-language claims went silently false in one
+      #    afternoon before the implementations were co-located.
+      # ---------------------------------------------------------------------
+      - name: Cross-language conformance, both clients
+        # Through env, not interpolated into the script. A repository variable is not a
+        # secret but it is still attacker-influenceable config, and `${{ vars.X }}` pasted
+        # into a run: block executes a newline or $(...) as shell -- inside the job that
+        # holds the signing key.
+        env:
+          POETRY_VERSION: ${{ vars.POETRY_V2_VERSION }}
+        run: |
+          set -euo pipefail
+          pipx install "poetry==$POETRY_VERSION"
+          pipx install invoke
+          poetry install --with dev,test --no-root
+          inv test-conformance
+
+  # =======================================================================
+  # Nothing above this line has run in the same job as a secret, and nothing
+  # below it installs a dependency or runs a test. That is the invariant.
+  # =======================================================================
+  tag:
+    needs: validate
+    runs-on: ubuntu-latest
+    # READ. The tag push authenticates with GALILEO_AUTOMATION_GITHUB_TOKEN via a one-shot
+    # credential helper, so GITHUB_TOKEN never performs a write.
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          # The automation token appears ONLY in this job, which runs no third-party code
+          # beyond checkout itself. persist-credentials: false still applies -- the push
+          # below authenticates explicitly rather than through .git/config.
+          persist-credentials: false
+
+      # Re-checked on this runner, cheaply. `needs: validate` already gated the format and
+      # the collision, but those ran against a different checkout: re-verifying here means
+      # the job that actually creates the permanent tag does not take another job's word for
+      # what it is about to name. A tag collision in particular can appear between the two.
+      - name: Re-assert the version and tag absence on the signing runner
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::version must be canonical SemVer with no leading zeroes, got '$VERSION'"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/go/$VERSION" >/dev/null; then
+            echo "::error::tag go/$VERSION appeared after validation; refusing to retag"
+            exit 1
+          fi
+
+      # ---------------------------------------------------------------------
+      # Tag. Annotated and signed with the same automation key release.yaml
+      # uses -- never bypass signing.
+      # ---------------------------------------------------------------------
+      - name: Create and push the signed tag
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+          SSH_PUBLIC: ${{ secrets.GALILEO_AUTOMATION_SSH_PUBLIC_KEY }}
+          SSH_PRIVATE: ${{ secrets.GALILEO_AUTOMATION_SSH_PRIVATE_KEY }}
+          TAG_PUSH_TOKEN: ${{ secrets.GALILEO_AUTOMATION_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+
+          # Registered BEFORE the keys exist, deliberately. `set -e` means any later line
+          # can exit this step -- a failed `git tag -s`, a rejected push, a proxy check
+          # that errors -- and a trap installed after the write would never run in exactly
+          # those cases. The EXIT trap fires on success and failure alike, so the key does
+          # not outlive this step and is not present for the proxy-verification step that
+          # follows.
+          cleanup() {
+            rm -f ~/.ssh/signing_key ~/.ssh/signing_key.pub
+            git config --unset user.signingkey || true
+            git config --unset gpg.format || true
+          }
+          trap cleanup EXIT
+
+          printf '%s\n' "$SSH_PRIVATE" > ~/.ssh/signing_key
+          printf '%s\n' "$SSH_PUBLIC" > ~/.ssh/signing_key.pub
+          chmod 600 ~/.ssh/signing_key
+
+          git config user.name  "galileo-automation"
+          git config user.email "ci@rungalileo.io"
+          git config gpg.format ssh
+          git config user.signingkey ~/.ssh/signing_key
+
+          # The dispatched commit explicitly, not HEAD: HEAD is whatever the checkout and
+          # every step since left behind, so tagging it would make the immutable tag's
+          # contents depend on steps that run third-party code. This is the commit the
+          # build, vet and conformance gates above actually ran against.
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA" \
+            || { echo "::error::HEAD moved during the release job; refusing to tag"; exit 1; }
+          git tag -s "go/$VERSION" -m "gcache Go client $VERSION" "$RELEASE_SHA"
+
+          # Credentials via a one-shot helper, so the token is in neither .git/config nor
+          # argv. An earlier version of this put it in the push URL, which keeps it out of
+          # .git/config but exposes it to anything reading the process list for the duration
+          # of the push. The helper string is single-quoted, so argv carries the literal
+          # $TAG_PUSH_TOKEN and git's shell expands it from the environment.
+          git -c credential.username=x-access-token \
+              -c credential.helper='!f() { test "$1" = get && echo "password=${TAG_PUSH_TOKEN}"; }; f' \
+              push "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/go/$VERSION"
+
+  verify:
+    needs: tag
+    runs-on: ubuntu-latest
+    # No secrets: by this point the tag is public, and confirming the proxy serves it needs
+    # no credential. Kept out of `tag` so the signing job ends the moment the push does.
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      # ---------------------------------------------------------------------
+      # Confirm the proxy serves it, which also warms the cache so a consumer's
+      # first fetch is not the one that populates it.
+      # ---------------------------------------------------------------------
+      - name: Verify the module proxy resolves the new version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          cd "$(mktemp -d)"
+          go mod init release-check
+          for attempt in 1 2 3 4 5; do
+            if GOPROXY=proxy.golang.org GOFLAGS=-mod=mod \
+               go get "github.com/rungalileo/gcache/go@$VERSION"; then
+              echo "proxy resolved github.com/rungalileo/gcache/go@$VERSION"
+              exit 0
+            fi
+            echo "attempt $attempt: not yet indexed, waiting"
+            sleep 15
+          done
+          # FAIL, even though the tag is pushed and may well be fine. This step exists to
+          # PROVE the version resolves, and `go get` does not say whether it failed because
+          # the proxy is slow or because the module is unservable -- so a green job here
+          # would report a verification that did not happen. Red makes someone look.
+          echo "::error::tag go/$VERSION is pushed, but the proxy did not serve it after 5"
+          echo "::error::attempts. Do NOT re-release -- the version is permanent. Run"
+          echo "::error::'go get github.com/rungalileo/gcache/go@$VERSION' to tell a slow"
+          echo "::error::index from a module the proxy cannot build."
+          exit 1

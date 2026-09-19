@@ -741,7 +741,7 @@ async def test_miss_counter_incremented(
         await cached_func(1)
         # Check miss counter was incremented (both LOCAL and REMOTE layers)
         miss_count = get_func_metric(
-            'api_gcache_miss_counter_total{key_type="Test",layer="LOCAL",use_case="test_miss"}'
+            'api_gcache_miss_counter_total{key_type="Test",layer="LOCAL",reason="",use_case="test_miss"}'
         )
         assert miss_count >= 1.0
 
@@ -879,3 +879,40 @@ async def test_sync_from_async_logs_warning(
         assert "Sync cached function" in caplog.text
         assert "async context" in caplog.text
         assert "test_sync_async_warning" not in caplog.text or "sync_cached_func" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_invalidate_rejects_an_empty_identifier(gcache: GCache) -> None:
+    """An empty half wrote a watermark for a malformed key -- suppressing nothing while
+    reporting success.
+    """
+    for key_type, id_ in (("", "some-id"), ("kt", ""), ("", "")):
+        with pytest.raises(ValueError, match="requires both key_type and id"):
+            await gcache.ainvalidate(key_type, id_)
+
+    # And a well-formed pair still works, so the guard is not rejecting everything.
+    await gcache.ainvalidate("kt", "some-id")
+
+
+@pytest.mark.asyncio
+async def test_invalidate_rejects_an_empty_identifier_without_redis_too() -> None:
+    """The NoopCache path, which is the one that matters.
+
+    The guard used to live in RedisCache.invalidate, so it fired only where a Redis layer
+    existed: local runs and consumer test suites -- both documented NoopCache deployments --
+    accepted the malformed call while production rejected it. The bug met a caller in the
+    environment where it costs most, which is the wrong direction.
+    """
+    no_redis = GCache(GCacheConfig(urn_prefix="urn:galileo:test"))
+    try:
+        for key_type, id_ in (("", "some-id"), ("kt", "")):
+            with pytest.raises(ValueError, match="requires both key_type and id"):
+                await no_redis.ainvalidate(key_type, id_)
+
+        # Still a no-op rather than an error for a well-formed pair.
+        await no_redis.ainvalidate("kt", "some-id")
+    finally:
+        # Release the singleton, as every other direct construction here does. Without it a
+        # failure in this test leaves it held and turns one failure into an ERROR in an
+        # unrelated file -- measured in review, on test_proto_serializer.py.
+        no_redis.__del__()

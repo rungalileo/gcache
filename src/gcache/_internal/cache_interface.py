@@ -1,12 +1,9 @@
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
 from typing import Any
 
-from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey, GCacheKeyConfig
+from gcache.config import CacheConfigProvider, CacheLayer, Fallback, GCacheKey, GCacheKeyConfig
 
-#: Async callable that fetches the actual value on cache miss.
-#: Invoked by cache implementations when the requested key is not found or is stale.
-Fallback = Callable[..., Awaitable[Any]]
+__all__ = ["CacheInterface", "Fallback"]
 
 
 class CacheInterface(ABC):

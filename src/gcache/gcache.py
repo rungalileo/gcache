@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from functools import partial
 from typing import Any
 
+from gcache._internal.constants import validate_invalidation_args
 from gcache._internal.event_loop_thread import EventLoopThread, EventLoopThreadPool
 from gcache._internal.local_cache import LocalCache
 from gcache._internal.metrics import GCacheMetrics
@@ -15,19 +16,51 @@ from gcache._internal.redis_cache import RedisCache, create_default_redis_client
 from gcache._internal.state import _GLOBAL_GCACHE_STATE, GCacheContext
 from gcache._internal.wrappers import CacheChain, CacheController, DisabledReasons
 from gcache.config import (
+    Envelope,
+    Fallback,
     GCacheConfig,
     GCacheKey,
     GCacheKeyConfig,
     Serializer,
 )
 from gcache.exceptions import (
+    EmptyUrnPrefixNotSupported,
+    EnvelopeMismatchWithRegisteredUseCase,
+    EnvelopeRequiresSerializer,
     GCacheAlreadyInstantiated,
+    GCacheError,
+    GCacheKeyPrefixMismatch,
     KeyArgDoesNotExist,
     RedisConfigConflict,
     ReentrantSyncFunctionDetected,
+    SerializerMismatchWithRegisteredUseCase,
+    UrnPrefixContainsDelimiter,
     UseCaseIsAlreadyRegistered,
     UseCaseNameIsReserved,
 )
+
+
+def _serializer_identity(serializer: Serializer | None) -> Any:
+    """What makes two serializers interchangeable on the wire.
+
+    Type alone is not enough: two ProtoSerializers carrying different messages share a
+    type, and reading one's payload as the other yields an empty message with no error,
+    because load() passes ignore_unknown_fields=True.
+
+    This used to special-case that by reaching for ``_message_type``, and its docstring
+    claimed any other Serializer "contributes only its type, which is all it has". That is
+    false for a stateful serializer, and the claim was the bug: a caller's serializer
+    configured per instance -- a compression level, a schema version, an encoding -- had two
+    instances compare EQUAL, pass _check_direct_key, share a urn, and each decode the
+    other's payload.
+
+    So the decision belongs to the serializer. ``Serializer.wire_identity`` defaults to the
+    class, which keeps every stateless implementation behaving exactly as before, and
+    ProtoSerializer overrides it rather than being reached into from here.
+    """
+    if serializer is None:
+        return None
+    return serializer.wire_identity()
 
 
 class GCache:
@@ -49,11 +82,37 @@ class GCache:
                       and cache config provider.
         :raises GCacheAlreadyInstantiated: If a GCache instance already exists.
         :raises RedisConfigConflict: If both redis_config and redis_client_factory are provided.
+        :raises EmptyUrnPrefixNotSupported: If urn_prefix is "" -- an empty prefix cannot
+            interoperate, since Python renders ``kt:id`` where Go renders ``:kt:id``.
         """
+        # Pure config validation BEFORE the singleton check: with the order reversed a live
+        # GCache made this branch unreachable in-process, so the test could only assert on
+        # inspect.getsource -- which stays green if the condition changes and the text stays.
+        if config.urn_prefix == "":
+            # An empty prefix is not merely unusual, it cannot interoperate: Python renders
+            # "kt:id" and Go ":kt:id". See EmptyUrnPrefixNotSupported. An earlier
+            # revision of this branch "fixed" the silent-ignore by honouring "", which
+            # enabled a configuration that silently breaks the cross-language keyspace this
+            # work exists to establish. Rejecting is the fix; honouring it was not.
+            raise EmptyUrnPrefixNotSupported()
+        if config.urn_prefix is not None and any(ch in config.urn_prefix for ch in "{}#?"):
+            # Go's New refuses the same set, so accepting them here produced a prefix Python
+            # writes and Go cannot construct a client for.
+            raise UrnPrefixContainsDelimiter(config.urn_prefix)
+
+        if config.redis_config is not None and config.redis_client_factory is not None:
+            raise RedisConfigConflict()
+
         if _GLOBAL_GCACHE_STATE.gcache_instantiated:
             raise GCacheAlreadyInstantiated()
 
-        if config.urn_prefix:
+        # VALIDATE BEFORE TOUCHING GLOBAL STATE. The assignments below used to sit above the
+        # Redis checks, so a RedisConfigConflict left the new urn_prefix and logger published
+        # while no GCache existed -- the next construction inherited a namespace from an
+        # attempt that failed. __del__ clears only gcache_instantiated, so nothing ever put
+        # them back.
+
+        if config.urn_prefix is not None:
             _GLOBAL_GCACHE_STATE.urn_prefix = config.urn_prefix
 
         if config.logger:
@@ -65,10 +124,8 @@ class GCache:
             metrics_prefix=config.metrics_prefix,
         )
 
-        # Validate and determine Redis cache layer
-        if config.redis_config is not None and config.redis_client_factory is not None:
-            raise RedisConfigConflict()
-
+        # Determine the Redis cache layer. The conflict check moved above, before any global
+        # state is published; leaving a second copy here would be dead code.
         if config.redis_config is not None:
             # redis_config provided: create RedisCache with factory from config
             redis_cache = CacheController(
@@ -102,7 +159,17 @@ class GCache:
 
         self._cache = CacheChain(config.cache_config_provider, local_cache, redis_cache)
 
-        self._use_case_registry: set = set()
+        # Deliberately still a set. Consumers reach into this private attribute to reset it
+        # between tests (a consumer's test conftest does `gcache
+        # ._use_case_registry = set()`), so changing its type breaks them at a distance --
+        # which is exactly what happened when this was a dict for one commit. The declared
+        # envelope lives alongside it instead.
+        self._use_case_registry: set[str] = set()
+        # use_case -> what the decorator declared for it, for _check_direct_key.
+        # Consulted only for names still in _use_case_registry, so a consumer that resets
+        # the registry makes this inert too rather than leaving a stale rule behind.
+        self._use_case_envelopes: dict[str, Envelope] = {}
+        self._use_case_serializers: dict[str, Serializer | None] = {}
 
         # Use a thread pool to run non async cached functions in.
         # This is because all of the GCache implementation is async, but we still want to support caching
@@ -110,12 +177,44 @@ class GCache:
         self._event_loop_thread_pool: EventLoopThreadPool = EventLoopThreadPool("gcache thread pool")
 
         _GLOBAL_GCACHE_STATE.gcache_instantiated = True
+        _GLOBAL_GCACHE_STATE.gcache_owner_id = id(self)
 
         self.config = config
 
     def __del__(self) -> None:
-        self._event_loop_thread_pool.stop()
+        """Tear down only what __init__ actually built.
+
+        ``gcache_instantiated`` is set on the LAST line of __init__, so any earlier raise --
+        GCacheAlreadyInstantiated, EmptyUrnPrefixNotSupported, RedisConfigConflict -- still
+        gets this object finalized, with no ``_event_loop_thread_pool`` attribute. The
+        unguarded ``.stop()`` raised AttributeError here, which appears twice in every test
+        run as a PytestUnraisableExceptionWarning.
+
+        The noise was the smaller half. The AttributeError is also the only reason the next
+        line was not reached, and that line clears a flag this instance does not own: a
+        failed construction would otherwise mark the LIVE GCache as uninstantiated, letting a
+        third be built alongside it. So the guard is load-bearing, not cosmetic -- and the
+        ownership check is what makes it safe rather than merely quiet.
+
+        Pre-existing, but in scope here because this branch adds two new early raises and so
+        widens the path that reaches it.
+        """
+        pool = getattr(self, "_event_loop_thread_pool", None)
+        if pool is None:
+            # __init__ raised before construction completed. Nothing was published under this
+            # object's name, so there is nothing to undo and the flag is not ours to clear.
+            return
+
+        # Stopping the pool is always right -- it is this object's own resource.
+        pool.stop()
+
+        # Only clear the flag if this object still OWNS it: a pool proves __init__ finished,
+        # not that we are still the registered instance. Otherwise a stale __del__ releases
+        # another object's flag and two GCaches race one urn_prefix.
+        if _GLOBAL_GCACHE_STATE.gcache_owner_id != id(self):
+            return
         _GLOBAL_GCACHE_STATE.gcache_instantiated = False
+        _GLOBAL_GCACHE_STATE.gcache_owner_id = None
 
     def _run_coroutine_in_thread(self, coro: Callable[[], Awaitable[Any]], func_name: str = "") -> Any:
         if isinstance(threading.current_thread(), EventLoopThread):
@@ -154,6 +253,7 @@ class GCache:
         track_for_invalidation: bool = False,
         default_config: GCacheKeyConfig | None = None,
         serializer: Serializer | None = None,
+        envelope: Envelope | str = Envelope.PICKLE,
     ) -> Any:
         """
         Decorator which caches a function which can be either sync or async.
@@ -175,8 +275,42 @@ class GCache:
         :param serializer: Optional serializer to use to serialize and deserialize cache values.  Care must be taken that
                            the returned value matches the signature of cached function, as otherwise you may get runtime
                            type/attribute errors.
+
+                           Do NOT add this to a live use case either.  A serialized payload is indistinguishable from a
+                           normally-cached value once it is inside a pickle envelope, so a pod running the older code --
+                           same use case, no serializer -- hands the raw payload back to its caller instead of the value,
+                           silently.  A JSON envelope is caught (the reader knows it needs a serializer and treats the
+                           entry as a miss); the pickle case cannot be detected at all.  Migrate under a new ``use_case``.
+        :param envelope: How the value is framed in Redis.  ``Envelope.PICKLE`` (the default) serializes arbitrary
+                         Python objects but is readable only from Python.  ``Envelope.JSON`` writes the same envelope
+                         the Go client uses, so the entry can be shared across languages; it requires a
+                         ``Serializer`` producing str/bytes (pass ``serializer=JsonSerializer()``).  Reads sniff the
+                         framing they actually find, so a JSON key still reads a JSON entry written by any language --
+                         but a JSON key refuses to unpickle, rather than leaving unpickling reachable for whoever can
+                         write the keyspace.
+
+                         Do NOT flip this on a live use case.  A rolling deploy runs both pod generations at once: an
+                         old pod (pickle, no serializer) treats a JSON entry as a miss and writes pickle over it, and a
+                         new pod refuses that pickle and writes JSON again.  Each destroys the framing the other needs,
+                         so the key's hit rate sits near zero for the whole rollout -- a load spike on the backing
+                         store, not a slow warm-up.  Migrate under a NEW ``use_case``; the two generations then use
+                         different keys and never fight.
+
+                         Note also that cross-language invalidation reaches the REDIS layer only.  ``ainvalidate``
+                         writes a watermark, and ``LocalCache`` does not read watermarks, so a Go
+                         invalidation does not clear a Python pod's in-process copy until the local TTL expires.  For a
+                         use case shared across languages, keep the local TTL short or set the local ramp to 0.
         :return:
         """
+
+        # Accept the bare string an untyped caller passes, but resolve it here so an
+        # unrecognized value raises instead of silently falling back to pickle -- the whole
+        # point of declaring an envelope is that both languages agree on the framing.
+        envelope = Envelope(envelope)
+
+        # Fail at decoration: JSON with no serializer can never produce a valid entry.
+        # Raised inside `decorator` so the default use case has resolved to module.function
+        # by then -- here it is still None and the message would name no code.
 
         def decorator(func: Any) -> Any:
             nonlocal use_case
@@ -189,6 +323,14 @@ class GCache:
             if use_case is None:
                 use_case = f"{func.__module__}.{func.__name__}"
 
+            if envelope in (Envelope.JSON, Envelope.PROTO) and serializer is None:
+                # EnvelopeRequiresSerializer, not a bare ValueError: GCacheKey raises that
+                # for the identical condition, so a caller wrapping both in `except GCacheError`
+                # caught one route and not the other.
+                raise EnvelopeRequiresSerializer(
+                    key_type, id_arg if isinstance(id_arg, str) else id_arg[0], use_case, envelope.name
+                )
+
             if use_case in self._use_case_registry:
                 raise UseCaseIsAlreadyRegistered(use_case)
 
@@ -196,6 +338,8 @@ class GCache:
                 raise UseCaseNameIsReserved()
 
             self._use_case_registry.add(use_case)
+            self._use_case_envelopes[use_case] = envelope
+            self._use_case_serializers[use_case] = serializer
 
             if arg_adapters is None:
                 arg_adapters = {}
@@ -264,6 +408,7 @@ class GCache:
                         invalidation_tracking=track_for_invalidation,
                         default_config=default_config,
                         serializer=serializer,
+                        envelope=envelope,
                     )
                 except Exception as e:
                     # Default to fallback but instrument the error as well as log.
@@ -316,8 +461,21 @@ class GCache:
 
         :param key_type: The type of cache key to invalidate.
         :param id: The ID of the entity to invalidate.
-        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the future.
+        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the
+            future. Defaults to 0, which invalidates as of now.
+        :raises ValueError: if ``key_type`` or ``id`` is empty; if ``future_buffer_ms`` is not
+            an ``int`` (a ``bool`` or a ``float`` included -- ``nan`` passes every range check
+            and reaches Redis); if it is negative, which would move the watermark into the
+            PAST and leave anything written after that instant fresh; or if it exceeds
+            ``MAX_FUTURE_BUFFER_SECONDS`` (1 hour). That ceiling is the watermark lifetime
+            minus the tracked-TTL cap, and it is a fifth of the watermark lifetime, which an
+            earlier version of this docstring named instead.
         """
+        # HERE, not in RedisCache.invalidate. Down there the guard fires only when a Redis
+        # layer exists, so a NoopCache deployment -- documented, and what local runs and many
+        # consumer test suites use -- accepted the malformed call while production rejected
+        # it. A caller met the bug in the environment where it costs most.
+        validate_invalidation_args(key_type, id, future_buffer_ms)
         await self._redis_cache.invalidate(key_type, id, future_buffer_ms)
 
     def invalidate(self, key_type: str, id: str, future_buffer_ms: int = 0) -> None:
@@ -326,7 +484,11 @@ class GCache:
 
         :param key_type: The type of cache key to invalidate.
         :param id: The ID of the entity to invalidate.
-        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the future.
+        :param future_buffer_ms: Buffer time in milliseconds to extend invalidation into the
+            future. Defaults to 0, which invalidates as of now.
+        :raises ValueError: on any of the four conditions ``ainvalidate`` documents -- see
+            there rather than restating them, which is how this one came to name a bound the
+            code had replaced.
         """
         return self._run_coroutine_in_thread(partial(self.ainvalidate, key_type, id, future_buffer_ms))
 
@@ -344,13 +506,162 @@ class GCache:
         """Remove all local and remote cache entries (sync version)."""
         self._run_coroutine_in_thread(self.aflushall)
 
+    def _check_direct_key(self, key: GCacheKey) -> None:
+        """Raise when a direct key can never share entries with what declared its use case.
+
+        Both render the same urn, so they are ONE entry, and the two halves of the framing
+        contract have to agree:
+
+        * ``envelope`` -- the decorator writes pickle, the direct key refuses that pickle
+          and writes JSON, the decorator calls the JSON a miss and writes pickle again.
+          They overwrite each other forever inside one process.
+        * ``serializer`` -- subtler and worse, because nothing even degrades. A decorator
+          with no serializer plus a direct key carrying JsonSerializer share one entry, and
+          the decorated function gets handed the raw payload ``'{"a": 1}'`` where it
+          expected a ``dict``. No exception, no log line, no metric.
+
+        Only checked against a REGISTERED use case. A direct-only use case has nothing to
+        compare against, which is why both still have to agree by convention across
+        languages -- there the library cannot see the other side at all.
+        """
+        self._check_key_namespace(key)
+
+        if key.use_case not in self._use_case_registry:
+            return
+
+        declared = self._use_case_envelopes.get(key.use_case)
+        if declared is not None and declared != key.envelope:
+            raise EnvelopeMismatchWithRegisteredUseCase(key.use_case, declared, key.envelope)
+
+        # By (type, message type): type alone accepted two ProtoSerializers carrying
+        # DIFFERENT messages, and ignore_unknown_fields=True makes that silent -- the wrong
+        # payload yields an empty message. Never by identity: two JsonSerializer()s differ.
+        if _serializer_identity(self._use_case_serializers.get(key.use_case)) != _serializer_identity(key.serializer):
+            raise SerializerMismatchWithRegisteredUseCase(
+                key.use_case, self._use_case_serializers.get(key.use_case), key.serializer
+            )
+
+    def _check_key_namespace(self, key: GCacheKey) -> None:
+        """Reject a key that renders into the wrong namespace.
+
+        Separate from the framing checks because this is the only one that changes the
+        urn, so it is the only one a DELETE needs -- and the only one it must have: a key
+        built before ``GCache()`` captured the default ``urn_prefix``, so it deletes a urn
+        in another namespace and reports ``False``, which a caller reads as "no entry
+        existed" while the real entry survives. (On a read or write the same mismatch also
+        splits the value from its watermark, into different cluster hash slots, so tracked
+        invalidation silently does nothing.)
+
+        Checked at use rather than forbidden at construction: a module-level key constant
+        is the natural thing to write and the only thing that reaches this state.
+        """
+        live = _GLOBAL_GCACHE_STATE.urn_prefix
+        if key.urn_prefix != live:
+            raise GCacheKeyPrefixMismatch(key.use_case, key.urn_prefix, live)
+
+    async def aget(self, key: GCacheKey, fallback: Fallback) -> Any:
+        """
+        Read one key, computing and caching the value on a miss (async version).
+
+        Use ``@cached`` when the value is a pure function of a call's arguments. This is
+        for what it cannot express: an entry in a cache SHARED with another service,
+        where the key comes from data that is not this function's parameters. Go's client
+        has always had a plain ``Get``; without this, a Python participant had to reach
+        into ``_internal`` or read its source of truth twice on a miss.
+
+        ``fallback`` runs only on a miss, so a caller can capture what it fetched there
+        and reuse it instead of reading again::
+
+            fetched = None
+
+            async def _load():
+                nonlocal fetched
+                fetched = await expensive_read()
+                return identity_of(fetched)
+
+            identity = await gcache.aget(key, _load)   # fetched is set only on a miss
+
+        :param key: ``key_type``, ``id``, ``args`` and ``use_case`` are the key space --
+            get any of them wrong and the two languages never see each other's entries.
+            ``envelope`` and ``serializer`` are NOT in the key, which is worse: both
+            clients then share one key with incompatible framing, so each overwrites the
+            other and neither can read what it finds.
+        :param fallback: Async callable invoked on a miss to produce the value.
+        :return: The cached value, or whatever ``fallback`` returned.
+        """
+        # Fails OPEN, unlike aput: a read must never break the caller's request, and the
+        # decorator path already degrades this way. gcache_error_counter is what keeps it
+        # visible -- silently uncached forever is how this reaches production.
+        try:
+            self._check_direct_key(key)
+        except GCacheError as e:
+            _GLOBAL_GCACHE_STATE.logger.error("Direct key is unusable; reading uncached", exc_info=True)
+            GCacheMetrics.ERROR_COUNTER.labels(
+                key.use_case, key.key_type, "direct key check", type(e).__name__, False
+            ).inc()
+            return await fallback()
+        return await self._cache.get(key, fallback)
+
+    def get(self, key: GCacheKey, fallback: Fallback) -> Any:
+        """Read one key, computing and caching the value on a miss (sync version)."""
+        return self._run_coroutine_in_thread(partial(self.aget, key, fallback))
+
+    async def aput(self, key: GCacheKey, value: Any) -> None:
+        """
+        Write one key without reading it first (async version).
+
+        For priming: the caller already knows the value and wants other services to find
+        it without paying the read that would otherwise populate the entry. Go's ``Put``
+        is the counterpart. See :meth:`aget` on matching a shared entry's key.
+
+        Unlike a read, this RAISES on a cache-layer failure -- a Redis timeout reaches the
+        caller. That matches :meth:`adelete` and :meth:`ainvalidate`, and it is deliberate:
+        a silent failure here means the entry another process is waiting for never appears.
+        A caller priming off a request path should not let that propagate.
+
+        A prime is also **sampled**, like a read. ``_should_cache`` calls ``random()`` on
+        every invocation and each layer samples independently, so a use case at ramp 50
+        drops about half its primes and this call still returns normally. On a read a
+        sampled skip costs one uncached call; on a prime it discards work the caller has
+        already done, and the entry another process is waiting for never appears. Ramp a
+        shared use case to 100 or 0, not through the middle.
+
+        A prime landing inside an active invalidation window is lost **on the Redis layer**,
+        silently: the entry is written with ``createdAtMs`` below the watermark, so remote
+        reads find it stale until the window closes and a read rewrites it. That is the
+        invalidation doing its job, but this call still returns normally. Go's ``Put``
+        behaves the same way; the Go client is the outlier and returns ``false``.
+        Checking here would cost an extra round trip on every prime.
+
+        The LOCAL layer does NOT honour that -- it never reads watermarks -- so a later
+        ``aget`` in the same process takes a local hit and returns the primed value as if
+        nothing had been invalidated. Keep the local ramp at 0 for any use case shared
+        across processes or languages, which is what the README already advises.
+        """
+        self._check_direct_key(key)
+        await self._cache.put(key, value)
+
+    def put(self, key: GCacheKey, value: Any) -> None:
+        """Write one key without reading it first (sync version). Raises like :meth:`aput`."""
+        self._run_coroutine_in_thread(partial(self.aput, key, value))
+
     async def adelete(self, key: GCacheKey) -> bool:
         """
         Delete a specific cache entry (async version).
 
+        Validates the NAMESPACE only, not the framing. A delete needs nothing but the urn,
+        and a key whose ``envelope`` or ``serializer`` differs from a decorator's renders
+        the same urn, so rejecting it would break the documented way to delete a decorated
+        entry -- ``test_delete_key`` does exactly that with a bare ``GCacheKey``.
+
+        The namespace check does raise, because returning ``False`` there is a lie a caller
+        cannot detect: the key deletes a urn in another namespace, reports "no entry
+        existed", and leaves the real entry in place.
+
         :param key: The cache key to delete.
         :return: True if the key was deleted, False otherwise.
         """
+        self._check_key_namespace(key)
         return await self._cache.delete(key)
 
     def delete(self, key: GCacheKey) -> bool:

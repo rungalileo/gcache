@@ -1,0 +1,26 @@
+# One place for whitespace conventions across both implementations, so Python and Go do not
+# drift into two house styles. Each language's own formatter (ruff-format, gofmt) remains the
+# authority for its files; this only covers what they share.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+[*.{json,yaml,yml}]
+indent_style = space
+indent_size = 2
+
+# Tabs, because gofmt uses tabs and will rewrite anything else.
+[*.go]
+indent_style = tab
+
+[*.md]
+trim_trailing_whitespace = false

@@ -1,0 +1,1383 @@
+package gcache
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"math"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+// testPrefix is the namespace every test in this file writes under.
+const testPrefix = "urn:galileo:test"
+
+type sessionIdentity struct {
+	SessionID string `json:"session_id"`
+	CreatedAt string `json:"created_at"`
+}
+
+// fakeClient is an in-memory stand-in for Redis. It records the calls made so tests can
+// assert on round trips, and can be told to fail.
+type fakeClient struct {
+	mu       sync.Mutex
+	data     map[string][]byte
+	ttls     map[string]time.Duration
+	mgetErr  error
+	setErr   error
+	mgetKeys [][]string
+}
+
+func newFakeClient() *fakeClient {
+	return &fakeClient{data: map[string][]byte{}, ttls: map[string]time.Duration{}}
+}
+
+func (f *fakeClient) MGet(_ context.Context, keys ...string) ([][]byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.mgetKeys = append(f.mgetKeys, append([]string(nil), keys...))
+	if f.mgetErr != nil {
+		return nil, f.mgetErr
+	}
+	out := make([][]byte, len(keys))
+	for i, k := range keys {
+		if v, ok := f.data[k]; ok {
+			out[i] = v
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeClient) SetEx(_ context.Context, key string, value []byte, ttl time.Duration) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.setErr != nil {
+		return f.setErr
+	}
+	f.data[key] = value
+	f.ttls[key] = ttl
+	return nil
+}
+
+func (f *fakeClient) get(key string) []byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.data[key]
+}
+
+func quietLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func newTestCache(t *testing.T, c Client) *Cache[sessionIdentity] {
+	t.Helper()
+	cache, err := New(Options[sessionIdentity]{
+		Client: c, URNPrefix: testPrefix, TTL: 2 * time.Hour, Logger: quietLogger(),
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	return cache
+}
+
+var testKey = Key{KeyType: "session_id", ID: "sid-1", UseCase: "ingest::session_identity", Tracked: true}
+
+func TestPutThenGetRoundTrips(t *testing.T) {
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	want := sessionIdentity{SessionID: "sid-1", CreatedAt: "2026-09-08T02:42:19.068724Z"}
+
+	if err := cache.Put(context.Background(), testKey, want); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	got, ok := cache.Get(context.Background(), testKey)
+	if !ok {
+		t.Fatal("Get returned not-ok after Put")
+	}
+	if got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestGetOnTrackedKeyIsASingleRoundTrip(t *testing.T) {
+	// Value and watermark must be fetched together; two round trips on the ingest hot path
+	// would defeat the point of the cache.
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	cache.Get(context.Background(), testKey)
+
+	if len(f.mgetKeys) != 1 {
+		t.Fatalf("made %d MGet calls, want 1", len(f.mgetKeys))
+	}
+	if len(f.mgetKeys[0]) != 2 {
+		t.Errorf("MGet fetched %d keys, want 2 (value + watermark): %v", len(f.mgetKeys[0]), f.mgetKeys[0])
+	}
+}
+
+func TestGetOnUntrackedKeySkipsTheWatermark(t *testing.T) {
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	cache.Get(context.Background(), Key{KeyType: "kt", ID: "id", UseCase: "uc"})
+
+	if len(f.mgetKeys[0]) != 1 {
+		t.Errorf("MGet fetched %v, want just the value key", f.mgetKeys[0])
+	}
+}
+
+func TestGetMissOnEmptyCache(t *testing.T) {
+	cache := newTestCache(t, newFakeClient())
+	if _, ok := cache.Get(context.Background(), testKey); ok {
+		t.Error("Get on an empty cache returned ok")
+	}
+}
+
+func TestInvalidateMakesTheEntryStale(t *testing.T) {
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	ctx := context.Background()
+
+	if err := cache.Put(ctx, testKey, sessionIdentity{SessionID: "sid-1"}); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	if _, ok := cache.Get(ctx, testKey); !ok {
+		t.Fatal("expected a hit before invalidation")
+	}
+	if err := cache.Invalidate(ctx, testKey.KeyType, testKey.ID, 0); err != nil {
+		t.Fatalf("Invalidate: %v", err)
+	}
+	if _, ok := cache.Get(ctx, testKey); ok {
+		t.Error("expected a miss after invalidation")
+	}
+}
+
+func TestInvalidateAffectsEveryUseCaseUnderTheSameKeyTypeAndID(t *testing.T) {
+	// The watermark carries no use case: (key_type, id) is the invalidation namespace, so
+	// one invalidate must bust sibling entries too.
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	ctx := context.Background()
+
+	a := Key{KeyType: "session_id", ID: "sid-1", UseCase: "uc-a", Tracked: true}
+	b := Key{KeyType: "session_id", ID: "sid-1", UseCase: "uc-b", Tracked: true}
+	for _, k := range []Key{a, b} {
+		if err := cache.Put(ctx, k, sessionIdentity{SessionID: "sid-1"}); err != nil {
+			t.Fatalf("Put %s: %v", k.UseCase, err)
+		}
+	}
+	if err := cache.Invalidate(ctx, "session_id", "sid-1", 0); err != nil {
+		t.Fatalf("Invalidate: %v", err)
+	}
+	for _, k := range []Key{a, b} {
+		if _, ok := cache.Get(ctx, k); ok {
+			t.Errorf("%s survived invalidation", k.UseCase)
+		}
+	}
+}
+
+func TestInvalidateWritesDecimalAsciiMillis(t *testing.T) {
+	// Python reads this with float() then int(). Anything but a bare decimal number breaks
+	// the Python side of the protocol.
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	if err := cache.Invalidate(context.Background(), "session_id", "sid-1", 30*time.Second); err != nil {
+		t.Fatalf("Invalidate: %v", err)
+	}
+
+	raw := f.get(WatermarkKey("urn:galileo:test", "session_id", "sid-1"))
+	ms, err := strconv.ParseInt(string(raw), 10, 64)
+	if err != nil {
+		t.Fatalf("watermark %q is not decimal ASCII: %v", raw, err)
+	}
+	// The future buffer must actually be in the future.
+	if ms <= time.Now().UnixMilli() {
+		t.Errorf("watermark %d is not in the future", ms)
+	}
+}
+
+func TestInvalidateUsesTheProtocolWatermarkTTL(t *testing.T) {
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	_ = cache.Invalidate(context.Background(), "session_id", "sid-1", 0)
+	if got := f.ttls[WatermarkKey("urn:galileo:test", "session_id", "sid-1")]; got != watermarkTTL {
+		t.Errorf("watermark TTL = %s, want %s (Python's hardcoded WATERMARK_TTL_SECONDS)", got, watermarkTTL)
+	}
+}
+
+func TestGetFailsOpenOnRedisError(t *testing.T) {
+	// The whole contract: a broken cache slows callers down, it never breaks them.
+	f := newFakeClient()
+	f.mgetErr = errors.New("connection refused")
+	cache := newTestCache(t, f)
+
+	if _, ok := cache.Get(context.Background(), testKey); ok {
+		t.Error("Get returned ok despite a Redis error")
+	}
+}
+
+func TestGetFailsOpenOnCorruptValue(t *testing.T) {
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	f.data[ValueKey("urn:galileo:test", testKey)] = []byte("\x01\x02 garbage")
+
+	if _, ok := cache.Get(context.Background(), testKey); ok {
+		t.Error("Get returned ok for a corrupt value")
+	}
+}
+
+func TestGetTreatsAPickleValueAsAPlainMiss(t *testing.T) {
+	// Written by a Python caller using the default envelope. Expected, not corruption.
+	f := newFakeClient()
+	rec := &recordingRecorder{}
+	cache, err := New(Options[sessionIdentity]{
+		Client: f, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	f.data[ValueKey("urn:galileo:test", testKey)] = []byte{0x80, 0x05, 0x95, 0x01}
+
+	if _, ok := cache.Get(context.Background(), testKey); ok {
+		t.Error("Get returned ok for a pickle value")
+	}
+	if got := rec.results[len(rec.results)-1]; got != ResultMiss {
+		t.Errorf("recorded %q, want %q -- a pickle value is expected, not an error", got, ResultMiss)
+	}
+}
+
+func TestGetFailsClosedOnAnUnreadableWatermark(t *testing.T) {
+	// An unparseable watermark must NOT be read as "no watermark": that would serve an
+	// entry someone tried to invalidate.
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	ctx := context.Background()
+	if err := cache.Put(ctx, testKey, sessionIdentity{SessionID: "sid-1"}); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	f.data[WatermarkKey("urn:galileo:test", "session_id", "sid-1")] = []byte("not-a-number")
+
+	if _, ok := cache.Get(ctx, testKey); ok {
+		t.Error("served an entry despite an unreadable watermark")
+	}
+}
+
+func TestPutReportsWriteFailures(t *testing.T) {
+	// Unlike reads, writes surface their error -- a caller that failed to publish usually
+	// wants to know.
+	f := newFakeClient()
+	f.setErr = errors.New("READONLY")
+	cache := newTestCache(t, f)
+
+	if err := cache.Put(context.Background(), testKey, sessionIdentity{}); err == nil {
+		t.Error("Put returned nil despite a Redis error")
+	}
+	if err := cache.Invalidate(context.Background(), "session_id", "sid-1", 0); err == nil {
+		t.Error("Invalidate returned nil despite a Redis error")
+	}
+}
+
+func TestNewRejectsATTLThatWouldOutliveItsWatermark(t *testing.T) {
+	// maxEntryTTL, NOT watermarkTTL: the two are no longer the same number. The entry cap
+	// pairs with maxFutureBuffer so buffer+TTL stays inside the watermark, so a TTL equal to
+	// the whole watermark lifetime must now be refused.
+	_, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix, TTL: maxEntryTTL + time.Second})
+	if err == nil {
+		t.Fatal("New accepted a TTL longer than the entry cap")
+	}
+	if _, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix, TTL: watermarkTTL}); err == nil {
+		t.Error("New accepted a TTL equal to the whole watermark lifetime; that leaves no room for any buffer")
+	}
+	if _, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix, TTL: maxEntryTTL}); err != nil {
+		t.Errorf("New rejected a TTL exactly at the cap: %v", err)
+	}
+}
+
+func TestNewRejectsAURNPrefixThatCannotWork(t *testing.T) {
+	// An empty prefix and one carrying a grammar delimiter both fail the same way -- the
+	// cache writes without error into a key space no other client reads.
+	for _, prefix := range []string{"", "urn:galileo:{cust}", "urn:galileo:cust#1", "urn:galileo:a?b"} {
+		if _, err := New(Options[sessionIdentity]{
+			Client: newFakeClient(), URNPrefix: prefix, TTL: time.Hour,
+		}); err == nil {
+			t.Errorf("New accepted URNPrefix %q", prefix)
+		}
+	}
+}
+
+func TestInvalidateRejectsAFutureBufferTheWatermarkCannotOutlive(t *testing.T) {
+	// The watermark lives 4h. An entry written just before the buffer elapses lives
+	// futureBuffer+TTL from now, so a buffer that pushes that sum past 4h would let the
+	// entry outlive the watermark suppressing it and resurrect.
+	client := newFakeClient()
+	cache, err := New(Options[sessionIdentity]{Client: client, URNPrefix: testPrefix, TTL: 2 * time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The ceiling is the CONSTANT maxFutureBuffer now, not watermarkTTL minus this cache's
+	// TTL. The old form only protected entries this cache wrote -- Invalidate spans every use
+	// case and both languages, so a longer-lived entry written elsewhere escaped it.
+	if err := cache.Invalidate(context.Background(), "kt", "id", maxFutureBuffer+time.Second); err == nil {
+		t.Error("Invalidate accepted a futureBuffer above the ceiling")
+	}
+	if err := cache.Invalidate(context.Background(), "kt", "id", maxFutureBuffer); err != nil {
+		t.Errorf("Invalidate rejected a futureBuffer exactly at the ceiling: %v", err)
+	}
+}
+
+func TestNewRequiresAClientAndTTL(t *testing.T) {
+	if _, err := New(Options[sessionIdentity]{URNPrefix: testPrefix, TTL: time.Hour}); err == nil {
+		t.Error("New accepted a nil Client")
+	}
+	if _, err := New(Options[sessionIdentity]{Client: newFakeClient(), URNPrefix: testPrefix}); err == nil {
+		t.Error("New accepted a zero TTL")
+	}
+}
+
+func TestGetRejectsAReservedUseCase(t *testing.T) {
+	cache := newTestCache(t, newFakeClient())
+	bad := Key{KeyType: "kt", ID: "id", UseCase: "watermark"}
+	if _, ok := cache.Get(context.Background(), bad); ok {
+		t.Error("Get accepted the reserved 'watermark' use case")
+	}
+	if err := cache.Put(context.Background(), bad, sessionIdentity{}); err == nil {
+		t.Error("Put accepted the reserved 'watermark' use case")
+	}
+}
+
+func TestStoredValueIsTheCrossLanguageEnvelope(t *testing.T) {
+	// Assert on the bytes, not a round trip: a round trip would pass for any framing.
+	f := newFakeClient()
+	cache := newTestCache(t, f)
+	if err := cache.Put(context.Background(), testKey, sessionIdentity{SessionID: "sid-1", CreatedAt: "t"}); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	var stored map[string]any
+	if err := json.Unmarshal(f.get(ValueKey("urn:galileo:test", testKey)), &stored); err != nil {
+		t.Fatalf("stored value is not JSON: %v", err)
+	}
+	if stored["version"] != float64(envelopeVersion) || stored["encoding"] != "utf8" {
+		t.Errorf("unexpected envelope: %+v", stored)
+	}
+	var payload sessionIdentity
+	if err := json.Unmarshal([]byte(stored["payload"].(string)), &payload); err != nil {
+		t.Fatalf("payload is not JSON: %v", err)
+	}
+	if payload.SessionID != "sid-1" {
+		t.Errorf("payload = %+v", payload)
+	}
+}
+
+type recordingRecorder struct {
+	mu      sync.Mutex
+	results []Result
+	errs    []error
+}
+
+func (r *recordingRecorder) RecordResult(_ string, res Result) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.results = append(r.results, res)
+}
+func (r *recordingRecorder) RecordLatency(_, _ string, _ time.Duration) {}
+func (r *recordingRecorder) RecordError(_, _ string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.errs = append(r.errs, err)
+}
+
+func TestRecorderSeesHitMissStaleAndError(t *testing.T) {
+	f := newFakeClient()
+	rec := &recordingRecorder{}
+	cache, err := New(Options[sessionIdentity]{
+		Client: f, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx := context.Background()
+
+	cache.Get(ctx, testKey)                                   // miss
+	_ = cache.Put(ctx, testKey, sessionIdentity{})            //
+	cache.Get(ctx, testKey)                                   // hit
+	_ = cache.Invalidate(ctx, testKey.KeyType, testKey.ID, 0) //
+	cache.Get(ctx, testKey)                                   // stale
+	f.mgetErr = errors.New("boom")
+	cache.Get(ctx, testKey) // error
+
+	want := []Result{ResultMiss, ResultHit, ResultStale, ResultError}
+	if len(rec.results) != len(want) {
+		t.Fatalf("recorded %v, want %v", rec.results, want)
+	}
+	for i := range want {
+		if rec.results[i] != want[i] {
+			t.Errorf("result[%d] = %q, want %q", i, rec.results[i], want[i])
+		}
+	}
+}
+
+func TestNilRecorderIsSafe(t *testing.T) {
+	cache := newTestCache(t, newFakeClient())
+	ctx := context.Background()
+	_ = cache.Put(ctx, testKey, sessionIdentity{})
+	cache.Get(ctx, testKey)
+	_ = cache.Invalidate(ctx, "session_id", "sid-1", 0)
+}
+
+func TestGetTreatsAnExpiredEnvelopeAsAMiss(t *testing.T) {
+	// Python's per-use-case TTL has no ceiling, so an entry can outlive the watermark that
+	// invalidated it; without honoring the envelope's own expiry, Go would serve it fresh.
+	client := newFakeClient()
+	cache, err := New(Options[sessionIdentity]{
+		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	key := Key{KeyType: "session_id", ID: "expired", UseCase: "test::expired"}
+
+	// Written an hour ago with a one-minute lifetime, but still present in the store --
+	// exactly what a PERSIST, or a longer Redis TTL than the envelope says, leaves behind.
+	raw, err := encodeEnvelope(time.Now().Add(-time.Hour), time.Minute, []byte(`{"session_id":"s","created_at":"t"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SetEx(ctx, ValueKey(testPrefix, key), raw, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := cache.Get(ctx, key); ok {
+		t.Error("Get served an entry past its expiresAtMs")
+	}
+}
+
+func TestGetServesAnUnexpiredEnvelope(t *testing.T) {
+	// The other direction, so the expiry check cannot pass by rejecting everything.
+	client := newFakeClient()
+	cache, err := New(Options[sessionIdentity]{
+		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	key := Key{KeyType: "session_id", ID: "fresh", UseCase: "test::fresh"}
+	want := sessionIdentity{SessionID: "s-1", CreatedAt: "2026-09-09T00:00:00Z"}
+
+	if err := cache.Put(ctx, key, want); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := cache.Get(ctx, key)
+	if !ok || got != want {
+		t.Errorf("Get = %+v, %v; want %+v, true", got, ok, want)
+	}
+}
+
+func TestGetDistrustsATrackedEntryDeclaringMoreThanTheWatermarkLifetime(t *testing.T) {
+	// The gap the expiry check alone misses: Python writes a 6h TTL at t=0, an invalidation
+	// at t=1h makes the watermark expire at t=5h, and Go reads at t=5h30m -- unexpired but
+	// with the watermark gone, so without this guard the invalidated value is served as a hit.
+	client := newFakeClient()
+	cache, err := New(Options[sessionIdentity]{
+		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	key := Key{KeyType: "session_id", ID: "long", UseCase: "test::long", Tracked: true}
+
+	// A 6h declared lifetime, written half an hour ago: unexpired, but longer than the 4h
+	// watermark can cover. The watermark itself has already expired and is absent.
+	raw, err := encodeEnvelope(time.Now().Add(-30*time.Minute), 6*time.Hour, []byte(`{"session_id":"s","created_at":"t"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SetEx(ctx, ValueKey(testPrefix, key), raw, 6*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := cache.Get(ctx, key); ok {
+		t.Error("Get served a tracked entry that could have outlived its watermark")
+	}
+}
+
+func TestDistrustedEntryIsRecordedDistinctlyFromAPlainMiss(t *testing.T) {
+	// An empty cache also records ResultMiss, so recording the guard as a miss would make
+	// it invisible: the cure is a use-case TTL in another language, unreachable from a miss count.
+	client := newFakeClient()
+	rec := &recordingRecorder{}
+	cache, err := New(Options[sessionIdentity]{
+		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	key := Key{KeyType: "session_id", ID: "distrusted", UseCase: "test::distrust", Tracked: true}
+
+	raw, err := encodeEnvelope(time.Now().Add(-30*time.Minute), 6*time.Hour, []byte(`{"session_id":"s"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SetEx(ctx, ValueKey(testPrefix, key), raw, 6*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := cache.Get(ctx, key); ok {
+		t.Fatal("Get served a distrusted entry")
+	}
+	if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+		t.Errorf("recorded %v, want exactly [%s]", rec.results, ResultDistrusted)
+	}
+
+	// An actually-absent key must still be a plain miss, so the two remain distinguishable.
+	rec.results = nil
+	if _, ok := cache.Get(ctx, Key{KeyType: "session_id", ID: "absent", UseCase: "test::distrust", Tracked: true}); ok {
+		t.Fatal("Get served an absent key")
+	}
+	if len(rec.results) != 1 || rec.results[0] != ResultMiss {
+		t.Errorf("absent key recorded %v, want exactly [%s]", rec.results, ResultMiss)
+	}
+}
+
+func TestGetAcceptsAnUntrackedEntryWithALongLifetime(t *testing.T) {
+	// The guard is about resurrection after invalidation, which only applies to tracked
+	// keys. An untracked key has no watermark to outlive, so a long lifetime is legitimate
+	// and must still be served.
+	client := newFakeClient()
+	cache, err := New(Options[sessionIdentity]{
+		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	key := Key{KeyType: "session_id", ID: "untracked", UseCase: "test::untracked"}
+	want := sessionIdentity{SessionID: "s-1", CreatedAt: "2026-09-09T00:00:00Z"}
+
+	payload, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := encodeEnvelope(time.Now(), 6*time.Hour, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SetEx(ctx, ValueKey(testPrefix, key), raw, 6*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := cache.Get(ctx, key)
+	if !ok || got != want {
+		t.Errorf("Get = %+v, %v; want %+v, true", got, ok, want)
+	}
+}
+
+// ctxAwareClient returns the context's error, the way a real Redis client does. fakeClient
+// ignores the context entirely, so a cancellation test using it never reaches Cache.fail,
+// and "no ResultError was recorded" then passes vacuously because nothing was recorded.
+type ctxAwareClient struct{ fakeClient }
+
+func (c *ctxAwareClient) MGet(ctx context.Context, keys ...string) ([][]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return c.fakeClient.MGet(ctx, keys...)
+}
+
+func (c *ctxAwareClient) SetEx(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return c.fakeClient.SetEx(ctx, key, value, ttl)
+}
+
+func newCtxAwareClient() *ctxAwareClient {
+	return &ctxAwareClient{fakeClient{data: map[string][]byte{}, ttls: map[string]time.Duration{}}}
+}
+
+func TestGetReportsACancelledCallerSeparatelyFromACacheFault(t *testing.T) {
+	// A client hanging up is not the cache breaking. Counting it as ResultError inflates the
+	// cache's error rate exactly when a service is shedding load.
+	rec := &recordingRecorder{}
+	cache, err := New(Options[sessionIdentity]{
+		Client: newCtxAwareClient(), URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, ok := cache.Get(ctx, Key{KeyType: "kt", ID: "id", UseCase: "test::cancel"}); ok {
+		t.Fatal("Get returned a value for a cancelled context")
+	}
+	for _, r := range rec.results {
+		if r == ResultError {
+			t.Error("a cancelled caller was recorded as a cache error")
+		}
+	}
+}
+
+// upperCodec is a deliberately non-JSON codec: it stores the value as a bare uppercased
+// string. Nothing about that shape is reachable through encoding/json, so a test using it
+// cannot pass unless Cache really routes both directions through Options.Codec.
+type upperCodec struct{}
+
+func (upperCodec) Marshal(v string) ([]byte, error) { return []byte(strings.ToUpper(v)), nil }
+func (upperCodec) Unmarshal(b []byte, v *string) error {
+	*v = strings.ToLower(string(b))
+	return nil
+}
+
+func TestPutAndGetBothRouteThroughTheConfiguredCodec(t *testing.T) {
+	client := newFakeClient()
+	cache, err := New(Options[string]{
+		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Codec: upperCodec{},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	key := Key{KeyType: "session_id", ID: "s1", UseCase: "Svc::m"}
+	ctx := context.Background()
+
+	if err := cache.Put(ctx, key, "hello"); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	// Assert the bytes on the wire, not just the round trip. A round trip alone passes for
+	// the default JSON codec too, so it would prove nothing about the seam.
+	var env struct {
+		Payload string `json:"payload"`
+	}
+	if err := json.Unmarshal(client.get(ValueKey(testPrefix, key)), &env); err != nil {
+		t.Fatalf("stored value is not an envelope: %v", err)
+	}
+	if env.Payload != "HELLO" {
+		t.Fatalf("payload = %q, want %q (Put did not use the codec)", env.Payload, "HELLO")
+	}
+
+	got, ok := cache.Get(ctx, key)
+	if !ok {
+		t.Fatal("Get missed a value it had just written")
+	}
+	if got != "hello" {
+		t.Fatalf("Get = %q, want %q (Get did not use the codec)", got, "hello")
+	}
+}
+
+func TestOmittingTheCodecKeepsTheJSONDefault(t *testing.T) {
+	client := newFakeClient()
+	cache, err := New(Options[sessionIdentity]{Client: client, URNPrefix: testPrefix, TTL: time.Hour})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	key := Key{KeyType: "session_id", ID: "s1", UseCase: "Svc::m"}
+	if err := cache.Put(context.Background(), key, sessionIdentity{SessionID: "abc"}); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	var env struct {
+		Payload string `json:"payload"`
+	}
+	if err := json.Unmarshal(client.get(ValueKey(testPrefix, key)), &env); err != nil {
+		t.Fatalf("stored value is not an envelope: %v", err)
+	}
+	if !strings.Contains(env.Payload, `"session_id"`) && !strings.Contains(env.Payload, `"SessionID"`) {
+		t.Fatalf("payload %q does not look like encoding/json output", env.Payload)
+	}
+}
+
+func TestGetDoesNotCountACallerDeadlineAsACacheError(t *testing.T) {
+	// Get derives a child context with c.timeout, so a caller deadline that fires first
+	// surfaces as context.DeadlineExceeded -- indistinguishable from the cache's own
+	// timeout by the error alone. Classifying on the CALLER's context resolves that.
+	rec := &recordingRecorder{}
+	cache, err := New(Options[sessionIdentity]{
+		Client: newCtxAwareClient(), URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	if _, ok := cache.Get(ctx, Key{KeyType: "kt", ID: "id", UseCase: "test::deadline"}); ok {
+		t.Fatal("Get returned a value for an expired caller deadline")
+	}
+	for _, r := range rec.results {
+		if r == ResultError {
+			t.Error("an expired caller deadline was recorded as a cache error")
+		}
+	}
+	if len(rec.errs) != 0 {
+		t.Errorf("caller termination reached the error series: %v", rec.errs)
+	}
+}
+
+func TestGetKeepsACancelledCallerOutOfTheErrorSeries(t *testing.T) {
+	// The docstring said cancellation is separated out so it does not inflate the error
+	// rate, but recordErr still ran -- so galileo_gcache_errors_total counted every one.
+	rec := &recordingRecorder{}
+	cache, err := New(Options[sessionIdentity]{
+		Client: newCtxAwareClient(), URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cache.Get(ctx, Key{KeyType: "kt", ID: "id", UseCase: "test::cancel-errs"})
+
+	if len(rec.errs) != 0 {
+		t.Errorf("a cancelled caller reached the error series: %v", rec.errs)
+	}
+	var sawCancelled bool
+	for _, r := range rec.results {
+		if r == ResultCancelled {
+			sawCancelled = true
+		}
+	}
+	if !sawCancelled {
+		t.Error("a cancelled caller was not recorded as ResultCancelled")
+	}
+}
+
+func TestInvalidateKeepsCallerTerminationOutOfTheErrorSeries(t *testing.T) {
+	// Get and Put both exempt caller termination from galileo_gcache_errors_total, but
+	// Invalidate was counting a hangup or elapsed deadline as a cache fault -- exactly the
+	// path a shutdown cancels mid-flight, so the spike lands when a service is degraded.
+	for _, tc := range []struct {
+		name string
+		ctx  func() (context.Context, context.CancelFunc)
+	}{
+		{"cancelled", func() (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			return ctx, func() {}
+		}},
+		{"deadline elapsed", func() (context.Context, context.CancelFunc) {
+			return context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := &recordingRecorder{}
+			cache, err := New(Options[sessionIdentity]{
+				Client: newCtxAwareClient(), URNPrefix: testPrefix, TTL: time.Hour,
+				Logger: quietLogger(), Recorder: rec,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := tc.ctx()
+			defer cancel()
+
+			// The error is still returned -- Invalidate's caller decides what to do with it.
+			if err := cache.Invalidate(ctx, "session_id", "sid-1", 0); err == nil {
+				t.Fatal("Invalidate returned nil for a terminated caller context")
+			}
+			if len(rec.errs) != 0 {
+				t.Errorf("caller termination reached the error series: %v", rec.errs)
+			}
+		})
+	}
+}
+
+func TestGetDistrustsALifetimeWhoseSubtractionOverflows(t *testing.T) {
+	// Both timestamps fit in int64; their difference does not. The overflowed difference is
+	// NEGATIVE, so a subtract-then-compare guard would pass an entry declaring roughly 570
+	// million years. No watermark: an expired watermark is a different case entirely.
+	client := newFakeClient()
+	cache := newTestCache(t, client)
+	key := Key{KeyType: "session_id", ID: "sid-overflow", UseCase: "test::overflow", Tracked: true}
+
+	raw := fmt.Sprintf(
+		`{"version":1,"createdAtMs":%d,"expiresAtMs":%d,"encoding":"utf8","payload":"{}"}`,
+		int64(-9e18), int64(9e18))
+	client.data[ValueKey(testPrefix, key)] = []byte(raw)
+
+	if _, ok := cache.Get(context.Background(), key); ok {
+		t.Error("served a tracked entry whose declared lifetime overflowed the guard")
+	}
+}
+
+func TestNewRejectsATTLThatRoundsToZeroMilliseconds(t *testing.T) {
+	// Caught at construction, not on every Put. Unchecked, rueidisClient.SetEx rejects the
+	// rounded-to-zero PX on every write and encodeEnvelope stamps expiresAtMs == createdAtMs,
+	// which reads as already expired -- both far from the cause.
+	_, err := New(Options[sessionIdentity]{
+		Client: newFakeClient(), URNPrefix: testPrefix, TTL: 500 * time.Microsecond,
+	})
+	if err == nil {
+		t.Fatal("New accepted a sub-millisecond TTL")
+	}
+	if !strings.Contains(err.Error(), "rounds to zero milliseconds") {
+		t.Errorf("error did not name the cause: %v", err)
+	}
+
+	// One millisecond is the smallest expressible TTL and must still be accepted.
+	if _, err := New(Options[sessionIdentity]{
+		Client: newFakeClient(), URNPrefix: testPrefix, TTL: time.Millisecond,
+	}); err != nil {
+		t.Errorf("New rejected a 1ms TTL: %v", err)
+	}
+}
+
+func TestGetTreatsANonPositiveExpiryAsExpired(t *testing.T) {
+	// A sign test on expiresAtMs used to skip these and serve the entry, but both other
+	// readers compare the raw value with no sign check and call it expired. Untracked, so
+	// no watermark can mask the difference.
+	for _, exp := range []string{"0", "-1"} {
+		client := newFakeClient()
+		cache := newTestCache(t, client)
+		key := Key{KeyType: "session_id", ID: "sid-exp" + exp, UseCase: "test::nonpositive-expiry"}
+
+		raw := fmt.Sprintf(
+			`{"version":1,"createdAtMs":1757000000000,"expiresAtMs":%s,"encoding":"utf8","payload":"{\"session_id\":\"s\"}"}`,
+			exp)
+		client.data[ValueKey(testPrefix, key)] = []byte(raw)
+
+		if _, ok := cache.Get(context.Background(), key); ok {
+			t.Errorf("expiresAtMs=%s was served; Python and Python both call it expired", exp)
+		}
+	}
+}
+
+func TestInvalidateRejectsAFutureBufferThatOverflowsTheGuard(t *testing.T) {
+	// futureBuffer+c.ttl overflows time.Duration for a large buffer, and an overflowed sum
+	// is NEGATIVE, so a summing guard would invert and accept precisely what it should
+	// refuse -- previously wrote a watermark dated 2318 while the key expired in 4h.
+	client := newFakeClient()
+	cache, err := New(Options[sessionIdentity]{
+		Client: client, URNPrefix: testPrefix, TTL: 2 * time.Hour, Logger: quietLogger(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cache.Invalidate(context.Background(), "session_id", "sid-1", time.Duration(math.MaxInt64)); err == nil {
+		t.Error("Invalidate accepted a futureBuffer that overflows futureBuffer+TTL")
+	}
+	if got := client.get(WatermarkKey(testPrefix, "session_id", "sid-1")); got != nil {
+		t.Errorf("a rejected Invalidate still wrote a watermark: %s", got)
+	}
+
+	// The largest buffer that genuinely fits must still be accepted, so the guard is not
+	// simply refusing everything: maxFutureBuffer, independent of this cache's TTL.
+	if err := cache.Invalidate(context.Background(), "session_id", "sid-2", maxFutureBuffer); err != nil {
+		t.Errorf("Invalidate rejected the largest valid buffer: %v", err)
+	}
+}
+
+func TestWatermarkOutranksTheDeclaredLifetimeGuard(t *testing.T) {
+	// The two tracked guards can both fire, and the order decides what an operator sees. All
+	// four outcomes below are a miss; what is pinned is the CLASSIFICATION.
+	//
+	// Precedence is PYTHON's, measured rather than chosen. For an entry created 30m ago
+	// declaring a 6h lifetime under a stale watermark, RedisCache.get records
+	// lifetime_exceeds_watermark and never reaches its watermark comparison -- so an earlier
+	// version of this test, which pinned ResultStale there, was pinning a cross-client
+	// divergence rather than a decision. Blaming the malformation is also the more useful
+	// half: "stale" is a routine outcome, "distrusted" says a writer is broken.
+	//
+	// The corrupt-watermark rows still report ResultError, because the watermark is now
+	// PARSED before the envelope guards and only COMPARED after them. Python does the same
+	// split and records BOTH unreadable_watermark and lifetime_exceeds_watermark; Go has one
+	// Result per read, and the corrupt key is the one a rewrite cannot repair.
+	build := func(t *testing.T, lifetime time.Duration, watermark string) (*recordingRecorder, bool) {
+		t.Helper()
+		client := newFakeClient()
+		rec := &recordingRecorder{}
+		cache, err := New(Options[sessionIdentity]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := Key{KeyType: "session_id", ID: "ordering", UseCase: "test::ordering", Tracked: true}
+		raw, err := encodeEnvelope(time.Now().Add(-30*time.Minute), lifetime, []byte(`{"session_id":"s"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.data[ValueKey(testPrefix, key)] = raw
+		if watermark != "" {
+			client.data[WatermarkKey(testPrefix, "session_id", "ordering")] = []byte(watermark)
+		}
+		_, ok := cache.Get(context.Background(), key)
+		return rec, ok
+	}
+
+	longLife, okLife := 6*time.Hour, time.Hour
+	stale := strconv.FormatInt(time.Now().UnixMilli(), 10)
+
+	for _, tc := range []struct {
+		name      string
+		lifetime  time.Duration
+		watermark string
+		want      Result
+		wantErrs  int
+	}{
+		{"long lifetime, no watermark", longLife, "", ResultDistrusted, 0},
+		{"long lifetime, corrupt watermark", longLife, "abc", ResultError, 1},
+		{"long lifetime, stale watermark", longLife, stale, ResultDistrusted, 0},
+		{"ok lifetime, corrupt watermark", okLife, "abc", ResultError, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec, ok := build(t, tc.lifetime, tc.watermark)
+			if ok {
+				t.Fatal("Get served the entry; every case here must be a miss")
+			}
+			if len(rec.results) != 1 || rec.results[0] != tc.want {
+				t.Errorf("recorded %v, want exactly [%s]", rec.results, tc.want)
+			}
+			if len(rec.errs) != tc.wantErrs {
+				t.Errorf("recorded %d errors, want %d: %v", len(rec.errs), tc.wantErrs, rec.errs)
+			}
+		})
+	}
+}
+
+func TestATrackedEntryCannotBeServedOlderThanTheWatermarkLifetime(t *testing.T) {
+	// Python's client has an explicit AGE check because legacy pickle entries carry no
+	// expiresAtMs; Go instead refuses pickle outright (ErrPickleEnvelope), so age >
+	// watermarkTTL is implied by its two existing guards rather than checked explicitly.
+	base := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
+	key := Key{KeyType: "session_id", ID: "age", UseCase: "test::age", Tracked: true}
+
+	serve := func(t *testing.T, age, declared time.Duration) (bool, []Result) {
+		t.Helper()
+		client := newFakeClient()
+		rec := &recordingRecorder{}
+		cache, err := New(Options[sessionIdentity]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
+			Recorder: rec, now: func() time.Time { return base },
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		created := base.Add(-age)
+		raw := fmt.Sprintf(
+			`{"version":1,"createdAtMs":%d,"expiresAtMs":%d,"encoding":"utf8","payload":"{\"session_id\":\"s\"}"}`,
+			created.UnixMilli(), created.Add(declared).UnixMilli())
+		client.data[ValueKey(testPrefix, key)] = []byte(raw)
+		_, ok := cache.Get(context.Background(), key)
+		return ok, rec.results
+	}
+
+	for _, tc := range []struct {
+		name          string
+		age, declared time.Duration
+		wantServed    bool
+		wantResult    Result
+	}{
+		// Old and declaring a long life: the declared-lifetime guard refuses it.
+		{"5h old, 6h declared", 5 * time.Hour, 6 * time.Hour, false, ResultDistrusted},
+		// Old but declaring a short life: it is necessarily EXPIRED, which is the step
+		// that makes a separate age check redundant.
+		{"5h old, 3h30m declared", 5 * time.Hour, 3*time.Hour + 30*time.Minute, false, ResultMiss},
+		{"4h6m old, 4h declared", 4*time.Hour + 6*time.Minute, 4 * time.Hour, false, ResultMiss},
+		// Inside both bounds, so served -- and necessarily younger than watermarkTTL.
+		{"1h old, 3h30m declared", time.Hour, 3*time.Hour + 30*time.Minute, true, ResultHit},
+		{"3h54m old, 4h declared", 3*time.Hour + 54*time.Minute, 4 * time.Hour, true, ResultHit},
+		// THE BAND between the write cap and the old read threshold. Raising watermarkTTL to
+		// 5h while maxEntryTTL stayed at 4h left an hour in which a declared lifetime passed
+		// the guard even though New refuses to build a cache that could write one. Every
+		// other row here sits outside that band, so none of them could see the gap.
+		{"1h old, 4h30m declared", time.Hour, 4*time.Hour + 30*time.Minute, false, ResultDistrusted},
+		{"1h old, 4h declared (the cap itself)", time.Hour, 4 * time.Hour, true, ResultHit},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ok, results := serve(t, tc.age, tc.declared)
+			if ok != tc.wantServed {
+				t.Errorf("served = %v, want %v", ok, tc.wantServed)
+			}
+			if len(results) != 1 || results[0] != tc.wantResult {
+				t.Errorf("recorded %v, want exactly [%s]", results, tc.wantResult)
+			}
+			// maxEntryTTL, not watermarkTTL: the loose bound could not fail while the read
+			// guard was itself loose, so the invariant agreed with the bug.
+			if ok && tc.age >= maxEntryTTL {
+				t.Errorf("INVARIANT BROKEN: served an entry %s old, at or past maxEntryTTL (%s)",
+					tc.age, maxEntryTTL)
+			}
+		})
+	}
+
+	// The pickle case Python's age check exists for: unreadable here, so never served.
+	client := newFakeClient()
+	rec := &recordingRecorder{}
+	cache := newTestCache(t, client)
+	cache.recorder = rec
+	client.data[ValueKey(testPrefix, key)] = []byte{0x80, 0x04, 0x95, 0x01}
+	if _, ok := cache.Get(context.Background(), key); ok {
+		t.Error("served a pickle entry, which carries no timestamps for either guard to check")
+	}
+}
+
+func TestPutWritesTheDeclaredEnvelope(t *testing.T) {
+	// Options.Envelope selects what THIS client writes, and it must match the Python key's
+	// `envelope=` or the two write framings the other reads but never produces. Caught in
+	// review: Put called encodeEnvelope unconditionally, so a PROTO-configured Go cache
+	// would have written JSON while Python wrote PROTO for the same key.
+	for _, tc := range []struct {
+		name      string
+		envelope  Envelope
+		wantFirst func(byte) bool
+		desc      string
+	}{
+		{"json is the default", EnvelopeJSON, func(b byte) bool { return b == '{' }, "'{'"},
+		{"proto when declared", EnvelopePROTO,
+			func(b byte) bool { return b >= protoFirstByteMin && b <= protoFirstByteMax }, "the PROTO range"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := newFakeClient()
+			c, err := New(Options[map[string]string]{
+				Client: fake, URNPrefix: "urn:galileo:test", TTL: time.Minute, Envelope: tc.envelope,
+			})
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if err := c.Put(context.Background(), Key{KeyType: "kt", ID: "i", UseCase: "u"},
+				map[string]string{"a": "b"}); err != nil {
+				t.Fatalf("Put: %v", err)
+			}
+			if len(fake.data) != 1 {
+				t.Fatalf("expected one write, got %d", len(fake.data))
+			}
+			var got []byte
+			for _, v := range fake.data {
+				got = v
+			}
+			if len(got) == 0 || !tc.wantFirst(got[0]) {
+				t.Fatalf("first byte 0x%02x, want %s", got[0], tc.desc)
+			}
+		})
+	}
+}
+
+// TestNewRejectsAnUnsupportedEnvelope guards the framing choice at construction.
+//
+// Put branches on `== EnvelopePROTO` and treats everything else as JSON, so an out-of-range
+// Envelope silently wrote the WRONG framing rather than failing. It is invisible downstream
+// too: a reader sniffs the leading byte, so the entry decodes fine and only a peer expecting
+// the declared framing ever notices.
+func TestNewRejectsAnUnsupportedEnvelope(t *testing.T) {
+	base := func() Options[string] {
+		return Options[string]{Client: newFakeClient(), URNPrefix: "urn:galileo:test", TTL: time.Hour}
+	}
+	for _, tc := range []struct {
+		name string
+		env  Envelope
+		ok   bool
+	}{
+		{"json is supported", EnvelopeJSON, true},
+		{"proto is supported", EnvelopePROTO, true},
+		{"an out-of-range value is refused", Envelope(99), false},
+		{"a negative value is refused", Envelope(-1), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o := base()
+			o.Envelope = tc.env
+			_, err := New(o)
+			if tc.ok && err != nil {
+				t.Fatalf("expected %v to be accepted, got %v", tc.env, err)
+			}
+			if !tc.ok && err == nil {
+				t.Fatalf("Envelope(%d) was accepted; Put would silently write JSON framing", tc.env)
+			}
+		})
+	}
+}
+
+// A tracked entry stamped far ahead is immune to invalidation, and every other guard passes.
+//
+// Staleness is `watermarkMs >= createdAtMs` and a watermark carries a real clock time, so it
+// never reaches a stamp far enough ahead. The expiry guard passes because expiresAtMs is
+// ahead too, and the lifetime guard passes because the declared lifetime is legal -- so the
+// entry survives every Invalidate call for its whole Redis TTL.
+//
+// Both sides of the boundary are pinned. The bound is the frontier of what an invalidation
+// issued NOW can reach, not "not in the future": refusing the reachable side would turn a
+// slightly fast clock into a permanent miss-and-rewrite loop. Mirrors Python's
+// test_a_future_created_at_cannot_put_an_entry_out_of_invalidations_reach.
+func TestAFutureCreatedAtCannotPutAnEntryOutOfInvalidationsReach(t *testing.T) {
+	now := time.Now()
+	serve := func(t *testing.T, createdAt time.Time, tracked bool, watermark string) (*recordingRecorder, bool) {
+		t.Helper()
+		client := newFakeClient()
+		rec := &recordingRecorder{}
+		cache, err := New(Options[sessionIdentity]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+			now: func() time.Time { return now },
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := Key{KeyType: "session_id", ID: "future", UseCase: "test::future", Tracked: tracked}
+		raw, err := encodeEnvelope(createdAt, time.Hour, []byte(`{"session_id":"s"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.data[ValueKey(testPrefix, key)] = raw
+		if watermark != "" {
+			client.data[WatermarkKey(testPrefix, "session_id", "future")] = []byte(watermark)
+		}
+		_, ok := cache.Get(context.Background(), key)
+		return rec, ok
+	}
+
+	atNow := strconv.FormatInt(now.UnixMilli(), 10)
+	withBuffer := strconv.FormatInt(now.Add(maxFutureBuffer).UnixMilli(), 10)
+
+	t.Run("a year ahead survives an invalidation issued now", func(t *testing.T) {
+		rec, ok := serve(t, now.AddDate(1, 0, 0), true, atNow)
+		if ok {
+			t.Fatal("Get served an entry beyond every reachable watermark")
+		}
+		if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+			t.Errorf("recorded %v, want [distrusted]", rec.results)
+		}
+	})
+
+	t.Run("just past the frontier", func(t *testing.T) {
+		rec, ok := serve(t, now.Add(maxFutureBuffer+time.Minute), true, "")
+		if ok {
+			t.Fatal("Get served an entry past the frontier")
+		}
+		if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+			t.Errorf("recorded %v, want [distrusted]", rec.results)
+		}
+	})
+
+	t.Run("just inside it is a hit", func(t *testing.T) {
+		_, ok := serve(t, now.Add(maxFutureBuffer-time.Minute), true, "")
+		if !ok {
+			t.Error("an entry a watermark can still reach must be served")
+		}
+	})
+
+	t.Run("and really is still reachable", func(t *testing.T) {
+		// The property the bound is derived from: a watermark written now with the full
+		// buffer suppresses an entry just inside the frontier.
+		if _, ok := serve(t, now.Add(maxFutureBuffer-time.Minute), true, withBuffer); ok {
+			t.Error("a watermark written with the full buffer must still suppress it")
+		}
+	})
+
+	t.Run("untracked keeps its clock-skew tolerance", func(t *testing.T) {
+		// No watermark to be out of reach of, so refusing a future stamp would cost a skewed
+		// writer its hit rate and buy nothing.
+		if _, ok := serve(t, now.Add(maxFutureBuffer+time.Minute), false, ""); !ok {
+			t.Error("an untracked future-stamped entry is clock skew, not corruption")
+		}
+	})
+}
+
+// A payload the two clients decode differently is refused on both sides of the wire.
+//
+// The escape form is the one that hides: the stored envelope is pure ASCII, so the utf8.Valid
+// gate cannot see it, and the surrogate only reappears when the caller's codec unescapes the
+// payload. Python keeps U+D800, encoding/json here substitutes U+FFFD, and both report a hit.
+func TestADivergentPayloadIsRefusedOnWriteAndOnRead(t *testing.T) {
+	t.Run("write", func(t *testing.T) {
+		_, err := encodeEnvelope(time.Now(), time.Hour, []byte(`{"v":"\ud800"}`))
+		if err == nil {
+			t.Fatal("encodeEnvelope stored a payload the two clients read differently")
+		}
+		if strings.Contains(err.Error(), `\ud800`) {
+			t.Errorf("the payload leaked into the error: %v", err)
+		}
+	})
+
+	t.Run("an emoji still writes", func(t *testing.T) {
+		// A valid PAIR is also two escapes. Refusing these was the first version's bug.
+		if _, err := encodeEnvelope(time.Now(), time.Hour, []byte(`{"v":"\ud83d\ude00"}`)); err != nil {
+			t.Errorf("a valid surrogate pair must write: %v", err)
+		}
+	})
+
+	t.Run("read", func(t *testing.T) {
+		// Hand-built, because encodeEnvelope now refuses to produce one -- which is the
+		// point: only a foreign writer or an older build can leave this in Redis.
+		raw := []byte(fmt.Sprintf(
+			`{"version":1,"createdAtMs":%d,"expiresAtMs":%d,"encoding":"utf8","payload":"{\"session_id\":\"\\ud800\"}"}`,
+			time.Now().UnixMilli(), time.Now().Add(time.Hour).UnixMilli()))
+		client := newFakeClient()
+		rec := &recordingRecorder{}
+		cache, err := New(Options[sessionIdentity]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := Key{KeyType: "session_id", ID: "poisoned", UseCase: "test::poisoned"}
+		client.data[ValueKey(testPrefix, key)] = raw
+		if _, ok := cache.Get(context.Background(), key); ok {
+			t.Fatal("Get served an entry Python would decode differently")
+		}
+		if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+			t.Errorf("recorded %v, want [distrusted]", rec.results)
+		}
+	})
+}
+
+// A payload is judged by its CONTENT, not by how the envelope transported it.
+//
+// Two wrong discriminators were tried and each broke one direction. Python used the Python
+// TYPE, which caught pickle values. Go used the envelope's `encoding` field, which exempted
+// base64 -- but base64 means "the writer handed us bytes", and a Serializer returning the
+// bytes of a json.dumps lands there with JSON text inside, which is precisely the payload
+// the two clients decode differently. What decides it is whether the bytes parse as strict
+// JSON, and that gate keeps real binary out on its own.
+func TestAPayloadIsJudgedByItsContentNotItsTransport(t *testing.T) {
+	envelopeAround := func(t *testing.T, encoding string, payload string) []byte {
+		t.Helper()
+		return []byte(fmt.Sprintf(
+			`{"version":1,"createdAtMs":%d,"expiresAtMs":%d,"encoding":%q,"payload":%q}`,
+			time.Now().UnixMilli(), time.Now().Add(time.Hour).UnixMilli(), encoding, payload))
+	}
+
+	t.Run("base64 carrying poisoned JSON is refused", func(t *testing.T) {
+		// The reproduction: Python's JsonSerializer-alike returning bytes. Both clients must
+		// refuse, or one writes what the other will not read.
+		raw := envelopeAround(t, "base64", base64.StdEncoding.EncodeToString([]byte(`{"a":"\ud800"}`)))
+		payload, _, _, err := decodeEnvelope(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reason := loneSurrogateReason(string(payload)); reason == "" {
+			t.Error("a base64 payload carrying a lone surrogate escape must be refused")
+		}
+	})
+
+	t.Run("real binary is left alone", func(t *testing.T) {
+		// Protobuf does not parse as JSON, so the strict-JSON gate excludes it without any
+		// need to consult the framing. Bytes that merely CONTAIN the characters \ud800 are
+		// the interesting case, since they pass the substring gate.
+		binary := append([]byte{0x08, 0x96, 0x01, 0xff, 0xfe}, []byte(`\ud800`)...)
+		env, err := encodeProtoEnvelope(time.Now(), time.Hour, binary)
+		if err != nil {
+			t.Fatalf("real binary must still write: %v", err)
+		}
+		payload, _, _, err := decodeEnvelope(env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reason := loneSurrogateReason(string(payload)); reason != "" {
+			t.Errorf("real binary was refused as %q", reason)
+		}
+	})
+
+	t.Run("and Get serves it end to end", func(t *testing.T) {
+		client := newFakeClient()
+		rec := &recordingRecorder{}
+		cache, err := New(Options[[]byte]{
+			Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(),
+			Recorder: rec, Codec: rawBytesCodec{},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		binary := append([]byte{0x08, 0x96, 0x01, 0xff, 0xfe}, []byte(`\ud800`)...)
+		key := Key{KeyType: "session_id", ID: "binary", UseCase: "test::binary"}
+		env, err := encodeProtoEnvelope(time.Now(), time.Hour, binary)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.data[ValueKey(testPrefix, key)] = env
+		got, ok := cache.Get(context.Background(), key)
+		if !ok {
+			t.Fatalf("real binary was refused; recorded %v", rec.results)
+		}
+		if string(got) != string(binary) {
+			t.Errorf("got %q, want %q", got, binary)
+		}
+	})
+}
+
+// rawBytesCodec hands the payload through untouched, which is what a binary codec does.
+type rawBytesCodec struct{}
+
+func (rawBytesCodec) Marshal(v []byte) ([]byte, error) { return v, nil }
+func (rawBytesCodec) Unmarshal(b []byte, v *[]byte) error {
+	*v = append([]byte(nil), b...)
+	return nil
+}
+
+// A corrupt watermark is reported even when there is no value to serve.
+//
+// Python parses the watermark the moment the MGET unpacks, so it records unreadable_watermark
+// regardless; Go read it after the value checks and so stayed silent on exactly the reads
+// where nothing else would mention it. A corrupt watermark is the one corruption a rewrite
+// cannot repair.
+func TestACorruptWatermarkIsReportedWithNoValuePresent(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value []byte
+	}{
+		{"value absent", nil},
+		{"value undecodable", []byte("not an envelope at all")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := newFakeClient()
+			rec := &recordingRecorder{}
+			cache, err := New(Options[sessionIdentity]{
+				Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			key := Key{KeyType: "session_id", ID: "wm", UseCase: "test::wm", Tracked: true}
+			if tc.value != nil {
+				client.data[ValueKey(testPrefix, key)] = tc.value
+			}
+			client.data[WatermarkKey(testPrefix, "session_id", "wm")] = []byte("abc")
+			if _, ok := cache.Get(context.Background(), key); ok {
+				t.Fatal("Get served something")
+			}
+			if len(rec.errs) != 1 {
+				t.Errorf("recorded %d errors, want 1 (the corrupt watermark): %v", len(rec.errs), rec.errs)
+			}
+		})
+	}
+}
+
+// A poisoned entry reports as poisoned even when a watermark also covers it.
+//
+// Both are a miss, so this is diagnostic rather than a wrong value -- but `stale` reads as
+// routine while `distrusted` says a poisoned entry is in the keyspace and someone has to
+// find the writer. Python asks the divergence question before its watermark comparison, so
+// ordering it after here hid the signal whenever a watermark happened to cover the entry.
+func TestAPoisonedEntryOutranksStaleness(t *testing.T) {
+	client := newFakeClient()
+	rec := &recordingRecorder{}
+	cache, err := New(Options[sessionIdentity]{
+		Client: client, URNPrefix: testPrefix, TTL: time.Hour, Logger: quietLogger(), Recorder: rec,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := Key{KeyType: "session_id", ID: "both", UseCase: "test::both", Tracked: true}
+	now := time.Now()
+	raw := []byte(fmt.Sprintf(
+		`{"version":1,"createdAtMs":%d,"expiresAtMs":%d,"encoding":"utf8","payload":"{\"s\":\"\\ud800\"}"}`,
+		now.Add(-time.Minute).UnixMilli(), now.Add(time.Hour).UnixMilli()))
+	client.data[ValueKey(testPrefix, key)] = raw
+	// A watermark that covers the entry, so the stale branch would fire if it ran first.
+	client.data[WatermarkKey(testPrefix, "session_id", "both")] = []byte(strconv.FormatInt(now.UnixMilli(), 10))
+
+	if _, ok := cache.Get(context.Background(), key); ok {
+		t.Fatal("Get served a poisoned entry")
+	}
+	if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
+		t.Errorf("recorded %v, want [distrusted] -- stale hides that a writer is broken", rec.results)
+	}
+}

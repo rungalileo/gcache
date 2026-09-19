@@ -1,0 +1,140 @@
+name: Cross-language conformance
+
+# DELIBERATELY UNFILTERED: the only job asserting the two clients agree on the wire.
+# Filtering it would restore the hole that let five cross-language claims go silently false
+# in one afternoon.
+on:
+  # main only on push; see test.yaml. A concurrency group does not dedupe the push and
+  # pull_request events, because github.head_ref is empty on push.
+  push:
+    branches: [main]
+  pull_request:
+
+# Supersession only, and not on main -- see test.yaml.
+concurrency:
+  group: conformance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Read-only. This job runs unpinned dependency code (poetry/go installs), so the
+# default repository token -- which may include contents: write -- is more than it needs.
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install
+        # Through env rather than interpolated into the script -- see go-release.yaml.
+        env:
+          POETRY_VERSION: ${{ vars.POETRY_V2_VERSION }}
+        run: |
+          pipx install "poetry==$POETRY_VERSION"
+          pipx install invoke
+          poetry install --with dev,test --no-root
+
+      # The Go↔Python suite builds gcachectl itself and drives it against the redislite
+      # instance the Python fixtures start, so it needs the Go toolchain present. It SKIPS if
+      # go is missing, which is right for a contributor and wrong here -- hence the guard.
+      - name: Fail if the Go toolchain is missing
+        run: |
+          command -v go >/dev/null || {
+            echo "::error::go not on PATH; the cross-language suite would silently skip"
+            exit 1
+          }
+
+      - name: Both conformance suites
+        run: inv test-conformance
+
+      # A changed vector must fail BOTH suites; if one passes it is not reading the file.
+      # -count=1 is required (go caches, and the step above warms it with the UNMUTATED
+      # fixture), the mutation asserts it landed, and each suite's outcome is named.
+      - name: Prove the fixture binds both clients
+        run: |
+          set -e
+          F=src/gcache/conformance/envelope_vectors.json
+          cp "$F" /tmp/vectors.bak
+          python3 - <<'PY'
+          import json, pathlib, sys
+          p = pathlib.Path("src/gcache/conformance/envelope_vectors.json")
+          d = json.loads(p.read_text())
+          hits = 0
+          for v in d["vectors"]:
+              if v["name"] == "fractional-expires":
+                  assert v["expect"] == "reject", f'expected reject, found {v["expect"]!r}'
+                  v["expect"] = "accept"
+                  v["decoded"] = {"createdAtMs": 1757308800123, "expiresAtMs": 1757308860123,
+                                  "payload": "{\"a\":1}"}
+                  hits += 1
+          if hits != 1:
+              sys.exit(f"mutation matched {hits} vectors, expected 1 -- "
+                       "the 'fractional-expires' vector was renamed or removed, so this "
+                       "step would have proven nothing")
+          p.write_text(json.dumps(d, indent=2))
+          PY
+          fails=0
+          detected=""
+          missed=""
+          unrelated=""
+          MUTATED_VECTOR=fractional-expires
+          # A non-zero exit is NOT proof the client read the mutated vector -- a collection
+          # error exits non-zero too. Three-way: exit 0 = MISSED, non-zero + names the
+          # vector = DETECTED, non-zero without naming it = UNRELATED and fails the step.
+          run_suite() {
+            name="$1"; shift
+            if "$@" >"/tmp/$name.log" 2>&1; then
+              missed="$missed $name"
+              echo "::group::$name PASSED on a mutated fixture (tail)"
+              tail -40 "/tmp/$name.log"
+              echo "::endgroup::"
+              return
+            fi
+            if grep -q "$MUTATED_VECTOR" "/tmp/$name.log"; then
+              detected="$detected $name"
+              fails=$((fails+1))
+              return
+            fi
+            echo "::group::$name failed WITHOUT naming $MUTATED_VECTOR (tail)"
+            tail -60 "/tmp/$name.log"
+            echo "::endgroup::"
+            echo "::error::$name failed for an unrelated reason, so this step cannot tell"
+            echo "::error::whether it reads the shared fixture. Fix that failure first."
+            unrelated="$unrelated $name"
+          }
+          run_suite python poetry run pytest tests/test_conformance.py -q
+          run_suite go go -C go test -count=1 -run TestConformance ./...
+          cp /tmp/vectors.bak "$F"
+          if [ -n "$unrelated" ]; then
+            echo "::error::unrelated failures in:$unrelated"
+            exit 1
+          fi
+          echo "detected the mutation:$detected"
+          if [ "$fails" -ne 2 ]; then
+            echo "::error::mutated vector detected by$detected but NOT by$missed -- \
+          that client is not reading the shared fixture, or its result was cached"
+            exit 1
+          fi
+          echo "both suites detected the mutated vector"

@@ -6,6 +6,12 @@ import pytest
 import redislite
 
 from gcache import CacheLayer, GCache, GCacheConfig, GCacheKey, GCacheKeyConfig, RedisConfig
+from gcache._internal.constants import (
+    MAX_FUTURE_BUFFER_SECONDS,
+    MAX_TRACKED_TTL_SECONDS,
+    WATERMARK_TTL_SECONDS,
+    validate_invalidation_args,
+)
 from gcache._internal.local_cache import LocalCache
 from gcache._internal.noop_cache import NoopCache
 from gcache._internal.redis_cache import RedisCache, create_default_redis_client_factory
@@ -175,3 +181,74 @@ def test_sync_flushall(gcache: GCache, redis_server: redislite.Redis) -> None:
 
         gcache.flushall()
         assert len(redis_server.keys()) == 0
+
+
+class TestInvalidationBufferBounds:
+    """The Go client refused both of these and Python refused neither.
+
+    A negative buffer puts the watermark in the PAST, so it suppresses only entries written
+    before that instant and reports success. A buffer past the watermark's own lifetime lets
+    an entry written inside the window outlive the thing suppressing it and resurrect. Go
+    named both; the divergence is the kind the shared corpus exists to prevent, and it sat on
+    the side with no test.
+    """
+
+    @pytest.mark.parametrize("buffer_ms", [-1, -1000])
+    def test_a_negative_buffer_is_refused(self, buffer_ms: int) -> None:
+        with pytest.raises(ValueError, match="negative"):
+            validate_invalidation_args("kt", "id", buffer_ms)
+
+    def test_a_buffer_past_the_ceiling_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="ceiling"):
+            validate_invalidation_args("kt", "id", MAX_FUTURE_BUFFER_SECONDS * 1000 + 1)
+
+    def test_the_boundary_itself_is_allowed(self) -> None:
+        # Exactly MAX_FUTURE_BUFFER_SECONDS is legal, and this is the case the earlier version
+        # of this test got WRONG. It pinned the full watermark lifetime as the boundary and
+        # justified it with "the entry expires as the watermark does" -- which is false. The
+        # watermark expires 4h after the INVALIDATION, not 4h after the entry, so a 4h buffer
+        # plus a legal 1h TTL let an entry live an hour past its own tombstone.
+        validate_invalidation_args("kt", "id", MAX_FUTURE_BUFFER_SECONDS * 1000)
+
+    def test_raising_the_ttl_cap_cannot_silently_eliminate_the_buffer(self) -> None:
+        # NOT `sum <= WATERMARK`. That assertion is vacuous: MAX_FUTURE_BUFFER_SECONDS is
+        # DERIVED as WATERMARK - MAX_TRACKED_TTL, so the sum is always exactly WATERMARK and
+        # the check can never fail. Verified by mutation -- raising the TTL cap to 5h left it
+        # green, because the buffer silently collapsed to 0.
+        #
+        # A zero buffer is the real regression hiding behind that: invalidate would still
+        # "work", but every settling window would be refused, so a caller papering over
+        # replication lag would start getting ValueError with no constant obviously wrong.
+        assert MAX_FUTURE_BUFFER_SECONDS > 0, (
+            "the buffer allowance has been squeezed to nothing; MAX_TRACKED_TTL_SECONDS was "
+            "raised to meet WATERMARK_TTL_SECONDS, leaving no room for any settling window"
+        )
+        assert MAX_TRACKED_TTL_SECONDS + MAX_FUTURE_BUFFER_SECONDS == WATERMARK_TTL_SECONDS
+
+    def test_the_old_unsafe_buffer_is_now_refused(self) -> None:
+        # The concrete case that was accepted before: a 4h buffer, with a tracked entry of a
+        # legal 1h TTL written just before it elapses, outlived its watermark by an hour.
+        with pytest.raises(ValueError, match="ceiling"):
+            validate_invalidation_args("kt", "id", WATERMARK_TTL_SECONDS * 1000)
+
+    def test_zero_is_allowed(self) -> None:
+        validate_invalidation_args("kt", "id", 0)
+
+    @pytest.mark.parametrize(("kt", "id_"), [("", "id"), ("kt", "")])
+    def test_an_empty_identifier_is_still_refused(self, kt: str, id_: str) -> None:
+        with pytest.raises(ValueError, match="requires both"):
+            validate_invalidation_args(kt, id_, 0)
+
+    @pytest.mark.parametrize("bad", [0.5, float("nan"), float("inf"), "5", None])
+    def test_a_non_integer_buffer_is_refused(self, bad: object) -> None:
+        # NaN is the one the range checks cannot catch: every comparison against it is
+        # False, so it passes `< 0` AND `> ceiling` and reaches SETEX, where Redis raises --
+        # but only on a Redis-backed deployment, so a Noop-backed test suite reports success.
+        with pytest.raises(ValueError, match="must be an int of milliseconds"):
+            validate_invalidation_args("kt", "id", bad)  # type: ignore[arg-type]
+
+    def test_a_bool_is_refused_despite_being_an_int(self) -> None:
+        # bool subclasses int in Python, so True would otherwise arrive as a deliberate
+        # one-millisecond buffer that nobody wrote.
+        with pytest.raises(ValueError, match="must be an int of milliseconds"):
+            validate_invalidation_args("kt", "id", True)  # type: ignore[arg-type]

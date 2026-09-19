@@ -9,6 +9,18 @@ LOCAL_CACHE_MAX_SIZE = 10_000
 # just as a large pickle does.
 ASYNC_DECODE_THRESHOLD_BYTES = 50_000
 
+# The SECOND axis, because the cross-client divergence check does not scale with size. Its
+# cost is one loop iteration per `\u` escape -- measured at ~0.2us each -- so a payload can
+# be small and still expensive. The densest payload that slips under the byte threshold is
+# 49,209 bytes of emoji: 8,200 escapes, 1.73ms, against 0.03ms to parse the same bytes. That
+# is 59x the work it sits beside, all of it on the event loop.
+#
+# A byte gate cannot see that, and the inline bound it does give is accidental -- the product
+# of the byte threshold and the bytes-per-escape ratio, which moves if either changes. 1,000
+# escapes is ~0.21ms, chosen to match the implied inline budget of the byte threshold rather
+# than picked for its own sake.
+ASYNC_CHECK_THRESHOLD_ESCAPES = 1_000
+
 # TTLs (seconds)
 # The watermark must outlive every entry it can suppress. It is 5 hours, which is the
 # tracked-TTL cap (4h) plus the invalidation buffer ceiling (1h) -- see the block below for

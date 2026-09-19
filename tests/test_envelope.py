@@ -2392,8 +2392,9 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
     import json as _json
     from unittest.mock import AsyncMock, MagicMock, patch
 
-    from gcache._internal.constants import ASYNC_DECODE_THRESHOLD_BYTES
+    from gcache._internal.constants import ASYNC_CHECK_THRESHOLD_ESCAPES, ASYNC_DECODE_THRESHOLD_BYTES
     from gcache._internal.redis_cache import RedisCache
+    from gcache.exceptions import GCacheError
 
     key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
 
@@ -2425,8 +2426,14 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
 
     # MULTIBYTE, which needs a CUSTOM serializer to reach. len() on a str counts code
     # points, so a non-ASCII payload read as a fraction of its size and a 200 KB value
-    # stayed on the event loop at four times the threshold -- and a payload dense in astral
-    # characters is exactly the expensive one for the divergence check.
+    # stayed on the event loop at four times the threshold.
+    #
+    # NOT because this is the expensive shape -- an earlier version of this comment said so
+    # and had it backwards. A literal-emoji payload carries no `\u` escapes, so the
+    # divergence check answers it in 0.022ms; the escape-dense shape costs 5.1ms and is
+    # already measured correctly, which is what the escape gate below is for. What the byte
+    # fix buys is that the whole ENCODER moves off the loop, and that a threshold named in
+    # bytes measures bytes.
     #
     # The default JsonSerializer cannot produce this: json.dumps with ensure_ascii emits
     # escapes, so its output is always ASCII and its character count IS its byte count. Only
@@ -2446,3 +2453,31 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
     assert len(dumped) < ASYNC_DECODE_THRESHOLD_BYTES, "under the threshold by CHARACTER count"
     assert len(dumped.encode()) > ASYNC_DECODE_THRESHOLD_BYTES, "over it in BYTES, which is what counts"
     assert len(await run({"v": payload}, emoji_key)) == 1, "a multibyte payload over the BYTE threshold must offload"
+
+    # ESCAPE-DENSE but SMALL, which the byte gate alone cannot see. The check costs one loop
+    # iteration per escape, so 49 KB of emoji is 8,200 escapes and 1.73ms -- 59x the 0.03ms
+    # to parse the same bytes, and it slipped under the byte threshold entirely.
+    dense = "\U0001f600" * (ASYNC_CHECK_THRESHOLD_ESCAPES // 2 + 100)
+    dumped_dense = _json.dumps({"v": dense})
+    assert len(dumped_dense.encode()) < ASYNC_DECODE_THRESHOLD_BYTES, "must be UNDER the byte gate"
+    assert dumped_dense.count("\\u") >= ASYNC_CHECK_THRESHOLD_ESCAPES, "and over the escape gate"
+    assert len(await run({"v": dense})) == 1, "an escape-dense payload must offload on the second axis"
+
+    # A LITERAL lone surrogate, through put() rather than through encode_json. This route is
+    # how a regression reached HEAD green: the size check ran before the guard and its plain
+    # `encode` raised UnicodeEncodeError, which is not a GCacheError, so `except GCacheError`
+    # around aput stopped catching it. Every other call-site case is ASCII and takes the
+    # isascii() fast path, so none of them reach the encode at all.
+    class LiteralSurrogateSerializer(Serializer):
+        async def dump(self, obj: object) -> str:
+            return "name: \ud800"
+
+        async def load(self, data: bytes | str) -> object:
+            return data
+
+    literal_key = GCacheKey(
+        key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=LiteralSurrogateSerializer()
+    )
+    with pytest.raises(UnserializableValue) as exc:
+        await run({"v": 1}, literal_key)
+    assert isinstance(exc.value, GCacheError), "must stay catchable as GCacheError"

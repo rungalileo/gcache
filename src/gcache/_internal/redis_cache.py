@@ -13,6 +13,7 @@ from redis.asyncio import Redis, RedisCluster
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
 from gcache._internal.constants import (
+    ASYNC_CHECK_THRESHOLD_ESCAPES,
     ASYNC_DECODE_THRESHOLD_BYTES,
     MAX_FUTURE_BUFFER_SECONDS,
     MAX_TRACKED_TTL_SECONDS,
@@ -228,23 +229,54 @@ class RedisCache(CacheInterface):
         return await loop.run_in_executor(RedisCache._executor, partial(decode, data, allow_pickle=allow_pickle))
 
     @staticmethod
+    def _should_offload(payload: str | bytes) -> bool:
+        """Whether the divergence check on ``payload`` belongs in the executor.
+
+        TWO axes, because the check does not scale with size. Its cost is one loop iteration
+        per ``\\u`` escape, so a payload can be small and still expensive: 49,209 bytes of
+        emoji is 8,200 escapes and 1.73ms, against 0.03ms to parse the same bytes. A byte
+        gate alone left that inline, and the bound it gave was accidental -- the product of
+        the threshold and the bytes-per-escape ratio.
+
+        The escape count is only taken for a payload already under the byte threshold, so
+        the extra scan is bounded by that threshold and is a single C-level ``count``.
+        """
+        if RedisCache._payload_bytes(payload) >= ASYNC_DECODE_THRESHOLD_BYTES:
+            return True
+        needle = b"\\u" if isinstance(payload, bytes) else "\\u"
+        return payload.count(needle) >= ASYNC_CHECK_THRESHOLD_ESCAPES  # type: ignore[arg-type]
+
+    @staticmethod
     def _payload_bytes(payload: str | bytes) -> int:
         """UTF-8 byte length, which is what ASYNC_DECODE_THRESHOLD_BYTES measures.
 
-        ``len()`` on a ``str`` counts CODE POINTS, so a payload of emoji read as a quarter of
-        its size and a 200 KB value stayed on the event loop at four times the threshold --
-        and an emoji-dense payload is exactly the expensive one for the divergence check. The
-        read path never had this: it measures the raw envelope, which is already bytes.
+        ``len()`` on a ``str`` counts CODE POINTS, so a non-ASCII payload read as a fraction
+        of its size: 12,400 emoji measured 49,900 and occupied 199,600 bytes.
+
+        The reason is NOT that this is the expensive shape for the divergence check -- an
+        earlier version of this docstring claimed that and had it backwards. A literal-emoji
+        payload carries no ``\\u`` escapes at all, so the substring gate answers it in
+        0.022ms; the expensive shape is escape-dense ASCII at 5.1ms, whose code-point count
+        already equals its byte count and was never mis-measured. That shape is what
+        ASYNC_CHECK_THRESHOLD_ESCAPES exists for.
+
+        What this fixes is simpler and still worth fixing: the offload moves the whole
+        encoder off the loop, not only the check, and a threshold named in bytes must
+        measure bytes.
 
         ``str.isascii()`` is O(1) in CPython (a flag on the object, not a scan), so the
-        encode happens only for a non-ASCII ``str``. That is rare on this path: the default
-        JsonSerializer emits ``ensure_ascii`` output, so only a custom serializer returning
-        non-ASCII text pays for it, and only to decide whether to offload work that is larger
-        still.
+        encode happens only for a non-ASCII ``str``.
+
+        ``surrogatepass`` so that MEASURING a payload cannot raise. A literal lone surrogate
+        is unencodable, and a plain ``encode`` here raised UnicodeEncodeError from the
+        size check before ``encode_json`` could reach its own guard -- turning a catchable
+        UnserializableValue, which is a GCacheError, into one that ``except GCacheError``
+        around ``aput`` does not catch. The guard still refuses the payload a moment later;
+        this only needs its length.
         """
         if isinstance(payload, bytes) or payload.isascii():
             return len(payload)
-        return len(payload.encode("utf-8"))
+        return len(payload.encode("utf-8", errors="surrogatepass"))
 
     @staticmethod
     async def _async_encode(encode: Callable[..., bytes], created_at_ms: int, ttl: int, payload: str | bytes) -> bytes:
@@ -471,9 +503,9 @@ class RedisCache(CacheInterface):
             # true for JSON and PROTO and false for pickle, which is exactly the set.
             if deserialized_value.is_json:
                 divergence = (
-                    lone_surrogate_reason(payload)
-                    if len(raw) < ASYNC_DECODE_THRESHOLD_BYTES
-                    else await RedisCache._async_lone_surrogate_reason(payload)
+                    await RedisCache._async_lone_surrogate_reason(payload)
+                    if RedisCache._should_offload(payload)
+                    else lone_surrogate_reason(payload)
                 )
                 if divergence is not None:
                     _GLOBAL_GCACHE_STATE.logger.warning(
@@ -557,7 +589,7 @@ class RedisCache(CacheInterface):
                 )
             encoded = (
                 encode_json(current_time_ms, ttl, serialized_value)
-                if RedisCache._payload_bytes(serialized_value) < ASYNC_DECODE_THRESHOLD_BYTES
+                if not RedisCache._should_offload(serialized_value)
                 else await RedisCache._async_encode(encode_json, current_time_ms, ttl, serialized_value)
             )
         elif key.envelope == Envelope.PROTO:
@@ -574,7 +606,7 @@ class RedisCache(CacheInterface):
                 )
             encoded = (
                 encode_proto(current_time_ms, ttl, serialized_value)
-                if RedisCache._payload_bytes(serialized_value) < ASYNC_DECODE_THRESHOLD_BYTES
+                if not RedisCache._should_offload(serialized_value)
                 else await RedisCache._async_encode(encode_proto, current_time_ms, ttl, serialized_value)
             )
         else:

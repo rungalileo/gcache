@@ -55,7 +55,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # The default leaves the token in .git/config as an http.extraheader for the whole
           # job, and the steps below run third-party code on a persistent runner.

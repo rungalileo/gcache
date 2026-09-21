@@ -67,7 +67,7 @@ jobs:
       # rejected; fail_ci_if_error defaults to false in v7.0.0, so the step stayed GREEN and
       # Go coverage simply never arrived. The skip condition has to cover forks as well as dependabot --
       # neither can read repository secrets. See test.yaml's note.
-      - uses: codecov/codecov-action@v7.0.0
+      - uses: codecov/codecov-action@v7.1.1
         if: >-
           ${{ github.actor != 'dependabot[bot]'
               && (github.event_name != 'pull_request'

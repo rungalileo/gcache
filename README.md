@@ -507,6 +507,16 @@ nothing fails. Binary carries field *numbers*, so there is no spelling to disagr
 and unknown fields are skipped by
 protobuf itself rather than by an option each language has to remember to set.
 
+**The message type is not on the wire, so the two clients must agree on it out of band.**
+Field numbers carry no names, so a payload written as `MessageA` and read as `MessageB` does
+not fail — protobuf skips the unknown fields and returns a zero-valued message, which reads
+as a hit. Python's `wire_identity()` catches the mismatch inside one process, but nothing
+catches it across languages or deployments. The `use_case` is the contract: both clients
+declaring it must name the same message, and the shared conformance corpus is where that
+pairing is pinned. Carrying the name in the envelope was considered and rejected: a full
+message name would multiply the 18-byte overhead that is the reason to choose PROTO, and it
+would break on a legitimate message rename.
+
 **What you give up is inspectability.** A JSON-enveloped entry can be read with `redis-cli
 GET`, piped through `jq`, or parsed inside Redis by a Lua script using `cjson`. A PROTO entry
 is opaque to all three — payload *and* metadata. **No general inspector exists yet**:

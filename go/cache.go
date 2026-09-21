@@ -229,6 +229,14 @@ func New[V any](o Options[V]) (*Cache[V], error) {
 		o.now = time.Now
 	}
 	if o.Codec == nil {
+		// The default codec is JSON text, which the PROTO envelope is not for. Left to
+		// default, a PROTO cache silently wrote JSON into a binary envelope and Python's
+		// ProtoSerializer could not parse it back -- a permanent miss, with the write
+		// reporting success. Caught at construction rather than at the first write.
+		if o.Envelope == EnvelopePROTO {
+			return nil, errors.New("gcache: EnvelopePROTO needs a binary Codec; " +
+				"pass protocodec.Proto[*YourMessage]()")
+		}
 		o.Codec = jsonCodec[V]{}
 	}
 	return &Cache[V]{

@@ -284,7 +284,9 @@ class GCache:
         :param envelope: How the value is framed in Redis.  ``Envelope.PICKLE`` (the default) serializes arbitrary
                          Python objects but is readable only from Python.  ``Envelope.JSON`` writes the same envelope
                          the Go client uses, so the entry can be shared across languages; it requires a
-                         ``Serializer`` producing str/bytes (pass ``serializer=JsonSerializer()``).  Reads sniff the
+                         ``Serializer`` producing ``str`` (pass ``serializer=JsonSerializer()``).  For a binary
+                         payload use ``Envelope.PROTO`` with ``ProtoSerializer`` -- the JSON envelope carries text
+                         and refuses bytes.  Reads sniff the
                          framing they actually find, so a JSON key still reads a JSON entry written by any language --
                          but a JSON key refuses to unpickle, rather than leaving unpickling reachable for whoever can
                          write the keyspace.

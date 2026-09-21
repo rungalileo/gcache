@@ -1038,9 +1038,15 @@ func TestPutWritesTheDeclaredEnvelope(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := newFakeClient()
-			c, err := New(Options[map[string]string]{
+			// PROTO needs a binary codec -- New refuses the JSON default with it, since
+			// that pairing writes JSON text into a binary envelope.
+			opts := Options[map[string]string]{
 				Client: fake, URNPrefix: "urn:galileo:test", TTL: time.Minute, Envelope: tc.envelope,
-			})
+			}
+			if tc.envelope == EnvelopePROTO {
+				opts.Codec = rawMapCodec{}
+			}
+			c, err := New(opts)
 			if err != nil {
 				t.Fatalf("New: %v", err)
 			}
@@ -1085,6 +1091,9 @@ func TestNewRejectsAnUnsupportedEnvelope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			o := base()
 			o.Envelope = tc.env
+			if tc.env == EnvelopePROTO {
+				o.Codec = rawStringCodec{}
+			}
 			_, err := New(o)
 			if tc.ok && err != nil {
 				t.Fatalf("expected %v to be accepted, got %v", tc.env, err)
@@ -1358,5 +1367,44 @@ func TestAPoisonedEntryOutranksStaleness(t *testing.T) {
 	}
 	if len(rec.results) != 1 || rec.results[0] != ResultDistrusted {
 		t.Errorf("recorded %v, want [distrusted] -- stale hides that a writer is broken", rec.results)
+	}
+}
+
+// rawMapCodec and rawStringCodec stand in for a binary codec where the test only cares
+// about the framing, not the payload.
+type rawMapCodec struct{}
+
+func (rawMapCodec) Marshal(v map[string]string) ([]byte, error) { return []byte(v["a"]), nil }
+func (rawMapCodec) Unmarshal(b []byte, v *map[string]string) error {
+	*v = map[string]string{"a": string(b)}
+	return nil
+}
+
+type rawStringCodec struct{}
+
+func (rawStringCodec) Marshal(v string) ([]byte, error)    { return []byte(v), nil }
+func (rawStringCodec) Unmarshal(b []byte, v *string) error { *v = string(b); return nil }
+
+// EnvelopePROTO with the default codec is refused at construction.
+//
+// Left to default it wrote JSON text into a binary envelope -- Put reported success and
+// Python's ProtoSerializer could not parse it back, so the key missed forever.
+func TestNewRefusesProtoWithTheDefaultCodec(t *testing.T) {
+	_, err := New(Options[string]{
+		Client: newFakeClient(), URNPrefix: testPrefix, TTL: time.Hour, Envelope: EnvelopePROTO,
+	})
+	if err == nil {
+		t.Fatal("New accepted EnvelopePROTO with the JSON default codec")
+	}
+	if !strings.Contains(err.Error(), "binary Codec") {
+		t.Errorf("err = %v, want it to name the codec to pass", err)
+	}
+
+	// ...and it is accepted once a binary codec is supplied.
+	if _, err := New(Options[string]{
+		Client: newFakeClient(), URNPrefix: testPrefix, TTL: time.Hour,
+		Envelope: EnvelopePROTO, Codec: rawStringCodec{},
+	}); err != nil {
+		t.Errorf("New rejected PROTO with a binary codec: %v", err)
 	}
 }

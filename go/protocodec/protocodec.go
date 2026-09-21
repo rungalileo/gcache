@@ -14,20 +14,16 @@ import (
 // Proto returns a Codec that stores M in the binary protobuf wire format. M is the pointer
 // type of a generated message, e.g. protocodec.Proto[*cachev1.SessionIdentity]().
 //
-// Pairs with gcache.EnvelopePROTO, which carries the bytes in a binary envelope with no JSON
-// wrapper -- and is where binary belongs, since the JSON envelope carries text. Measured
-// against the same message as protojson in a JSON envelope: 69 bytes stored rather than 204,
-// and roughly 20x cheaper to serialize and parse. That comparison is against protojson TEXT,
-// so base64 never entered it.
+// Pairs with gcache.EnvelopePROTO, which carries the bytes in a binary envelope with no
+// JSON wrapper -- where binary belongs, since the JSON envelope carries text. 69 bytes
+// stored for a small message rather than 204, and roughly 20x cheaper to serialize.
 //
-// Python's counterpart is ProtoSerializer. Binary needs no cross-language options, which is
-// most of the point: protojson had to agree on UseProtoNames/preserving_proto_field_name
-// because it spells every field twice, and the wire form was two mistakes wide. Binary
-// carries field NUMBERS, so there is no spelling to disagree about -- and unknown fields are
-// skipped by proto.Unmarshal itself, so there is no DiscardUnknown to forget either.
+// Python's counterpart is ProtoSerializer. Binary carries field NUMBERS, so there is no
+// spelling for the two clients to disagree about, and unknown fields are skipped by
+// proto.Unmarshal itself.
 //
-// What it gives up is readability: a stored entry is opaque to redis-cli, jq and Redis's Lua
-// cjson. Use the JSON envelope with a text codec where that matters.
+// What it gives up is readability: a stored entry is opaque to redis-cli, jq and Redis's
+// Lua cjson. Use the JSON envelope with a text codec where that matters.
 func Proto[M proto.Message]() gcache.Codec[M] { return protoCodec[M]{} }
 
 type protoCodec[M proto.Message] struct{}

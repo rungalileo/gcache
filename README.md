@@ -488,10 +488,10 @@ async def get_session(session_id: str) -> session_identity_pb2.SessionIdentity: 
 Requires the extra: `pip install 'gcache[protobuf]'`. Importing gcache without it is fine;
 only constructing `ProtoSerializer` raises. The Go counterpart is `go/protocodec.Proto`.
 
-Measured on a small message (a uuid string and a timestamp), against the same message as
-protojson inside the JSON envelope:
+Measured on a small message (a uuid string and a timestamp), against the same message
+encoded as JSON text inside the JSON envelope:
 
-| | protojson in JSON envelope | binary in PROTO envelope |
+| | JSON text in JSON envelope | binary in PROTO envelope |
 |---|---|---|
 | serialize | 2.23 µs | **0.12 µs** |
 | parse | 6.48 µs | **0.29 µs** |
@@ -500,10 +500,11 @@ protojson inside the JSON envelope:
 Most of the size win is the envelope, not the payload: the JSON envelope costs ~102 bytes
 against the binary one's 18.
 
-Binary also removes a class of bug rather than testing for it. protojson spells every field
-twice — `session_id` and `sessionId` — and both readers accept either, so a writer emitting
-the wrong one produces two wire forms for one key and nothing fails. Binary carries field
-*numbers*, so there is no spelling to disagree about, and unknown fields are skipped by
+Binary also removes a class of bug rather than testing for it. A JSON encoding of a
+protobuf message spells every field twice — `session_id` and `sessionId` — and both readers
+accept either, so a writer emitting the wrong one produces two wire forms for one key and
+nothing fails. Binary carries field *numbers*, so there is no spelling to disagree about,
+and unknown fields are skipped by
 protobuf itself rather than by an option each language has to remember to set.
 
 **What you give up is inspectability.** A JSON-enveloped entry can be read with `redis-cli
@@ -516,13 +517,8 @@ empty or wrong value. If being able to eyeball an entry matters more than its si
 
 **`Envelope.JSON` carries text, and `Envelope.PROTO` carries bytes.** A serializer used with
 the JSON envelope must return `str`; a `bytes` payload is refused at the write with an error
-naming `Envelope.PROTO`. The JSON envelope once base64-ed bytes into its payload string, and
-that branch made the decoded Python type depend on **which client wrote the entry** — Python
-picked the encoding from the Python type, Go by sniffing `utf8.Valid`, because Go has no such
-type to read. Removing it makes `encoding` constant, so a JSON entry always decodes to `str`
-whoever wrote it, and the payload's type is a property of the declared envelope. A stored
-entry claiming `encoding: "base64"` is now refused by both readers as a miss the caller
-rewrites.
+naming `Envelope.PROTO`. So a JSON entry always decodes to `str` and a PROTO entry to
+`bytes` — the payload's type follows the declared envelope.
 
 ## Redis Configuration
 

@@ -21,10 +21,8 @@ class ProtoSerializer(Serializer):
     """Serializes a generated protobuf message in the binary wire format.
 
     Pairs with ``Envelope.PROTO``, which carries the bytes in a binary envelope with no JSON
-    wrapper -- and is where binary belongs, since the JSON envelope carries text. Measured
-    against the same message as protojson in a JSON envelope: 69 bytes stored rather than
-    204, and roughly 20x cheaper to serialize and parse (2.23 -> 0.12 us and 6.48 -> 0.29
-    us). The comparison is against protojson TEXT, so base64 never entered it.
+    wrapper: 69 bytes stored for a small message rather than 204, and roughly 20x cheaper to
+    serialize and parse.
 
     Use instead of a hand-written dataclass whenever another language reads the value: the
     schema then lives in one ``.proto`` rather than being reimplemented per language. Go's
@@ -52,10 +50,10 @@ class ProtoSerializer(Serializer):
     def wire_identity(self) -> Any:
         """The message's full name, not just this class.
 
-        Two ProtoSerializers carrying different messages share a type, and binary makes
-        confusing them WORSE than protojson did: field numbers carry no names, so another
-        message's payload does not fail to parse -- its fields are skipped as unknown and the
-        result is a zero-valued message. The full name is what keeps them apart.
+        Two ProtoSerializers carrying different messages share a type. Field numbers carry
+        no names, so another message's payload does not fail to parse -- its fields are
+        skipped as unknown and the result is a zero-valued message. The full name keeps
+        them apart.
         """
         return (type(self), self._message_type.DESCRIPTOR.full_name)
 
@@ -67,28 +65,15 @@ class ProtoSerializer(Serializer):
 
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, str):
-            # One way to arrive here: this serializer on a key declaring Envelope.JSON,
-            # which carries text and so always yields str. The PROTO envelope always yields
-            # bytes, so a correctly paired key never reaches this branch.
-            #
-            # This used to name a second way -- a JSON entry written by Go, whose writer
-            # stored valid UTF-8 as `encoding: "utf8"` where Python base64-ed any bytes
-            # payload, so the same []byte came back as `str` or `bytes` depending on the
-            # writer. The JSON envelope carries text only now, so that path is gone and the
-            # mis-paired key is all that is left.
-            #
-            # Encode rather than reject: a parse failure here is a miss the caller heals,
-            # and that is the same outcome.
+            # Only reachable on a key declaring Envelope.JSON, which yields str; PROTO
+            # yields bytes. Encode rather than reject -- a parse failure below is a miss
+            # the caller heals, which is the same outcome.
             data = data.encode("utf-8")
         msg = self._message_type()
-        # No offload, unlike the protojson serializer this replaced. That one needed it
-        # because Parse is Python driving upb per field and yields between bytecodes: at
-        # 1.18 MB the worst event-loop tick delay was 104 ms inline. ParseFromString is C
-        # and holds the GIL, so it blocks the loop once and briefly -- measured 0.5 ms for a
-        # 1.24 MB payload, which is not worth a thread hop (and the default executor is
-        # shared with getaddrinfo, so using it delays DNS).
+        # No offload: ParseFromString is C and holds the GIL, so it blocks the loop once
+        # and briefly -- 0.5 ms measured at 1.24 MB, not worth a thread hop.
         #
-        # Unknown fields are skipped by protobuf itself, so there is no DiscardUnknown to
-        # set: a field a newer writer added cannot make this reject the entry.
+        # Unknown fields are skipped by protobuf itself, so a field a newer writer added
+        # cannot make this reject the entry.
         msg.ParseFromString(data)
         return msg

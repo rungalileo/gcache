@@ -232,22 +232,10 @@ class RedisCache(CacheInterface):
     def _should_offload(payload: str | bytes) -> bool:
         """Whether the divergence check on ``payload`` belongs in the executor.
 
-        TWO axes, because the check does not scale with size. Its expensive half runs only
-        when the payload holds a ``\\ud`` escape at all -- without one, lone_surrogate_reason
-        exits at a C-level substring scan. Past that gate it walks ``body.find("\\\\")``, so
-        the cost is one Python-level iteration per BACKSLASH.
-
-        Both halves of that sentence are load-bearing, and an earlier version of this gate
-        counted ``\\u`` and got both wrong. It over-triggered on ordinary non-ASCII text: 20
-        KiB of Japanese is 3,400 ``\\u`` escapes and no surrogates, so the check exits in
-        0.049ms while an executor round trip costs ~0.064ms -- paying more than it saves on
-        every read of any non-Latin payload, since JsonSerializer's ensure_ascii turns every
-        such character into one escape. And it under-triggered on the shape the gate exists
-        for: one surrogate pair beside 6,000 ``\\n`` escapes measured 0.436ms and stayed
-        inline, because it holds two ``\\u``.
-
-        Counted only for a payload already under the byte threshold, so the extra scan is
-        bounded by that threshold and is a single C-level ``count``.
+        Two axes, because the check does not scale with size: its expensive half runs only
+        when a ``\\ud`` escape is present, and then costs one iteration per BACKSLASH. The
+        count is taken only under the byte threshold, so it is bounded and is one C-level
+        ``count``.
         """
         if RedisCache._payload_bytes(payload) >= ASYNC_DECODE_THRESHOLD_BYTES:
             return True
@@ -263,29 +251,10 @@ class RedisCache(CacheInterface):
     def _payload_bytes(payload: str | bytes) -> int:
         """UTF-8 byte length, which is what ASYNC_DECODE_THRESHOLD_BYTES measures.
 
-        ``len()`` on a ``str`` counts CODE POINTS, so a non-ASCII payload read as a fraction
-        of its size: 12,400 emoji measured 49,900 and occupied 199,600 bytes.
-
-        The reason is NOT that this is the expensive shape for the divergence check -- an
-        earlier version of this docstring claimed that and had it backwards. A literal-emoji
-        payload carries no ``\\u`` escapes at all, so the substring gate answers it in
-        0.022ms; the expensive shape is escape-dense ASCII at 5.1ms, whose code-point count
-        already equals its byte count and was never mis-measured. That shape is what
-        ASYNC_CHECK_THRESHOLD_BACKSLASHES exists for.
-
-        What this fixes is simpler and still worth fixing: the offload moves the whole
-        encoder off the loop, not only the check, and a threshold named in bytes must
-        measure bytes.
-
-        ``str.isascii()`` is O(1) in CPython (a flag on the object, not a scan), so the
-        encode happens only for a non-ASCII ``str``.
-
-        ``surrogatepass`` so that MEASURING a payload cannot raise. A literal lone surrogate
-        is unencodable, and a plain ``encode`` here raised UnicodeEncodeError from the
-        size check before ``encode_json`` could reach its own guard -- turning a catchable
-        UnserializableValue, which is a GCacheError, into one that ``except GCacheError``
-        around ``aput`` does not catch. The guard still refuses the payload a moment later;
-        this only needs its length.
+        ``len()`` on a ``str`` counts code points, so a non-ASCII payload read as a fraction
+        of its size. ``isascii()`` is O(1) in CPython, so the encode happens only when it
+        must, and ``surrogatepass`` so that MEASURING a payload cannot raise -- the write
+        guard refuses it a moment later with a catchable error.
         """
         if isinstance(payload, bytes) or payload.isascii():
             return len(payload)
@@ -293,39 +262,13 @@ class RedisCache(CacheInterface):
 
     @staticmethod
     async def _async_encode(encode: Callable[..., bytes], created_at_ms: int, ttl: int, payload: str | bytes) -> bytes:
-        """Off the event loop, on the same threshold and for the same reason as _async_decode.
-
-        The encoders run the divergence check, which validates the payload's own JSON, so on
-        a large payload they cost about what decode costs. The READ path was offloaded first
-        and the write path was not, which left the larger of the two exposures open: a write
-        is where the whole payload is in hand.
-        """
+        """Off the event loop, on the same threshold and for the same reason as _async_decode."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(RedisCache._executor, partial(encode, created_at_ms, ttl, payload))
 
     @staticmethod
     async def _async_lone_surrogate_reason(payload: str | bytes) -> str | None:
-        """Off the event loop, on the same threshold and for the same reason as _async_decode.
-
-        Cost is driven by ESCAPE COUNT, not by size, and not by the parse. Since the scan was
-        moved ahead of the parse, an ordinary payload is answered without parsing at all;
-        what is left is one loop iteration per `\\u` escape. Measured against a bare
-        json.loads, which JsonSerializer.load pays anyway:
-
-            20000 records, no astral character   1.6 MB    0.41x
-            20000 records, one emoji each        2.1 MB    1.44x
-            500 records, one emoji each           32 KiB   1.72x
-            2000 emoji in ONE string              23 KiB  56.75x
-
-        That last row is the one to know when tuning ASYNC_DECODE_THRESHOLD_BYTES: it is the
-        most expensive shape and it is 23 KiB, so it sits UNDER the threshold and runs
-        inline. A byte threshold is the wrong axis for this cost; it is kept because it is
-        the axis decode already uses, and because the absolute time there is still small.
-
-        An earlier version of this docstring said the check "parses the payload's own JSON"
-        and cited 1.31x. Both were retracted by the commit that reordered the check -- 1.31x
-        was one payload shape, and misleading as a summary.
-        """
+        """Off the event loop. Cost follows ESCAPE COUNT, not size -- see _should_offload."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(RedisCache._executor, partial(lone_surrogate_reason, payload))
 
@@ -394,19 +337,9 @@ class RedisCache(CacheInterface):
                 self._record_degraded_read(key, "json_without_serializer")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
-            # Honour the envelope's expiry, not just Redis's TTL: Go calls a past
-            # expiresAtMs a miss. No skew tolerance, so clocks must agree within the
-            # shortest JSON TTL; a writer lagging further pins the hit rate at zero.
-            # A REVERSED envelope -- expires before it was created -- is malformed, and the
+            # A REVERSED envelope -- expires before created -- is malformed, and the
             # lifetime guard below cannot see it: the difference is negative, so `> cap` is
-            # False and it sails through as a plausible entry. Checked separately rather than
-            # by folding it into that comparison, because the two mean different things: one
-            # is "this entry claims too long a life", the other is "these numbers are not a
-            # lifetime at all".
-            #
-            # A future created_at is handled by its own guard below, not by this one: the
-            # two are different faults. Reversed timestamps are not a lifetime at all; a
-            # future stamp is a credible lifetime placed out of the watermark's reach.
+            # False and it passes as plausible. A future created_at has its own guard below.
             if (
                 deserialized_value.expires_at_ms is not None
                 and deserialized_value.created_at_ms is not None
@@ -418,24 +351,14 @@ class RedisCache(CacheInterface):
                 self._record_degraded_read(key, "reversed_envelope_timestamps")
                 return await self._exec_fallback(key, watermark_ms, fallback)
 
-            # A created_at far enough in the FUTURE makes a tracked entry immune to
-            # invalidation, which is not the clock skew this envelope tolerates elsewhere.
-            # Staleness is `watermark_ms >= created_at_ms` and a watermark carries a real
-            # clock time, so a stamp beyond every reachable watermark can never be suppressed
-            # -- the entry survives every invalidate call for its whole Redis TTL. The expiry
-            # and lifetime guards both pass, because a future created_at with a legal
-            # declared lifetime is a perfectly plausible entry.
+            # A created_at far enough ahead makes a tracked entry immune to invalidation:
+            # staleness is `watermark_ms >= created_at_ms`, and a real-clock watermark never
+            # reaches it, while the expiry and lifetime guards both pass.
             #
-            # The bound is the exact frontier rather than "not in the future". An invalidation
-            # issued NOW writes a watermark of at most now + MAX_FUTURE_BUFFER, so an entry
-            # created at or before that instant is still suppressible and one created after it
-            # is not. That it also grants an hour of skew tolerance is a consequence, not the
-            # reason: a zero-tolerance test would turn a one-millisecond clock lead into a
-            # permanent miss-and-rewrite loop for every entry the leading pod writes.
-            #
-            # Tracked entries only, like the lifetime and age guards. An untracked entry has
-            # no watermark to be out of reach of, so refusing one would cost a skewed writer
-            # its hit rate and buy nothing.
+            # The bound is the frontier an invalidation issued NOW can reach -- a watermark
+            # of at most now + MAX_FUTURE_BUFFER -- so an hour of clock-skew tolerance falls
+            # out of it. Tracked only: an untracked entry has no watermark to be out of
+            # reach of.
             if (
                 key.invalidation_tracking
                 and deserialized_value.created_at_ms is not None
@@ -494,26 +417,14 @@ class RedisCache(CacheInterface):
             # Load payload using custom serializer if present.
             payload = deserialized_value.payload
 
-            # The same rule the write path enforces, asked on the way in. encode_json stops
-            # THIS client creating an entry the two decode differently; it says nothing about
-            # one already in Redis, written by a foreign client, by a custom Serializer in an
-            # older build, or by an intermediate build of this branch. Reading it is where the
-            # harm lands, and it is the harm with no symptom: both clients report a hit and
-            # return different values.
+            # The write guard covers what THIS client stores; this covers what is already
+            # in Redis. Before the serializer, because the question is about the stored text
+            # and a custom load() may have resolved the escape by the time it returns.
             #
-            # Before the serializer, not after: the question is about the stored TEXT, and a
-            # custom load() has already resolved the escape by the time it returns. Asking
-            # here also covers a serializer whose load does not go through json at all.
-            #
-            # The consequence is a permanent miss for a poisoned key rather than a silent
-            # disagreement -- the read degrades to the fallback, and re-writing the same value
-            # is refused by the write guard. That is the intended trade.
-            # is_json, NOT the Python type. `decode` returns the UNPICKLED object for a
-            # pickle entry, so `isinstance(payload, str)` refused a cached string under the
-            # DEFAULT envelope -- written happily, then refused on every read, and on the one
-            # framing Go cannot read at all, so there was never a divergence to prevent. It
-            # also missed a bytes payload, which the PROTO envelope still yields. is_json is
-            # true for JSON and PROTO and false for pickle, which is exactly the set.
+            # A poisoned key becomes a permanent miss rather than a silent disagreement.
+            # is_json, not the Python type: true for JSON and PROTO, false for pickle,
+            # which is exactly the set. Pickle is Python-only, so nothing can disagree
+            # with us about one.
             if deserialized_value.is_json:
                 divergence = (
                     await RedisCache._async_lone_surrogate_reason(payload)
@@ -595,10 +506,14 @@ class RedisCache(CacheInterface):
             # the reader with nothing to change.
             if key.serializer is None:
                 raise EnvelopeRequiresSerializer(key.key_type, key.id, key.use_case, "JSON")
-            if not isinstance(serialized_value, str | bytes):
+            # str, not `str | bytes`: the JSON envelope carries text. Caught here rather
+            # than left to encode_json so the message names the envelope to switch to,
+            # mirroring the PROTO branch below.
+            if not isinstance(serialized_value, str):
                 raise TypeError(
-                    f"Envelope.JSON requires a Serializer producing str or bytes for use case "
-                    f"{key.use_case!r}, got {type(serialized_value).__name__}. Pass serializer=JsonSerializer()."
+                    f"Envelope.JSON requires a Serializer producing str for use case "
+                    f"{key.use_case!r}, got {type(serialized_value).__name__}. Use Envelope.PROTO "
+                    f"for a binary payload, or pass serializer=JsonSerializer()."
                 )
             encoded = (
                 encode_json(current_time_ms, ttl, serialized_value)

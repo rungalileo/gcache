@@ -180,8 +180,8 @@ func TestEncodeEnvelopeRefusesABinaryPayload(t *testing.T) {
 }
 
 func TestEncodeEnvelopeKeepsUTF8Unencoded(t *testing.T) {
-	// The protojson path must stay utf8 -- that is what makes the value readable straight
-	// out of redis-cli, and what Python emits for a str payload.
+	// A text payload must stay utf8 -- that is what makes the value readable straight out
+	// of redis-cli, and what Python emits for a str payload.
 	raw, err := encodeEnvelope(time.UnixMilli(1757308800123), time.Hour, []byte(`{"session_id":"s-1"}`))
 	if err != nil {
 		t.Fatalf("encodeEnvelope: %v", err)

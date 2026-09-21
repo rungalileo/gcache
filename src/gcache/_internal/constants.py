@@ -4,9 +4,9 @@ LOCAL_CACHE_MAX_SIZE = 10_000
 
 # Thresholds
 # Size above which DECODING runs in a thread rather than on the event loop. Named for
-# decoding, not pickling: RedisCache.get routes on size alone, so this gates json.loads and
-# base64 decoding as much as pickle.loads -- a multi-megabyte JSON envelope blocks the loop
-# just as a large pickle does.
+# decoding, not pickling: RedisCache.get routes on size alone, so this gates json.loads as
+# much as pickle.loads -- a multi-megabyte JSON envelope blocks the loop just as a large
+# pickle does.
 ASYNC_DECODE_THRESHOLD_BYTES = 50_000
 
 # The SECOND axis, because the cross-client divergence check does not scale with size.

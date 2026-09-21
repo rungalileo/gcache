@@ -152,10 +152,8 @@ def _get_varint(data: bytes, i: int) -> tuple[int, int]:
 def encode_proto(created_at_ms: int, ttl_sec: int, payload: bytes) -> bytes:
     """Frame an already-serialized binary ``payload`` in the PROTO envelope.
 
-    Where binary belongs, and now the only place it can go: the JSON envelope carries text.
-    18 bytes of overhead against that envelope's ~102, and no ``encoding`` field to make the
-    payload's type depend on the writer. The cost is that neither the payload nor the
-    metadata is readable from ``redis-cli`` or Redis's Lua ``cjson``; see the README.
+    Where binary belongs. 18 bytes of overhead against the JSON envelope's ~102, and
+    neither payload nor metadata is readable from ``redis-cli`` or Redis's Lua ``cjson``.
     """
     if not isinstance(payload, bytes):
         raise EnvelopeEncodeError(f"the PROTO envelope carries bytes, got {type(payload).__name__}")
@@ -277,12 +275,9 @@ def _decode_proto(data: bytes) -> DecodedValue:
 
 
 def _reject_lone_surrogate(payload: str | bytes) -> None:
-    """Refuse a payload the two clients would decode to different values.
+    """Refuse a payload the two clients would decode differently.
 
-    HERE, at the framing boundary, not in one serializer: every serializer's output passes
-    through the encoders, so a check living in ``JsonSerializer`` was bypassed by any CUSTOM
-    ``Serializer`` -- and ``serializer=`` is public, documented API, so that is a supported
-    path rather than an exotic one. The rule is a property of the envelope.
+    At the framing boundary rather than in a serializer, so a custom one cannot bypass it.
     """
     reason = lone_surrogate_reason(payload)
     if reason is not None:
@@ -290,30 +285,21 @@ def _reject_lone_surrogate(payload: str | bytes) -> None:
 
 
 def lone_surrogate_reason(payload: str | bytes) -> str | None:
-    """Name the divergence in ``payload``, or ``None`` if the two clients agree about it.
+    r"""Name the divergence in ``payload``, or ``None`` if the two clients agree about it.
 
-    The rule is "valid UTF-8 that parses as strict JSON and holds an unpaired surrogate",
-    and NOT anything about the Python type or the transport encoding. Two earlier attempts
-    used those instead and both were wrong:
+    A lone surrogate decodes differently in the two clients -- Python keeps it, Go
+    substitutes U+FFFD -- and both report a hit, so nothing raises and no metric moves. It
+    reaches a payload two ways: as a literal character, and as the JSON escape ``\ud800``
+    that ``ensure_ascii`` produces, which is invisible in the stored entry because the
+    envelope is then pure ASCII.
 
-    * ``isinstance(payload, str)`` caught PICKLE values, because ``decode`` returns the
-      UNPICKLED object and a cached string is a ``str``. A ``@cached`` function under the
-      default envelope returning a string with a lone surrogate was written happily and then
-      refused on every read -- a permanent miss on the one framing Go cannot read at all, so
-      there was never a divergence to prevent. The same string inside a dict was served,
-      which is the tell that the discriminator had nothing to do with the rule.
-    * the envelope's ``encoding`` field was equally wrong, and Go tried it. That field no
-      longer varies -- the JSON envelope carries text only -- but the lesson stands: it
-      recorded how a payload was TRANSPORTED, never what it was.
+    The rule is "valid UTF-8 that parses as strict JSON and holds an unpaired surrogate".
+    Strict JSON is the proxy for "the caller's codec will unescape this", which is the
+    thing that actually decides it and which neither client can see; it is self-limiting,
+    since protobuf and other binary do not parse.
 
-    What actually decides it is whether the CALLER's codec will unescape the payload, which
-    neither client can see. "Parses as strict JSON" is the closest honest proxy, and it is
-    self-limiting: protobuf and other binary do not parse, so they are left alone.
-
-    Split from the raise so the READ path can ask the same question. The write guard stops
-    this client creating a divergent entry; it says nothing about one already in Redis,
-    written by a foreign client or an older build. Reading it is where the harm lands, and
-    it is the harm with no symptom -- both clients report a hit and return different values.
+    Split from the raise so the read path can ask the same question of an entry already in
+    Redis.
     """
     if isinstance(payload, bytes):
         try:
@@ -335,47 +321,21 @@ def lone_surrogate_reason(payload: str | bytes) -> str | None:
     # payload written under ensure_ascii, which is most of them.
     if "\\ud" not in body and "\\uD" not in body:
         return None
-    # SCAN FIRST, and only then establish that the payload is JSON. The scan needs no parse
-    # and no tree, so a payload whose surrogates are all PAIRED -- which is every emoji
-    # payload, the overwhelmingly common case -- is answered here and pays neither the
-    # validation parse nor the nesting count.
-    #
-    # That ordering also removes a duplicate parse on the read path, where JsonSerializer
-    # then parses the same bytes again. It costs nothing in exactness: the scan is only
-    # MEANINGFUL on JSON, and its answer is only ACTED on below, after JSON is established.
-    # A false positive on non-JSON text is discarded there.
+    # SCAN FIRST, then establish JSON. A payload whose surrogates are all paired -- every
+    # emoji payload -- is answered here without a parse. Exact either way: the scan's answer
+    # is only acted on below, after JSON is established, so a false positive is discarded.
     if not _has_unpaired_surrogate_escape(body):
         return None
 
-    # Only a payload that already looks poisoned reaches here.
-    #
-    # Nesting BEFORE the parse, and the reason is determinism rather than safety. Relying on
-    # the interpreter to say when a payload is too deep makes the ANSWER depend on the
-    # machine: depth 4000 parses on a developer laptop and raises RecursionError in CI, so
-    # the same payload was written on one host and refused on another. Two Python pods
-    # disagreeing about an entry is the same defect as Python and Go disagreeing about one.
-    #
-    # The consequence, which is narrow and fails closed: a payload that is NOT JSON, nests
-    # deeper than the limit, AND carries an unpaired surrogate escape is refused here rather
-    # than passed as "not JSON". Establishing JSON first would invert the problem, since the
-    # parse is the thing the limit exists to keep bounded.
+    # Nesting before the parse, for determinism: leaving the depth question to the
+    # interpreter made the answer depend on the machine. Fails closed -- a non-JSON payload
+    # that is both too deep and carries an unpaired escape is refused rather than passed.
     if _exceeds_nesting(body):
         return f"a payload nested deeper than the {_MAX_JSON_NESTING}-level limit"
     try:
-        # Strict JSON is the rule that keeps protobuf and other binary out, and json.loads is
-        # the only way to ask it in Python; Go asks json.Valid for the same reason. The
-        # RESULT is discarded -- the scan above already has the answer.
-        #
-        # parse_constant refuses NaN/Infinity, which json.loads accepts by default and Go's
-        # json.Valid does not. Without it the two clients disagreed about whether such a
-        # payload was JSON at all, and so about whether this rule applied to it.
-        #
-        # No object_pairs_hook. An earlier version used one to keep DUPLICATE keys, which
-        # json.loads otherwise drops -- the scan reads the raw text and sees every escape,
-        # duplicates included, so the hook is gone and the C parser's fast path is back.
-        #
-        # RecursionError is unreachable while _MAX_JSON_NESTING holds, and caught anyway,
-        # because "unreachable" is a property of a constant someone can raise.
+        # Validation only; the scan above already has the answer. parse_constant refuses
+        # NaN/Infinity, which json.loads accepts and Go's json.Valid does not -- without it
+        # the two disagree about whether the payload is JSON at all.
         json.loads(body, parse_constant=_refuse_json_constant)
     except RecursionError:
         return "a payload too deeply nested to check"
@@ -389,24 +349,15 @@ def lone_surrogate_reason(payload: str | bytes) -> str | None:
 def _has_unpaired_surrogate_escape(body: str) -> bool:
     r"""Scan validated JSON text for a surrogate escape with no partner.
 
-    The SAME algorithm as Go's loneSurrogateReason, which is the point: one rule implemented
-    twice is what the conformance corpus exists to hold together, and two different
-    algorithms gave it more to hold than it needed to.
+    The same algorithm as Go's hasUnpairedSurrogateEscape; the corpus holds them together.
 
-    It replaced a walk over the parsed value, which was correct but paid for the whole tree:
-    on a 2 MB payload of 20,000 records it spent 80 ms of 87 ms pushing 120,000 keys and
-    values through a Python loop. The text is already in hand and an escape is a local fact,
-    so the tree was never needed to answer this.
+    Consuming each escape in order is what tells a real `\uXXXX` from the characters
+    `\\ud800` -- a literal backslash followed by text -- because `\\` is consumed as one
+    escape and its second backslash never starts another.
 
-    Only BACKSLASH positions are visited, via str.find, so the C library does the scanning
-    between escapes and this loop runs once per escape rather than once per character.
-    Consuming each escape in order is also what distinguishes a real `\uXXXX` from the
-    characters `\\ud800` -- a literal backslash followed by text -- because the `\\` pair is
-    consumed as one escape and its second backslash never starts another. That distinction
-    is the one two earlier regex attempts got wrong.
-
-    Safe on any input, but only MEANINGFUL on text already known to be JSON: outside a
-    string literal a backslash is not an escape, and valid JSON has none there.
+    Only BACKSLASH positions are visited, via str.find, so this runs once per escape rather
+    than once per character. Safe on any input but only MEANINGFUL on JSON, which callers
+    establish after it returns true.
     """
     i = body.find("\\")
     while i != -1:
@@ -450,16 +401,12 @@ _MAX_JSON_NESTING = 500
 def _exceeds_nesting(body: str) -> bool:
     """Report whether ``body`` nests deeper than ``_MAX_JSON_NESTING``, string-aware.
 
-    A raw count of ``[`` and ``{`` would refuse an ordinary flat array of 500 objects, so
-    this tracks NET depth, and skips brackets inside string literals -- a value containing
-    ``"[[[["`` is not nesting.
+    NET depth, ignoring brackets inside string literals, so a flat array of 500 objects and
+    a value containing ``"[[[["`` both stay under it.
 
-    Identical in Go (``exceedsNesting``), deliberately, and over the same text. The limit is
-    explicit because each parser's own is not portable: Go's scanner stops at 10000,
-    CPython's follows the interpreter stack, and depth 4000 parsed on a laptop while raising
-    RecursionError in CI -- so the same payload was written on one host and refused on
-    another. Two Python pods disagreeing about an entry is the same defect as the two
-    clients disagreeing about one.
+    An explicit limit because each parser's own is not portable -- Go's scanner stops at
+    10000 and CPython's follows the interpreter stack -- which made the answer depend on the
+    machine. Identical in Go (``exceedsNesting``).
     """
     depth = 0
     in_string = False
@@ -491,28 +438,10 @@ def _refuse_json_constant(name: str) -> object:
 def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes:
     """Frame already-serialized TEXT in the cross-language JSON envelope.
 
-    TEXT, and only text. A ``bytes`` payload was previously base64-encoded into the JSON
-    string and flagged ``encoding: "base64"``, and that branch is what made the payload's
-    Python type depend on WHICH CLIENT wrote the entry: Python chose the encoding from the
-    Python type, while Go -- which has no such type, since ``Codec.Marshal`` returns
-    ``[]byte`` for JSON text too -- chose it by sniffing ``utf8.Valid``. So the same value
-    stored ``base64`` from Python and ``utf8`` from Go, and Python read it back as ``bytes``
-    or ``str`` accordingly.
-
-    Refusing bytes here removes that at the source rather than reconciling it: with base64
-    gone the ``encoding`` field is constant, ``Envelope.JSON`` always decodes to ``str``, and
-    the payload's type is a property of the DECLARED envelope instead of the writer.
-
-    Binary belongs on ``Envelope.PROTO``, which has no ``encoding`` field at all and carries
-    bytes end to end in both clients. The capability being removed had no user: nothing in
-    this repository outside its own tests, and no declaration of ``Envelope.JSON`` anywhere
-    in the one consumer.
+    Text only. Binary goes on the PROTO envelope, which carries bytes end to end.
     """
     if isinstance(payload, bytes):
-        raise EnvelopeEncodeError(
-            "the JSON envelope carries text, got bytes. Use Envelope.PROTO for a binary "
-            "payload -- it has no encoding field, so bytes stay bytes in both clients."
-        )
+        raise EnvelopeEncodeError("the JSON envelope carries text, got bytes. Use Envelope.PROTO for a binary payload.")
     _reject_lone_surrogate(payload)
     encoding = "utf8"
     body = payload
@@ -639,14 +568,7 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                 # through float(), so Python and Go already agree there.
                 if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):
                     raise EnvelopeDecodeError(f"{field} is outside the safe-integer range, got {value!r}")
-            # utf8 ONLY. The base64 branch is gone with the write path that produced it;
-            # an entry carrying it now falls here and becomes a miss that the fallback
-            # rewrites, which is the right failure -- loud and self-healing, never a silent
-            # misread. Nothing reachable can have written one: the JSON envelope has never
-            # shipped (no envelope.py in v2.1.0 or on main), the Go client is new in this
-            # change, and the only consumer declares Envelope.PROTO on both sides.
-            #
-            # The field is kept rather than dropped so that exactly this check exists.
+            # utf8 is the only encoding. Anything else is a miss the caller rewrites.
             encoding = envelope.get("encoding")
             if encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")

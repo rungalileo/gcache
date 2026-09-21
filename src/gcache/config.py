@@ -127,27 +127,15 @@ class GCacheKeyConfig(BaseModel):
 class Envelope(str, Enum):
     """How a cached value is framed in Redis.
 
-    ``PICKLE`` is the default and serializes arbitrary Python objects, but is readable only
-    from Python -- no other client can read a pickle entry, which is also why it is the one
-    framing outside the cross-client rules.
+    ``PICKLE`` is the default. It serializes arbitrary Python objects and needs no
+    ``Serializer``, but only Python can read it.
 
-    ``JSON`` writes the cross-language envelope the Go client also uses, so an entry can be
-    shared between them and inspected server-side from Redis's Lua interpreter. It carries
-    TEXT: a serializer used with it must return ``str``, and a ``bytes`` payload is refused
-    with a pointer here. That is not a limitation of JSON so much as the absence of one --
-    the alternative was base64-ing bytes into the JSON string, and because Python chose that
-    branch from the Python type while Go chose it by sniffing ``utf8.Valid`` (Go has no such
-    type: ``Codec.Marshal`` returns ``[]byte`` for JSON text too), the same value stored
-    differently depending on which client wrote it, and Python read it back as ``str`` or
-    ``bytes`` accordingly. With text only, ``encoding`` never varies and ``JSON`` always
-    decodes to ``str``.
+    ``JSON`` is the cross-language framing, readable from ``redis-cli`` and Redis's Lua
+    ``cjson``. It carries TEXT: a serializer used with it must return ``str``.
 
-    ``PROTO`` frames a binary payload in a binary envelope: 18 bytes of overhead against
-    JSON's ~102, so a small entry is roughly a third the size (measured: 69 bytes against
-    204 for the same protobuf message as protojson). It is where binary belongs -- no
-    ``encoding`` field exists, so bytes stay bytes in both clients. It gives up what JSON
-    buys: neither payload nor metadata is readable from ``redis-cli`` or Redis's Lua
-    ``cjson``. Use it for a hot path, or for any value that is not text.
+    ``PROTO`` carries binary in a binary envelope -- 18 bytes of overhead against JSON's
+    ~102, and opaque to ``redis-cli``, ``jq`` and ``cjson`` alike. Use it for a hot path, or
+    for any value that is not text.
 
     Public API: this lives here rather than in ``gcache._internal`` so callers do not have
     to import from a private path to name it.
@@ -171,25 +159,14 @@ class Serializer(ABC):
     async def load(self, data: bytes | str) -> Any:
         pass
 
-    # What load RECEIVES is decided by the key's declared envelope, not by which client
-    # wrote the entry: Envelope.JSON always yields `str` and Envelope.PROTO always yields
-    # `bytes`. That is a property worth stating because it was not always true -- the JSON
-    # envelope once base64-ed a bytes payload, and since Python chose that branch from the
-    # Python type while Go chose it by sniffing (Go has no such type to read), the same
-    # value came back as `bytes` or `str` depending on the writer. The JSON envelope carries
-    # text only now, so the question has one answer per envelope.
+    # What load receives follows the key's envelope: JSON yields str, PROTO yields bytes.
+    # The `bytes | str` annotation stays because one implementation may be used under
+    # either.
     #
-    # The `bytes | str` annotation stays: an implementation may be used under either
-    # envelope, and a serializer that is wrong for its key should fail on the first read
-    # rather than never.
-    #
-    # One constraint on dump's output, enforced at the framing boundary rather than trusted:
-    # a TEXT payload must not carry a lone surrogate, as a character or as the JSON escape
-    # \ud800. Both are cross-client divergences -- Python keeps the surrogate, Go substitutes
-    # U+FFFD -- and the escape form is invisible in the stored entry, which is pure ASCII.
-    # encode_json refuses either, and RedisCache.get refuses one already in Redis. A payload
-    # this client hands over as BYTES is opaque to the envelope, so a serializer producing
-    # bytes owns that question itself.
+    # One constraint on dump's output, enforced in encode_json rather than trusted: a
+    # payload must not carry a lone surrogate, as a character or as the JSON escape \ud800.
+    # Python keeps it and Go substitutes U+FFFD, so the two would return different values
+    # and both report a hit.
 
     def wire_identity(self) -> Any:
         """What makes this instance interchangeable with another on the wire.
@@ -224,15 +201,12 @@ class JsonSerializer(Serializer):
     """
 
     async def dump(self, obj: Any) -> str:
-        # allow_nan=False because json.dumps otherwise emits the bare tokens NaN, Infinity
-        # and -Infinity, which are not JSON -- Go's encoding/json rejects all three. The
-        # write would succeed and the entry would be
-        # unreadable from every non-Python client until its TTL ran out. Failing the write
-        # is the rule the rest of this envelope follows.
-        # The lone-surrogate rule is NOT here. It lives at the framing boundary
-        # (envelope.encode_json) because every serializer's output passes through it, and a
-        # check in this one was bypassed by any custom Serializer -- which `serializer=`
-        # makes a supported path.
+        # allow_nan=False: json.dumps otherwise emits the bare tokens NaN/Infinity, which
+        # Go's encoding/json rejects, leaving the entry unreadable from every other client
+        # until its TTL ran out.
+        #
+        # The lone-surrogate rule lives in envelope.encode_json instead, so a custom
+        # Serializer cannot bypass it.
         return json.dumps(obj, separators=(",", ":"), allow_nan=False)
 
     async def load(self, data: bytes | str) -> Any:
@@ -241,7 +215,7 @@ class JsonSerializer(Serializer):
         # Inline on purpose: json.loads holds the GIL, so offloading a 5.3 MB payload moved
         # the max tick delay 0.007s -> 0.007-0.014s and starved getaddrinfo in the default
         # pool. (ProtoSerializer.load does NOT offload: ParseFromString is C and blocks the
-        # loop once -- 0.5ms measured at 1.24MB, against protojson's 104ms at 1.18MB.)
+        # loop once -- 0.5ms measured at 1.24MB.)
         # The read-side half of the lone-surrogate rule is not here either. RedisCache.get
         # asks it of the stored TEXT before any serializer sees it, so a custom load() --
         # which may resolve the escape, or not use json at all -- cannot get past it.

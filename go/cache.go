@@ -121,9 +121,9 @@ const (
 	// EnvelopeJSON is the cross-language JSON envelope: readable from redis-cli and
 	// parseable by Redis's Lua cjson, at ~102 bytes of overhead. The default.
 	EnvelopeJSON Envelope = iota
-	// EnvelopePROTO is the binary envelope, and where a binary payload belongs -- the JSON
-	// envelope carries text and refuses one. 18 bytes of overhead, no encoding field, and
-	// opaque to redis-cli, jq and cjson alike. Pair it with protocodec.Proto.
+	// EnvelopePROTO is the binary envelope, and where a binary payload belongs: the JSON
+	// envelope carries text. 18 bytes of overhead, and opaque to redis-cli, jq and cjson
+	// alike. Pair it with protocodec.Proto.
 	EnvelopePROTO
 )
 
@@ -310,42 +310,26 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		return zero, false
 	}
 
-	// PARSE the watermark here, but COMPARE it last. Python splits the two the same way, and
-	// for the same reason: an unreadable watermark is an operational fault in its own right,
-	// so it must be reported whichever envelope guard fires afterwards. Reading it late meant
-	// a malformed entry with a corrupt watermark reported only the malformation, and the
-	// corrupt key -- the one a rewrite cannot repair -- went unrecorded.
-	//
-	// Failing closed on it, rather than treating unreadable as "no watermark", which would
-	// serve an entry someone tried to invalidate. Python fails closed by substituting a
-	// suppress-everything sentinel and carrying on; the effect for the caller is the same
-	// here, and one Result per read is the Go model.
-	// ENVELOPE INTEGRITY FIRST, then expiry, then the watermark -- the order Python uses, and
-	// it decides which outcome a reader sees when several conditions hold at once. These two
-	// guards used to sit below both, so a reversed envelope that had also expired was
-	// recorded as ResultMiss here and as reversed_envelope_timestamps in Python. Same bytes,
-	// two diagnoses, and the one that says "malformed" is the one worth having.
+	// PARSE here, COMPARE last, as Python does: an unreadable watermark is a fault in its
+	// own right -- and the one a rewrite cannot repair -- so it must be reported whichever
+	// envelope guard fires afterwards. Fails closed, rather than reading unreadable as "no
+	// watermark", which would serve an entry someone tried to invalidate.
+	// ENVELOPE INTEGRITY FIRST, then expiry, then the watermark -- Python's order, which
+	// decides what a reader sees when several conditions hold at once.
 	//
 	// A REVERSED envelope -- expires before created -- is malformed, and the lifetime guard
-	// below cannot catch it: the difference is negative, so the `>` comparison is false and
-	// it passes as a plausible entry.
+	// below cannot catch it: the difference is negative, so `>` is false and it passes.
 	if expiresAtMs < createdAtMs {
 		c.record(key.UseCase, ResultDistrusted)
 		return zero, false
 	}
 
-	// A createdAt far enough in the FUTURE makes a tracked entry immune to invalidation,
-	// which is not the clock skew this envelope tolerates elsewhere. Staleness is
-	// `watermarkMs >= createdAtMs` and a watermark carries a real clock time, so a stamp
-	// beyond every reachable watermark can never be suppressed -- the entry survives every
-	// Invalidate call for its whole Redis TTL, while the expiry and lifetime guards both pass
-	// because a future createdAt with a legal declared lifetime is a plausible entry.
+	// A createdAt far enough ahead makes a tracked entry immune to invalidation: staleness
+	// is `watermarkMs >= createdAtMs`, and a real-clock watermark never reaches it, while
+	// the expiry and lifetime guards both pass.
 	//
-	// The bound is the exact frontier, not "not in the future". An invalidation issued NOW
-	// writes a watermark of at most now+maxFutureBuffer, so an entry created at or before
-	// that instant is still suppressible and one created after it is not. The hour of skew
-	// tolerance is a consequence, not the reason: a zero-tolerance test would turn a
-	// one-millisecond clock lead into a permanent miss-and-rewrite loop.
+	// The bound is the frontier an invalidation issued NOW can reach -- a watermark of at
+	// most now+maxFutureBuffer -- so an hour of clock-skew tolerance falls out of it.
 	if key.Tracked && createdAtMs > c.now().UnixMilli()+maxFutureBuffer.Milliseconds() {
 		c.record(key.UseCase, ResultDistrusted)
 		return zero, false
@@ -370,17 +354,11 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		return zero, false
 	}
 
-	// BEFORE the staleness comparison, which is where Python asks it. An entry that is both
-	// stale and poisoned is a miss either way, so this is diagnostic: `stale` reads as
-	// routine, while `distrusted` says a poisoned entry is sitting in the keyspace and
-	// someone has to find the writer. Ordering it below meant Go hid that signal whenever a
-	// watermark happened to cover the entry.
+	// BEFORE the staleness comparison, where Python asks it. Both are a miss, so this is
+	// diagnostic: `stale` reads as routine, `distrusted` says a writer is broken.
 	//
-	// Every framing Go can read, which is JSON and PROTO -- pickle already returned above,
-	// and pickle is the one framing no other client reads, so nothing can disagree about it.
-	// Deliberately NOT gated on the envelope's `encoding`, which no longer varies anyway:
-	// what keeps protobuf and other binary out is the strict-JSON gate inside
-	// loneSurrogateReason, applied to the payload's CONTENT rather than to its framing.
+	// Pickle already returned above, and is the one framing no other client reads. What
+	// keeps protobuf out is the strict-JSON gate inside loneSurrogateReason.
 	if reason := loneSurrogateReason(string(payload)); reason != "" {
 		c.record(key.UseCase, ResultDistrusted)
 		return zero, false

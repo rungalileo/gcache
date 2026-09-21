@@ -35,11 +35,9 @@ type envelope struct {
 	Payload     string `json:"payload"`
 }
 
-// encodeEnvelope frames already-serialized TEXT for storage. A payload that is not valid
-// UTF-8 is REFUSED, not base64-encoded: see the body for why that branch was removed rather
-// than kept. Refusing also covers what base64 originally guarded against -- encoding/json
-// silently substitutes U+FFFD per bad byte, so an unchecked binary payload wrote a value no
-// client could read back.
+// encodeEnvelope frames already-serialized TEXT for storage. Binary belongs on the PROTO
+// envelope and is refused here -- encoding/json would otherwise substitute U+FFFD per bad
+// byte and write a value no client could read back.
 func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]byte, error) {
 	createdMs := createdAt.UnixMilli()
 	// The writer refuses what the reader rejects, matching Python's encode_json. Without
@@ -49,18 +47,11 @@ func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]b
 		return nil, fmt.Errorf("gcache: timestamps %d/%d outside the safe-integer range; no client could read this back",
 			createdMs, createdMs+ttl.Milliseconds())
 	}
-	// TEXT, and only text. A non-UTF-8 payload was previously base64-encoded into the JSON
-	// string, and that branch is what made the payload's Python type depend on which client
-	// wrote the entry: Go has no bytes-versus-text distinction to record (Codec.Marshal
-	// returns []byte for JSON text too), so it chose by sniffing, while Python chose by the
-	// Python type. The same value stored utf8 from here and base64 from there.
-	//
-	// Refusing here removes that at the source. Go cannot say "not bytes" -- everything is
-	// []byte -- so the testable form of "this envelope carries text" is "this is valid
-	// UTF-8". Binary belongs on the PROTO envelope, which has no encoding field.
+	// Go cannot say "not bytes" -- Codec.Marshal returns []byte for JSON text too -- so the
+	// testable form of "this envelope carries text" is "this is valid UTF-8".
 	if !utf8.Valid(payload) {
 		return nil, errors.New("gcache: the JSON envelope carries text, got bytes that are not valid UTF-8; " +
-			"use the PROTO envelope for a binary payload -- it has no encoding field, so bytes stay bytes")
+			"use the PROTO envelope for a binary payload")
 	}
 	encoding, body := "utf8", string(payload)
 	if reason := loneSurrogateReason(body); reason != "" {
@@ -138,10 +129,8 @@ func getVarint(data []byte, i int) (uint64, int, error) {
 	return 0, 0, errors.New("gcache: varint longer than 10 bytes")
 }
 
-// encodeProtoEnvelope frames an already-serialized binary payload. Where binary belongs,
-// and now the only place it can go: the JSON envelope carries text. 18 bytes of overhead
-// against that envelope's ~102, and no encoding field to make the payload's type depend on
-// which client wrote it.
+// encodeProtoEnvelope frames an already-serialized binary payload -- where binary belongs,
+// since the JSON envelope carries text. 18 bytes of overhead against that envelope's ~102.
 func encodeProtoEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]byte, error) {
 
 	// The PROTO framing is not an exemption: "opaque bytes" is the writer's word, and a
@@ -428,23 +417,13 @@ func clampToInt64(f float64) int64 {
 // discarded. Loosening it to `>` would let a write that raced the invalidation survive.
 func isStale(watermarkMs, createdAtMs int64) bool { return watermarkMs >= createdAtMs }
 
-// loneSurrogateReason names the divergence in a TEXT payload, or "" if the two clients agree
-// about it. Mirrors Python's envelope.lone_surrogate_reason, and the shared corpus pins that
-// the two agree on which payloads are refused.
+// loneSurrogateReason names the divergence in a payload, or "" if the two clients agree
+// about it. Mirrors Python's lone_surrogate_reason; the shared corpus holds them together.
 //
-// The hazard is the ESCAPE form. Any serializer calling Python's json.dumps with the default
-// ensure_ascii turns U+D800 into the six ASCII characters \ud800, so the stored envelope is
-// pure ASCII and the utf8.Valid gate above cannot see it -- the surrogate only reappears when
-// the CALLER's codec unescapes the payload. Python then returns a string holding U+D800 while
-// encoding/json here substitutes U+FFFD. Both clients report a hit and return different
-// values, with nothing raised and no metric moved.
-//
-// The literal-CHARACTER form needs no check here: a []byte holding an unpaired surrogate is
-// not valid UTF-8, so encodeEnvelope refuses it outright before this is reached.
-//
-// Python answers this with json.loads plus a re-dump; Go's encoding/json substitutes rather
-// than erroring, so it cannot be asked the same way and this walks the escapes instead. Two
-// mechanisms, one rule, pinned by the corpus -- which is what the corpus is for.
+// The hazard is the ESCAPE form: json.dumps with ensure_ascii turns U+D800 into the six
+// ASCII characters \ud800, so the stored envelope is pure ASCII and utf8.Valid cannot see
+// it. The surrogate reappears only when the CALLER's codec unescapes, and then Python keeps
+// it while encoding/json here substitutes U+FFFD -- both reporting a hit.
 func loneSurrogateReason(body string) string {
 	// Not valid UTF-8 means genuinely binary; Python's bytes branch reaches the same
 	// conclusion by failing to decode. Still checked even though encodeEnvelope now refuses
@@ -487,13 +466,11 @@ func loneSurrogateReason(body string) string {
 // hasUnpairedSurrogateEscape scans JSON text for a surrogate escape with no partner.
 //
 // Consuming each escape in order is what distinguishes a real `\uXXXX` from the characters
-// `\\ud800` -- a literal backslash followed by text -- because the `\\` pair is consumed as
-// one escape and its second backslash never starts another. That distinction is the one two
-// earlier regex attempts got wrong.
+// `\\ud800` -- a literal backslash followed by text -- since `\\` is consumed as one escape
+// and its second backslash never starts another.
 //
-// Safe on any input, but only MEANINGFUL on text already known to be JSON: outside a string
-// literal a backslash is not an escape, and valid JSON has none there. Callers establish
-// that after this returns true, not before, so the common payload never pays for it.
+// Only MEANINGFUL on text already known to be JSON; callers establish that after this
+// returns true, so the common payload never pays for it.
 func hasUnpairedSurrogateEscape(body string) bool {
 	for i := 0; i < len(body); {
 		if body[i] != '\\' {

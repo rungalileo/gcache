@@ -163,7 +163,7 @@ class Serializer(ABC):
     # The `bytes | str` annotation stays because one implementation may be used under
     # either.
     #
-    # One constraint on dump's output, enforced in encode_json rather than trusted: a
+    # One constraint on dump's output, enforced by both encoders rather than trusted: a
     # payload must not carry a lone surrogate, as a character or as the JSON escape \ud800.
     # Python keeps it and Go substitutes U+FFFD, so the two would return different values
     # and both report a hit.

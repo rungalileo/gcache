@@ -305,12 +305,8 @@ class RedisCache(CacheInterface):
             start_sec = time.monotonic()
 
             # Framings identify themselves by first byte, so decode needs no hint -- except
-            # for pickle, which is the one case the DECLARATION decides rather than the bytes.
-            #
-            # POSITIVE, not `!= Envelope.JSON`. Negative was correct while JSON was the only
-            # alternative; adding PROTO made it grant unpickling to a PROTO key, which is the
-            # arbitrary-code-execution path this envelope exists to close. Declaring pickle is
-            # what grants pickle, and nothing else does.
+            # pickle, which the DECLARATION decides. Positive test on purpose: declaring
+            # pickle is what grants unpickling, the arbitrary-code path, and nothing else.
             allow_pickle = key.envelope == Envelope.PICKLE
             try:
                 deserialized_value: DecodedValue = (
@@ -417,14 +413,12 @@ class RedisCache(CacheInterface):
             # Load payload using custom serializer if present.
             payload = deserialized_value.payload
 
-            # The write guard covers what THIS client stores; this covers what is already
-            # in Redis. Before the serializer, because the question is about the stored text
-            # and a custom load() may have resolved the escape by the time it returns.
-            #
+            # The write guard covers what this client stores; this covers what is already
+            # in Redis. Before the serializer, since the question is about the stored text.
             # A poisoned key becomes a permanent miss rather than a silent disagreement.
-            # is_json, not the Python type: true for JSON and PROTO, false for pickle,
-            # which is exactly the set. Pickle is Python-only, so nothing can disagree
-            # with us about one.
+            #
+            # is_json is true for JSON and PROTO and false for pickle, which is the set that
+            # another client can read and therefore disagree about.
             if deserialized_value.is_json:
                 divergence = (
                     await RedisCache._async_lone_surrogate_reason(payload)
@@ -444,11 +438,9 @@ class RedisCache(CacheInterface):
                 try:
                     payload = await key.serializer.load(payload)
                 except Exception as e:
-                    # Same reasoning as the decode guard above, which this sat outside of: a
-                    # payload the serializer cannot parse used to raise past it, so the
-                    # caller logged an error, re-ran the fallback and never wrote back --
-                    # leaving the entry poisoned for its whole TTL. Any non-Python writer can
-                    # produce one.
+                    # A payload the serializer cannot parse is a miss, not an exception:
+                    # raising would skip the write-back and leave the entry poisoned for its
+                    # whole TTL. Any non-Python writer can produce one.
                     _GLOBAL_GCACHE_STATE.logger.warning(
                         "Unloadable cache payload for %s (%s); treating as miss", key.urn, e
                     )
@@ -482,11 +474,8 @@ class RedisCache(CacheInterface):
             raise MissingKeyConfig(key.use_case)
 
         # Refuse a tracked write outliving its watermark. Raising, not capping: a cap
-        # silently shortens the configured TTL and the read guard then never fires, so the
-        # misconfiguration stays invisible. gcache swallows write errors, so this is safe.
-        # MAX_TRACKED_TTL_SECONDS, not the full watermark lifetime: the cap pairs with
-        # MAX_FUTURE_BUFFER_SECONDS so buffer+TTL stays inside the watermark by construction.
-        # See constants.py for why the sum is split rather than checked in one place.
+        # shortens the configured TTL silently and the read guard then never fires. Against
+        # MAX_TRACKED_TTL_SECONDS rather than the watermark lifetime -- see constants.py.
         if key.invalidation_tracking and ttl > MAX_TRACKED_TTL_SECONDS:
             raise TrackedTTLExceedsWatermark(key.use_case, ttl, MAX_TRACKED_TTL_SECONDS)
 
@@ -496,14 +485,10 @@ class RedisCache(CacheInterface):
         # `==`, not `is`: Envelope subclasses str, so an untyped caller passing the plain
         # string "json" must opt in rather than silently fall back to pickle.
         if key.envelope == Envelope.JSON:
-            # Require the serializer, not merely a str/bytes result. A cached function that
-            # already returns str passes a type check with no serializer and stores
-            # non-JSON text in a JSON envelope, which every other language's reader then
-            # fails to parse -- the exact breakage this envelope exists to prevent.
-            # The two causes are reported SEPARATELY. As one OR-ed condition the message
-            # always named the payload type, so a missing serializer read as
-            # "requires ... str or bytes, got bytes" -- a type that already matches, leaving
-            # the reader with nothing to change.
+            # Require the serializer, not merely a str result: a function already returning
+            # str would otherwise store non-JSON text in a JSON envelope, which no other
+            # client can parse. Reported separately from the type check below so the message
+            # names the actual cause.
             if key.serializer is None:
                 raise EnvelopeRequiresSerializer(key.key_type, key.id, key.use_case, "JSON")
             # str, not `str | bytes`: the JSON envelope carries text. Caught here rather

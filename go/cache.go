@@ -11,39 +11,15 @@ import (
 )
 
 // watermarkTTL is how long an invalidation watermark lives. 5h, matching Python's
-// WATERMARK_TTL_SECONDS: both languages write into the same key space and must agree, and
-// the shared conformance corpus pins this number and the two caps below in both.
-//
-// This comment said 4h for a while after the constant became 5h, in the one file whose whole
-// premise is that the two clients agree on it -- which is why the corpus pin exists now
-// rather than a comment asserting the agreement.
+// WATERMARK_TTL_SECONDS -- both write the same key space, and the corpus pins the number.
 const watermarkTTL = 5 * time.Hour
 
 // The resurrection invariant is `futureBuffer + entryTTL <= watermarkTTL`: a watermark must
-// outlive every entry it suppresses, or the entry becomes readable again when the tombstone
-// expires. Those two numbers are chosen by DIFFERENT parties -- the buffer by whoever
-// invalidates, the TTL by each writer -- across every use case and both languages. So no
-// single check can see both: an invalidate-time check must guess about writers it cannot
-// see, and a write-time check must guess about invalidations that have not happened.
-//
-// Rather than guess, the sum is split into two caps that hold BY CONSTRUCTION:
-//
-//	maxEntryTTL + maxFutureBuffer <= watermarkTTL      (4h + 1h <= 5h)
-//
-// The watermark lifetime was raised from 4h to 5h rather than lowering the entry cap to 3h.
-// The entry TTL is what consumers configure per use case, so capping it lower would break
-// existing callers; the buffer is a settling window for replication lag, measured in seconds
-// in practice and defaulting to zero, so a 1h ceiling costs nobody anything. The price is one
-// extra hour of tombstone lifetime per invalidated key.
-//
-// Each is then enforced locally against a value its own caller owns -- Put against the TTL,
-// Invalidate against the buffer -- and neither needs the other party's number. The previous
-// bound here (`futureBuffer > watermarkTTL - c.ttl`) only covered entries THIS cache wrote;
-// another cache, or the Python client, could still write a longer-lived entry under the same
-// key type and resurrect past the watermark.
-//
-// Mirrored exactly in Python (constants.py) and pinned by the shared conformance corpus, so
-// the two clients cannot drift on the numbers this contract rests on.
+// outlive every entry it suppresses. The two numbers are chosen by different parties -- the
+// buffer by whoever invalidates, the TTL by each writer -- so instead of one check that
+// cannot see both, the sum is split into two caps that hold by construction (4h + 1h <= 5h),
+// each enforced against a value its own caller owns. Mirrored in Python (constants.py) and
+// pinned by the shared conformance corpus.
 const maxEntryTTL = 4 * time.Hour
 
 // maxFutureBuffer caps Invalidate's settling window. See maxEntryTTL for why this and the
@@ -97,8 +73,8 @@ type Client interface {
 }
 
 // Codec converts a value to and from the bytes carried in the envelope payload. Exists so a
-// shared-schema payload can be a generated type rather than a hand-written struct -- six
-// cross-language divergences found in review came from the latter. See subpackage protocodec.
+// shared-schema payload can be a generated type rather than a hand-written struct, which is
+// where cross-language divergences come from. See subpackage protocodec.
 type Codec[V any] interface {
 	Marshal(V) ([]byte, error)
 	Unmarshal([]byte, *V) error
@@ -278,17 +254,10 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		c.fail(callerCtx, key.UseCase, "get", fmt.Errorf("MGet returned %d values for %d keys", len(vals), len(keys)))
 		return zero, false
 	}
-	// PARSE the watermark FIRST, before the value is even looked at, and COMPARE it last.
-	// Python parses it the moment the MGET unpacks, so it reports a corrupt watermark whether
-	// or not there is a value to serve; Go read it late and so stayed silent about one on
-	// exactly the reads where nothing else would mention it -- an absent value, or an
-	// undecodable one. A corrupt watermark is the one corruption a rewrite cannot repair, so
-	// going unrecorded is the worst place for it.
-	//
-	// Failing closed on it, rather than treating unreadable as "no watermark", which would
-	// serve an entry someone tried to invalidate. Python fails closed by substituting a
-	// suppress-everything sentinel and carrying on; the effect for the caller is the same
-	// here, and one Result per read is the Go model.
+	// PARSE before the value is looked at and COMPARE last, as Python does: a corrupt
+	// watermark is the one corruption a rewrite cannot repair, so it must be reported even
+	// when the value is absent or undecodable. Fails closed -- reading unreadable as "no
+	// watermark" would serve an entry someone tried to invalidate.
 	var watermarkMs int64
 	haveWatermark := false
 	if key.Tracked && vals[1] != nil {
@@ -318,10 +287,6 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		return zero, false
 	}
 
-	// PARSE here, COMPARE last, as Python does: an unreadable watermark is a fault in its
-	// own right -- and the one a rewrite cannot repair -- so it must be reported whichever
-	// envelope guard fires afterwards. Fails closed, rather than reading unreadable as "no
-	// watermark", which would serve an entry someone tried to invalidate.
 	// ENVELOPE INTEGRITY FIRST, then expiry, then the watermark -- Python's order, which
 	// decides what a reader sees when several conditions hold at once.
 	//
@@ -377,14 +342,8 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 		return zero, false
 	}
 
-	// The same rule the write path enforces, asked on the way in -- encodeEnvelope stops THIS
-	// client creating a divergent entry and says nothing about one already in Redis, written
-	// by a Python pod with a custom Serializer or by any other writer sharing the key space.
-	// Reading it is where the harm lands, and it is the harm with no symptom.
-	//
 	// Before the codec, not after: the question is about the stored TEXT, and Unmarshal has
-	// already substituted U+FFFD by the time it returns. Distrusted rather than a decode
-	// failure -- the entry is well-formed, it just cannot be agreed upon.
+	// already substituted U+FFFD by the time it returns.
 	if err := c.codec.Unmarshal(payload, &value); err != nil {
 		c.fail(callerCtx, key.UseCase, "unmarshal", err)
 		return zero, false
@@ -443,14 +402,9 @@ func (c *Cache[V]) Invalidate(ctx context.Context, keyType, id string, futureBuf
 		// other bad argument here is rejected; this one hid.
 		return fmt.Errorf("gcache: futureBuffer %s is negative; it moves the watermark into the past", futureBuffer)
 	}
-	// The watermark must outlive every entry it suppresses, so futureBuffer+TTL is the real
-	// ceiling. Compared rather than summed: the sum overflows time.Duration and comes out
-	// NEGATIVE -- time.Duration(math.MaxInt64) once passed on a 2h-TTL cache this way.
-	// Against maxFutureBuffer, NOT watermarkTTL-c.ttl. The old form used this cache's own
-	// TTL, so it protected only entries this cache wrote -- Invalidate covers every use case
-	// and both languages, and a longer-lived entry written elsewhere under the same key type
-	// escaped it entirely. The constant pairs with maxEntryTTL to make the sum safe for every
-	// writer, not just this one.
+	// Compared, not summed: the sum overflows time.Duration and comes out negative. Against
+	// maxFutureBuffer rather than watermarkTTL-c.ttl, since Invalidate covers every use case
+	// and both languages, not just entries this cache wrote.
 	if futureBuffer > maxFutureBuffer {
 		return fmt.Errorf(
 			"gcache: futureBuffer %s exceeds the %s ceiling; with the %s entry-TTL cap that "+

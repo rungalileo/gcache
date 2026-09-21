@@ -182,8 +182,8 @@ func TestRueidisSetExPreservesBinaryValues(t *testing.T) {
 }
 
 func TestRueidisSetExHonoursASubSecondTTL(t *testing.T) {
-	// SETEX takes whole seconds, so this TTL used to truncate to `SETEX key 0` -- which
-	// Redis rejects outright, turning a short-lived write into a hard error.
+	// SETEX takes whole seconds, so a sub-second TTL must not truncate to `SETEX key 0`,
+	// which Redis rejects outright.
 	r, prefix := liveAdapter(t, true)
 	ctx := context.Background()
 
@@ -292,8 +292,8 @@ func waitForCacheState(t *testing.T, cache *gcache.Cache[sessionIdentity], key g
 
 func TestCacheOverLiveRedisRoundTripsAndInvalidates(t *testing.T) {
 	// The adapter under the real Cache, end to end, since the watermark comparison is only
-	// meaningful against real key expiry. Runs for BOTH client-side-cache settings and
-	// invalidates from a SECOND client: client_side_cache=true (the default) was previously untested here, since this test and gcachectl both disabled it.
+	// meaningful against real key expiry. BOTH client-side-cache settings, invalidating from
+	// a SECOND client -- csc=true is the default and needs the invalidation push to work.
 	for _, csc := range []bool{false, true} {
 		t.Run(fmt.Sprintf("client_side_cache=%v", csc), func(t *testing.T) {
 			r, prefix := liveAdapter(t, !csc)

@@ -229,19 +229,10 @@ class CacheChain(CacheWrapper):
         write is in flight -- prompt cancellation is correct when the caller is gone, and
         suppressing it to finish a best-effort write would delay it.
         """
-        # SHARED layer first, and the local write is skipped when it fails.
-        #
-        # aput exists to prime an entry another PROCESS will read. With the local write
-        # first, a failed Redis write left this process holding a local copy: aput raised,
-        # so the caller believed the prime failed, but a later aget in the same process took
-        # a local hit and returned the value -- a cache that looks healthy to the one
-        # participant that does not matter and is empty for every other. That is the default
-        # shape, not an edge case, since GCacheKeyConfig.enabled() ramps the local layer to
-        # 100.
-        #
-        # This refines "both layers are always attempted" to "both unless the shared layer
-        # failed", deliberately. Attempting both still matters in the other direction: a
-        # local failure must not stop the remote write, which is the whole point of aput.
+        # SHARED layer first, so a failed Redis write skips the local one. aput primes an
+        # entry another PROCESS reads; local-first would leave this process holding a copy
+        # of a value no one else can see, while the caller was told the prime failed. A
+        # local failure still must not stop the remote write.
         await self.fallback_cache.put(key, value)
         await self.wrapped.put(key, value)
 

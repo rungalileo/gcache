@@ -492,9 +492,8 @@ func TestConformanceWatermarkTimingMatchesTheCorpus(t *testing.T) {
 // U+FFFD rather than erroring, so loneSurrogateReason walks the escapes instead. Two
 // implementations of one rule is exactly the shape the shared corpus exists to police.
 //
-// The accepts carry as much weight as the rejects. Two earlier versions of this rule were
-// regexes and each was wrong in a different direction -- one refused every emoji, the other
-// refused ordinary text containing the characters \ud800.
+// The accepts carry as much weight as the rejects: a valid surrogate PAIR is also two
+// escapes, and ordinary text can contain the characters \ud800.
 func TestConformancePayloadDivergenceMatchesTheCorpus(t *testing.T) {
 	var corpus struct {
 		PayloadDivergence struct {

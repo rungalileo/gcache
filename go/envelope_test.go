@@ -151,13 +151,8 @@ func TestParseWatermarkRejectsNonFiniteAndClampsOverflow(t *testing.T) {
 
 func TestEncodeEnvelopeRefusesABinaryPayload(t *testing.T) {
 	// The JSON envelope carries TEXT, and Go cannot say "not bytes" -- Codec.Marshal returns
-	// []byte for JSON text too -- so the testable form of that rule is "valid UTF-8".
-	//
-	// This used to assert the opposite: that a binary payload was base64'd so the entry
-	// stayed readable in both languages. It was readable, but it was also the branch that
-	// made the payload's Python type depend on WHICH CLIENT wrote it, since Python chose
-	// base64 from the Python type while this chose it by sniffing. Binary goes on the PROTO
-	// envelope, which has no encoding field and carries bytes end to end.
+	// []byte for JSON text too -- so the testable form of that rule is "valid UTF-8". Binary
+	// goes on the PROTO envelope, which carries bytes end to end.
 	binary := []byte{0x00, 0xff, 0xfe, 0x80}
 	if _, err := encodeEnvelope(time.UnixMilli(1757308800123), time.Hour, binary); err == nil {
 		t.Fatal("encodeEnvelope accepted a non-UTF-8 payload")
@@ -346,9 +341,9 @@ func TestDecodeEnvelopeNamesTheVersionItRejected(t *testing.T) {
 }
 
 func TestDecodeEnvelopeStopsAtTheSafeIntegerBoundary(t *testing.T) {
-	// The band between 2^53 and int64 is the one where every client used to ACCEPT and
-	// compare different numbers with no error -- measured, createdAtMs 9007199254740993
-	// decodes to ...992 here vs ...993 in Python's exact int. Go/TS now share this bound; Python stays looser, which is self-healing (a miss there instead).
+	// Between 2^53 and int64 the clients compare DIFFERENT numbers with no error:
+	// createdAtMs 9007199254740993 decodes to ...992 here and ...993 in Python's exact int.
+	// Python stays looser, which is self-healing -- a miss there rather than a wrong hit.
 	const maxSafe = 1<<53 - 1 // 9007199254740991
 
 	// The boundary itself must be accepted, or the bound is off by one.

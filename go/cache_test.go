@@ -318,9 +318,9 @@ func TestInvalidateRejectsAFutureBufferTheWatermarkCannotOutlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The ceiling is the CONSTANT maxFutureBuffer now, not watermarkTTL minus this cache's
-	// TTL. The old form only protected entries this cache wrote -- Invalidate spans every use
-	// case and both languages, so a longer-lived entry written elsewhere escaped it.
+	// The ceiling is the CONSTANT maxFutureBuffer, not watermarkTTL minus this cache's TTL:
+	// Invalidate spans every use case and both languages, so a bound derived from one
+	// cache's TTL would miss a longer-lived entry written elsewhere.
 	if err := cache.Invalidate(context.Background(), "kt", "id", maxFutureBuffer+time.Second); err == nil {
 		t.Error("Invalidate accepted a futureBuffer above the ceiling")
 	}
@@ -831,9 +831,9 @@ func TestNewRejectsATTLThatRoundsToZeroMilliseconds(t *testing.T) {
 }
 
 func TestGetTreatsANonPositiveExpiryAsExpired(t *testing.T) {
-	// A sign test on expiresAtMs used to skip these and serve the entry, but both other
-	// readers compare the raw value with no sign check and call it expired. Untracked, so
-	// no watermark can mask the difference.
+	// Both other readers compare the raw value with no sign check and call these expired,
+	// so a sign test here would serve an entry they refuse. Untracked, so no watermark can
+	// mask the difference.
 	for _, exp := range []string{"0", "-1"} {
 		client := newFakeClient()
 		cache := newTestCache(t, client)
@@ -852,8 +852,8 @@ func TestGetTreatsANonPositiveExpiryAsExpired(t *testing.T) {
 
 func TestInvalidateRejectsAFutureBufferThatOverflowsTheGuard(t *testing.T) {
 	// futureBuffer+c.ttl overflows time.Duration for a large buffer, and an overflowed sum
-	// is NEGATIVE, so a summing guard would invert and accept precisely what it should
-	// refuse -- previously wrote a watermark dated 2318 while the key expired in 4h.
+	// is NEGATIVE, so a summing guard inverts and accepts what it should refuse -- writing
+	// a watermark dated 2318 over a key that expires in 4h.
 	client := newFakeClient()
 	cache, err := New(Options[sessionIdentity]{
 		Client: client, URNPrefix: testPrefix, TTL: 2 * time.Hour, Logger: quietLogger(),
@@ -986,10 +986,9 @@ func TestATrackedEntryCannotBeServedOlderThanTheWatermarkLifetime(t *testing.T) 
 		// Inside both bounds, so served -- and necessarily younger than watermarkTTL.
 		{"1h old, 3h30m declared", time.Hour, 3*time.Hour + 30*time.Minute, true, ResultHit},
 		{"3h54m old, 4h declared", 3*time.Hour + 54*time.Minute, 4 * time.Hour, true, ResultHit},
-		// THE BAND between the write cap and the old read threshold. Raising watermarkTTL to
-		// 5h while maxEntryTTL stayed at 4h left an hour in which a declared lifetime passed
-		// the guard even though New refuses to build a cache that could write one. Every
-		// other row here sits outside that band, so none of them could see the gap.
+		// THE BAND between maxEntryTTL (4h) and watermarkTTL (5h): a declared lifetime in
+		// here must be refused even though no compliant writer can produce one. Every other
+		// row sits outside the band and so cannot see this.
 		{"1h old, 4h30m declared", time.Hour, 4*time.Hour + 30*time.Minute, false, ResultDistrusted},
 		{"1h old, 4h declared (the cap itself)", time.Hour, 4 * time.Hour, true, ResultHit},
 	} {
@@ -1206,7 +1205,7 @@ func TestADivergentPayloadIsRefusedOnWriteAndOnRead(t *testing.T) {
 	})
 
 	t.Run("an emoji still writes", func(t *testing.T) {
-		// A valid PAIR is also two escapes. Refusing these was the first version's bug.
+		// A valid PAIR is also two escapes, and must not be refused.
 		if _, err := encodeEnvelope(time.Now(), time.Hour, []byte(`{"v":"\ud83d\ude00"}`)); err != nil {
 			t.Errorf("a valid surrogate pair must write: %v", err)
 		}
@@ -1237,17 +1236,10 @@ func TestADivergentPayloadIsRefusedOnWriteAndOnRead(t *testing.T) {
 	})
 }
 
-// A payload is judged by its CONTENT, not by its framing.
-//
-// This used to have a base64 half as well, asserting that a base64 payload carrying poisoned
-// JSON was refused -- the argument against gating the surrogate check on the envelope's
-// `encoding` field, which says how a payload was TRANSPORTED rather than what it is. The
-// JSON envelope carries text only now, so base64 is gone and the transport axis with it.
-//
-// What survives is the half that still matters: real binary on the PROTO envelope is left
-// alone, and it is the strict-JSON gate inside loneSurrogateReason that does it, not any
-// knowledge of the framing. Bytes that merely CONTAIN the characters \ud800 are the
-// interesting case, since they pass the substring gate and reach that check.
+// A payload is judged by its CONTENT, not by its framing: real binary on the PROTO envelope
+// is left alone by the strict-JSON gate inside loneSurrogateReason, with no knowledge of the
+// framing involved. Bytes that merely CONTAIN the characters \ud800 are the interesting
+// case, since they pass the substring gate and reach that check.
 func TestRealBinaryIsNotJudgedAsText(t *testing.T) {
 	binary := append([]byte{0x08, 0x96, 0x01, 0xff, 0xfe}, []byte(`\ud800`)...)
 

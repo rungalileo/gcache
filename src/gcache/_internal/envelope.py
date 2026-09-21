@@ -98,21 +98,17 @@ class EnvelopeDecodeError(Exception):
 # --- The PROTO envelope -------------------------------------------------------------------
 #
 # Protobuf wire format, hand-written rather than generated: four fields is small enough to
-# pin byte-for-byte in the conformance corpus, and generating it would put protoc in a repo
-# that has none AND make protobuf non-optional here (it is a lazy import on purpose --
-# ~30 google.* modules on every `import gcache` was ruled out). See envelope.proto, which
-# documents the same schema so another language can interoperate.
+# pin byte-for-byte in the corpus, and codegen would add protoc to a repo with none and make
+# protobuf non-optional. envelope.proto documents the same schema for other languages.
 #
 #   field 1  version        varint
 #   field 2  created_at_ms  varint
 #   field 3  expires_at_ms  varint
 #   field 4  payload        length-delimited
 #
-# FIELD NUMBERS MUST STAY <= 14. That is what makes the framing self-identifying: a tag byte
-# is (field_number << 3) | wire_type, so fields 1-14 over proto3's wire types (0/1/2/5) span
-# 0x08..0x75 -- disjoint from JSON's '{' (0x7b) and pickle's PROTO opcode (0x80). Field 16
-# with a varint is exactly 0x80, so going past 15 would collide with pickle; and capping at
-# 15 rather than 14 would stretch the range over 0x7b. Ten spare numbers remain.
+# FIELD NUMBERS MUST STAY <= 14, which is what makes the framing self-identifying: fields
+# 1-14 over proto3's wire types span 0x08..0x75, disjoint from JSON's '{' (0x7b) and pickle's
+# 0x80. Field 15 would reach 0x7b and field 16 is exactly 0x80. Ten spare numbers remain.
 _PROTO_FIRST_BYTE_MIN = 0x08
 _PROTO_FIRST_BYTE_MAX = 0x75
 
@@ -244,19 +240,9 @@ def _decode_proto(data: bytes) -> DecodedValue:
         if i > len(data):
             raise EnvelopeDecodeError("field runs past the end")
 
-    # GREATER than, not !=. A strict check makes every added field a flag day: an old reader
-    # would reject an entry it could otherwise parse, because protobuf already skips fields
-    # it does not know. Rejecting only a HIGHER version keeps that forward compatibility and
-    # still refuses a deliberate incompatible break.
-    # `< 1` as well as `> ENVELOPE_VERSION`. Rejecting only a HIGHER version let an
-    # explicit-or-absent zero through, because 0 > 1 is false -- so a frame carrying no
-    # usable version decoded as a HIT. The JSON envelope already refuses it (the
-    # `version-zero` corpus vector expects `reject`), and this path did not, which is the
-    # kind of one-sided divergence the shared corpus exists to prevent.
-    #
-    # No legitimate writer is excluded: both clients set version explicitly to
-    # ENVELOPE_VERSION (1), and proto3 encodes a non-zero scalar, so a real frame always
-    # carries it. Zero here means an absent field -- a writer that did not set it.
+    # `> ENVELOPE_VERSION` rather than `!=`, so adding a field is not a flag day: protobuf
+    # already skips fields a reader does not know. `< 1` as well, because proto3 omits a
+    # zero default -- an absent version must not decode as a hit.
     if version is None or version < 1 or version > ENVELOPE_VERSION:
         raise EnvelopeDecodeError(f"unsupported envelope version {version!r}")
     # Negative is not a timestamp. Both clients now READ these identically, so this is no

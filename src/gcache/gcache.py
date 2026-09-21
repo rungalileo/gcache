@@ -106,11 +106,8 @@ class GCache:
         if _GLOBAL_GCACHE_STATE.gcache_instantiated:
             raise GCacheAlreadyInstantiated()
 
-        # VALIDATE BEFORE TOUCHING GLOBAL STATE. The assignments below used to sit above the
-        # Redis checks, so a RedisConfigConflict left the new urn_prefix and logger published
-        # while no GCache existed -- the next construction inherited a namespace from an
-        # attempt that failed. __del__ clears only gcache_instantiated, so nothing ever put
-        # them back.
+        # Validate before touching global state: a failed construction must not leave a
+        # urn_prefix or logger published, since __del__ clears only gcache_instantiated.
 
         if config.urn_prefix is not None:
             _GLOBAL_GCACHE_STATE.urn_prefix = config.urn_prefix

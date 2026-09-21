@@ -212,13 +212,8 @@ class JsonSerializer(Serializer):
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, bytes):
             data = data.decode("utf-8")
-        # Inline on purpose: json.loads holds the GIL, so offloading a 5.3 MB payload moved
-        # the max tick delay 0.007s -> 0.007-0.014s and starved getaddrinfo in the default
-        # pool. (ProtoSerializer.load does NOT offload: ParseFromString is C and blocks the
-        # loop once -- 0.5ms measured at 1.24MB.)
-        # The read-side half of the lone-surrogate rule is not here either. RedisCache.get
-        # asks it of the stored TEXT before any serializer sees it, so a custom load() --
-        # which may resolve the escape, or not use json at all -- cannot get past it.
+        # Inline on purpose: json.loads holds the GIL, so offloading a 5.3 MB payload
+        # doubled the max tick delay and starved getaddrinfo in the default pool.
         return json.loads(data)
 
 
@@ -296,13 +291,10 @@ class GCacheKey:
         # decorator path, so coerce here too and let an unrecognized value raise.
         object.__setattr__(self, "envelope", Envelope(self.envelope))
 
-        # BOTH encoded framings, not just JSON. JSON needs a serializer for its string
-        # payload and PROTO needs one for its bytes; PICKLE is the only framing that works
-        # without, because it serialises the object itself. The guard covered JSON alone, so
-        # a PROTO key with no serializer constructed fine and then failed EVERY write --
-        # CacheController swallows the write error and the local layer masks it in-process,
-        # so Redis stayed empty for that use case for the life of the deployment, which is
-        # exactly the failure this check exists to prevent for JSON.
+        # Both encoded framings: JSON needs a serializer for its string payload and PROTO
+        # for its bytes. PICKLE is the only one that works without, since it serialises the
+        # object itself. Without this a write failure is invisible -- CacheController
+        # swallows it and the local layer keeps serving in-process.
         if self.envelope in (Envelope.JSON, Envelope.PROTO) and self.serializer is None:
             raise EnvelopeRequiresSerializer(self.key_type, self.id, self.use_case, self.envelope.name)
 

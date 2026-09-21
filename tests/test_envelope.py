@@ -235,9 +235,8 @@ def test_decode_rejects_envelopes_the_go_reader_rejects(envelope: dict, reason: 
     ],
 )
 def test_decode_wraps_pickle_failures(blob: bytes) -> None:
-    # These used to escape as UnpicklingError / AttributeError, past the caller's
-    # EnvelopeDecodeError guard, so the bad entry survived its whole TTL and re-failed on
-    # every read.
+    # Anything but EnvelopeDecodeError escapes the caller's guard, so the bad entry
+    # survives its whole TTL and re-fails on every read.
     with pytest.raises(EnvelopeDecodeError):
         decode(blob)
 
@@ -385,12 +384,8 @@ async def test_an_undecodable_value_is_rewritten_not_just_skipped(
 async def test_a_bytes_payload_goes_on_PROTO_and_is_refused_on_JSON(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # Both halves of the narrowed contract, driven through the real read/write path.
-    #
-    # This used to assert that bytes round-trip through the JSON envelope as base64. That
-    # branch is gone: it was the reason the decoded Python type depended on which client
-    # wrote the entry, and nothing used it -- no Envelope.JSON declaration exists in the one
-    # consumer, which is on PROTO in both languages.
+    # Both halves of the contract, driven through the real read/write path: bytes belong on
+    # PROTO, and the JSON envelope refuses them without failing the caller.
     payload = b"\x00\xffbinary\x80"
 
     class BytesSerializer(Serializer):
@@ -882,9 +877,8 @@ async def test_invalidate_writes_a_watermark_in_the_value_key_s_slot() -> None:
     ],
 )
 def test_parse_watermark_never_raises_and_fails_closed(raw: bytes | None, expected: int | None) -> None:
-    # Every one of these used to raise out of RedisCache.get (float()/int() outside the
-    # guarded block). Suppresses rather than returning None: None means "no invalidation",
-    # which would SERVE the entry a broken watermark should hide.
+    # None of these may raise out of RedisCache.get. Suppresses rather than returning
+    # None, which means "no invalidation" and would SERVE the entry.
     from gcache._internal.redis_cache import _parse_watermark
     from gcache.config import GCacheKey
 
@@ -1230,9 +1224,8 @@ async def test_a_pickle_key_on_a_text_mode_client_warns_once() -> None:
 
 
 def test_an_empty_urn_prefix_is_rejected_because_it_cannot_interoperate() -> None:
-    # GCache.__init__ used to silently ignore urn_prefix="". Honoring it is worse: Python's
-    # render_prefix omits an empty prefix ("kt:id") while TS joins it (":kt:id"), silently
-    # splitting both the value and watermark keyspace.
+    # An empty prefix must be refused, not honoured: render_prefix omits it ("kt:id")
+    # where another client joins it (":kt:id"), splitting the keyspace silently.
     import inspect
 
     from gcache.exceptions import EmptyUrnPrefixNotSupported
@@ -1251,9 +1244,9 @@ def test_an_empty_urn_prefix_is_rejected_because_it_cannot_interoperate() -> Non
 
 
 def test_global_state_is_not_published_before_validation() -> None:
-    # urn_prefix/logger used to be published ABOVE the Redis checks, so a RedisConfigConflict
-    # left them set with no GCache existing -- __del__ clears only gcache_instantiated, so
-    # the next construction inherited a namespace from a failed attempt.
+    # Publishing urn_prefix/logger above the Redis checks would leave them set with no
+    # GCache existing -- __del__ clears only gcache_instantiated, so the next construction
+    # would inherit a namespace from a failed attempt.
     import inspect
 
     from gcache.gcache import GCache
@@ -1312,9 +1305,9 @@ def test_a_whole_number_float_timestamp_is_still_accepted() -> None:
 
 
 def test_a_stateful_serializer_can_declare_its_own_wire_identity() -> None:
-    # _serializer_identity used to reduce every serializer to its class, so two stateful
-    # instances with different wire formats compared EQUAL, shared a urn, and each decoded
-    # the other's payload. Default is still the class, so stateless serializers are unaffected.
+    # Reducing every serializer to its class makes two stateful instances with different
+    # wire formats compare EQUAL and share a urn. The default is still the class, so
+    # stateless serializers are unaffected.
     from gcache.gcache import _serializer_identity
 
     class Stateless(Serializer):
@@ -1909,8 +1902,8 @@ class TestLoneSurrogateIsRefused:
 
     @pytest.mark.asyncio
     async def test_a_valid_surrogate_PAIR_is_fine(self) -> None:
-        # Every non-BMP character is a pair under ensure_ascii. Refusing these would break
-        # any cached value containing an emoji, which the first version of this guard did.
+        # Every non-BMP character is a pair under ensure_ascii, so refusing these would
+        # break any cached value containing an emoji.
         for pair in ("\U0001f600", "\U00020000", "\U0001d11e"):
             assert await self._write({"v": pair})
 
@@ -1929,12 +1922,9 @@ class TestLoneSurrogateIsRefused:
             encode_json(created_at_ms=1, ttl_sec=60, payload='{"\\ud800":"v"}')
 
     def test_nesting_is_bounded_by_an_EXPLICIT_limit_not_the_interpreter(self) -> None:
-        # This test is the reason the limit exists. An earlier version asserted that a
-        # 4000-deep emoji payload writes; it passed locally and failed in CI, because
-        # json.loads raises RecursionError at a depth that depends on the interpreter's
-        # stack. So the PRODUCT was machine-dependent too -- the same payload written on a
-        # laptop and refused on a CI runner -- which is the same defect as the two clients
-        # disagreeing, with the pods harder to tell apart.
+        # The limit is explicit because json.loads raises RecursionError at a depth that
+        # follows the interpreter's stack -- without it the same payload is written on one
+        # machine and refused on another.
         from gcache._internal.envelope import _MAX_JSON_NESTING
 
         # Inside the limit: inspected, and the surrogate at the BOTTOM of the nesting is
@@ -2443,17 +2433,13 @@ async def test_the_encoders_are_offloaded_for_a_large_payload() -> None:
     # points, so a non-ASCII payload read as a fraction of its size and a 200 KB value
     # stayed on the event loop at four times the threshold.
     #
-    # NOT because this is the expensive shape -- an earlier version of this comment said so
-    # and had it backwards. A literal-emoji payload carries no `\u` escapes, so the
-    # divergence check answers it in 0.022ms; the escape-dense shape costs 5.1ms and is
-    # already measured correctly, which is what the escape gate below is for. What the byte
-    # fix buys is that the whole ENCODER moves off the loop, and that a threshold named in
-    # bytes measures bytes.
+    # NOT the expensive shape: a literal-emoji payload carries no `\u` escapes, so the
+    # check answers it in 0.022ms, while the escape-dense shape costs 5.1ms and is what the
+    # escape gate below is for. What the byte fix buys is the whole ENCODER moving off the
+    # loop.
     #
-    # The default JsonSerializer cannot produce this: json.dumps with ensure_ascii emits
-    # escapes, so its output is always ASCII and its character count IS its byte count. Only
-    # a serializer that keeps the characters gets there, which is the narrow shape of the
-    # bug and the reason no existing test covered it.
+    # Needs a CUSTOM serializer: json.dumps with ensure_ascii emits escapes, so the default
+    # output is always ASCII and its character count IS its byte count.
     class NonAsciiSerializer(Serializer):
         async def dump(self, obj: object) -> str:
             return _json.dumps(obj, ensure_ascii=False)

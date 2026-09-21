@@ -71,20 +71,18 @@ func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]b
 }
 
 // The PROTO envelope. Protobuf wire format, hand-written rather than generated: four fields
-// is small enough to pin byte-for-byte in the conformance corpus, and generating it would put
-// protoc in a repo that has none. Python's counterpart is encode_proto/_decode_proto in
-// _internal/envelope.py; envelope.proto documents the same schema.
+// is small enough to pin byte-for-byte in the corpus, and codegen would add protoc to a repo
+// with none. Python's counterpart is encode_proto/_decode_proto; envelope.proto is the
+// schema.
 //
 //	field 1  version        varint
 //	field 2  created_at_ms  varint
 //	field 3  expires_at_ms  varint
 //	field 4  payload        length-delimited
 //
-// FIELD NUMBERS MUST STAY <= 14. That is what makes the framing self-identifying: a tag byte
-// is (field_number << 3) | wire_type, so fields 1-14 over proto3's wire types (0/1/2/5) span
-// 0x08..0x75 -- disjoint from JSON's '{' (0x7b) and pickle's PROTO opcode (0x80). Field 16
-// with a varint is exactly 0x80, so going past 15 would collide with pickle; capping at 15
-// rather than 14 would stretch the range over 0x7b. Ten spare numbers remain.
+// FIELD NUMBERS MUST STAY <= 14, which is what makes the framing self-identifying: fields
+// 1-14 over proto3's wire types span 0x08..0x75, disjoint from JSON's '{' (0x7b) and pickle's
+// 0x80. Field 15 would reach 0x7b and field 16 is exactly 0x80. Ten spare numbers remain.
 const (
 	protoFirstByteMin = 0x08
 	protoFirstByteMax = 0x75
@@ -225,16 +223,10 @@ func decodeProtoEnvelope(data []byte) (payload []byte, createdAtMs int64, expire
 		}
 	}
 
-	// GREATER than, not !=. A strict check makes every added field a flag day: an old reader
-	// would reject an entry it could otherwise parse, because the loop above already skips
-	// fields it does not know.
-	//
-	// `version < 1` as well, and it is not redundant with !haveVersion: proto3 omits a zero
-	// scalar, so an EXPLICIT zero and an absent field are the same bytes here -- but a frame
-	// could also carry field 1 with value 0 from a writer that set it wrongly, and
-	// haveVersion would be true. Both mean "no usable version" and both must miss. The JSON
-	// envelope already refuses version zero (`version-zero` in the shared corpus expects
-	// reject); this path did not, and one-sided divergence is what the corpus exists to stop.
+	// `>` rather than `!=`, so adding a field is not a flag day: the loop above already
+	// skips fields it does not know. `version < 1` as well as !haveVersion -- a writer can
+	// set field 1 to zero explicitly, and both that and an absent field mean no usable
+	// version.
 	if !haveVersion || version < 1 || version > uint64(envelopeVersion) {
 		return nil, 0, 0, fmt.Errorf("gcache: unsupported envelope version %d", version)
 	}
@@ -425,10 +417,9 @@ func isStale(watermarkMs, createdAtMs int64) bool { return watermarkMs >= create
 // it. The surrogate reappears only when the CALLER's codec unescapes, and then Python keeps
 // it while encoding/json here substitutes U+FFFD -- both reporting a hit.
 func loneSurrogateReason(body string) string {
-	// Not valid UTF-8 means genuinely binary; Python's bytes branch reaches the same
-	// conclusion by failing to decode. Still checked even though encodeEnvelope now refuses
-	// such a payload, because this also runs on the PROTO envelope, whose payload is bytes
-	// by design, and on whatever a read finds in Redis.
+	// Not valid UTF-8 means genuinely binary; Python's bytes branch decides the same way.
+	// Checked here as well as in encodeEnvelope because this also runs on the PROTO
+	// envelope, whose payload is bytes by design, and on whatever a read finds in Redis.
 	if !utf8.ValidString(body) {
 		return ""
 	}

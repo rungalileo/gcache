@@ -232,10 +232,8 @@ class UnserializableValue(GCacheError, ValueError):
     """
 
     def __init__(self, reason: str) -> None:
-        # DIAGNOSTIC ONLY -- never the value. This used to append the first 120 characters of
-        # the serialized payload, which is cached application data: tokens, PII, whatever the
-        # caller put in the cache. CacheController catches a failed Redis write and logs
-        # str(e) at error level, so every rejected value was copied into the logs.
+        # Diagnostic only, never the value: CacheController logs str(e) at error level on a
+        # failed write, and the payload is cached application data -- tokens, PII.
         super().__init__(
             f"gcache: value contains {reason}, which this client and the Go client decode to "
             "different values (Python keeps the surrogate, Go substitutes U+FFFD). Refusing "

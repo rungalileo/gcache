@@ -82,18 +82,13 @@ func (k Key) Validate() error {
 //
 // Hash the COMPONENT, not the whole id: callers build ids like
 // projectID + ":" + runID + ":" + externalID, and hashing only the sensitive part keeps the
-// rest readable from redis-cli. Because the caller hands the result back in as an ordinary
-// component, every path -- Get, Put, Invalidate, the watermark key -- agrees with no further
-// work.
+// rest readable from redis-cli.
 //
-// Plain SHA-256 over the string's bytes; the shared conformance corpus pins agreement with
-// Python. Deliberately NOT salted or truncated: truncation trades collision resistance, and
-// two external ids answering to one cache entry is a wrong answer rather than a slow one.
+// Plain SHA-256, pinned against Python by the corpus. Not salted or truncated: two external
+// ids answering to one entry is a wrong answer, not a slow one.
 //
-// Total, unlike Python's, which raises UnhashableKeyComponent: a Go string is arbitrary bytes,
-// so there is no unencodable input here. The divergence is real but only reachable for a lone
-// surrogate, which encoding/json has already replaced with U+FFFD by the time it reaches this
-// -- so Python refusing is the two clients declining to disagree, not Go being more capable.
+// Total, where Python's raises on a lone surrogate -- a Go string is arbitrary bytes, so
+// there is no unencodable input here.
 func HashComponent(value string) string {
 	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])

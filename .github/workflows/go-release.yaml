@@ -233,10 +233,9 @@ jobs:
           git tag -s "go/$VERSION" -m "gcache Go client $VERSION" "$RELEASE_SHA"
 
           # Credentials via a one-shot helper, so the token is in neither .git/config nor
-          # argv. An earlier version of this put it in the push URL, which keeps it out of
-          # .git/config but exposes it to anything reading the process list for the duration
-          # of the push. The helper string is single-quoted, so argv carries the literal
-          # $TAG_PUSH_TOKEN and git's shell expands it from the environment.
+          # argv -- a token in the push URL is visible to anything reading the process list.
+          # Single-quoted, so argv carries the literal $TAG_PUSH_TOKEN and git's shell
+          # expands it from the environment.
           git -c credential.username=x-access-token \
               -c credential.helper='!f() { test "$1" = get && echo "password=${TAG_PUSH_TOKEN}"; }; f' \
               push "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/go/$VERSION"

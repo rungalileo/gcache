@@ -32,13 +32,9 @@ from typing import Any
 
 # Keeps any file importlib.resources had to EXTRACT alive for the process's lifetime.
 #
-# resources.as_file is a context manager, and for a zip-loaded package it materializes the
-# resource in a temp dir that it DELETES on exit. vectors_path() returns a path string, so
-# without this the path it hands back is already gone by the time the caller -- a Go binary,
-# typically -- opens it. On a normal filesystem install as_file yields the real path and
-# cleans up nothing, which is why this never showed up here: the failure only appears when
-# gcache is installed as a zip, i.e. in the "consumer in another repository" case this
-# accessor exists to serve.
+# resources.as_file deletes what it extracted on exit, and vectors_path() returns a path
+# string, so for a zip-installed package the path would be gone before the caller opens it.
+# Invisible on a filesystem install, which is why it needs saying.
 _EXTRACTED = ExitStack()
 atexit.register(_EXTRACTED.close)
 

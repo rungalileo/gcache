@@ -1,0 +1,473 @@
+package gcache
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+)
+
+// watermarkTTL is how long an invalidation watermark lives. 5h, matching Python's
+// WATERMARK_TTL_SECONDS -- both write the same key space, and the corpus pins the number.
+const watermarkTTL = 5 * time.Hour
+
+// The resurrection invariant is `futureBuffer + entryTTL <= watermarkTTL`: a watermark must
+// outlive every entry it suppresses. The two numbers are chosen by different parties -- the
+// buffer by whoever invalidates, the TTL by each writer -- so instead of one check that
+// cannot see both, the sum is split into two caps that hold by construction (4h + 1h <= 5h),
+// each enforced against a value its own caller owns. Mirrored in Python (constants.py) and
+// pinned by the shared conformance corpus.
+const maxEntryTTL = 4 * time.Hour
+
+// maxFutureBuffer caps Invalidate's settling window. See maxEntryTTL for why this and the
+// entry TTL are capped separately rather than checked as a sum.
+const maxFutureBuffer = watermarkTTL - maxEntryTTL
+
+// defaultTimeout bounds every Redis call. 300ms, matching what Galileo's ingest service
+// already uses for Redis, so a cache degrades to a miss well before the caller's own
+// deadline.
+const defaultTimeout = 300 * time.Millisecond
+
+// Result classifies a lookup, for metrics.
+type Result string
+
+const (
+	ResultHit   Result = "hit"   // value found and fresh
+	ResultMiss  Result = "miss"  // no value stored
+	ResultStale Result = "stale" // value found but superseded by a watermark
+	ResultError Result = "error" // Redis or decode failure; served as a miss
+	// ResultCancelled is the caller's own context ending, not a cache fault. Kept out of
+	// ResultError so a client disconnect -- or load shedding, when these arrive in bulk --
+	// does not read as the cache breaking.
+	ResultCancelled Result = "cancelled"
+	// ResultDistrusted is an entry no watermark can vouch for, in any of four ways: a
+	// TRACKED entry declaring a lifetime longer than maxEntryTTL (4h -- NOT watermarkTTL,
+	// which is 5h), a tracked entry stamped more than maxFutureBuffer ahead and so out of
+	// every reachable watermark's range, a reversed envelope, or a payload the two clients
+	// would decode differently. Separate from ResultMiss/Stale because the fix is a writer
+	// somewhere else -- a use case's TTL, a clock, a serializer -- not an invalidation.
+	ResultDistrusted Result = "distrusted"
+)
+
+// Recorder receives cache events, as an interface rather than a Prometheus dependency so
+// this library stays dependency-light; services implement it with promauto, as
+// a service does with its own metrics adapter. A nil Recorder is fine -- calls are skipped.
+type Recorder interface {
+	RecordResult(useCase string, result Result)
+	RecordLatency(useCase, op string, d time.Duration)
+	RecordError(useCase, op string, err error)
+}
+
+// Client is the narrow slice of Redis this package needs, kept small so tests can fake it
+// and the concrete client stays swappable: rueidis today (RESP3 client-side caching
+// verified against Galileo's ElastiCache), go-redis if a deployment's Redis rejects it.
+type Client interface {
+	// MGet fetches keys in one round trip. The result has one entry per requested key, in
+	// order; a nil entry means that key was absent.
+	MGet(ctx context.Context, keys ...string) ([][]byte, error)
+	// SetEx writes a value with an expiry.
+	SetEx(ctx context.Context, key string, value []byte, ttl time.Duration) error
+}
+
+// Codec converts a value to and from the bytes carried in the envelope payload. Exists so a
+// shared-schema payload can be a generated type rather than a hand-written struct, which is
+// where cross-language divergences come from. See subpackage protocodec.
+type Codec[V any] interface {
+	Marshal(V) ([]byte, error)
+	Unmarshal([]byte, *V) error
+}
+
+// jsonCodec is the default, so a general-purpose cache still takes a plain struct
+// without its caller taking on protobuf.
+type jsonCodec[V any] struct{}
+
+func (jsonCodec[V]) Marshal(v V) ([]byte, error)    { return json.Marshal(v) }
+func (jsonCodec[V]) Unmarshal(b []byte, v *V) error { return json.Unmarshal(b, v) }
+
+// Options configures a Cache. It carries the value type so Codec can be typed; New
+// infers V, so callers name the type once:
+// gcache.New(gcache.Options[*cachev1.SessionIdentity]{...}).
+// Envelope is the framing a Cache writes. Reads never need it -- see Options.Envelope.
+type Envelope int
+
+const (
+	// EnvelopeJSON is the cross-language JSON envelope: readable from redis-cli and
+	// parseable by Redis's Lua cjson, at ~102 bytes of overhead. The default.
+	EnvelopeJSON Envelope = iota
+	// EnvelopePROTO is the binary envelope, and where a binary payload belongs: the JSON
+	// envelope carries text. 18 bytes of overhead, and opaque to redis-cli, jq and cjson
+	// alike. Pair it with protocodec.Proto.
+	EnvelopePROTO
+)
+
+type Options[V any] struct {
+	// Client is the Redis client. Required.
+	Client Client
+	// URNPrefix namespaces every key. Must match the Python side's
+	// galileo_gcache_urn_prefix() -- "urn:galileo:<customer_name>" -- or the two languages
+	// write into disjoint key spaces and never see each other's entries.
+	URNPrefix string
+	// TTL is how long written values live. Required, and must be <= 4h (see maxEntryTTL).
+	TTL time.Duration
+	// Timeout bounds each Redis call. Defaults to 300ms.
+	Timeout time.Duration
+	// Recorder receives cache events. Optional.
+	Recorder Recorder
+	// Codec serializes the value. Defaults to encoding/json; use protocodec.Proto
+	// for a payload shared with another language. The envelope records the framing, not
+	// the payload's encoding, so a mismatch is undetected -- it yields a zero value.
+	Codec Codec[V]
+	// Envelope is the framing written. Defaults to EnvelopeJSON, which is what a caller
+	// sharing entries with a JSON-envelope Python key needs. EnvelopePROTO stores the
+	// payload raw in a binary envelope -- 69 bytes against 204 for a small message -- and
+	// MUST match the Python key's `envelope=`, or the two write framings that the other
+	// reads but never produces.
+	//
+	// Reads do not consult this: every framing identifies itself by first byte, so a reader
+	// handles whatever the writer left. It only selects what THIS client writes.
+	Envelope Envelope
+	// Logger receives degradation warnings. Defaults to slog.Default().
+	Logger *slog.Logger
+	// now is a test seam for the clock.
+	now func() time.Time
+}
+
+// Cache is a Redis-backed cache speaking the gcache wire protocol. Reads never fail: any
+// Redis, decode, or protocol problem is recorded and reported as a miss, so a degraded
+// cache slows the caller down but cannot break it. Writes return their error.
+type Cache[V any] struct {
+	client    Client
+	urnPrefix string
+	ttl       time.Duration
+	timeout   time.Duration
+	recorder  Recorder
+	log       *slog.Logger
+	now       func() time.Time
+	codec     Codec[V]
+	envelope  Envelope
+}
+
+// New builds a Cache.
+func New[V any](o Options[V]) (*Cache[V], error) {
+	switch {
+	case o.Client == nil:
+		return nil, errors.New("gcache: Options.Client is required")
+	case o.URNPrefix == "":
+		// An empty prefix still produces syntactically valid keys, in a key space no
+		// Python or Python client will ever look in. That failure is invisible: the
+		// cache writes fine and simply never hits.
+		return nil, errors.New("gcache: Options.URNPrefix is required (\"urn:galileo:<customer_name>\")")
+	case strings.ContainsAny(o.URNPrefix, "{}#?"):
+		// These are the grammar's own delimiters. A prefix carrying one produces a key that
+		// parses as a different key, and in cluster mode a stray brace can move the hash
+		// tag, splitting a value from its watermark across slots and breaking the MGET.
+		return nil, fmt.Errorf("gcache: Options.URNPrefix %q must not contain any of {}#?", o.URNPrefix)
+	case o.TTL <= 0:
+		return nil, errors.New("gcache: Options.TTL is required")
+	case o.TTL.Milliseconds() == 0:
+		// The wire resolution is milliseconds; unchecked, a sub-millisecond TTL fails far
+		// from its cause -- SetEx rejects the rounded-to-zero PX on every Put, and
+		// encodeEnvelope stamps expiresAtMs==createdAtMs, read as already expired.
+		return nil, fmt.Errorf(
+			"gcache: Options.TTL %s rounds to zero milliseconds; the wire resolution is milliseconds", o.TTL)
+	case o.TTL > maxEntryTTL:
+		// Refuse rather than silently clamp: a caller asking for a longer TTL has a
+		// resurrection bug in mind that they should see, not have quietly papered over.
+		return nil, fmt.Errorf(
+			"gcache: Options.TTL %s exceeds the %s entry-TTL cap; paired with the %s buffer "+
+				"ceiling that keeps buffer+TTL inside the %s watermark lifetime, so an entry "+
+				"cannot outlive the watermark and resurrect after invalidation",
+			o.TTL, maxEntryTTL, maxFutureBuffer, watermarkTTL)
+	}
+	// Reject an Envelope this client cannot write. Put branches on `== EnvelopePROTO` and
+	// treats everything else as JSON, so an out-of-range value -- Envelope(99), or a zero
+	// value from a future constant the caller's build does not have -- would SILENTLY write
+	// the wrong framing. A reader sniffs, so it would even decode; the mismatch would only
+	// show as a cache that writes one shape and a peer that expects another.
+	switch o.Envelope {
+	case EnvelopeJSON, EnvelopePROTO:
+	default:
+		return nil, fmt.Errorf(
+			"gcache: Options.Envelope %d is not a supported framing (EnvelopeJSON or EnvelopePROTO)",
+			o.Envelope)
+	}
+
+	if o.Timeout <= 0 {
+		o.Timeout = defaultTimeout
+	}
+	if o.Logger == nil {
+		o.Logger = slog.Default()
+	}
+	if o.now == nil {
+		o.now = time.Now
+	}
+	if o.Codec == nil {
+		// The default codec is JSON text, which the PROTO envelope is not for. Left to
+		// default, a PROTO cache silently wrote JSON into a binary envelope and Python's
+		// ProtoSerializer could not parse it back -- a permanent miss, with the write
+		// reporting success. Caught at construction rather than at the first write.
+		if o.Envelope == EnvelopePROTO {
+			return nil, errors.New("gcache: EnvelopePROTO needs a binary Codec; " +
+				"pass protocodec.Proto[*YourMessage]()")
+		}
+		o.Codec = jsonCodec[V]{}
+	}
+	return &Cache[V]{
+		client: o.Client, urnPrefix: o.URNPrefix, ttl: o.TTL,
+		timeout: o.Timeout, recorder: o.Recorder, log: o.Logger, now: o.now,
+		codec: o.Codec, envelope: o.Envelope,
+	}, nil
+}
+
+// Get returns the cached value for key. It returns ok=false for a genuine miss, a stale
+// entry, or any failure -- deliberately there is no error return, so a caller cannot
+// propagate a cache problem into its own request path.
+func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
+	var zero V
+	if err := key.Validate(); err != nil {
+		c.fail(ctx, key.UseCase, "get", err)
+		return zero, false
+	}
+
+	callerCtx := ctx
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	valueKey := ValueKey(c.urnPrefix, key)
+	keys := []string{valueKey}
+	if key.Tracked {
+		// One round trip for both. They share a hash tag, so this is legal in cluster mode.
+		keys = append(keys, WatermarkKey(c.urnPrefix, key.KeyType, key.ID))
+	}
+
+	start := c.now()
+	vals, err := c.client.MGet(ctx, keys...)
+	c.observe(key.UseCase, "get", start)
+	if err != nil {
+		c.fail(callerCtx, key.UseCase, "get", err)
+		return zero, false
+	}
+	if len(vals) != len(keys) {
+		c.fail(callerCtx, key.UseCase, "get", fmt.Errorf("MGet returned %d values for %d keys", len(vals), len(keys)))
+		return zero, false
+	}
+	// PARSE before the value is looked at and COMPARE last, as Python does: a corrupt
+	// watermark is the one corruption a rewrite cannot repair, so it must be reported even
+	// when the value is absent or undecodable. Fails closed -- reading unreadable as "no
+	// watermark" would serve an entry someone tried to invalidate.
+	var watermarkMs int64
+	haveWatermark := false
+	if key.Tracked && vals[1] != nil {
+		parsed, err := parseWatermark(vals[1])
+		if err != nil {
+			c.fail(callerCtx, key.UseCase, "watermark", err)
+			return zero, false
+		}
+		watermarkMs, haveWatermark = parsed, true
+	}
+
+	if vals[0] == nil {
+		c.record(key.UseCase, ResultMiss)
+		return zero, false
+	}
+
+	payload, createdAtMs, expiresAtMs, err := decodeEnvelope(vals[0])
+	if err != nil {
+		// A pickle value is an expected condition, not corruption: a Python caller wrote
+		// it under the default envelope. Report it as a plain miss and let the value be
+		// rewritten, without the noise of an error.
+		if errors.Is(err, ErrPickleEnvelope) {
+			c.record(key.UseCase, ResultMiss)
+			return zero, false
+		}
+		c.fail(callerCtx, key.UseCase, "decode", err)
+		return zero, false
+	}
+
+	// ENVELOPE INTEGRITY FIRST, then expiry, then the watermark -- Python's order, which
+	// decides what a reader sees when several conditions hold at once.
+	//
+	// A REVERSED envelope -- expires before created -- is malformed, and the lifetime guard
+	// below cannot catch it: the difference is negative, so `>` is false and it passes.
+	if expiresAtMs < createdAtMs {
+		c.record(key.UseCase, ResultDistrusted)
+		return zero, false
+	}
+
+	// A createdAt far enough ahead makes a tracked entry immune to invalidation: staleness
+	// is `watermarkMs >= createdAtMs`, and a real-clock watermark never reaches it, while
+	// the expiry and lifetime guards both pass.
+	//
+	// The bound is the frontier an invalidation issued NOW can reach -- a watermark of at
+	// most now+maxFutureBuffer -- so an hour of clock-skew tolerance falls out of it.
+	if key.Tracked && createdAtMs > c.now().UnixMilli()+maxFutureBuffer.Milliseconds() {
+		c.record(key.UseCase, ResultDistrusted)
+		return zero, false
+	}
+
+	// maxEntryTTL, NOT watermarkTTL. Raising the watermark to 5h while the write cap stayed
+	// at 4h opened an hour-wide band: an entry declaring a 4h30m lifetime passed this guard
+	// even though New refuses to build a cache that could write one. The correct threshold is
+	// watermarkTTL - maxFutureBuffer, which IS maxEntryTTL -- an entry created at C can be
+	// suppressed by a watermark written as early as C-B, and that watermark dies at C+(W-B),
+	// so past that age no watermark can still vouch for it.
+	if key.Tracked && float64(expiresAtMs)-float64(createdAtMs) > float64(maxEntryTTL.Milliseconds()) {
+		c.record(key.UseCase, ResultDistrusted)
+		return zero, false
+	}
+
+	// Honour the writer's own expiry, not just Redis's TTL -- Python has no TTL ceiling and
+	// any writer can PERSIST a key. No sign test: both other readers compare the raw value
+	// with no sign check, and decodeEnvelope already rejects an absent expiresAtMs.
+	if c.now().UnixMilli() >= expiresAtMs {
+		c.record(key.UseCase, ResultMiss)
+		return zero, false
+	}
+
+	// BEFORE the staleness comparison, where Python asks it. Both are a miss, so this is
+	// diagnostic: `stale` reads as routine, `distrusted` says a writer is broken.
+	//
+	// Pickle already returned above, and is the one framing no other client reads. What
+	// keeps protobuf out is the strict-JSON gate inside loneSurrogateReason.
+	if reason := loneSurrogateReason(string(payload)); reason != "" {
+		c.record(key.UseCase, ResultDistrusted)
+		return zero, false
+	}
+
+	if haveWatermark && isStale(watermarkMs, createdAtMs) {
+		c.record(key.UseCase, ResultStale)
+		return zero, false
+	}
+
+	// Before the codec, not after: the question is about the stored TEXT, and Unmarshal has
+	// already substituted U+FFFD by the time it returns.
+	if err := c.codec.Unmarshal(payload, &value); err != nil {
+		c.fail(callerCtx, key.UseCase, "unmarshal", err)
+		return zero, false
+	}
+	c.record(key.UseCase, ResultHit)
+	return value, true
+}
+
+// Put stores value under key.
+func (c *Cache[V]) Put(ctx context.Context, key Key, value V) error {
+	if err := key.Validate(); err != nil {
+		return err
+	}
+	payload, err := c.codec.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("gcache: marshaling value for %s: %w", key.UseCase, err)
+	}
+	var raw []byte
+	if c.envelope == EnvelopePROTO {
+		raw, err = encodeProtoEnvelope(c.now(), c.ttl, payload)
+	} else {
+		raw, err = encodeEnvelope(c.now(), c.ttl, payload)
+	}
+	if err != nil {
+		return fmt.Errorf("gcache: encoding envelope for %s: %w", key.UseCase, err)
+	}
+
+	callerCtx := ctx
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	start := c.now()
+	err = c.client.SetEx(ctx, ValueKey(c.urnPrefix, key), raw, c.ttl)
+	c.observe(key.UseCase, "put", start)
+	if err != nil {
+		// Same rule as the read path: a caller that gave up is not a cache fault. The
+		// error is still returned -- unlike Get, Put's caller decides what to do.
+		if callerCtx.Err() == nil {
+			c.recordErr(key.UseCase, "put", err)
+		}
+		return fmt.Errorf("gcache: writing %s: %w", key.UseCase, err)
+	}
+	return nil
+}
+
+// Invalidate marks every TRACKED entry under (keyType, id) stale, across every use case and
+// language. futureBuffer suppresses writes during a settling window, but is NOT durable: a
+// later invalidation with a smaller buffer LOWERS the watermark (plain SET, not monotonic).
+func (c *Cache[V]) Invalidate(ctx context.Context, keyType, id string, futureBuffer time.Duration) error {
+	if keyType == "" || id == "" {
+		return errors.New("gcache: Invalidate requires both keyType and id")
+	}
+	if futureBuffer < 0 {
+		// A watermark in the past suppresses only part of the key type -- anything written
+		// after that instant stays fresh -- while the call still reports success. Every
+		// other bad argument here is rejected; this one hid.
+		return fmt.Errorf("gcache: futureBuffer %s is negative; it moves the watermark into the past", futureBuffer)
+	}
+	// Compared, not summed: the sum overflows time.Duration and comes out negative. Against
+	// maxFutureBuffer rather than watermarkTTL-c.ttl, since Invalidate covers every use case
+	// and both languages, not just entries this cache wrote.
+	if futureBuffer > maxFutureBuffer {
+		return fmt.Errorf(
+			"gcache: futureBuffer %s exceeds the %s ceiling; with the %s entry-TTL cap that "+
+				"keeps buffer+TTL inside the %s watermark lifetime, so an entry written inside "+
+				"the buffer cannot outlive the watermark and resurrect",
+			futureBuffer, maxFutureBuffer, maxEntryTTL, watermarkTTL)
+	}
+
+	callerCtx := ctx
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	expMs := c.now().Add(futureBuffer).UnixMilli()
+	// Decimal ASCII, matching what Python's redis-py writes for an int.
+	body := []byte(fmt.Sprintf("%d", expMs))
+
+	// Invalidation is scoped to a key type, not a use case. Prefixing keeps the metric
+	// label one domain: key types are bare names ("session_id"), use cases are qualified
+	// ("Service::method"), and an unprefixed key type would collide with the latter.
+	label := "invalidate:" + keyType
+
+	start := c.now()
+	err := c.client.SetEx(ctx, WatermarkKey(c.urnPrefix, keyType, id), body, watermarkTTL)
+	c.observe(label, "invalidate", start)
+	if err != nil {
+		// Same rule as Get and Put: a caller that gave up is not a cache fault. Decided on
+		// the CALLER's context rather than the error, because the timeout derived just
+		// above makes a parent deadline surface as context.DeadlineExceeded too.
+		if callerCtx.Err() == nil {
+			c.recordErr(label, "invalidate", err)
+		}
+		return fmt.Errorf("gcache: invalidating %s:%s: %w", keyType, id, err)
+	}
+	return nil
+}
+
+func (c *Cache[V]) record(useCase string, r Result) {
+	if c.recorder != nil {
+		c.recorder.RecordResult(useCase, r)
+	}
+}
+
+func (c *Cache[V]) observe(useCase, op string, start time.Time) {
+	if c.recorder != nil {
+		c.recorder.RecordLatency(useCase, op, c.now().Sub(start))
+	}
+}
+
+func (c *Cache[V]) recordErr(useCase, op string, err error) {
+	if c.recorder != nil {
+		c.recorder.RecordError(useCase, op, err)
+	}
+}
+
+// fail records a degradation and logs it, so a broken cache stays observable though the
+// caller only sees a miss. Caller termination alone reaches ResultCancelled, decided on
+// the CALLER's context since Get's own timeout looks identical. Logged at Debug, not Warn: ingest's ~13 lookups/sec/pod would flood the logs at Warn during an outage.
+func (c *Cache[V]) fail(callerCtx context.Context, useCase, op string, err error) {
+	if callerCtx != nil && callerCtx.Err() != nil {
+		c.record(useCase, ResultCancelled)
+		return
+	}
+	c.record(useCase, ResultError)
+	c.recordErr(useCase, op, err)
+	c.log.Debug("gcache degraded to a miss", "use_case", useCase, "op", op, "error", err)
+}

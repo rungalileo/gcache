@@ -133,8 +133,11 @@ async def test_redis_read_failure_instruments_fallback_once(
         "key_type": key.key_type,
         "layer": controller.layer().name,
     }
+    # The miss counter carries a `reason`, empty for an ordinary miss. A read FAILURE is not
+    # a degraded read -- that label names entries we found and could not use.
+    miss_labels = {**metric_labels, "reason": ""}
     requests_before = _metric_value("api_gcache_request_counter_total", metric_labels)
-    misses_before = _metric_value("api_gcache_miss_counter_total", metric_labels)
+    misses_before = _metric_value("api_gcache_miss_counter_total", miss_labels)
     fallback_time_before = _metric_value("api_gcache_fallback_timer_sum", metric_labels)
     get_time_before = _metric_value("api_gcache_get_timer_sum", metric_labels)
     monotonic_values = iter((0.0, 1.0, 11.0, 13.0))
@@ -157,7 +160,7 @@ async def test_redis_read_failure_instruments_fallback_once(
     assert client.setex_calls == 0
     assert error_metric._value.get() == errors_before + 1
     assert _metric_value("api_gcache_request_counter_total", metric_labels) == requests_before + 1
-    assert _metric_value("api_gcache_miss_counter_total", metric_labels) == misses_before + 1
+    assert _metric_value("api_gcache_miss_counter_total", miss_labels) == misses_before + 1
     assert _metric_value("api_gcache_fallback_timer_sum", metric_labels) == fallback_time_before + 10
     assert _metric_value("api_gcache_get_timer_sum", metric_labels) == get_time_before + 3
     assert "Error getting value from cache: redis read failed" in caplog.text

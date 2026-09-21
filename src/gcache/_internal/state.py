@@ -22,6 +22,19 @@ class GCacheGlobalState(BaseModel):
     gcache_instantiated: bool = False
     """Singleton guard: set to True when GCache is created, prevents duplicate instances."""
 
+    gcache_owner_id: int | None = None
+    """``id()`` of the GCache that currently holds the singleton, or None.
+
+    ``gcache_instantiated`` alone cannot tell a destructor whether it owns the flag. A
+    GCache that finished ``__init__`` but is no longer the registered live instance -- one
+    whose ``__del__`` is invoked directly, or which is finalized after another has taken
+    over -- would clear a flag belonging to a DIFFERENT object, letting a third instance be
+    built alongside the live one. Two GCaches then race one ``urn_prefix`` and one logger.
+
+    ``id()`` rather than a weakref because the check only has to be true at the moment the
+    owner is torn down: while the owner is alive its id cannot be reused, and once the flag
+    is cleared the value is never consulted again."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 

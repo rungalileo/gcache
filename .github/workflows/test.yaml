@@ -1,17 +1,72 @@
 name: test
 
-on: push
+# NO `paths:` FILTER, deliberately: `test` is a REQUIRED check, and a path-filtered workflow
+# leaves its check Pending rather than Success -- so a PR touching only go/** could never
+# merge. The suite is ~15s. (The `branches: [main]` on push below is a different thing and is
+# fine: the required check comes from the pull_request event, which carries no filter of any
+# kind. Do not add `paths:` to either trigger unless the ruleset changes.)
+
+on:
+  # main only. `push` and `pull_request` both fire for every push to a PR branch, and a
+  # concurrency group does NOT dedupe them -- github.head_ref is empty on push, so the two
+  # events land in different groups and both runs complete. Measured on bacbe24: two `test`
+  # runs, two seconds apart, neither cancelled, both on the one self-hosted runner. The
+  # required check comes from the pull_request event.
+  push:
+    branches: [main]
+  pull_request:
+
+# Supersession only, which is what a group actually buys: a later push to a PR branch
+# cancels the earlier run. NOT on main -- two quick merges would have the second cancel the
+# first, leaving that commit with no coverage upload and a cancelled `test` status that every
+# later PR then compares against.
+#
+# github.ref, NOT github.head_ref: head_ref is the branch NAME, which two fork pull requests
+# share all the time (`patch-1` is what the web editor creates, `main` is common in a fork),
+# so one PR would cancel another's REQUIRED check and leave it unmergeable until someone
+# re-ran it by hand. github.ref is refs/pull/<n>/merge here -- unique per PR, stable across
+# that PR's own pushes, and the branch ref on a push to main.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Read-only. This job installs and runs unpinned dependency code (pipx, poetry, the test
+# suite) on a persistent runner, so the default token is more than it needs.
+permissions:
+  contents: read
 
 jobs:
   test:
-    runs-on: galileo
+    # Self-hosted for same-repo refs, GitHub-hosted for forks.
+    #
+    # This is the only workflow here on the self-hosted `galileo` runner; everything else is
+    # ubuntu-latest. Adding the `pull_request` trigger above therefore routed FORK-controlled
+    # code onto persistent infrastructure, where it checks out and executes the PR's own
+    # install/type-check/test steps. Fork token and secret restrictions do not help with
+    # that: the risk is runner state and whatever the runner can reach, not the token.
+    #
+    # Forks run on ubuntu-latest instead of being skipped, so a fork PR keeps full Python
+    # coverage. That is known to work rather than hoped: conformance.yaml already installs
+    # this project and runs pytest on ubuntu-latest on every PR.
+    runs-on: >-
+      ${{ (github.event_name == 'pull_request'
+           && github.event.pull_request.head.repo.full_name != github.repository)
+          && 'ubuntu-latest' || 'galileo' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # The default leaves the token in .git/config as an http.extraheader for the whole
+          # job, and the steps below run third-party code on a persistent runner.
+          persist-credentials: false
 
       - name: Install poetry
-        run: pipx install poetry==${{vars.POETRY_V2_VERSION}}
+        # Through env, not interpolated into the script: a repository variable carrying a
+        # newline or $(...) would otherwise run as shell here. Same fix as conformance.yaml.
+        env:
+          POETRY_VERSION: ${{ vars.POETRY_V2_VERSION }}
+        run: pipx install "poetry==$POETRY_VERSION"
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -33,10 +88,18 @@ jobs:
       - name: Run Tets
         run: inv test
 
-      # Dependabot-triggered runs cannot access repository secrets, so this
-      # upload would fail with an empty Codecov token.
+      # Skipped wherever the Codecov token is unavailable, because fail_ci_if_error is
+      # true and an empty token turns the check red AFTER a green suite.
+      #
+      # Two such cases, not one. Dependabot runs cannot read repository secrets -- already
+      # handled. Neither can a pull_request from a FORK, and that trigger was added to this
+      # workflow alongside the path filter, so an outside contributor would see the tests
+      # pass and the check fail. Guarding the actor alone missed it.
       - name: Upload Test Coverage Reports
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: >-
+          ${{ github.actor != 'dependabot[bot]'
+              && (github.event_name != 'pull_request'
+                  || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: codecov/codecov-action@v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

@@ -9,11 +9,14 @@ gcache is a fine-grained caching library with multi-layer support (local + Redis
 ```
 src/gcache/
 ├── __init__.py              # Public API exports
-├── config.py                # GCacheKey, GCacheKeyConfig, GCacheConfig, RedisConfig, Serializer
+├── config.py                # GCacheKey, GCacheKeyConfig, GCacheConfig, RedisConfig, Envelope,
+│                            #   Serializer, JsonSerializer, Fallback
 ├── exceptions.py            # All exception classes
-├── gcache.py                # GCache main class and @cached decorator
+├── gcache.py                # GCache main class, @cached decorator, aget/aput direct keys
+├── proto_serializer.py      # ProtoSerializer, binary protobuf (extra; imported lazily)
 └── _internal/               # Implementation details (not public API)
     ├── constants.py         # Named constants (cache sizes, TTLs, thresholds)
+    ├── envelope.py          # Value framing: pickle vs the cross-language JSON envelope
     ├── event_loop_thread.py # EventLoopThread, EventLoopThreadPool
     ├── local_cache.py       # LocalCache (TTLCache-based)
     ├── metrics.py           # GCacheMetrics (Prometheus)
@@ -22,8 +25,38 @@ src/gcache/
 
 tests/
 ├── conftest.py              # Fixtures (redis_server, gcache, cache_config_provider)
+├── test_conformance.py      # Python half of the shared cross-language corpus
+├── test_cross_language.py   # Go<->Python round trip, drives a locally-built gcachectl
 └── test_*.py                # Test suites
+
+go/                          # Go client (module github.com/rungalileo/gcache/go)
+├── cache.go                 # Cache[V]: Get/Put/Invalidate, Result, Options
+├── envelope.go              # The cross-language JSON envelope; refuses pickle
+├── key.go                   # Key grammar, ValueKey, WatermarkKey
+├── rueidis_client.go        # Client impl over rueidis, with OTel spans
+├── conformance_test.go      # Go half of the shared corpus
+├── protocodec/              # BINARY protobuf Codec (proto.Marshal), not protojson
+├── redislive/               # Live-Redis tests, in their own package to keep core hermetic
+└── cmd/gcachectl/           # CLI; also what the Go<->Python suite drives
 ```
+
+**Two implementations, one wire protocol.** Python is the reference and the published
+package; Go is an independent port that must agree with it on the wire. They are versioned
+separately (`go/` at v0.1.0, Python at 3.x) because a package version is the wrong instrument
+for wire compatibility -- see the conformance section below for the one that is.
+
+Commands are the same shape for each:
+
+```bash
+inv test          inv test-go        inv test-all
+inv type-check    inv vet-go
+inv test-conformance                 # both against the shared corpus
+```
+
+These shell out to each language's own tooling -- poetry/pytest, go build/test. Deliberately
+not a build system: two independent ports share no build graph, which is the only thing Bazel
+or Nx exists to exploit. The Go client arrived carrying five BUILD.bazel files and they were
+dropped for that reason.
 
 ## Key Components
 
@@ -49,23 +82,106 @@ tests/
 
 - Type hints required, line length 120, ruff + mypy
 - Python 3.10+ (uses `|` union syntax)
-- Always use `poetry run` for all commands including git (e.g., `poetry run pytest`, `poetry run git push`)
+- Always use `poetry run` for PYTHON tooling, including git (e.g., `poetry run pytest`, `poetry run git push`) -- it is what puts the project venv on PATH
+- Go tooling runs directly (`go test`, `gofmt`, `go vet`). There is no venv for it to enter, so `poetry run go` would resolve the same binary with a layer of indirection
 
 ## Testing
 
 ```bash
-poetry run pytest tests/
+poetry run pytest tests/          # Python
+inv test-go                       # Go (needs a Redis on localhost:6379)
+inv test-conformance              # both clients against the shared vectors
 ```
+
+### Cross-language conformance vectors
+
+`src/gcache/conformance/envelope_vectors.json` is the single source of truth for envelope wire
+behaviour and key rendering. It is read by BOTH suites: `tests/test_conformance.py` and
+`go/conformance_test.go`.
+
+Run them together with `inv test-conformance`. CI runs it on **every** PR with no path filter,
+unlike the Go workflow (`test.yaml` is unfiltered too) -- it is the only job that checks both
+clients agree,
+and filtering it would recreate the hole that bringing the Go client in-repo closed.
+
+**Do not copy a case into either suite.** Parity used to be asserted by hand-mirrored literals
+in two suites that run in separate CI workflows, so a divergence was only caught by a human
+reading both — and two escaped that way (an empty `urn_prefix`, and a fractional timestamp)
+and were found in review rather than by a test. A mirrored copy restores exactly that failure
+mode: each suite then passes against its own assumptions.
+
+To add a case, edit the JSON and run both suites. Every vector must carry a `why`, and an
+`expect: "accept"` case must declare what it decodes to. Changing a vector's expectation
+should fail **both**; if only one fails, the other is not really reading the file. The
+conformance workflow asserts that property by mutating a vector and requiring two failures.
+
+**Always run the Go suite with `-count=1`** (`inv test-go` and `inv test-conformance` both do).
+Go caches test results, and its cache does not reliably invalidate on a change to the fixture,
+so a mutated vector comes back `ok (cached)` -- the exact green-means-nothing failure this
+corpus exists to prevent, appearing in the check meant to prevent it. The first run of the
+conformance workflow reported "a mutated vector failed only 1 of 2 suites" for precisely this
+reason and blamed the Go suite for not reading the file, which was false. pytest
+cache transforms, not results, so neither has this hazard; Go is the only one.
+
+`keyRendering.cases` carry an `agreeingClients` partition rather than a boolean, because the
+partition survives a client being added or removed, where a boolean would not. Each
+suite asserts its own client's column against what it actually renders, plus that the
+partition matches the recorded strings -- so the file cannot claim an agreement its own values
+contradict. More than one group requires a `reason`.
+
+## Releasing
+
+Two independent release paths, both manual `workflow_dispatch`.
+
+**Python** — `release.yaml`. python-semantic-release reads Conventional Commit titles, bumps
+`pyproject.toml:project.version`, writes CHANGELOG.md, tags `vX.Y.Z`, and publishes to PyPI.
+
+**Go** — `go-release.yaml`, input e.g. `v0.1.0`. A Go release is a **git tag and nothing
+else**: no registry, no artifact, no publish step. Consumers fetch through
+`proxy.golang.org`.
+
+```
+git tag           go/v0.1.0        <- what the workflow creates
+consumer go.mod   github.com/rungalileo/gcache/go v0.1.0
+```
+
+The `go/` prefix is only how git stores a subdirectory module's tag; consumers write the bare
+version and Go maps between them. Pass `v0.1.0`, not `go/v0.1.0` — the workflow adds the
+prefix and rejects input that already has it.
+
+**A published Go version is permanent.** `proxy.golang.org` caches module versions immutably,
+so a broken `go/v0.1.0` cannot be re-tagged — you burn the version and ship `go/v0.1.1`. The
+workflow therefore validates *before* tagging: version format, tag collision, gofmt, vet,
+`go test`, and the full conformance suite. It is the only irreversible action in
+this repo.
+
+**Do not tag by hand.** A bare `v0.1.0` already exists from the Python package's history
+(`0bc6951`, 2025-02-24), so a mistyped tag attaches silently to the wrong thing. The workflow
+guards both forms.
+
+**Why not one version for both.** Lockstep versioning is a real argument for a monorepo,
+and it is declined here for a concrete reason: Go requires a major-version suffix in the
+module path from v2, so sharing the namespace would make a future Python 3.0.0 force a
+breaking import-path change (`/v2/go` → `/v3/go`) on Go consumers for reasons unrelated to Go.
+The thing lockstep is *for* — knowing two clients agree on the wire — is covered mechanically
+by `envelopeVersion` in the shared corpus, which a package version cannot do because it cannot
+fail a test.
+
+Do not wire the Go module into python-semantic-release. It emits bare `v{version}` from
+`pyproject.toml` and has no concept of a second module; making it produce `go/` tags means
+`tag_format` changes that would break the Python tags.
 
 ## Common Gotchas
 
 - GCache is singleton - second instantiation raises `GCacheAlreadyInstantiated`
-- "watermark" is reserved use_case name
+- "watermark" is reserved use_case name - rejected by both `@cached` and `GCacheKey`
 - Local cache cannot be invalidated across instances (TTL-only)
-- `WATERMARK_TTL_SECONDS` (4 hours) must exceed your longest cache TTL for invalidation to work
+- `WATERMARK_TTL_SECONDS` (5 hours) must exceed any entry it can suppress. It is not a number to
+  tune alone: it equals `MAX_TRACKED_TTL_SECONDS` (4h) plus `MAX_FUTURE_BUFFER_SECONDS` (1h), and the
+  shared corpus pins all three in both languages
 - uvloop is optional - falls back to asyncio on Windows/PyPy
 
 ## Dependencies
 
 Core: pydantic, prometheus-client, cachetools, redis
-Optional: uvloop
+Optional: uvloop; protobuf (extra `protobuf`, needed only for `ProtoSerializer`)

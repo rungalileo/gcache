@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Update Python packages weekly.
+  # Update Python packages monthly.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -9,5 +9,12 @@ updates:
   # Update GitHub Actions monthly.
   - package-ecosystem: "github-actions"
     directory: "/"
+    schedule:
+      interval: "monthly"
+
+  # The Go client. This module IS consumed by a downstream service, so its dependencies
+  # are worth tracking.
+  - package-ecosystem: "gomod"
+    directory: "/go"
     schedule:
       interval: "monthly"

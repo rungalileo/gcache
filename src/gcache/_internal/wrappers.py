@@ -4,7 +4,7 @@ from random import random
 from typing import Any
 
 from gcache._internal.cache_interface import CacheInterface, Fallback
-from gcache._internal.metrics import GCacheMetrics
+from gcache._internal.metrics import DEGRADED_REASON, GCacheMetrics
 from gcache._internal.state import _GLOBAL_GCACHE_STATE, GCacheContext
 from gcache.config import CacheConfigProvider, CacheLayer, GCacheKey
 
@@ -58,6 +58,19 @@ class CacheController(CacheWrapper):
         super().__init__(cache_config_provider, cache)
         GCacheMetrics.initialize(metrics_prefix)
 
+    async def put(self, key: GCacheKey, value: Any) -> None:
+        """Write only if policy allows it, mirroring get.
+
+        Without this, CacheController inherits CacheWrapper.put and writes
+        unconditionally: a use case ramped to 0 -- the kill switch -- still gets written,
+        and so does one written outside an ``enable()`` block, while ``get`` on the same
+        key honours both. _should_cache also covers a config that omits this layer, whose
+        ttl_sec lookup would otherwise raise KeyError out of LocalCache.
+        """
+        if not await self._should_cache(key):
+            return
+        await self.wrapped.put(key, value)
+
     async def get(self, key: GCacheKey, fallback: Fallback) -> Any:
         if await self._should_cache(key):
             start_time = time.monotonic()
@@ -75,7 +88,12 @@ class CacheController(CacheWrapper):
                     nonlocal fallback_succeeded
                     nonlocal fallback_time
                     start_fallback = time.monotonic()
-                    GCacheMetrics.MISS_COUNTER.labels(key.use_case, key.key_type, self.layer().name).inc()
+                    # `reason` is set by the layer below when a read found an entry it
+                    # could not use; empty for an ordinary miss. Reset after reading so the
+                    # next request on this task does not inherit it.
+                    reason = DEGRADED_REASON.get()
+                    DEGRADED_REASON.set("")
+                    GCacheMetrics.MISS_COUNTER.labels(key.use_case, key.key_type, self.layer().name, reason).inc()
                     try:
                         fallback_result = await fallback()
                         fallback_succeeded = True
@@ -128,6 +146,14 @@ class CacheController(CacheWrapper):
     async def _should_cache(self, key: GCacheKey) -> bool:
         try:
             if not GCacheContext.enabled.get():
+                # Counted here, not only in the decorator. The decorator returns before it
+                # ever reaches the cache, so it cannot double-count -- and aget/aput come
+                # straight here, which made a disabled context the one skip reason with no
+                # exception, no log and no metric. A caller that primes outside enable()
+                # otherwise believes another process can read the entry.
+                GCacheMetrics.DISABLED_COUNTER.labels(
+                    key.use_case, key.key_type, self.layer().name, DisabledReasons.context.name
+                ).inc()
                 return False
             config = await self._resolve_config(key)
             if config is None:
@@ -186,6 +212,29 @@ class CacheChain(CacheWrapper):
             return await self.fallback_cache.get(key, fallback)
 
         return await self.wrapped.get(key, cache_fallback)
+
+    async def put(self, key: GCacheKey, value: Any) -> None:
+        """Write BOTH layers, unlike the inherited single-layer put.
+
+        Inheriting CacheWrapper.put wrote only the local, in-process layer and never
+        Redis. That was invisible while nothing called it -- each layer populates itself
+        from its own miss path inside ``get`` -- but GCache.aput exists to prime an entry
+        for another PROCESS, which a local-only write cannot do.
+
+        The SHARED layer is written first and its failure skips the local write, so a
+        failed prime leaves nothing cached anywhere rather than a local-only copy. A local
+        failure still surfaces, after the shared write has already succeeded.
+
+        asyncio.CancelledError is a BaseException and propagates on the spot from whichever
+        write is in flight -- prompt cancellation is correct when the caller is gone, and
+        suppressing it to finish a best-effort write would delay it.
+        """
+        # SHARED layer first, so a failed Redis write skips the local one. aput primes an
+        # entry another PROCESS reads; local-first would leave this process holding a copy
+        # of a value no one else can see, while the caller was told the prime failed. A
+        # local failure still must not stop the remote write.
+        await self.fallback_cache.put(key, value)
+        await self.wrapped.put(key, value)
 
     async def delete(self, key: GCacheKey) -> bool:
         ret = await self.wrapped.delete(key)

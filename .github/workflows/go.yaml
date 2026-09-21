@@ -1,0 +1,79 @@
+name: Go
+
+# Path-filtered; conformance.yaml is not, so every PR still exercises both clients.
+# NOTE: `paths` on `push` matches that commit, but on `pull_request` it matches the PR's
+# CUMULATIVE diff -- so a PR that ever touched go/** runs this on every later push.
+on:
+  # main only on push; see test.yaml. A concurrency group does not dedupe push against
+  # pull_request, because github.head_ref is empty on push.
+  push:
+    branches: [main]
+    paths:
+      - "go/**"
+      - ".github/workflows/go.yaml"
+  pull_request:
+    paths:
+      - "go/**"
+      - ".github/workflows/go.yaml"
+
+# Supersession only, and not on main -- see test.yaml.
+concurrency:
+  group: go-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Read-only: this job runs unpinned dependency code. See conformance.yaml.
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+
+    # go/redislive is a PURE GO test and cannot use the redislite instance the Python
+    # fixtures start. It is deliberately not skippable -- a silent skip would restore the
+    # coverage gap it exists to close -- so it needs a real server. It reads
+    # GALILEO_REDIS_HOST/PORT and defaults to localhost:6379.
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      # gofmt is CHECKED, not applied. A CI job that rewrites files would pass while leaving
+      # the repo unformatted for everyone else.
+      - name: gofmt
+        run: cd go && out=$(gofmt -l . 2>&1) || { printf "%s\n" "$out"; exit 1; }; test -z "$out" || { echo "unformatted:"; printf "%s\n" "$out"; exit 1; }
+
+      - name: go vet
+        run: cd go && go vet ./...
+
+      - name: go test
+        run: cd go && go test -count=1 ./... -coverprofile=coverage.out
+
+      # Same version, token and failure mode as test.yaml. Without the token the upload is
+      # rejected; fail_ci_if_error defaults to false in v7.0.0, so the step stayed GREEN and
+      # Go coverage simply never arrived. The skip condition has to cover forks as well as dependabot --
+      # neither can read repository secrets. See test.yaml's note.
+      - uses: codecov/codecov-action@v7.0.0
+        if: >-
+          ${{ github.actor != 'dependabot[bot]'
+              && (github.event_name != 'pull_request'
+                  || github.event.pull_request.head.repo.full_name == github.repository) }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: go/coverage.out
+          flags: gcache-go
+          fail_ci_if_error: true

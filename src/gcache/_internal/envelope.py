@@ -39,21 +39,15 @@ the backing store, not a slow warm-up. Migrate under a NEW use_case instead; the
 generations then use different keys and never fight.
 """
 
-import base64
 import json
 import math
 import pickle
-import re
 from dataclasses import dataclass
 from typing import Any
 
 from gcache.exceptions import UnserializableValue
 
 ENVELOPE_VERSION = 1
-
-# Exactly the six ASCII bytes Go's normalizeBase64 strips. Not \s, which on a str pattern
-# also matches U+00A0 and friends -- those would diverge from Go, which keeps them.
-_WHITESPACE_RE = re.compile(r"[ \t\n\r\x0b\f]")
 
 # Envelope timestamps are int64 milliseconds, matching the Go client. See decode().
 _INT64_MAX = 2**63 - 1
@@ -158,9 +152,10 @@ def _get_varint(data: bytes, i: int) -> tuple[int, int]:
 def encode_proto(created_at_ms: int, ttl_sec: int, payload: bytes) -> bytes:
     """Frame an already-serialized binary ``payload`` in the PROTO envelope.
 
-    18 bytes of overhead against the JSON envelope's ~102, and no base64 -- which is a third
-    of the payload back. The cost is that neither the payload nor the metadata is readable
-    from ``redis-cli`` or Redis's Lua ``cjson`` any more; see the README.
+    Where binary belongs, and now the only place it can go: the JSON envelope carries text.
+    18 bytes of overhead against that envelope's ~102, and no ``encoding`` field to make the
+    payload's type depend on the writer. The cost is that neither the payload nor the
+    metadata is readable from ``redis-cli`` or Redis's Lua ``cjson``; see the README.
     """
     if not isinstance(payload, bytes):
         raise EnvelopeEncodeError(f"the PROTO envelope carries bytes, got {type(payload).__name__}")
@@ -307,10 +302,9 @@ def lone_surrogate_reason(payload: str | bytes) -> str | None:
       refused on every read -- a permanent miss on the one framing Go cannot read at all, so
       there was never a divergence to prevent. The same string inside a dict was served,
       which is the tell that the discriminator had nothing to do with the rule.
-    * the envelope's ``encoding`` field is equally wrong, and Go tried it. ``base64`` means
-      "the writer handed us bytes", not "this is binary": a ``Serializer`` returning ``bytes``
-      from ``json.dumps`` lands there with JSON text inside, and that text is exactly what
-      the two clients disagree about.
+    * the envelope's ``encoding`` field was equally wrong, and Go tried it. That field no
+      longer varies -- the JSON envelope carries text only -- but the lesson stands: it
+      recorded how a payload was TRANSPORTED, never what it was.
 
     What actually decides it is whether the CALLER's codec will unescape the payload, which
     neither client can see. "Parses as strict JSON" is the closest honest proxy, and it is
@@ -495,24 +489,33 @@ def _refuse_json_constant(name: str) -> object:
 
 
 def encode_json(created_at_ms: int, ttl_sec: int, payload: str | bytes) -> bytes:
-    """Frame ``payload`` in the cross-language JSON envelope.
+    """Frame already-serialized TEXT in the cross-language JSON envelope.
 
-    ``payload`` must already be serialized -- the JSON envelope carries a string, so keys
-    using it need a ``Serializer`` (``JsonSerializer`` by default). ``bytes`` payloads are
-    base64-encoded and flagged via ``encoding``.
+    TEXT, and only text. A ``bytes`` payload was previously base64-encoded into the JSON
+    string and flagged ``encoding: "base64"``, and that branch is what made the payload's
+    Python type depend on WHICH CLIENT wrote the entry: Python chose the encoding from the
+    Python type, while Go -- which has no such type, since ``Codec.Marshal`` returns
+    ``[]byte`` for JSON text too -- chose it by sniffing ``utf8.Valid``. So the same value
+    stored ``base64`` from Python and ``utf8`` from Go, and Python read it back as ``bytes``
+    or ``str`` accordingly.
+
+    Refusing bytes here removes that at the source rather than reconciling it: with base64
+    gone the ``encoding`` field is constant, ``Envelope.JSON`` always decodes to ``str``, and
+    the payload's type is a property of the DECLARED envelope instead of the writer.
+
+    Binary belongs on ``Envelope.PROTO``, which has no ``encoding`` field at all and carries
+    bytes end to end in both clients. The capability being removed had no user: nothing in
+    this repository outside its own tests, and no declaration of ``Envelope.JSON`` anywhere
+    in the one consumer.
     """
-    # BEFORE the branch, so a bytes payload is asked the same question. `Serializer.dump` is
-    # typed `-> bytes | str`, and a serializer returning the bytes of a json.dumps lands in
-    # the base64 branch with JSON text inside -- which is exactly the payload the two clients
-    # decode differently, while Go, reading the base64-decoded bytes, refuses it. Checking
-    # only the str branch made this client the one that wrote what the other would not read.
-    _reject_lone_surrogate(payload)
     if isinstance(payload, bytes):
-        encoding = "base64"
-        body = base64.b64encode(payload).decode("ascii")
-    else:
-        encoding = "utf8"
-        body = payload
+        raise EnvelopeEncodeError(
+            "the JSON envelope carries text, got bytes. Use Envelope.PROTO for a binary "
+            "payload -- it has no encoding field, so bytes stay bytes in both clients."
+        )
+    _reject_lone_surrogate(payload)
+    encoding = "utf8"
+    body = payload
 
     # The writer honours the reader's bound, or a large ttl_sec pushes expiresAtMs past
     # 2^53 and every subsequent read rejects it -- rewritten and rejected forever.
@@ -636,18 +639,16 @@ def decode(data: bytes | str, *, allow_pickle: bool = True) -> DecodedValue:
                 # through float(), so Python and Go already agree there.
                 if not (_MIN_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER):
                     raise EnvelopeDecodeError(f"{field} is outside the safe-integer range, got {value!r}")
+            # utf8 ONLY. The base64 branch is gone with the write path that produced it;
+            # an entry carrying it now falls here and becomes a miss that the fallback
+            # rewrites, which is the right failure -- loud and self-healing, never a silent
+            # misread. Nothing reachable can have written one: the JSON envelope has never
+            # shipped (no envelope.py in v2.1.0 or on main), the Go client is new in this
+            # change, and the only consumer declares Envelope.PROTO on both sides.
+            #
+            # The field is kept rather than dropped so that exactly this check exists.
             encoding = envelope.get("encoding")
-            if encoding == "base64":
-                # Normalize first, because Python alone rejects three legal spellings a
-                # foreign writer produces: the URL-safe alphabet, missing padding, and line
-                # wrapping (the base64 CLI wraps at 76 columns by default, so a hand-repaired
-                # entry has newlines). Go's normalizeBase64 does the same three, in the same
-                # order -- whitespace BEFORE padding, or the padding is computed from a
-                # length that counts the newlines and the decode fails on both sides for
-                # some inputs and not others. validate=True still rejects a wrong alphabet.
-                normalized = _WHITESPACE_RE.sub("", payload).replace("-", "+").replace("_", "/")
-                payload = base64.b64decode(normalized + "=" * (-len(normalized) % 4), validate=True)
-            elif encoding != "utf8":
+            if encoding != "utf8":
                 raise EnvelopeDecodeError(f"unsupported payload encoding {encoding!r}")
             # int() loses nothing -- the is_integer() check above already rejected any
             # fractional value, so this only narrows float to int for DecodedValue.

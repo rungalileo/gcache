@@ -542,14 +542,14 @@ async def test_every_payload_divergence_case_through_the_REAL_call_sites() -> No
     skipped its ``bytes`` branch entirely, and the read path gated on the Python type and so
     refused PICKLE values while missing ``bytes`` ones. The corpus was green through both.
 
-    Each case runs four ways -- write and read, ``str`` and ``bytes`` -- because the two
-    payload types take different routes at both ends: on write, the base64 branch versus the
-    utf8 one; on read, ``decode`` hands back ``bytes`` for a base64 envelope and ``str`` for
-    a utf8 one.
+    It used to run each case four ways, ``str`` and ``bytes`` at both ends, because the two
+    payload types took different routes. Narrowing the JSON envelope to text deleted the
+    bytes routes instead of covering them, so what is pinned now is that a bytes payload is
+    refused outright whatever it contains.
     """
     from unittest.mock import AsyncMock, MagicMock, patch
 
-    from gcache._internal.envelope import encode_json
+    from gcache._internal.envelope import EnvelopeEncodeError, encode_json
     from gcache._internal.metrics import GCacheMetrics
     from gcache._internal.redis_cache import RedisCache
     from gcache.config import Envelope, GCacheKey, JsonSerializer
@@ -558,22 +558,23 @@ async def test_every_payload_divergence_case_through_the_REAL_call_sites() -> No
     section = _DATA["payloadDivergence"]
     key = GCacheKey(key_type="kt", id="i", use_case="u", envelope=Envelope.JSON, serializer=JsonSerializer())
 
-    async def read_back(stored_payload: str, encoding: str) -> list[str]:
+    async def read_back(stored_payload: str) -> list[str]:
         """Hand-build the envelope, so a write guard cannot hide a read-guard gap.
 
-        BOTH encodings. A `bytes` payload reaches encode_json's base64 branch, so `decode`
-        hands the read guard `bytes` rather than `str` -- which is a different route through
-        the guard, and the exact route whose absence was the last defect here. An earlier
-        version of this test claimed to run four ways and ran four on write and one on read.
+        ONE encoding, because there is only one left. This used to build `utf8` and `base64`
+        variants: a `bytes` payload reached encode_json's base64 branch and `decode` handed
+        the read guard `bytes` rather than `str`, a second route through it. Narrowing the
+        JSON envelope to text DELETED that route rather than covering it -- `decode` now
+        yields `str` for every JSON entry, from either client.
         """
         now = int(time.time() * 1000)
-        body = stored_payload if encoding == "utf8" else base64.b64encode(stored_payload.encode()).decode("ascii")
+        body = stored_payload
         raw = json.dumps(
             {
                 "version": 1,
                 "createdAtMs": now,
                 "expiresAtMs": now + 60_000,
-                "encoding": encoding,
+                "encoding": "utf8",
                 "payload": body,
             },
             separators=(",", ":"),
@@ -595,21 +596,24 @@ async def test_every_payload_divergence_case_through_the_REAL_call_sites() -> No
     for case in section["cases"]:
         payload, rejected, why = case["payload"], case["expect"] == "reject", case["why"]
 
-        for label, value in (("str", payload), ("bytes", payload.encode())):
-            # WRITE. A bytes payload reaches the base64 branch, which asked nothing at all.
-            if rejected:
-                with pytest.raises(UnserializableValue):
-                    encode_json(created_at_ms=1, ttl_sec=60, payload=value)
-            else:
-                assert encode_json(created_at_ms=1, ttl_sec=60, payload=value), f"{case['name']}/{label}: {why}"
+        # WRITE, as text -- the only form the JSON envelope now accepts.
+        if rejected:
+            with pytest.raises(UnserializableValue):
+                encode_json(created_at_ms=1, ttl_sec=60, payload=payload)
+        else:
+            assert encode_json(created_at_ms=1, ttl_sec=60, payload=payload), f"{case['name']}: {why}"
 
-            # READ, under both encodings: `utf8` hands the guard a str and `base64` hands it
-            # bytes, and gating on that difference is what broke it last time.
-            reasons = await read_back(payload, "utf8" if label == "str" else "base64")
-            if rejected:
-                assert reasons == ["divergent_payload_encoding"], f"{case['name']}/{label} read: {reasons} -- {why}"
-            else:
-                assert "divergent_payload_encoding" not in reasons, f"{case['name']}/{label} read: {reasons} -- {why}"
+        # A bytes payload is refused whatever it holds, so the surrogate rule is never the
+        # reason a bytes write fails -- the framing is.
+        with pytest.raises(EnvelopeEncodeError, match="carries text"):
+            encode_json(created_at_ms=1, ttl_sec=60, payload=payload.encode())
+
+        # READ.
+        reasons = await read_back(payload)
+        if rejected:
+            assert reasons == ["divergent_payload_encoding"], f"{case['name']} read: {reasons} -- {why}"
+        else:
+            assert "divergent_payload_encoding" not in reasons, f"{case['name']} read: {reasons} -- {why}"
 
 
 @pytest.mark.asyncio

@@ -20,10 +20,11 @@ if TYPE_CHECKING:
 class ProtoSerializer(Serializer):
     """Serializes a generated protobuf message in the binary wire format.
 
-    Pairs with ``Envelope.PROTO``, which carries the bytes in a binary envelope with no
-    base64 and no JSON wrapper. Measured against the same message as protojson in a JSON
-    envelope: 69 bytes stored rather than 204, and roughly 20x cheaper to serialize and
-    parse (2.23 -> 0.12 us and 6.48 -> 0.29 us).
+    Pairs with ``Envelope.PROTO``, which carries the bytes in a binary envelope with no JSON
+    wrapper -- and is where binary belongs, since the JSON envelope carries text. Measured
+    against the same message as protojson in a JSON envelope: 69 bytes stored rather than
+    204, and roughly 20x cheaper to serialize and parse (2.23 -> 0.12 us and 6.48 -> 0.29
+    us). The comparison is against protojson TEXT, so base64 never entered it.
 
     Use instead of a hand-written dataclass whenever another language reads the value: the
     schema then lives in one ``.proto`` rather than being reimplemented per language. Go's
@@ -66,19 +67,18 @@ class ProtoSerializer(Serializer):
 
     async def load(self, data: bytes | str) -> Any:
         if isinstance(data, str):
-            # Two ways to arrive here, and the second was missing from this comment. One is
-            # a key whose envelope was changed without its serializer -- the PROTO envelope
-            # itself always yields bytes.
+            # One way to arrive here: this serializer on a key declaring Envelope.JSON,
+            # which carries text and so always yields str. The PROTO envelope always yields
+            # bytes, so a correctly paired key never reaches this branch.
             #
-            # The other is the JSON envelope written by GO. Its writer sniffs the payload and
-            # stores valid UTF-8 as `encoding: "utf8"`, where Python base64s any bytes
-            # payload unconditionally -- so the same []byte round-trips as `bytes` when
-            # Python wrote it and as `str` when Go did. `encoding` is a TRANSPORT field, not
-            # a type declaration, which is why Serializer.load is typed `bytes | str` and why
-            # every implementation must accept both.
+            # This used to name a second way -- a JSON entry written by Go, whose writer
+            # stored valid UTF-8 as `encoding: "utf8"` where Python base64-ed any bytes
+            # payload, so the same []byte came back as `str` or `bytes` depending on the
+            # writer. The JSON envelope carries text only now, so that path is gone and the
+            # mis-paired key is all that is left.
             #
-            # Encode rather than reject: a parse failure here is a miss the caller heals, and
-            # that is the same outcome.
+            # Encode rather than reject: a parse failure here is a miss the caller heals,
+            # and that is the same outcome.
             data = data.encode("utf-8")
         msg = self._message_type()
         # No offload, unlike the protojson serializer this replaced. That one needed it

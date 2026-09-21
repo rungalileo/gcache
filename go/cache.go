@@ -121,8 +121,9 @@ const (
 	// EnvelopeJSON is the cross-language JSON envelope: readable from redis-cli and
 	// parseable by Redis's Lua cjson, at ~102 bytes of overhead. The default.
 	EnvelopeJSON Envelope = iota
-	// EnvelopePROTO is the binary envelope: 18 bytes of overhead, no base64, and opaque to
-	// redis-cli, jq and cjson alike. Pair it with protocodec.Proto.
+	// EnvelopePROTO is the binary envelope, and where a binary payload belongs -- the JSON
+	// envelope carries text and refuses one. 18 bytes of overhead, no encoding field, and
+	// opaque to redis-cli, jq and cjson alike. Pair it with protocodec.Proto.
 	EnvelopePROTO
 )
 
@@ -377,10 +378,9 @@ func (c *Cache[V]) Get(ctx context.Context, key Key) (value V, ok bool) {
 	//
 	// Every framing Go can read, which is JSON and PROTO -- pickle already returned above,
 	// and pickle is the one framing no other client reads, so nothing can disagree about it.
-	// Deliberately NOT gated on the envelope's `encoding`: that says how the payload was
-	// TRANSPORTED, not what it is, and a Serializer returning the bytes of a json.dumps
-	// arrives base64-encoded with JSON text inside. The strict-JSON gate inside
-	// loneSurrogateReason is what keeps protobuf and other binary out.
+	// Deliberately NOT gated on the envelope's `encoding`, which no longer varies anyway:
+	// what keeps protobuf and other binary out is the strict-JSON gate inside
+	// loneSurrogateReason, applied to the payload's CONTENT rather than to its framing.
 	if reason := loneSurrogateReason(string(payload)); reason != "" {
 		c.record(key.UseCase, ResultDistrusted)
 		return zero, false

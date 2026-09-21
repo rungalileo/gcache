@@ -498,7 +498,7 @@ protojson inside the JSON envelope:
 | stored entry | 204 B | **69 B** |
 
 Most of the size win is the envelope, not the payload: the JSON envelope costs ~102 bytes
-against the binary one's 18, and base64 would give back a third of what binary saves.
+against the binary one's 18.
 
 Binary also removes a class of bug rather than testing for it. protojson spells every field
 twice — `session_id` and `sessionId` — and both readers accept either, so a writer emitting
@@ -512,7 +512,17 @@ is opaque to all three — payload *and* metadata. **No general inspector exists
 `go/cmd/gcachectl` round-trips only the fixed `descriptorpb.FileOptions` the cross-language
 suite uses, and prints no envelope metadata, so pointed at any other message it prints an
 empty or wrong value. If being able to eyeball an entry matters more than its size, use
-`Envelope.JSON` with a text serializer.
+`Envelope.JSON`, whose serializer must return text — see below.
+
+**`Envelope.JSON` carries text, and `Envelope.PROTO` carries bytes.** A serializer used with
+the JSON envelope must return `str`; a `bytes` payload is refused at the write with an error
+naming `Envelope.PROTO`. The JSON envelope once base64-ed bytes into its payload string, and
+that branch made the decoded Python type depend on **which client wrote the entry** — Python
+picked the encoding from the Python type, Go by sniffing `utf8.Valid`, because Go has no such
+type to read. Removing it makes `encoding` constant, so a JSON entry always decodes to `str`
+whoever wrote it, and the payload's type is a property of the declared envelope. A stored
+entry claiming `encoding: "base64"` is now refused by both readers as a miss the caller
+rewrites.
 
 ## Redis Configuration
 

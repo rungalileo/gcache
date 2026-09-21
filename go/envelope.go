@@ -1,7 +1,6 @@
 package gcache
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,13 +31,15 @@ type envelope struct {
 	Version     int    `json:"version"`
 	CreatedAtMs int64  `json:"createdAtMs"`
 	ExpiresAtMs int64  `json:"expiresAtMs"`
-	Encoding    string `json:"encoding"` // "utf8" | "base64"
+	Encoding    string `json:"encoding"` // "utf8" -- the only value; see encodeEnvelope
 	Payload     string `json:"payload"`
 }
 
-// encodeEnvelope frames an already-serialized payload for storage. A payload that is not
-// valid UTF-8 is base64-encoded, the same branch Python takes for bytes -- without it,
-// encoding/json would silently substitute U+FFFD per bad byte and write an unreadable value.
+// encodeEnvelope frames already-serialized TEXT for storage. A payload that is not valid
+// UTF-8 is REFUSED, not base64-encoded: see the body for why that branch was removed rather
+// than kept. Refusing also covers what base64 originally guarded against -- encoding/json
+// silently substitutes U+FFFD per bad byte, so an unchecked binary payload wrote a value no
+// client could read back.
 func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]byte, error) {
 	createdMs := createdAt.UnixMilli()
 	// The writer refuses what the reader rejects, matching Python's encode_json. Without
@@ -48,10 +49,21 @@ func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]b
 		return nil, fmt.Errorf("gcache: timestamps %d/%d outside the safe-integer range; no client could read this back",
 			createdMs, createdMs+ttl.Milliseconds())
 	}
-	encoding, body := "utf8", string(payload)
+	// TEXT, and only text. A non-UTF-8 payload was previously base64-encoded into the JSON
+	// string, and that branch is what made the payload's Python type depend on which client
+	// wrote the entry: Go has no bytes-versus-text distinction to record (Codec.Marshal
+	// returns []byte for JSON text too), so it chose by sniffing, while Python chose by the
+	// Python type. The same value stored utf8 from here and base64 from there.
+	//
+	// Refusing here removes that at the source. Go cannot say "not bytes" -- everything is
+	// []byte -- so the testable form of "this envelope carries text" is "this is valid
+	// UTF-8". Binary belongs on the PROTO envelope, which has no encoding field.
 	if !utf8.Valid(payload) {
-		encoding, body = "base64", base64.StdEncoding.EncodeToString(payload)
-	} else if reason := loneSurrogateReason(body); reason != "" {
+		return nil, errors.New("gcache: the JSON envelope carries text, got bytes that are not valid UTF-8; " +
+			"use the PROTO envelope for a binary payload -- it has no encoding field, so bytes stay bytes")
+	}
+	encoding, body := "utf8", string(payload)
+	if reason := loneSurrogateReason(body); reason != "" {
 		// Refuse the write rather than store a value the two clients read differently. The
 		// payload itself is not in the message: it is cached application data and this
 		// reaches the logs.
@@ -65,31 +77,6 @@ func encodeEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]b
 		Encoding:    encoding,
 		Payload:     body,
 	})
-}
-
-// normalizeBase64 accepts the three legal spellings a foreign writer produces and neither
-// client emits: the URL-safe alphabet, missing padding, and line wrapping (the base64 CLI
-// wraps at 76 columns). Python's decode does the same three, in the same order.
-//
-// Whitespace comes out BEFORE padding is computed. Not stripping it at all -- what this did
-// -- padded a length that counted the newlines, so a wrapped payload decoded here when that
-// length happened to be a multiple of four and errored otherwise, agreeing with Python on
-// neither outcome. Exactly these six ASCII bytes, not unicode.IsSpace, so Python's
-// character class matches byte for byte.
-func normalizeBase64(s string) string {
-	s = strings.Map(func(r rune) rune {
-		switch r {
-		case ' ', '\t', '\n', '\r', '\v', '\f':
-			return -1
-		}
-		return r
-	}, s)
-	s = strings.ReplaceAll(s, "-", "+")
-	s = strings.ReplaceAll(s, "_", "/")
-	if pad := len(s) % 4; pad != 0 {
-		s += strings.Repeat("=", 4-pad)
-	}
-	return s
 }
 
 // The PROTO envelope. Protobuf wire format, hand-written rather than generated: four fields
@@ -151,8 +138,10 @@ func getVarint(data []byte, i int) (uint64, int, error) {
 	return 0, 0, errors.New("gcache: varint longer than 10 bytes")
 }
 
-// encodeProtoEnvelope frames an already-serialized binary payload. 18 bytes of overhead
-// against the JSON envelope's ~102, and no base64 -- which is a third of the payload back.
+// encodeProtoEnvelope frames an already-serialized binary payload. Where binary belongs,
+// and now the only place it can go: the JSON envelope carries text. 18 bytes of overhead
+// against that envelope's ~102, and no encoding field to make the payload's type depend on
+// which client wrote it.
 func encodeProtoEnvelope(createdAt time.Time, ttl time.Duration, payload []byte) ([]byte, error) {
 
 	// The PROTO framing is not an exemption: "opaque bytes" is the writer's word, and a
@@ -363,16 +352,15 @@ func decodeEnvelope(raw []byte) (payload []byte, createdAtMs int64, expiresAtMs 
 	if w.Encoding != nil {
 		encoding = *w.Encoding
 	}
+	// utf8 ONLY. The base64 branch is gone with the write path that produced it; an entry
+	// carrying it now falls to the default and becomes a miss the caller rewrites, which is
+	// the right failure -- loud and self-healing, never a silent misread. Nothing reachable
+	// can have written one: the JSON envelope has never shipped and this client is new.
+	//
+	// The field is kept rather than dropped so that exactly this check exists.
 	switch encoding {
 	case "utf8":
 		return []byte(*w.Payload), createdAtMs, expiresAtMs, nil
-	case "base64":
-		// See normalizeBase64 for which spellings this accepts and why.
-		decoded, err := base64.StdEncoding.DecodeString(normalizeBase64(*w.Payload))
-		if err != nil {
-			return nil, 0, 0, fmt.Errorf("gcache: malformed base64 payload: %w", err)
-		}
-		return decoded, createdAtMs, expiresAtMs, nil
 	default:
 		return nil, 0, 0, fmt.Errorf("gcache: unknown payload encoding %q", encoding)
 	}
@@ -452,17 +440,16 @@ func isStale(watermarkMs, createdAtMs int64) bool { return watermarkMs >= create
 // values, with nothing raised and no metric moved.
 //
 // The literal-CHARACTER form needs no check here: a []byte holding an unpaired surrogate is
-// not valid UTF-8, so encodeEnvelope already routes it to base64, where it is opaque to both
-// clients and cannot diverge.
+// not valid UTF-8, so encodeEnvelope refuses it outright before this is reached.
 //
 // Python answers this with json.loads plus a re-dump; Go's encoding/json substitutes rather
 // than erroring, so it cannot be asked the same way and this walks the escapes instead. Two
 // mechanisms, one rule, pinned by the corpus -- which is what the corpus is for.
 func loneSurrogateReason(body string) string {
 	// Not valid UTF-8 means genuinely binary; Python's bytes branch reaches the same
-	// conclusion by failing to decode. The envelope's `encoding` field is deliberately NOT
-	// consulted: `base64` means "the writer handed us bytes", not "this is binary", and a
-	// Serializer returning the bytes of a json.dumps lands there with JSON text inside.
+	// conclusion by failing to decode. Still checked even though encodeEnvelope now refuses
+	// such a payload, because this also runs on the PROTO envelope, whose payload is bytes
+	// by design, and on whatever a read finds in Redis.
 	if !utf8.ValidString(body) {
 		return ""
 	}

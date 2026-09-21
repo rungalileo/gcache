@@ -1,7 +1,6 @@
 package gcache
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -54,19 +53,23 @@ func TestDecodeEnvelopeRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDecodeEnvelopeAcceptsBase64PayloadsFromOtherClients(t *testing.T) {
-	// Python base64s a bytes payload. Go must read those even though it only ever writes
-	// utf8.
+func TestDecodeEnvelopeRefusesBase64(t *testing.T) {
+	// The JSON envelope carries TEXT. base64 existed so a bytes payload could fit in a JSON
+	// string, and that branch is what made the decoded Python type depend on which client
+	// wrote the entry -- Python chose the encoding from the Python type, Go by sniffing
+	// utf8.Valid, because Go has no such type. Both writers refuse it now.
+	//
+	// Failing CLOSED is the point: the entry becomes a miss the caller rewrites, never a
+	// silent misread. Nothing reachable can have written one -- the JSON envelope has never
+	// shipped and this client is new -- and binary belongs on the PROTO envelope.
 	raw, _ := json.Marshal(envelope{
 		Version: 1, CreatedAtMs: 7, ExpiresAtMs: 8,
 		Encoding: "base64", Payload: base64.StdEncoding.EncodeToString([]byte{0x00, 0xff}),
 	})
-	payload, _, _, err := decodeEnvelope(raw)
-	if err != nil {
-		t.Fatalf("decodeEnvelope: %v", err)
-	}
-	if string(payload) != "\x00\xff" {
-		t.Errorf("payload = %q", payload)
+	if _, _, _, err := decodeEnvelope(raw); err == nil {
+		t.Fatal("decodeEnvelope accepted a base64 payload")
+	} else if !strings.Contains(err.Error(), "unknown payload encoding") {
+		t.Errorf("err = %v, want an unknown-encoding rejection", err)
 	}
 }
 
@@ -146,28 +149,33 @@ func TestParseWatermarkRejectsNonFiniteAndClampsOverflow(t *testing.T) {
 	}
 }
 
-func TestEncodeEnvelopeBase64sABinaryPayload(t *testing.T) {
-	// encoding/json substitutes U+FFFD for invalid UTF-8 and reports success, so a binary
-	// Codec would write a value that can never be read back. Base64 is the branch Python
-	// takes for a bytes payload, so the entry stays readable in both languages.
+func TestEncodeEnvelopeRefusesABinaryPayload(t *testing.T) {
+	// The JSON envelope carries TEXT, and Go cannot say "not bytes" -- Codec.Marshal returns
+	// []byte for JSON text too -- so the testable form of that rule is "valid UTF-8".
+	//
+	// This used to assert the opposite: that a binary payload was base64'd so the entry
+	// stayed readable in both languages. It was readable, but it was also the branch that
+	// made the payload's Python type depend on WHICH CLIENT wrote it, since Python chose
+	// base64 from the Python type while this chose it by sniffing. Binary goes on the PROTO
+	// envelope, which has no encoding field and carries bytes end to end.
 	binary := []byte{0x00, 0xff, 0xfe, 0x80}
-	raw, err := encodeEnvelope(time.UnixMilli(1757308800123), time.Hour, binary)
+	if _, err := encodeEnvelope(time.UnixMilli(1757308800123), time.Hour, binary); err == nil {
+		t.Fatal("encodeEnvelope accepted a non-UTF-8 payload")
+	} else if !strings.Contains(err.Error(), "carries text") {
+		t.Errorf("err = %v, want a text-only rejection naming the PROTO envelope", err)
+	}
+
+	// ...and the PROTO envelope takes the same bytes.
+	env, err := encodeProtoEnvelope(time.UnixMilli(1757308800123), time.Hour, binary)
 	if err != nil {
-		t.Fatalf("encodeEnvelope: %v", err)
+		t.Fatalf("encodeProtoEnvelope: %v", err)
 	}
-	var e envelope
-	if err := json.Unmarshal(raw, &e); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if e.Encoding != "base64" {
-		t.Fatalf("encoding = %q, want base64", e.Encoding)
-	}
-	payload, _, _, err := decodeEnvelope(raw)
+	payload, _, _, err := decodeEnvelope(env)
 	if err != nil {
 		t.Fatalf("decodeEnvelope: %v", err)
 	}
-	if !bytes.Equal(payload, binary) {
-		t.Errorf("round trip = %#v, want %#v", payload, binary)
+	if string(payload) != string(binary) {
+		t.Errorf("payload = %q, want %q", payload, binary)
 	}
 }
 

@@ -87,14 +87,9 @@
     },
     {
       "name": "base64-payload",
-      "why": "The bytes path. Python base64s a bytes payload where Go never does, so this is the one encoding both must agree on.",
+      "why": "The JSON envelope carries TEXT only. base64 existed so a bytes payload could fit in a JSON string, and that branch is what made the decoded Python type depend on which client wrote the entry -- Python chose the encoding from the Python type, Go by sniffing utf8.Valid, because Go has no such type. Both writers refuse it now and both readers reject it, so the entry becomes a miss the caller rewrites. Binary goes on the PROTO envelope, which has no encoding field. Kept as REJECT vectors rather than deleted: they pin that the removal fails closed in both clients.",
       "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"eyJhIjoxfQ==\"}",
-      "expect": "accept",
-      "decoded": {
-        "createdAtMs": 1757308800123,
-        "expiresAtMs": 1757308860123,
-        "payloadBase64": "eyJhIjoxfQ=="
-      }
+      "expect": "reject"
     },
     {
       "name": "unknown-encoding",
@@ -139,36 +134,21 @@
     },
     {
       "name": "base64-unpadded",
-      "why": "A raw encoder emits no padding. Python's b64decode rejects it, so without the shared re-padding step the same entry is a Go hit and a Python miss-and-rewrite.",
+      "why": "The JSON envelope carries TEXT only. base64 existed so a bytes payload could fit in a JSON string, and that branch is what made the decoded Python type depend on which client wrote the entry -- Python chose the encoding from the Python type, Go by sniffing utf8.Valid, because Go has no such type. Both writers refuse it now and both readers reject it, so the entry becomes a miss the caller rewrites. Binary goes on the PROTO envelope, which has no encoding field. Kept as REJECT vectors rather than deleted: they pin that the removal fails closed in both clients.",
       "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"eyJhIjoxfQ\"}",
-      "expect": "accept",
-      "decoded": {
-        "createdAtMs": 1757308800123,
-        "expiresAtMs": 1757308860123,
-        "payloadBase64": "eyJhIjoxfQ=="
-      }
+      "expect": "reject"
     },
     {
       "name": "base64-url-safe-alphabet",
-      "why": "base64.RawURLEncoding and urlsafe_b64encode emit - and _. Python's b64decode rejects both, so each client must map them onto the standard alphabet first.",
+      "why": "The JSON envelope carries TEXT only. base64 existed so a bytes payload could fit in a JSON string, and that branch is what made the decoded Python type depend on which client wrote the entry -- Python chose the encoding from the Python type, Go by sniffing utf8.Valid, because Go has no such type. Both writers refuse it now and both readers reject it, so the entry becomes a miss the caller rewrites. Binary goes on the PROTO envelope, which has no encoding field. Kept as REJECT vectors rather than deleted: they pin that the removal fails closed in both clients.",
       "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"-P_-IGJpbmFyeQ\"}",
-      "expect": "accept",
-      "decoded": {
-        "createdAtMs": 1757308800123,
-        "expiresAtMs": 1757308860123,
-        "payloadBase64": "+P/+IGJpbmFyeQ=="
-      }
+      "expect": "reject"
     },
     {
       "name": "base64-line-wrapped",
-      "why": "The base64 CLI wraps at 76 columns, so an entry repaired by hand carries newlines. Whitespace must be stripped BEFORE padding is computed: padding a length that counts the newlines decoded for one client only when that length happened to be a multiple of four.",
+      "why": "The JSON envelope carries TEXT only. base64 existed so a bytes payload could fit in a JSON string, and that branch is what made the decoded Python type depend on which client wrote the entry -- Python chose the encoding from the Python type, Go by sniffing utf8.Valid, because Go has no such type. Both writers refuse it now and both readers reject it, so the entry becomes a miss the caller rewrites. Binary goes on the PROTO envelope, which has no encoding field. Kept as REJECT vectors rather than deleted: they pin that the removal fails closed in both clients.",
       "envelope": "{\"version\":1,\"createdAtMs\":1757308800123,\"expiresAtMs\":1757308860123,\"encoding\":\"base64\",\"payload\":\"YWJj\\nZGVm\\nZ2hp\\namts\"}",
-      "expect": "accept",
-      "decoded": {
-        "createdAtMs": 1757308800123,
-        "expiresAtMs": 1757308860123,
-        "payloadBase64": "YWJjZGVmZ2hpamts"
-      }
+      "expect": "reject"
     }
   ],
   "keyRendering": {

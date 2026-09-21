@@ -1,4 +1,3 @@
-import base64
 import json
 import pickle
 import time
@@ -11,6 +10,7 @@ from gcache import CacheLayer, Envelope, GCache, GCacheKeyConfig, JsonSerializer
 from gcache._internal.envelope import (
     ENVELOPE_VERSION,
     EnvelopeDecodeError,
+    EnvelopeEncodeError,
     decode,
     encode_json,
     encode_proto,
@@ -39,11 +39,19 @@ def test_encode_json_shape_is_the_shared_wire_format() -> None:
     }
 
 
-def test_encode_json_base64s_bytes() -> None:
-    raw = encode_json(created_at_ms=1, ttl_sec=1, payload=b"\x00\xffbinary")
-    envelope = json.loads(raw)
-    assert envelope["encoding"] == "base64"
-    assert base64.b64decode(envelope["payload"]) == b"\x00\xffbinary"
+def test_encode_json_refuses_a_bytes_payload() -> None:
+    # The JSON envelope carries TEXT. base64 existed so bytes could fit in a JSON string,
+    # and that branch is what made the decoded Python type depend on which client wrote the
+    # entry -- Python chose the encoding from the Python type, Go by sniffing utf8.Valid,
+    # because Go has no such type. With it gone, `encoding` is constant and Envelope.JSON
+    # always decodes to str.
+    with pytest.raises(EnvelopeEncodeError, match="carries text") as exc:
+        encode_json(created_at_ms=1, ttl_sec=1, payload=b"\x00\xffbinary")
+    # The message points at the framing that DOES carry bytes, rather than only refusing.
+    assert "Envelope.PROTO" in str(exc.value), exc.value
+
+    # ...and PROTO really does take the same payload.
+    assert decode(encode_proto(created_at_ms=1, ttl_sec=1, payload=b"\x00\xffbinary")).payload == b"\x00\xffbinary"
 
 
 def test_decode_round_trips_both_envelopes() -> None:
@@ -54,8 +62,23 @@ def test_decode_round_trips_both_envelopes() -> None:
     assert (pk.created_at_ms, pk.payload) == (7, "hello")
 
 
-def test_decode_round_trips_base64_payload() -> None:
-    assert decode(encode_json(created_at_ms=1, ttl_sec=1, payload=b"\x00\xff")).payload == b"\x00\xff"
+def test_decode_refuses_every_base64_spelling() -> None:
+    # Reading fails CLOSED now, in all four spellings the corpus carries: standard,
+    # unpadded, URL-safe and line-wrapped. An entry becomes a miss the fallback rewrites,
+    # which is the right failure -- loud and self-healing, never a silent misread. Nothing
+    # reachable can have written one: the JSON envelope has never shipped, the Go client is
+    # new, and the only consumer declares Envelope.PROTO on both sides.
+    for name, body in (
+        ("standard", "AP9iaW5hcnk="),
+        ("unpadded", "YWJjZGU"),
+        ("url-safe", "-_8gYmluYXJ5"),
+        ("line-wrapped", "YWJj\nZGU="),
+    ):
+        raw = json.dumps(
+            {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "base64", "payload": body}
+        ).encode()
+        with pytest.raises(EnvelopeDecodeError, match="unsupported payload encoding"):
+            decode(raw)
 
 
 @pytest.mark.parametrize("blob", [b"", b"not an envelope", b"[1,2,3]"])
@@ -359,14 +382,15 @@ async def test_an_undecodable_value_is_rewritten_not_just_skipped(
 
 
 @pytest.mark.asyncio
-async def test_a_bytes_payload_round_trips_through_the_cache(
+async def test_a_bytes_payload_goes_on_PROTO_and_is_refused_on_JSON(
     gcache: GCache, redis_server: redislite.Redis, cache_config_provider: FakeCacheConfigProvider
 ) -> None:
-    # base64 had unit coverage on decode only. This drives it through the real read/write
-    # path, which is where an encoding mismatch would actually bite.
-    cache_config_provider.configs["bytes_uc"] = GCacheKeyConfig.enabled(60)
-    cache_config_provider.configs["bytes_uc"].ramp[CacheLayer.LOCAL] = 0
-
+    # Both halves of the narrowed contract, driven through the real read/write path.
+    #
+    # This used to assert that bytes round-trip through the JSON envelope as base64. That
+    # branch is gone: it was the reason the decoded Python type depended on which client
+    # wrote the entry, and nothing used it -- no Envelope.JSON declaration exists in the one
+    # consumer, which is on PROTO in both languages.
     payload = b"\x00\xffbinary\x80"
 
     class BytesSerializer(Serializer):
@@ -376,22 +400,44 @@ async def test_a_bytes_payload_round_trips_through_the_cache(
         async def load(self, data: bytes | str) -> bytes:
             return data if isinstance(data, bytes) else data.encode()
 
-    calls = 0
+    # PROTO: the framing that carries bytes. No `encoding` field, so bytes stay bytes.
+    cache_config_provider.configs["proto_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["proto_uc"].ramp[CacheLayer.LOCAL] = 0
+    proto_calls = 0
 
     @gcache.cached(
-        key_type="Test", id_arg="test", use_case="bytes_uc", envelope=Envelope.JSON, serializer=BytesSerializer()
+        key_type="Test", id_arg="test", use_case="proto_uc", envelope=Envelope.PROTO, serializer=BytesSerializer()
     )
-    async def cached_func(test: int = 1) -> bytes:
-        nonlocal calls
-        calls += 1
+    async def proto_func(test: int = 1) -> bytes:
+        nonlocal proto_calls
+        proto_calls += 1
         return payload
 
     with gcache.enable():
-        assert await cached_func(1) == payload
-        (redis_key,) = redis_server.keys()
-        assert json.loads(redis_server.get(redis_key))["encoding"] == "base64"
-        assert await cached_func(1) == payload
-        assert calls == 1, "the second read must come from cache"
+        assert await proto_func(1) == payload
+        assert await proto_func(1) == payload
+        assert proto_calls == 1, "the second read must come from cache"
+
+    # JSON: refused on write, and the caller STILL GETS ITS VALUE -- a cache must not be
+    # able to fail a request. Nothing unreadable is stored, so there is no entry to heal.
+    cache_config_provider.configs["json_uc"] = GCacheKeyConfig.enabled(60)
+    cache_config_provider.configs["json_uc"].ramp[CacheLayer.LOCAL] = 0
+    before = set(redis_server.keys())
+    json_calls = 0
+
+    @gcache.cached(
+        key_type="Test", id_arg="test", use_case="json_uc", envelope=Envelope.JSON, serializer=BytesSerializer()
+    )
+    async def json_func(test: int = 1) -> bytes:
+        nonlocal json_calls
+        json_calls += 1
+        return payload
+
+    with gcache.enable():
+        assert await json_func(1) == payload, "the write guard must not fail the caller"
+        assert await json_func(1) == payload
+        assert json_calls == 2, "nothing was cached, so both calls reach the function"
+    assert set(redis_server.keys()) == before, "a refused write must store nothing"
 
 
 @pytest.mark.asyncio
@@ -608,37 +654,6 @@ def test_decode_rejects_a_string_timestamp(field: str) -> None:
     envelope = {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "utf8", "payload": "x"}
     with pytest.raises(EnvelopeDecodeError):
         decode(json.dumps({**envelope, field: "5"}).encode())
-
-
-def test_decode_accepts_unpadded_base64() -> None:
-    # Python rejects unpadded base64 where Go's RawStdEncoding path accepts it, so a
-    # writer using a raw encoder would make every Python read a miss-and-rewrite while the
-    # Go reader kept hitting the same key.
-    raw = json.dumps(
-        {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "base64", "payload": "YWJjZGU"}
-    ).encode()
-    assert decode(raw).payload == b"abcde"
-
-
-def test_decode_accepts_the_url_safe_base64_alphabet() -> None:
-    # Go's URLEncoding accepts "-" and "_"; Python's b64decode rejects them,
-    # which would make a Go writer using base64.RawURLEncoding a miss-and-rewrite for
-    # Python while Go kept hitting the same key.
-    payload = base64.urlsafe_b64encode(b"\xf8\xff\xfe binary").decode().rstrip("=")
-    assert "-" in payload or "_" in payload, f"fixture must exercise the URL-safe chars: {payload}"
-    raw = json.dumps(
-        {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "base64", "payload": payload}
-    ).encode()
-    assert decode(raw).payload == b"\xf8\xff\xfe binary"
-
-
-def test_decode_still_rejects_a_bad_base64_alphabet() -> None:
-    # Re-padding must not weaken validation into accepting non-base64 characters.
-    raw = json.dumps(
-        {"version": 1, "createdAtMs": 1, "expiresAtMs": 2, "encoding": "base64", "payload": "!!!!"}
-    ).encode()
-    with pytest.raises(EnvelopeDecodeError):
-        decode(raw)
 
 
 @pytest.mark.asyncio

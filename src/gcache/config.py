@@ -128,16 +128,26 @@ class Envelope(str, Enum):
     """How a cached value is framed in Redis.
 
     ``PICKLE`` is the default and serializes arbitrary Python objects, but is readable only
-    from Python. ``JSON`` writes the cross-language envelope the Go client
-    also uses, so an entry can be shared between them and inspected server-side from Redis's
-    Lua interpreter.
+    from Python -- no other client can read a pickle entry, which is also why it is the one
+    framing outside the cross-client rules.
+
+    ``JSON`` writes the cross-language envelope the Go client also uses, so an entry can be
+    shared between them and inspected server-side from Redis's Lua interpreter. It carries
+    TEXT: a serializer used with it must return ``str``, and a ``bytes`` payload is refused
+    with a pointer here. That is not a limitation of JSON so much as the absence of one --
+    the alternative was base64-ing bytes into the JSON string, and because Python chose that
+    branch from the Python type while Go chose it by sniffing ``utf8.Valid`` (Go has no such
+    type: ``Codec.Marshal`` returns ``[]byte`` for JSON text too), the same value stored
+    differently depending on which client wrote it, and Python read it back as ``str`` or
+    ``bytes`` accordingly. With text only, ``encoding`` never varies and ``JSON`` always
+    decodes to ``str``.
 
     ``PROTO`` frames a binary payload in a binary envelope: 18 bytes of overhead against
-    JSON's ~102, and no base64, so a small entry is roughly a third the size (measured: 69
-    bytes against 204 for the same protobuf message as protojson). It gives up what JSON
-    buys -- neither payload nor metadata is readable from ``redis-cli`` or Redis's Lua
-    ``cjson``. Use it for a hot path where size and parse cost matter more than being able
-    to eyeball an entry.
+    JSON's ~102, so a small entry is roughly a third the size (measured: 69 bytes against
+    204 for the same protobuf message as protojson). It is where binary belongs -- no
+    ``encoding`` field exists, so bytes stay bytes in both clients. It gives up what JSON
+    buys: neither payload nor metadata is readable from ``redis-cli`` or Redis's Lua
+    ``cjson``. Use it for a hot path, or for any value that is not text.
 
     Public API: this lives here rather than in ``gcache._internal`` so callers do not have
     to import from a private path to name it.
@@ -161,12 +171,17 @@ class Serializer(ABC):
     async def load(self, data: bytes | str) -> Any:
         pass
 
-    # load must accept BOTH bytes and str, and the annotation is not a formality. Go's JSON
-    # writer sniffs its payload and stores valid UTF-8 as `encoding: "utf8"`, where Python
-    # base64s any bytes payload unconditionally -- so the same []byte comes back as `bytes`
-    # when Python wrote it and as `str` when Go did. `encoding` records how the payload was
-    # TRANSPORTED, not what type it is. A codec whose payload is genuinely binary belongs on
-    # Envelope.PROTO, where there is no such field and bytes stay bytes.
+    # What load RECEIVES is decided by the key's declared envelope, not by which client
+    # wrote the entry: Envelope.JSON always yields `str` and Envelope.PROTO always yields
+    # `bytes`. That is a property worth stating because it was not always true -- the JSON
+    # envelope once base64-ed a bytes payload, and since Python chose that branch from the
+    # Python type while Go chose it by sniffing (Go has no such type to read), the same
+    # value came back as `bytes` or `str` depending on the writer. The JSON envelope carries
+    # text only now, so the question has one answer per envelope.
+    #
+    # The `bytes | str` annotation stays: an implementation may be used under either
+    # envelope, and a serializer that is wrong for its key should fail on the first read
+    # rather than never.
     #
     # One constraint on dump's output, enforced at the framing boundary rather than trusted:
     # a TEXT payload must not carry a lone surrogate, as a character or as the JSON escape

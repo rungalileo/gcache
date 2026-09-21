@@ -512,7 +512,7 @@ class RedisCache(CacheInterface):
             # pickle entry, so `isinstance(payload, str)` refused a cached string under the
             # DEFAULT envelope -- written happily, then refused on every read, and on the one
             # framing Go cannot read at all, so there was never a divergence to prevent. It
-            # also missed a bytes payload, which Go checks after base64-decoding. is_json is
+            # also missed a bytes payload, which the PROTO envelope still yields. is_json is
             # true for JSON and PROTO and false for pickle, which is exactly the set.
             if deserialized_value.is_json:
                 divergence = (

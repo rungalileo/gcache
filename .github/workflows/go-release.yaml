@@ -220,7 +220,7 @@ jobs:
           chmod 600 ~/.ssh/signing_key
 
           git config user.name  "galileo-automation"
-          git config user.email "ci@rungalileo.io"
+          git config user.email "${{ vars.SAO_PLATFORM_AUTOMATION_EMAIL }}"
           git config gpg.format ssh
           git config user.signingkey ~/.ssh/signing_key
 

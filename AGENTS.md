@@ -179,6 +179,9 @@ Do not wire the Go module into python-semantic-release. It emits bare `v{version
 - `WATERMARK_TTL_SECONDS` (5 hours) must exceed any entry it can suppress. It is not a number to
   tune alone: it equals `MAX_TRACKED_TTL_SECONDS` (4h) plus `MAX_FUTURE_BUFFER_SECONDS` (1h), and the
   shared corpus pins all three in both languages
+- Key args must be sorted by name in both `GCacheKey.__post_init__` (else direct `aget`/`aput` miss
+  `cached()` entries) and Go's `ValueKey` (else Go misses Python's entries); `@cached`'s own sort is
+  redundant. Pinned by the `argOrdering` vectors in `src/gcache/conformance/envelope_vectors.json`
 - uvloop is optional - falls back to asyncio on Windows/PyPy
 
 ## Dependencies

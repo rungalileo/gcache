@@ -179,7 +179,9 @@ Do not wire the Go module into python-semantic-release. It emits bare `v{version
 - `WATERMARK_TTL_SECONDS` (5 hours) must exceed any entry it can suppress. It is not a number to
   tune alone: it equals `MAX_TRACKED_TTL_SECONDS` (4h) plus `MAX_FUTURE_BUFFER_SECONDS` (1h), and the
   shared corpus pins all three in both languages
-- `@cached`, `GCacheKey.__post_init__` and Go's `ValueKey` all sort key args by name. Keep the last two. Without the `__post_init__` sort, direct `aget`/`aput` keys with unsorted args miss entries `cached()` wrote. Without the `ValueKey` sort, Go keys miss entries Python wrote. The `@cached` sort is redundant, since `__post_init__` sorts again. The `argOrdering` section of `src/gcache/conformance/envelope_vectors.json` pins the sort in both languages via `tests/test_conformance.py::test_argument_order_is_normalized_identically_by_every_client` and `go/conformance_test.go:TestConformanceArgOrdering`. `go/key_test.go:TestValueKeyMatchesProductionKeys` adds a Go-only check against production key shapes.
+- Key args must be sorted by name in both `GCacheKey.__post_init__` (else direct `aget`/`aput` miss
+  `cached()` entries) and Go's `ValueKey` (else Go misses Python's entries); `@cached`'s own sort is
+  redundant. Pinned by the `argOrdering` vectors in `src/gcache/conformance/envelope_vectors.json`
 - uvloop is optional - falls back to asyncio on Windows/PyPy
 
 ## Dependencies

@@ -179,7 +179,7 @@ Do not wire the Go module into python-semantic-release. It emits bare `v{version
 - `WATERMARK_TTL_SECONDS` (5 hours) must exceed any entry it can suppress. It is not a number to
   tune alone: it equals `MAX_TRACKED_TTL_SECONDS` (4h) plus `MAX_FUTURE_BUFFER_SECONDS` (1h), and the
   shared corpus pins all three in both languages
-- `@cached` sorts key args by name. `GCacheKey.__post_init__` and Go's `ValueKey` sort too. Go's sort matches the keys in production, so do not remove it. `go/key_test.go:TestValueKeyMatchesProductionKeys` pins this
+- `@cached` sorts key args by name. `GCacheKey.__post_init__` and Go's `ValueKey` sort too. Go's sort matches the keys in production, so do not remove it. The shared corpus section `argOrdering` (`src/gcache/conformance/envelope_vectors.json`) pins the sort in both languages, through `tests/test_conformance.py::test_argument_order_is_normalized_identically_by_every_client` and `go/conformance_test.go:TestConformanceArgOrdering`. `go/key_test.go:TestValueKeyMatchesProductionKeys` adds a Go-only check against production literals.
 - uvloop is optional - falls back to asyncio on Windows/PyPy
 
 ## Dependencies

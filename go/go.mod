@@ -3,7 +3,7 @@ module github.com/rungalileo/gcache/go
 go 1.26.0
 
 require (
-	github.com/redis/rueidis v1.0.77
+	github.com/redis/rueidis v1.0.78
 	google.golang.org/protobuf v1.36.12
 )
 

@@ -60,7 +60,7 @@ type rueidisClient struct {
 
 // NewRueidisClient builds a Client backed by rueidis. Cluster mode is not configurable:
 // rueidis probes with CLUSTER SLOTS and picks cluster vs standalone itself. This dials the
-// endpoint and errors when Redis is unreachable. The caller decides whether that is fatal and owns the returned closer.
+// endpoint and can error when Redis is down -- do NOT treat that as fatal, or a rollout-time outage crash-loops every new pod; the caller owns the returned closer.
 func NewRueidisClient(o RueidisOptions) (Client, func(), error) {
 	if o.Host == "" {
 		return nil, nil, errors.New("gcache: RueidisOptions.Host is required")

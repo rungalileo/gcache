@@ -36,9 +36,15 @@ type RueidisOptions struct {
 	// Protocol follows the Galileo-wide convention: "rediss" anywhere in the string
 	// enables TLS. Cluster mode needs nothing here -- see NewRueidisClient.
 	Protocol string
+	// TLSConfig replaces the default TLS config when Protocol enables TLS. The default
+	// verifies the server against the system roots with TLS 1.2 or later. Pass one to
+	// trust a private CA or to apply the caller's verification policy. It is ignored
+	// without TLS, and cloned so the caller may reuse it.
+	TLSConfig *tls.Config
 	// DisableClientSideCache turns off RESP3 CLIENT TRACKING. Galileo's ElastiCache supports
 	// it (verified against Redis 7.2.4, which accepts OPTIN/OPTOUT/BCAST), but some managed
-	// Redis offerings reject the command outright (redis/rueidis#612); set this for those.
+	// Redis offerings, such as Memorystore, reject the command (redis/rueidis#612).
+	// NewRueidisClient then retries with the cache off, so this is needed only to opt out.
 	DisableClientSideCache bool
 	// CacheSizeEachConn bounds the client-side cache per connection. Zero uses the
 	// rueidis default.
@@ -54,7 +60,7 @@ type rueidisClient struct {
 
 // NewRueidisClient builds a Client backed by rueidis. Cluster mode is not configurable:
 // rueidis probes with CLUSTER SLOTS and picks cluster vs standalone itself. This dials the
-// endpoint and can error when Redis is down -- do NOT treat that as fatal, or a rollout-time outage crash-loops every new pod; the caller owns the returned closer.
+// endpoint and errors when Redis is unreachable. The caller decides whether that is fatal and owns the returned closer.
 func NewRueidisClient(o RueidisOptions) (Client, func(), error) {
 	if o.Host == "" {
 		return nil, nil, errors.New("gcache: RueidisOptions.Host is required")
@@ -65,6 +71,22 @@ func NewRueidisClient(o RueidisOptions) (Client, func(), error) {
 	}
 	addr := net.JoinHostPort(o.Host, port)
 
+	c, err := newRueidis(clientOption(o, addr))
+	if errors.Is(err, rueidis.ErrNoCache) && !o.DisableClientSideCache {
+		o.DisableClientSideCache = true
+		c, err = newRueidis(clientOption(o, addr))
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("gcache: connecting to redis at %s: %w", addr, err)
+	}
+	return &rueidisClient{c: c, cacheEnabled: !o.DisableClientSideCache, addr: addr}, c.Close, nil
+}
+
+// newRueidis is a seam so tests can simulate a server that rejects CLIENT TRACKING.
+var newRueidis = rueidis.NewClient
+
+// clientOption maps RueidisOptions onto rueidis' options, without dialing.
+func clientOption(o RueidisOptions, addr string) rueidis.ClientOption {
 	opt := rueidis.ClientOption{
 		InitAddress:       []string{addr},
 		Password:          o.Password,
@@ -74,15 +96,14 @@ func NewRueidisClient(o RueidisOptions) (Client, func(), error) {
 	if strings.Contains(o.Protocol, "rediss") {
 		// No ServerName: Go fills SNI from the dial address via rueidis' tls.Dialer.
 		// Pinning it to o.Host would be wrong in cluster mode, where rueidis dials the node
-		// addresses CLUSTER SLOTS returns; session_redis.go does the same.
-		opt.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		// addresses CLUSTER SLOTS returns.
+		if o.TLSConfig != nil {
+			opt.TLSConfig = o.TLSConfig.Clone()
+		} else {
+			opt.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		}
 	}
-
-	c, err := rueidis.NewClient(opt)
-	if err != nil {
-		return nil, nil, fmt.Errorf("gcache: connecting to redis at %s: %w", addr, err)
-	}
-	return &rueidisClient{c: c, cacheEnabled: !o.DisableClientSideCache, addr: addr}, c.Close, nil
+	return opt
 }
 
 // span opens a CLIENT-kind span for one Redis round trip: Redis speaks its own wire
